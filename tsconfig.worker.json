@@ -1,0 +1,11 @@
+{
+  "compilerOptions": {
+    "outDir": "dist",
+    "module": "commonjs",
+    "target": "es2020"
+  },
+  "include": [
+    "worker.ts",
+    "lib/**/*.ts"
+  ]
+}

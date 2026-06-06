@@ -1,0 +1,67 @@
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: app
+    ports:
+      - "5433:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  nextjs:
+    build: .
+    command: pnpm run dev
+    ports:
+      - "3000:3000"
+    environment:
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+    depends_on:
+      redis:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    develop:
+      watch:
+        - path: ./app
+          target: /app/app
+          action: sync
+        - path: ./app/api
+          target: /app/app/api
+          action: sync
+        - path: ./app/components
+          target: /app/app/components
+          action: sync
+
+  worker:
+    build: .
+    command: pnpm run worker
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/app
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+    depends_on:
+      redis:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    develop:
+      watch:
+        - path: ./worker.ts
+          target: /app/worker.ts
+          action: sync

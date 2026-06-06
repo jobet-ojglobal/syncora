@@ -1,0 +1,140 @@
+{
+  "productGroupId": "40c48891-64ce-4866-9047-964348fe7f01",
+  "categoryId": "98a15544-6569-4139-85f6-f9cca0cadae0",
+  "defaultImageId": null,
+  "defaultProductId": "de3fb676-6f05-4def-b229-3d7807b44f3d",
+  "isActive": true,
+  "name": "ASUS ROG Swift",
+  "timestamp": "000000000000A12E",
+  "category": {
+    "categoryId": "98a15544-6569-4139-85f6-f9cca0cadae0",
+    "isDefault": false,
+    "name": "Computers",
+    "parentCategoryId": null,
+    "timestamp": "0000000000009821"
+  },
+  "images": [
+    {
+      "productGroupImageId": "ed721407-985d-4fd5-9892-ab5edfd7a6a5",
+      "image": {
+        "imageId": "60e33bae-b9eb-4e5f-bfcb-bf07331f4d00",
+        "largeUrl": "https://inflowclouduser.blob.core.windows.net/22458163-1583-4ddb-b2ca-e8f467e67143/images/gdtamxxd31vhjwfeopktzk5o-large.png",
+        "mediumUncroppedUrl": "https://inflowclouduser.blob.core.windows.net/22458163-1583-4ddb-b2ca-e8f467e67143/images/gdtamxxd31vhjwfeopktzk5o-medium-uncropped.png",
+        "mediumUrl": "https://inflowclouduser.blob.core.windows.net/22458163-1583-4ddb-b2ca-e8f467e67143/images/gdtamxxd31vhjwfeopktzk5o-256x256.png",
+        "originalUrl": "https://inflowclouduser.blob.core.windows.net/22458163-1583-4ddb-b2ca-e8f467e67143/images/gdtamxxd31vhjwfeopktzk5o.png",
+        "smallUrl": "https://inflowclouduser.blob.core.windows.net/22458163-1583-4ddb-b2ca-e8f467e67143/images/gdtamxxd31vhjwfeopktzk5o-128x128.png",
+        "thumbUrl": "https://inflowclouduser.blob.core.windows.net/22458163-1583-4ddb-b2ca-e8f467e67143/images/gdtamxxd31vhjwfeopktzk5o-48x48.png"
+      }
+    },
+    {
+      "productGroupImageId": "26ec0131-cefd-4fd5-b52a-44928110c95f",
+      "image": {
+        "imageId": "e0b51e4c-4509-4aff-a474-b8c27cb65ccf",
+        "largeUrl": "https://inflowclouduser.blob.core.windows.net/22458163-1583-4ddb-b2ca-e8f467e67143/images/sw3hubi0zv0gmtwobo4ydkzr-large.png",
+        "mediumUncroppedUrl": "https://inflowclouduser.blob.core.windows.net/22458163-1583-4ddb-b2ca-e8f467e67143/images/sw3hubi0zv0gmtwobo4ydkzr-medium-uncropped.png",
+        "mediumUrl": "https://inflowclouduser.blob.core.windows.net/22458163-1583-4ddb-b2ca-e8f467e67143/images/sw3hubi0zv0gmtwobo4ydkzr-256x256.png",
+        "originalUrl": "https://inflowclouduser.blob.core.windows.net/22458163-1583-4ddb-b2ca-e8f467e67143/images/sw3hubi0zv0gmtwobo4ydkzr.png",
+        "smallUrl": "https://inflowclouduser.blob.core.windows.net/22458163-1583-4ddb-b2ca-e8f467e67143/images/sw3hubi0zv0gmtwobo4ydkzr-128x128.png",
+        "thumbUrl": "https://inflowclouduser.blob.core.windows.net/22458163-1583-4ddb-b2ca-e8f467e67143/images/sw3hubi0zv0gmtwobo4ydkzr-48x48.png"
+      }
+    }
+  ],
+  "options": [ // variant attributes
+    {
+      "productGroupOptionId": "b5e84c6b-1ff9-4d41-b50e-b66508a7f83f",
+      "lineNum": 0,
+      "name": "Configuration",
+      "optionValues": [
+        {
+          "productGroupOptionValueId": "0c821935-7029-4689-b5ae-4d615e2a1f4a",
+          "lineNum": 0,
+          "value": "Body Only"
+        },
+        {
+          "productGroupOptionValueId": "07b95f0b-0e57-4428-8c14-a2f723df5066",
+          "lineNum": 1,
+          "value": "XLR Handle Unit Kit"
+        }
+      ]
+    }
+  ],
+  "productVariants": [
+    {
+      "productVariantId": "40c48891-64ce-4866-9047-964348fe7f01_1f6d2a40-0d66-4fb5-88ff-df1691d6fc17",
+      "defaultPrice": "1062.43000",
+      "productGroupId": "40c48891-64ce-4866-9047-964348fe7f01",
+      "productId": "1f6d2a40-0d66-4fb5-88ff-df1691d6fc17",
+      "variantOption": { //variant attribute value
+        "b5e84c6b-1ff9-4d41-b50e-b66508a7f83f": "07b95f0b-0e57-4428-8c14-a2f723df5066"
+      },
+      "product": {
+        "productId": "1f6d2a40-0d66-4fb5-88ff-df1691d6fc17",
+        "autoAssemble": false,
+        "categoryId": "98a15544-6569-4139-85f6-f9cca0cadae0",
+        "createdDttm": "2026-06-02T08:50:57.1599124+00:00",
+        "customFields": {  
+          "custom1": "H&M", // this is a Brand
+          "custom2": "Premium Material;Eco Friendly", // this is a Feature
+          "custom3": "New Arrival,Featured,Top Rated", // this is a Tag
+          "custom4": "",
+          "custom5": "",
+          "custom6": "",
+          "custom7": "",
+          "custom8": "",
+          "custom9": "",
+          "custom10": ""
+        },
+        "description": "ASUS ROG Swift gaming monitor - 42 inch display",
+        "expiryNotificationDays": null,
+        "height": "6.0000",
+        "hsTariffNumber": "",
+        "includeQuantityBuildable": false,
+        "isActive": true,
+        "isManufacturable": false,
+        "itemType": "stockedProduct",
+        "lastModifiedById": "c2f66484-b2bc-48fb-86d6-fac0b52c5ea1",
+        "lastModifiedDateTime": "2026-06-04T02:04:05.4566258+00:00",
+        "lastVendorId": "3e1293e0-c880-41b5-a268-e9781f79f631",
+        "length": "27.0000",
+        "name": "ASUS ROG Swift - 42-inch",
+        "originCountry": "",
+        "purchasingUom": {
+          "name": "pack",
+          "conversionRatio": {
+            "standardQuantity": "1.0000",
+            "uomQuantity": "1.0000"
+          }
+        },
+        "remarks": "Generated sample record #36",
+        "salesUom": {
+          "name": "box",
+          "conversionRatio": {
+            "standardQuantity": "1.0000",
+            "uomQuantity": "1.0000"
+          }
+        },
+        "sellBeforeExpiryDays": null,
+        "shelfLifeDays": null,
+        "sku": "ASUS-ROG-42",
+        "standardUomName": "pcs",
+        "timestamp": "000000000000A957",
+        "trackExpiry": false,
+        "trackLots": false,
+        "trackSerials": false,
+        "weight": "3.0700",
+        "width": "50.0000",
+        "images": [
+          {
+            "imageId": "59c8c663-6cb2-4cf4-884f-3569c19472c1",
+            "largeUrl": "https://inflowclouduser.blob.core.windows.net/22458163-1583-4ddb-b2ca-e8f467e67143/images/rbl21ri55u2ml5wceqsgy233-large.png",
+            "mediumUncroppedUrl": "https://inflowclouduser.blob.core.windows.net/22458163-1583-4ddb-b2ca-e8f467e67143/images/rbl21ri55u2ml5wceqsgy233-medium-uncropped.png",
+            "mediumUrl": "https://inflowclouduser.blob.core.windows.net/22458163-1583-4ddb-b2ca-e8f467e67143/images/rbl21ri55u2ml5wceqsgy233-256x256.png",
+            "originalUrl": "https://inflowclouduser.blob.core.windows.net/22458163-1583-4ddb-b2ca-e8f467e67143/images/rbl21ri55u2ml5wceqsgy233.png",
+            "smallUrl": "https://inflowclouduser.blob.core.windows.net/22458163-1583-4ddb-b2ca-e8f467e67143/images/rbl21ri55u2ml5wceqsgy233-128x128.png",
+            "thumbUrl": "https://inflowclouduser.blob.core.windows.net/22458163-1583-4ddb-b2ca-e8f467e67143/images/rbl21ri55u2ml5wceqsgy233-48x48.png"
+          }
+        ]
+      }
+    },
+  ]
+}
