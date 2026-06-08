@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 
-export default function SyncButton() {
+export default function TestSyncButton() {
   const [loading, setLoading] = useState(false);
   const [jobId, setJobId] = useState<string | null>(null);
   const [status, setStatus] = useState<string>("");

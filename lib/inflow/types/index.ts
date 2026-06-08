@@ -1,3 +1,26 @@
+export interface InflowWebhook {
+  webHookSubscriptionId: string;
+  url: string;
+  events: string[];
+  secret?: string;
+
+  consecutiveFailureCount: number;
+  isDisabled: boolean;
+  lastFailureMessage?: string;
+}
+
+export type InflowWebhookEvent =
+  | "customer.created"
+  | "customer.updated"
+  | "vendor.created"
+  | "vendor.updated"
+  | "purchaseOrder.created"
+  | "purchaseOrder.updated"
+  | "salesOrder.created"
+  | "salesOrder.updated"
+  | "product.created"
+  | "product.updated";
+
 // =====================================
 // Root
 // =====================================
@@ -144,7 +167,51 @@ export interface InflowProduct {
   customFields: InflowCustomFields;
 
   images: InflowProductImage[];
+
+  cost?: InflowProductCost;
+  defaultPrice?: InflowProductPrice;
+
+  inventoryLines?: InflowInventoryLine[];
 }
+
+// =====================================
+// Inventory Line
+// =====================================
+
+export interface InflowInventoryLine {
+  inventoryLineId: string;
+  locationId: string;
+  lotId: string | null;
+  productId: string;
+  quantityOnHand: string;
+  serial: string;
+  sublocation: string;
+  timestamp: string;
+}
+
+// =====================================
+// Product Cost
+// =====================================
+
+export interface InflowProductCost {
+  productCostId: string;
+  cost: string;
+  productId: string;
+}
+
+// =====================================
+// Product Price
+// =====================================
+
+export interface InflowProductPrice {
+  productPriceId: string;
+  priceType: string;
+  pricingSchemeId: string;
+  productId: string;
+  timestamp: string;
+  unitPrice: string;
+}
+
 
 // =====================================
 // Custom Fields
@@ -196,3 +263,55 @@ export interface InflowProductImage {
   smallUrl: string | null;
   thumbUrl: string | null;
 }
+
+// =====================================
+// Location Address
+// =====================================
+
+export interface InflowLocationAddress {
+  address1: string;
+  address2: string;
+  city: string;
+  state: string;
+  country: string;
+  postalCode: string;
+  remarks: string;
+  addressType: string | null;
+}
+
+// =====================================
+// Location 
+// =====================================
+
+export interface InflowLocation {
+  locationId: string;
+  address: InflowLocationAddress;
+
+  isActive: boolean;
+  isDefault: boolean;
+  name: string;
+
+  timestamp: string;
+}
+
+// =====================================
+// Sublocations
+// =====================================
+
+
+export interface InflowSuggestedSublocations {
+  id: string;
+  sublocations: string[];
+  type: "suggested-sublocations";
+}
+
+// =====================================
+// Sublocations Inventory
+// =====================================
+
+export interface InflowProductLocationSublocation {
+  id: string;
+  quantity: string;
+  sublocation: string;
+}
+

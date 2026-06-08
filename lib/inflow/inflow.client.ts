@@ -57,6 +57,19 @@ export class InflowClient {
     );
   }
 
+  put<T>(
+    endpoint: string,
+    body: unknown
+  ): Promise<T> {
+    return this.request<T>(
+      endpoint,
+      {
+        method: "PUT",
+        body: JSON.stringify(body),
+      }
+    );
+  }
+
   patch<T>(
     endpoint: string,
     body: unknown

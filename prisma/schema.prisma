@@ -71,11 +71,12 @@ model ProductVariant {
   id                String   @id @default(cuid())
   inflowVariantId   String   @unique
   productGroupId    String
-  productId         String
-  defaultPrice      Decimal @db.Decimal(18,5)
+  productId         String   @unique
+  defaultPrice      Decimal  @db.Decimal(18,5)
 
   group             ProductGroup @relation(fields: [productGroupId], references: [inflowProdGroupId])
-  product           Product      @relation(fields: [productId], references: [inflowProductId])
+  // product           Product      @relation(fields: [productId], references: [inflowProductId])
+  product           Product  @relation(fields: [productId], references: [inflowProductId])
   selections        ProductVariantSelection[]
 
   createdAt         DateTime @default(now())
@@ -119,7 +120,7 @@ model Product {
 
   purchasingUom         ProductUom?
   salesUom              ProductSalesUom?
-  variant               ProductVariant[]
+  variant               ProductVariant?
   images                ProductImage[]
 
   brandId           String?
@@ -127,6 +128,9 @@ model Product {
 
   features          ProductFeature[]
   tags              ProductTag[]
+
+  inventories             Inventory[]
+  inventoryBins           InventoryBin[]
 
   createdAt             DateTime @default(now())
   updatedAt             DateTime @updatedAt
@@ -285,4 +289,168 @@ model ProductVariantSelection {
 
   @@unique([variantId,optionId])
   @@map("product_variant_selection")
+}
+
+// Locations
+
+model Location {
+  id              String   @id @default(cuid())
+  inflowId        String   @unique
+  name            String
+  isActive        Boolean  @default(true)
+  isDefault       Boolean  @default(false)
+  timestamp       String?
+
+  address         LocationAddress?
+  inventories     Inventory[]
+  sublocations    Sublocation[]
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@map("location")
+}
+
+model LocationAddress {
+  id            String @id @default(cuid())
+  locationId    String @unique
+  address1      String?
+  address2      String?
+  city          String?
+  state         String?
+  country       String?
+  postalCode    String?
+  remarks       String?
+  addressType   String?
+
+  location      Location @relation(fields: [locationId],references: [inflowId])
+}
+
+model Sublocation {
+  id              String @id @default(cuid())
+  locationId      String
+  name            String
+  location        Location @relation(fields: [locationId],references: [inflowId])
+  inventoryBins   InventoryBin[]
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@unique([locationId, name])
+  @@index([locationId])
+
+  @@map("sublocation")
+}
+
+model Inventory {
+  id             String @id @default(cuid())
+  productId      String
+  locationId     String
+  quantityOnHand Decimal @db.Decimal(18,4)
+  
+  quantityAvailable   Decimal? @db.Decimal(18,4)
+  quantityReserved    Decimal? @db.Decimal(18,4)
+
+  product             Product @relation(fields: [productId],references: [inflowProductId])
+  location            Location @relation(fields: [locationId],references: [inflowId])
+
+  bins                InventoryBin[]
+
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  @@unique([productId, locationId])
+  @@index([productId])
+  @@index([locationId])
+
+  @@map("inventory")
+}
+
+model InventoryBin {
+  id             String @id @default(cuid())
+  inventoryId    String
+  productId      String
+  sublocationId  String
+  quantity       Decimal @db.Decimal(18,4)
+
+  inventory           Inventory @relation(fields: [inventoryId],references: [id])
+  product             Product @relation(fields: [productId],references: [inflowProductId])
+  sublocation         Sublocation @relation(fields: [sublocationId],references: [id])
+
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  @@unique([productId,sublocationId])
+
+  @@map("inventory_bin")
+}
+
+
+
+// Integrations
+
+model WebhookSubscription {
+  id          String   @id @default(cuid())
+  provider    String   // "inflow"
+  remoteId    String?  // ID from inFlow if they provide one
+  url         String
+  event       String
+  active      Boolean  @default(true)
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("webhook_subscription")
+}
+
+model WebhookEvent {
+  id          String   @id @default(cuid())
+
+  provider    String
+  eventType   String
+  payload     Json
+
+  processed   Boolean  @default(false)
+  receivedAt  DateTime @default(now())
+
+  @@index([provider, eventType])
+
+  @@map("webhook_event")
+}
+
+model InflowWebhook {
+  id                      String   @id
+  url                     String
+
+  secret                  String?
+  events                  Json
+  isDisabled              Boolean @default(false)
+  consecutiveFailureCount Int     @default(0)
+  lastFailureMessage      String?
+
+  createdAt               DateTime @default(now())
+  updatedAt               DateTime @updatedAt
+
+  @@map("inflow_webhook")
+}
+
+model InflowIntegration {
+  id          String   @id @default(cuid())
+  webhookId   String?  @unique
+  webhookUrl  String?
+  secret      String?
+  isConnected Boolean @default(false)
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model InflowWebhookEvent {
+  id          String   @id @default(cuid())
+  eventType   String
+  payload     Json
+  processed   Boolean @default(false)
+  receivedAt  DateTime @default(now())
+
+  @@index([eventType])
 }

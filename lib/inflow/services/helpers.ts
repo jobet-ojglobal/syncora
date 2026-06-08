@@ -1,7 +1,7 @@
 // services/sync/products/helpers.ts
 
 import { Prisma } from "@/generated/prisma/client";
-import { InflowProduct, InflowProductGroupImage, InflowProductGroupResponse } from "../types";
+import { InflowInventoryLine, InflowProduct, InflowProductGroupImage } from "../types";
 
 type Tx = Prisma.TransactionClient;
 
@@ -273,6 +273,108 @@ export async function syncGroupImages(
   }
 }
 
+export async function syncInventoryLines(
+  tx: Prisma.TransactionClient,
+  productId: string,
+  inventoryLines: InflowInventoryLine[]
+) {
+  if (!inventoryLines.length) {
+    return;
+  }
+
+  const locationTotals = new Map<
+    string,
+    Prisma.Decimal
+  >();
+
+  // Aggregate location inventory totals
+  for (const line of inventoryLines) {
+    const current =
+      locationTotals.get(line.locationId) ??
+      new Prisma.Decimal(0);
+
+    locationTotals.set(
+      line.locationId,
+      current.plus(
+        new Prisma.Decimal(line.quantityOnHand)
+      )
+    );
+  }
+
+  // Create location inventory
+  for (const [
+    locationId,
+    quantityOnHand,
+  ] of locationTotals) {
+    const inventory = await tx.inventory.upsert({
+      where: {
+        productId_locationId: {
+          productId,
+          locationId,
+        },
+      },
+      create: {
+        productId,
+        locationId,
+        quantityOnHand,
+      },
+      update: {
+        quantityOnHand,
+      },
+    });
+
+    const linesForLocation =
+      inventoryLines.filter(
+        (x) => x.locationId === locationId
+      );
+
+    for (const line of linesForLocation) {
+      const sublocationName =
+        line.sublocation?.trim() || "Default";
+
+      const sublocation =
+        await tx.sublocation.findUnique({
+          where: {
+            locationId_name: {
+              locationId,
+              name: sublocationName,
+            },
+          },
+        });
+
+      if (!sublocation) {
+        console.warn(
+          `Missing sublocation "${sublocationName}" for location ${locationId}`
+        );
+        continue;
+      }
+
+      await tx.inventoryBin.upsert({
+        where: {
+          productId_sublocationId: {
+            productId,
+            sublocationId: sublocation.id,
+          },
+        },
+        create: {
+          inventoryId: inventory.id,
+          productId,
+          sublocationId: sublocation.id,
+          quantity: new Prisma.Decimal(
+            line.quantityOnHand
+          ),
+        },
+        update: {
+          quantity: new Prisma.Decimal(
+            line.quantityOnHand
+          ),
+        },
+      });
+    }
+  }
+}
+
+
 export function parseFeatures(
   value?: string | null
 ): string[] {
@@ -290,3 +392,79 @@ export function parseTags(
     .map((x) => x.trim())
     .filter(Boolean);
 }
+
+
+// export async function syncInventoryLines(
+//   tx: Prisma.TransactionClient,
+//   productId: string,
+//   lines: InflowInventoryLine[]
+// ) {
+//   const grouped = new Map<
+//     string,
+//     Prisma.Decimal
+//   >();
+
+//   for (const line of lines) {
+//     const current =
+//       grouped.get(line.locationId) ??
+//       new Prisma.Decimal(0);
+
+//     grouped.set(
+//       line.locationId,
+//       current.plus(line.quantityOnHand)
+//     );
+//   }
+
+//   for (const [locationId, qty] of grouped) {
+//     const inventory = await tx.inventory.upsert({
+//       where: {
+//         productId_locationId: {
+//           productId,
+//           locationId,
+//         },
+//       },
+//       create: {
+//         productId,
+//         locationId,
+//         quantityOnHand: qty,
+//       },
+//       update: {
+//         quantityOnHand: qty,
+//       },
+//     });
+
+//     for (const line of lines.filter(
+//       (x) =>
+//         x.locationId === locationId &&
+//         x.sublocation
+//     )) {
+//       const sublocation =
+//         await tx.sublocation.findFirst({
+//           where: {
+//             locationId,
+//             name: line.sublocation,
+//           },
+//         });
+
+//       if (!sublocation) continue;
+
+//       await tx.inventoryBin.upsert({
+//         where: {
+//           productId_sublocationId: {
+//             productId,
+//             sublocationId: sublocation.id,
+//           },
+//         },
+//         create: {
+//           inventoryId: inventory.id,
+//           productId,
+//           sublocationId: sublocation.id,
+//           quantity: line.quantityOnHand,
+//         },
+//         update: {
+//           quantity: line.quantityOnHand,
+//         },
+//       });
+//     }
+//   }
+// }

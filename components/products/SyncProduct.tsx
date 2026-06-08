@@ -1,10 +1,9 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useEffect, useState } from "react";
 
-export default function SyncProductPage() {
+export default function SyncProduct() {
   const [jobId, setJobId] = useState<string | null>(null);
   const [progress, setProgress] = useState(0);
   const [status, setStatus] = useState("");
@@ -15,7 +14,7 @@ export default function SyncProductPage() {
     if (!jobId) return;
 
     const interval = setInterval(async () => {
-        const res = await fetch(`/api/sync/products?jobId=${jobId}`);
+        const res = await fetch(`/api/sync?jobId=${jobId}`);
         const data = await res.json();
 
         setProgress(Number(data.progress) || 0);
@@ -37,7 +36,7 @@ export default function SyncProductPage() {
     setStatus("Starting...");
     
     try {
-      const res = await fetch("/api/sync/products", {
+      const res = await fetch("/api/sync", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ source: "products" }),
@@ -59,12 +58,8 @@ export default function SyncProductPage() {
 
   return (
     <div className="space-y-6 max-w-2xl mx-auto">
-      <div className="flex justify-between items-center">
-        <h1 className="text-2xl font-bold">Inventory Sync</h1>
-      </div>
-
-      <Button onClick={startSync} disabled={isSyncing}>
-        {isSyncing ? "Syncing..." : "Start Product Sync"}
+      <Button variant="outline"  onClick={startSync} disabled={isSyncing}>
+        {isSyncing ? "Product Syncing..." : "Product Sync"}
       </Button>
 
       {jobId && (
@@ -102,26 +97,6 @@ export default function SyncProductPage() {
           )}
         </div>
       )}
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Quick Actions</CardTitle>
-        </CardHeader>
-        <CardContent className="grid gap-3">
-          <Button variant="outline" onClick={() => console.log("Sync Inventory")}>
-            Sync Inventory Levels
-          </Button>
-          <Button variant="outline" onClick={() => console.log("Sync Vendors")}>
-            Sync Vendors
-          </Button>
-          <Button variant="outline" onClick={() => console.log("Sync Prices")}>
-            Sync Prices
-          </Button>
-          <Button variant="default" onClick={startSync} disabled={isSyncing}>
-            Full Synchronization
-          </Button>
-        </CardContent>
-      </Card>
     </div>
   );
 }
