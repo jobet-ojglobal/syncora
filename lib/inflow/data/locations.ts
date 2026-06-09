@@ -1,14 +1,14 @@
 import { inflow } from "@/lib/inflow/inflow.client";
 import { InflowLocation, InflowProductLocationSublocation, InflowSuggestedSublocations } from "../types";
 
-export async function fetchLocations() {
+export async function getLocations() {
   const data = await inflow.get<InflowLocation[]>(
     "/locations"
   );
   return data;
 }
 
-export async function getLocationById(locationId: string) {
+export async function getLocation(locationId: string) {
   const data = await inflow.get<InflowLocation>(
     `/locations/${locationId}`
   );

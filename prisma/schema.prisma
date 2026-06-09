@@ -389,43 +389,59 @@ model InventoryBin {
 
 // Integrations
 
-model WebhookSubscription {
-  id          String   @id @default(cuid())
-  provider    String   // "inflow"
-  remoteId    String?  // ID from inFlow if they provide one
-  url         String
-  event       String
-  active      Boolean  @default(true)
+// model WebhookSubscription {
+//   id          String   @id @default(cuid())
+//   provider    String   // "inflow"
+//   remoteId    String?  // ID from inFlow if they provide one
+//   url         String
+//   event       String
+//   active      Boolean  @default(true)
 
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+//   createdAt   DateTime @default(now())
+//   updatedAt   DateTime @updatedAt
 
-  @@map("webhook_subscription")
-}
+//   @@map("webhook_subscription")
+// }
 
-model WebhookEvent {
-  id          String   @id @default(cuid())
+// model WebhookEvent {
+//   id          String   @id @default(cuid())
 
-  provider    String
-  eventType   String
-  payload     Json
+//   provider    String
+//   eventType   String
+//   payload     Json
 
-  processed   Boolean  @default(false)
-  receivedAt  DateTime @default(now())
+//   processed   Boolean  @default(false)
+//   receivedAt  DateTime @default(now())
 
-  @@index([provider, eventType])
+//   @@index([provider, eventType])
 
-  @@map("webhook_event")
-}
+//   @@map("webhook_event")
+// }
+
+// model InflowWebhook {
+//   id                      String   @id
+//   url                     String
+
+//   secret                  String?
+//   events                  Json
+//   isDisabled              Boolean @default(false)
+//   consecutiveFailureCount Int     @default(0)
+//   lastFailureMessage      String?
+
+//   createdAt               DateTime @default(now())
+//   updatedAt               DateTime @updatedAt
+
+//   @@map("inflow_webhook")
+// }
 
 model InflowWebhook {
-  id                      String   @id
-  url                     String
+  id                      String   @id // webHookSubscriptionId
+  url                     String   @unique // <--- ADD THIS @unique ANNOTATION
 
   secret                  String?
   events                  Json
-  isDisabled              Boolean @default(false)
-  consecutiveFailureCount Int     @default(0)
+  isDisabled              Boolean  @default(false)
+  consecutiveFailureCount Int      @default(0)
   lastFailureMessage      String?
 
   createdAt               DateTime @default(now())
@@ -443,6 +459,8 @@ model InflowIntegration {
 
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+
+  @@map("inflow_integration")
 }
 
 model InflowWebhookEvent {
@@ -453,4 +471,7 @@ model InflowWebhookEvent {
   receivedAt  DateTime @default(now())
 
   @@index([eventType])
+  @@index([receivedAt])
+
+  @@map("inflow_webhook_event")
 }

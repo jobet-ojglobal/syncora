@@ -1,6 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import {
-  fetchLocations,
+  getLocations,
   getSublocationsByLocation,
 } from "../data/locations";
 
@@ -10,7 +10,7 @@ type SyncOptions = {
 
 export class LocationSyncService {
   async sync(options?: SyncOptions) {
-    const locations = await fetchLocations();
+    const locations = await getLocations();
 
     let processed = 0;
     const total = locations.length;

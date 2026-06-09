@@ -1,4 +1,4 @@
-import { getLocationById } from '@/lib/inflow/data/locations';
+import { getLocation } from '@/lib/inflow/data/locations';
 import { NextRequest, NextResponse } from 'next/server';
 
 interface Props {
@@ -15,7 +15,7 @@ export async function GET(
     const { id } = await params;
 
     const data =
-      await getLocationById(id);
+      await getLocation(id);
 
     return NextResponse.json({
       success: true,

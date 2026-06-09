@@ -86,11 +86,11 @@ export function SyncButton({
   };
 
   return (
-    <div className="space-y-4 rounded-lg border p-4">
+    <div className="space-y-2">
       <Button
         onClick={startSync}
         disabled={isSyncing}
-        className="w-full"
+        className="w-full rounded-xl"
       >
         {isSyncing
           ? `${title} Running...`

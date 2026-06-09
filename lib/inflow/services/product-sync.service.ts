@@ -1,48 +1,81 @@
 // services/sync/products/product-sync.service.ts
-
 import { prisma } from "@/lib/prisma";
-import { fetchProductGoup } from "../data/product-group";
-
+import { getProducts } from "../data/products"; 
 import { syncCategory } from "./category.sync";
-import { syncProductGroup } from "./product-group.sync";
+import { syncProductGroup } from "./product-group-sync";
 import { syncProduct } from "./product.sync";
 import { syncVariant } from "./variant.sync";
 
 type SyncOptions = {
-  onProgress?: (progress: number) => Promise<void>;
+  onProgress?: (processedCount: number) => Promise<void>;
+  batchSize?: number;
 };
 
 export class ProductSyncService {
   async sync(options?: SyncOptions) {
-    const groups = await fetchProductGoup();
+    const BATCH_SIZE = options?.batchSize || 10;
+    
+    // Track synced IDs across the entire execution to prevent duplicate DB writes
+    const syncedCategoryIds = new Set<string>();
+    const syncedGroupIds = new Set<string>();
 
-    let processed = 0;
-    const total = groups.length;
+    let after: string | undefined = undefined;
+    let totalProcessed = 0;
+    
+    console.log("Starting hyper-optimized product sync...");
 
-    for (let i = 0; i < total; i++) {
-      const group = groups[i];
+    while (true) {
+      // 1. Fetch the batch (This ALREADY includes the deep relations!)
+      const batch = await getProducts(BATCH_SIZE, after);
+      if (!batch || batch.length === 0) break;
 
-      await prisma.$transaction(async (tx) => {
-        await syncCategory(tx, group.category);
-        await syncProductGroup(tx, group);
+      // 2. Process the batch inside a single Database Transaction
+      try {
+        await prisma.$transaction(async (tx) => {
+          for (const fullProduct of batch) {
+            const variantRelation = fullProduct.productVariant;
+            const groupData = variantRelation?.productGroup;
+            const categoryData = groupData?.category;
 
-        for (const variant of group.productVariants ?? []) {
-          await syncProduct(tx, variant.product);
-          await syncVariant(tx, group.productGroupId, variant);
-        }
-      });
+            // A. Sync Category (Only if never seen before in this entire sync run)
+            if (categoryData && !syncedCategoryIds.has(categoryData.categoryId)) {
+              await syncCategory(tx, categoryData);
+              syncedCategoryIds.add(categoryData.categoryId);
+            }
 
-      const progress = Math.round(((i + 1) / total) * 100);
+            // B. Sync Product Group (Only if never seen before in this entire sync run)
+            if (groupData && !syncedGroupIds.has(groupData.productGroupId)) {
+              await syncProductGroup(tx, groupData);
+              syncedGroupIds.add(groupData.productGroupId);
+            }
 
-      console.log("progress:", progress); // debug
+            // C. Always sync the Product itself
+            await syncProduct(tx, fullProduct);
 
-      await options?.onProgress?.(progress);
+            // D. Sync the Variant relation if it exists
+            if (variantRelation && groupData) {
+              await syncVariant(tx, groupData.productGroupId, variantRelation);
+            }
+          }
+        }, {
+          timeout: 40000 // Give the batch transaction plenty of breathing room
+        });
+      } catch (transactionError) {
+        console.error(`Transaction failed for batch ending with ID ${after}:`, transactionError);
+        // Depending on requirements, you can choose to throw or break here.
+      }
 
-      processed++;
+      // 3. Update pagination cursor and progress tracking
+      after = batch[batch.length - 1].productId;
+      totalProcessed += batch.length;
+      
+      if (options?.onProgress) {
+        await options.onProgress(totalProcessed);
+      }
     }
 
     return {
-      groupsProcessed: processed,
+      productsProcessed: totalProcessed,
       syncedAt: new Date().toISOString(),
     };
   }

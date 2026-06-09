@@ -1,25 +1,3 @@
-export interface InflowWebhook {
-  webHookSubscriptionId: string;
-  url: string;
-  events: string[];
-  secret?: string;
-
-  consecutiveFailureCount: number;
-  isDisabled: boolean;
-  lastFailureMessage?: string;
-}
-
-export type InflowWebhookEvent =
-  | "customer.created"
-  | "customer.updated"
-  | "vendor.created"
-  | "vendor.updated"
-  | "purchaseOrder.created"
-  | "purchaseOrder.updated"
-  | "salesOrder.created"
-  | "salesOrder.updated"
-  | "product.created"
-  | "product.updated";
 
 // =====================================
 // Root
@@ -111,6 +89,8 @@ export interface InflowProductVariant {
   variantOption: VariantOptionMap;
 
   product: InflowProduct;
+
+  productGroup?: InflowProductGroupResponse
 }
 
 // =====================================
@@ -171,7 +151,9 @@ export interface InflowProduct {
   cost?: InflowProductCost;
   defaultPrice?: InflowProductPrice;
 
-  inventoryLines?: InflowInventoryLine[];
+  inventoryLines: InflowInventoryLine[];
+
+  productVariant: InflowProductVariant
 }
 
 // =====================================
@@ -187,6 +169,8 @@ export interface InflowInventoryLine {
   serial: string;
   sublocation: string;
   timestamp: string;
+
+  location: InflowLocation
 }
 
 // =====================================
@@ -314,4 +298,117 @@ export interface InflowProductLocationSublocation {
   quantity: string;
   sublocation: string;
 }
+
+
+// ======= INFLOW INTEGRATIONS 
+
+// import { 
+//   Prisma,
+// } from "@/generated/prisma/client";
+
+// // 1. Move the literal array here
+// export const INFLOW_EVENTS = [
+//   "product.created",
+//   "product.updated",
+//   "stock.adjusted"
+// ] as const;
+
+// // 2. Define the type here
+// export type InflowEvent = typeof INFLOW_EVENTS[number];
+
+// export type WebhookProvider = "inflow";
+
+// export interface WebhookSubscription {
+//   id: string;
+//   provider: WebhookProvider;
+//   remoteId: string | null;
+//   url: string;
+//   event: string;
+//   active: boolean;
+//   createdAt: Date;
+//   updatedAt: Date;
+// }
+
+// export interface InflowWebhook {
+//   webHookSubscriptionId: string;
+//   url: string;
+//   events: string[];
+//   secret?: string;
+//   consecutiveFailureCount: number;
+//   isDisabled: boolean;
+//   lastFailureMessage?: string;
+// }
+
+// export type InflowWebhookEventType =
+//   | "customer.created"
+//   | "customer.updated"
+//   | "vendor.created"
+//   | "vendor.updated"
+//   | "purchaseOrder.created"
+//   | "purchaseOrder.updated"
+//   | "salesOrder.created"
+//   | "salesOrder.updated"
+//   | "product.created"
+//   | "product.updated";
+
+// export interface InflowWebhook {
+//   id: string;
+//   url: string;
+//   secret: string | null;
+//   events: Prisma.JsonValue;
+//   isDisabled: boolean;
+//   consecutiveFailureCount: number;
+//   lastFailureMessage: string | null;
+//   createdAt: Date;
+//   updatedAt: Date;
+// }
+
+// export interface InflowIntegration {
+//   id: string;
+//   webhookId: string | null;
+//   webhookUrl: string | null;
+//   secret: string | null;
+//   isConnected: boolean;
+//   createdAt: Date;
+//   updatedAt: Date;
+// }
+
+// export interface WebhookEvent {
+//   id: string;
+//   provider: string;
+//   eventType: string;
+//   payload: Prisma.JsonValue;
+//   processed: boolean;
+//   receivedAt: Date;
+// }
+
+// export interface InflowWebhookEvent {
+//   id: string;
+//   eventType: string;
+//   payload: Prisma.JsonValue;
+//   processed: boolean;
+//   receivedAt: Date;
+// }
+
+// export interface CreateInflowWebhookDto {
+//   url: string;
+//   secret?: string;
+//   events: string[];
+// }
+
+// export interface UpdateInflowWebhookDto {
+//   url?: string;
+//   secret?: string;
+//   events?: string[];
+//   isDisabled?: boolean;
+// }
+
+// export interface ReceiveInflowWebhookDto {
+//   eventType: string;
+//   payload: Prisma.JsonValue;
+// }
+
+// export type CreateInflowWebhookInput =
+//   Prisma.InflowWebhookCreateInput;
+
 

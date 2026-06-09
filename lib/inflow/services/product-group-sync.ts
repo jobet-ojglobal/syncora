@@ -1,6 +1,6 @@
 import { Prisma } from "@/generated/prisma/client";
 import { InflowProductGroupResponse } from "../types";
-import { syncGroupImages, syncImages } from "./helpers";
+import { syncGroupImages } from "./helpers";
 
 type Tx = Prisma.TransactionClient;
 

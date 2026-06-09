@@ -1,3 +1,4 @@
+import { InflowProduct } from "../types";
 import { syncBrand } from "./helpers";
 import { syncFeatures } from "./helpers";
 import { syncTags } from "./helpers";
@@ -7,7 +8,7 @@ import { syncSalesUom } from "./helpers";
 
 export async function syncProduct(
   tx: any,
-  product: any
+  product: InflowProduct
 ) {
   const brandId = await syncBrand(
     tx,

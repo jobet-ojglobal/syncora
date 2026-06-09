@@ -3,35 +3,7 @@ export async function syncVariant(
   productGroupId: string,
   variant: any
 ) {
-  // =========== Use to debug ===========
 
-  // const dbProduct = await tx.product.findUnique({
-  //   where: {
-  //     inflowProductId: variant.productId,
-  //   },
-  //   select: {
-  //     inflowProductId: true,
-  //   },
-  // });
-
-  // const dbGroup = await tx.productGroup.findUnique({
-  //   where: {
-  //     inflowProdGroupId: productGroupId,
-  //   },
-  //   select: {
-  //     inflowProdGroupId: true,
-  //   },
-  // });
-
-  // console.log({
-  //   variantId: variant.productVariantId,
-  //   productExists: !!dbProduct,
-  //   groupExists: !!dbGroup,
-  //   productId: variant.productId,
-  //   groupId: productGroupId,
-  // });
-
-  // x =========== Use to debug =========== x
 
   await tx.productVariant.upsert({
     where: {

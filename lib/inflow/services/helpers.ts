@@ -273,7 +273,7 @@ export async function syncGroupImages(
   }
 }
 
-export async function syncInventoryLines(
+export async function syncInventoryLines1(
   tx: Prisma.TransactionClient,
   productId: string,
   inventoryLines: InflowInventoryLine[]

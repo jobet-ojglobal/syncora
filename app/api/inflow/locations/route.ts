@@ -1,10 +1,10 @@
-import { fetchLocations } from '@/lib/inflow/data/locations';
+import { getLocations } from '@/lib/inflow/data/locations';
 import { NextResponse } from 'next/server';
 
 export async function GET() {
   try {
     const data =
-        await fetchLocations();
+        await getLocations();
 
     return NextResponse.json({
       success: true,

@@ -99,17 +99,6 @@ const InflowCloudHealth = () => {
               ? "Connected"
               : "Unknown"}
           </Badge>
-          {/* <Badge
-            variant={
-              result?.connected
-                ? "default"
-                : "secondary"
-            }
-          >
-            {result?.connected
-              ? "Connected"
-              : "Unknown"}
-          </Badge> */}
         </div>
 
         <div className="flex items-center justify-between">
