@@ -182,6 +182,103 @@ model ProductImage {
   @@map("product_image")
 }
 
+model ProductGroupOption {
+  id                    String @id @default(cuid())
+  inflowId              String @unique
+  productGroupId        String
+  lineNum               Int
+  name                  String // e.g., "Color", "Configuration", "Lens Kit"
+
+  attributeId           String?
+  attribute             Attribute? @relation(fields: [attributeId], references: [id])
+
+  productGroup          ProductGroup @relation(fields: [productGroupId],references: [inflowProdGroupId])
+  values                ProductGroupOptionValue[]
+  variantSelections     ProductVariantSelection[]
+
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  @@index([productGroupId])
+  @@map("product_group_option")
+}
+
+model ProductGroupOptionValue {
+  id                     String @id @default(cuid())
+  inflowId               String @unique
+  optionId               String
+  lineNum                Int
+  value                  String
+
+  attributeValueId       String?
+  attributeValue         AttributeValue? @relation(fields: [attributeValueId], references: [id])
+
+  option                 ProductGroupOption @relation(fields: [optionId],references: [inflowId])
+  variantSelections      ProductVariantSelection[]
+
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
+  
+  @@index([optionId])
+  @@map("product_group_option_value")
+}
+
+model Attribute {
+  id        String @id @default(cuid())
+  name      String @unique
+  values    AttributeValue[]
+  inflowOptions ProductGroupOption[]
+
+  @@map("attribute")
+}
+
+model AttributeValue {
+  id          String @id @default(cuid())
+  value       String
+  hexCode     String?
+  attributeId String
+  attribute   Attribute @relation(fields: [attributeId], references: [id])
+  inflowValues ProductGroupOptionValue[]
+
+  @@unique([attributeId, value])
+}
+
+// model ProductGroupOptionAttributeMap {
+//   id          String @id @default(cuid())
+
+//   optionId    String @unique
+//   attributeId String
+
+//   option      ProductGroupOption @relation(fields:[optionId], references:[inflowId])
+//   attribute   Attribute @relation(fields:[attributeId], references:[id])
+// }
+
+// model ProductGroupOptionValueAttributeValueMap {
+//   id               String @id @default(cuid())
+
+//   optionValueId    String @unique
+//   attributeValueId String
+
+//   optionValue      ProductGroupOptionValue @relation(fields:[optionValueId], references:[inflowId])
+//   attributeValue   AttributeValue @relation(fields:[attributeValueId], references:[id])
+// }
+
+model ProductVariantSelection {
+  id                     String @id @default(cuid())
+  variantId              String
+  optionId               String
+  optionValueId          String
+
+  variant                ProductVariant @relation(fields: [variantId],references: [inflowVariantId])
+  option                 ProductGroupOption @relation(fields: [optionId],references: [inflowId])
+  optionValue            ProductGroupOptionValue @relation(fields: [optionValueId],references: [inflowId])
+
+  createdAt              DateTime @default(now())
+
+  @@unique([variantId,optionId])
+  @@map("product_variant_selection")
+}
+
 // customFields.custom1
 model Brand {
   id          String @id @default(cuid())
@@ -242,54 +339,6 @@ model ProductTag {
 }
 
 
-model ProductGroupOption {
-  id                    String @id @default(cuid())
-  inflowId              String @unique
-  productGroupId        String
-  lineNum               Int
-  name                  String
-  productGroup          ProductGroup @relation(fields: [productGroupId],references: [inflowProdGroupId])
-  values                ProductGroupOptionValue[]
-  variantSelections     ProductVariantSelection[]
-
-  createdAt             DateTime @default(now())
-  updatedAt             DateTime @updatedAt
-
-  @@index([productGroupId])
-  @@map("product_group_option")
-}
-
-model ProductGroupOptionValue {
-  id                     String @id @default(cuid())
-  inflowId               String @unique
-  optionId               String
-  lineNum                Int
-  value                  String
-  option                 ProductGroupOption @relation(fields: [optionId],references: [inflowId])
-  variantSelections      ProductVariantSelection[]
-
-  createdAt              DateTime @default(now())
-  updatedAt              DateTime @updatedAt
-  
-  @@index([optionId])
-  @@map("product_group_option_value")
-}
-
-model ProductVariantSelection {
-  id                     String @id @default(cuid())
-  variantId              String
-  optionId               String
-  optionValueId          String
-
-  variant                ProductVariant @relation(fields: [variantId],references: [inflowVariantId])
-  option                 ProductGroupOption @relation(fields: [optionId],references: [inflowId])
-  optionValue            ProductGroupOptionValue @relation(fields: [optionValueId],references: [inflowId])
-
-  createdAt              DateTime @default(now())
-
-  @@unique([variantId,optionId])
-  @@map("product_variant_selection")
-}
 
 // Locations
 

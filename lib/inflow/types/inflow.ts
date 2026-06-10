@@ -13,14 +13,6 @@ export const INFLOW_EVENTS: InflowEvent[] = [
   "product.created", "product.updated",
 ];
 
-// export type InflowWebhook = {
-//   webHookSubscriptionId: string;
-//   url: string;
-//   events: string[];
-//   isDisabled: boolean;
-//   consecutiveFailureCount: number;
-// };
-
 export interface InflowWebhook {
   webHookSubscriptionId: string;
   url: string;

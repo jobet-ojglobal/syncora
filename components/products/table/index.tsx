@@ -10,7 +10,7 @@ const fetcher = (url: string) =>
 export function ProductsTable() {
   const { data, isLoading } =
     useSWR(
-      "/api/products",
+      "/api/admin/products",
       fetcher,
       {
         refreshInterval: 10000, // 10-second polling

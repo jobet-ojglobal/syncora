@@ -1,4 +1,4 @@
-import InflowWorkspace from "@/components/settings/InflowWorkspace";
+import InflowWorkspace from "@/components/settings/inflow-workspace";
 
 export default function InflowSettingsPage() {
 
