@@ -24,7 +24,7 @@ export class ProductGroupSyncService {
 
       await prisma.$transaction(async (tx) => {
         await syncCategory(tx, group.category);
-        await syncProductGroup(tx, group);
+        await syncProductGroup(tx, group, group.defaultProduct);
 
         for (const variant of group.productVariants ?? []) {
           await syncProduct(tx, variant.product);

@@ -166,3 +166,14 @@ export interface ProductSearchResult {
   image?: string | null;
   active: boolean;
 }
+
+export interface ProductBarcodeDto {
+  id: string;
+  inflowProductBarcodeId: string;
+  productId: string;
+  barcode: string;
+  lineNum: number;
+  timestamp?: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+}

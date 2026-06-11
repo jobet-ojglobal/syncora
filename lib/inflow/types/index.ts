@@ -11,14 +11,11 @@ export interface InflowProductGroupResponse {
   isActive: boolean;
   name: string;
   timestamp: string;
-
   category: InflowCategory | null;
-
   images: InflowProductGroupImage[];
-
   options: InflowProductGroupOption[];
-
   productVariants: InflowProductVariant[];
+  defaultProduct?: InflowProduct
 }
 
 // =====================================
@@ -202,16 +199,16 @@ export interface InflowProductPrice {
 // =====================================
 
 export interface InflowCustomFields {
-  custom1: string; // Brand
-  custom2: string; // Features
-  custom3: string; // Tags
-  custom4: string;
-  custom5: string;
-  custom6: string;
-  custom7: string;
-  custom8: string;
-  custom9: string;
-  custom10: string;
+  custom1?: string; // Brand
+  custom2?: string; // Features
+  custom3?: string; // Tags
+  custom4?: string;
+  custom5?: string;
+  custom6?: string;
+  custom7?: string;
+  custom8?: string;
+  custom9?: string;
+  custom10?: string;
 }
 
 // =====================================

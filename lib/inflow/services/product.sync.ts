@@ -1,3 +1,4 @@
+import { prisma } from "@/lib/prisma";
 import { InflowProduct } from "../types";
 import { syncBrand } from "./helpers";
 import { syncFeatures } from "./helpers";
@@ -5,6 +6,7 @@ import { syncTags } from "./helpers";
 import { syncImages } from "./helpers";
 import { syncPurchasingUom } from "./helpers";
 import { syncSalesUom } from "./helpers";
+import { genUniqueSlug } from "@/helpers/genUniqueSlug";
 
 export async function syncProduct(
   tx: any,
@@ -15,6 +17,9 @@ export async function syncProduct(
     product.customFields?.custom1
   );
 
+  const baseSlug = await genUniqueSlug(product.name || "product-variant", prisma.product);
+  const productSlug = `${baseSlug}-${product.productId.slice(0, 5)}`;
+
   const dbProduct = await tx.product.upsert({
     where: {
       inflowProductId: product.productId,
@@ -23,6 +28,7 @@ export async function syncProduct(
       inflowProductId: product.productId,
       sku: product.sku,
       name: product.name,
+      slug: productSlug,
       description: product.description,
       itemType: product.itemType,
       autoAssemble: product.autoAssemble,

@@ -25,8 +25,9 @@ export async function getProduct(productId: string) {
   );
 }
 
-export async function createProduct(payload: Partial<InflowProduct>) {
-  return inflow.post<InflowProduct>("/products", payload);
+export async function upsertProduct(payload: Partial<InflowProduct>) {
+  console.log("OUTBOUND INFLOW PRODUCT PAYLOAD:", JSON.stringify(payload, null, 2));
+  return inflow.put<InflowProduct>("/products", payload);
 }
 
 export async function updateProduct(
