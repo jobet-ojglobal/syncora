@@ -26,98 +26,181 @@ export async function syncBrand(
   return brand.id;
 }
 
-export async function syncFeatures(
+/**
+ * 📸 Separated Feature Synchronization Layer
+ */
+export async function syncGroupFeatures(
   tx: Tx,
-  inflowProductId: string,
-  value?: string | null
+  groupId: string,
+  productId: string,
+  rawFeatures?: string | null
 ) {
-  const product = await tx.product.findUnique({
-    where: {
-      inflowProductId,
-    },
-    select: {
-      id: true,
-    },
+  // Clear old feature links for this group block to prevent stale variations or key collisions
+  await tx.productFeature.deleteMany({ 
+    where: { groupId } 
   });
 
-  if (!product) return;
+  if (!rawFeatures?.trim()) return;
 
-  const features = (value ?? "")
-    .split(";")
-    .map((x) => x.trim())
-    .filter(Boolean);
+  // Parse pipeline map: "Sensor:Full Frame|Max Resolution:8K 30p"
+  const parsedFeatures = parseFeatures(rawFeatures);
 
-  await tx.productFeature.deleteMany({
-    where: {
-      productId: product.id,
-    },
-  });
-
-  for (const featureName of features) {
-    const feature = await tx.feature.upsert({
-      where: {
-        name: featureName,
-      },
-      create: {
-        name: featureName,
-      },
+  for (const f of parsedFeatures) {
+    // Step A: Ensure global feature key classification exists
+    const globalFeature = await tx.feature.upsert({
+      where: { name: f.key },
+      create: { name: f.key },
       update: {},
     });
 
+    // Step B: Connect join row using the newly added value field
     await tx.productFeature.create({
       data: {
-        productId: product.id,
-        featureId: feature.id,
+        productId,
+        groupId,
+        featureId: globalFeature.id,
+        value: f.value,
       },
     });
   }
 }
 
-export async function syncTags(
+/**
+ * 🏷️ Separated Tag Synchronization Layer
+ */
+export async function syncGroupTags(
   tx: Tx,
-  inflowProductId: string,
-  value?: string | null
+  groupId: string,
+  productId: string,
+  rawTags?: string | null
 ) {
-  const product = await tx.product.findUnique({
-    where: {
-      inflowProductId,
-    },
-    select: {
-      id: true,
-    },
+  // Clear old tag connections for this group execution
+  await tx.productTag.deleteMany({ 
+    where: { groupId } 
   });
 
-  if (!product) return;
+  if (!rawTags?.trim()) return;
 
-  const tags = (value ?? "")
-    .split(",")
-    .map((x) => x.trim())
-    .filter(Boolean);
+  // Parse comma-separated matrix list
+  const parsedTags = parseTags(rawTags);
 
-  await tx.productTag.deleteMany({
-    where: {
-      productId: product.id,
-    },
-  });
-
-  for (const tagName of tags) {
-    const tag = await tx.tag.upsert({
-      where: {
-        name: tagName,
-      },
-      create: {
-        name: tagName,
-      },
+  for (const tagName of parsedTags) {
+    // Step A: Ensure master tag index item exists globally
+    const globalTag = await tx.tag.upsert({
+      where: { name: tagName },
+      create: { name: tagName },
       update: {},
     });
 
+    // Step B: Map join connection row records
     await tx.productTag.create({
       data: {
-        productId: product.id,
-        tagId: tag.id,
+        productId,
+        groupId,
+        tagId: globalTag.id,
       },
     });
   }
+}
+
+/**
+ * 📸 Separated Feature Synchronization Layer
+ */
+export async function syncProductFeatures(
+  tx: Tx,
+  productId: string,
+  rawFeatures?: string | null
+) {
+  // Clear old feature links for this group block to prevent stale variations or key collisions
+  await tx.productFeature.deleteMany({ 
+    where: { productId } 
+  });
+
+  if (!rawFeatures?.trim()) return;
+
+  // Parse pipeline map: "Sensor:Full Frame|Max Resolution:8K 30p"
+  const parsedFeatures = parseFeatures(rawFeatures);
+    
+  for (const f of parsedFeatures) {
+    // Step A: Ensure global feature key classification exists
+    const globalFeature = await tx.feature.upsert({
+      where: { name: f.key },
+      create: { name: f.key },
+      update: {},
+    });
+
+    // Step B: Connect join row using the newly added value field
+    await tx.productFeature.create({
+      data: {
+        productId,
+        featureId: globalFeature.id,
+        value: f.value,
+      },
+    });
+  }
+}
+
+export async function syncProductTags(
+  tx: Tx,
+  productId: string,
+  rawTags?: string | null
+) {
+  // Clear old tag connections for this group execution
+  await tx.productTag.deleteMany({ 
+    where: { productId } 
+  });
+
+  if (!rawTags?.trim()) return;
+
+  // Parse comma-separated matrix list
+  const parsedTags = parseTags(rawTags);
+
+  for (const tagName of parsedTags) {
+    // Step A: Ensure master tag index item exists globally
+    const globalTag = await tx.tag.upsert({
+      where: { name: tagName },
+      create: { name: tagName },
+      update: {},
+    });
+
+    // Step B: Map join connection row records
+    await tx.productTag.create({
+      data: {
+        productId,
+        tagId: globalTag.id,
+      },
+    });
+  }
+}
+
+export interface ParsedFeature {
+  key: string;
+  value: string;
+}
+
+export function parseFeatures(
+  value?: string | null
+): ParsedFeature[] { // 👈 Updated from string[] to reflect the actual object shape
+  return (value ?? "")
+    .split("|")
+    .map((item) => {
+      const parts = item.split(":");
+      if (parts.length < 2) return null;
+      return {
+        key: parts[0].trim(),
+        value: parts.slice(1).join(":").trim(), // Safe for nested colons (e.g., "Time: 10:30")
+      };
+    })
+    .filter((f): f is ParsedFeature => f !== null && f.key !== "");
+}
+
+export function parseTags(
+  value?: string | null
+): string[] {
+  return (value ?? "")
+    .split(",")
+    .map((x) => x.trim())
+    .filter(Boolean);
 }
 
 export async function syncPurchasingUom(
@@ -201,10 +284,10 @@ export async function syncImages(
 
     await tx.productImage.upsert({
       where: {
-        inflowImageId: image.imageId,
+        inflowId: image.imageId,
       },
       create: {
-        inflowImageId: image.imageId,
+        inflowId: image.imageId,
         productId: product.productId,
         position: index,
         largeUrl: image.largeUrl,
@@ -244,10 +327,10 @@ export async function syncGroupImages(
 
     await tx.productImage.upsert({
       where: {
-        inflowImageId: image.imageId,
+        inflowId: image.imageId,
       },
       create: {
-        inflowImageId: image.imageId,
+        inflowId: image.imageId,
         groupId,
         position: index,
         largeUrl: image.largeUrl,
@@ -375,23 +458,119 @@ export async function syncInventoryLines1(
 }
 
 
-export function parseFeatures(
-  value?: string | null
-): string[] {
-  return (value ?? "")
-    .split(";")
-    .map((x) => x.trim())
-    .filter(Boolean);
-}
 
-export function parseTags(
-  value?: string | null
-): string[] {
-  return (value ?? "")
-    .split(",")
-    .map((x) => x.trim())
-    .filter(Boolean);
-}
+
+// export async function syncFeatures(
+//   tx: Tx,
+//   inflowProductId: string,
+//   value?: string | null
+// ) {
+//   const product = await tx.product.findUnique({
+//     where: {
+//       inflowId: inflowProductId,
+//     },
+//     select: {
+//       id: true,
+//     },
+//   });
+
+//   if (!product) return;
+
+//   const features = (value ?? "")
+//     .split(";")
+//     .map((x) => x.trim())
+//     .filter(Boolean);
+
+//   await tx.productFeature.deleteMany({
+//     where: {
+//       productId: product.id,
+//     },
+//   });
+
+//   for (const featureName of features) {
+//     const feature = await tx.feature.upsert({
+//       where: {
+//         name: featureName,
+//       },
+//       create: {
+//         name: featureName,
+//       },
+//       update: {},
+//     });
+
+//     await tx.productFeature.create({
+//       data: {
+//         productId: product.id,
+//         featureId: feature.id,
+//       },
+//     });
+//   }
+// }
+
+// export async function syncTags(
+//   tx: Tx,
+//   inflowProductId: string,
+//   value?: string | null
+// ) {
+//   const product = await tx.product.findUnique({
+//     where: {
+//       inflowId: inflowProductId,
+//     },
+//     select: {
+//       id: true,
+//     },
+//   });
+
+//   if (!product) return;
+
+//   const tags = (value ?? "")
+//     .split(",")
+//     .map((x) => x.trim())
+//     .filter(Boolean);
+
+//   await tx.productTag.deleteMany({
+//     where: {
+//       productId: product.id,
+//     },
+//   });
+
+//   for (const tagName of tags) {
+//     const tag = await tx.tag.upsert({
+//       where: {
+//         name: tagName,
+//       },
+//       create: {
+//         name: tagName,
+//       },
+//       update: {},
+//     });
+
+//     await tx.productTag.create({
+//       data: {
+//         productId: product.id,
+//         tagId: tag.id,
+//       },
+//     });
+//   }
+// }
+
+// export function parseFeatures(
+//   value?: string | null
+// ): string[] {
+//   return (value ?? "")
+//     .split(";")
+//     .map((x) => x.trim())
+//     .filter(Boolean);
+// }
+
+// export function parseTags(
+//   value?: string | null
+// ): string[] {
+//   return (value ?? "")
+//     .split(",")
+//     .map((x) => x.trim())
+//     .filter(Boolean);
+// }
 
 
 // export async function syncInventoryLines(

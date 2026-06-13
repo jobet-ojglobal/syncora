@@ -21,7 +21,7 @@ export async function getProducts(
 
 export async function getProduct(productId: string) {
   return inflow.get<InflowProduct>(
-    `/products/${productId}?include=images&include=productVariant.productGroup.category&include=productVariant.productGroup.options.optionValues&include=productVariant.productGroup.images.image`
+    `/products/${productId}?include=images,productVariant.productGroup.category,productVariant.productGroup.options.optionValues,productVariant.productGroup.images.image`
   );
 }
 

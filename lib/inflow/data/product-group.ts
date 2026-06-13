@@ -43,14 +43,14 @@ export async function upsertProductGroup(payload: Partial<InflowGroupPayload>) {
 
 export async function fetchProductGroup() {
   const data = await inflow.get<InflowProductGroupResponse[]>(
-    "/product-groups?include=defaultProduct,productVariants.product.images&include=category&include=images.image&include=options.optionValues"
+    "/product-groups?include=defaultProduct,category,images.image,options.optionValues,productVariants.product.images"
   );
   return data;
 }
 
 export async function getProductGroup(groupId: string) {
   const data = await inflow.get<InflowProductGroupResponse>(
-    `/product-groups/${groupId}?include=defaultProduct,productVariants.product.images&include=category&include=images.image&include=options.optionValues`
+    `/product-groups/${groupId}?include=defaultProduct,category,images.image,options.optionValues,productVariants.product.images`
   );
   return data;
 }

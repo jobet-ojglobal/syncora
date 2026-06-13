@@ -9,13 +9,15 @@ import { ProductSyncService } from "@/lib/inflow/services/product-sync.service";
 import { CustomerSyncService } from "@/lib/inflow/services/customer-sync.service";
 import { InventorySyncService } from "@/lib/inflow/services/inventory-sync.service";
 import { LocationSyncService } from "@/lib/inflow/services/location-sync.service";
+import { CategorySyncService } from "../inflow/services/category-sync.service";
 
-
-const testService = new TestSyncService()
+const testService = new TestSyncService();
+const categoryService = new CategorySyncService();
 const productService = new ProductSyncService();
 const customerService = new CustomerSyncService();
 const inventoryService = new InventorySyncService();
 const locationService = new LocationSyncService();
+
 
 type SyncOptions = {
   onProgress?: (progress: number) => Promise<void>;
@@ -51,6 +53,10 @@ const worker = new Worker(
       let result;
 
       switch (source) {
+         case "categories":
+          result = await categoryService.sync();
+          break;
+
         case "products":
           result = await productService.sync(syncOptions);
           break;

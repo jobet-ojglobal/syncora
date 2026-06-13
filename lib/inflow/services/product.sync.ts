@@ -1,31 +1,32 @@
 import { prisma } from "@/lib/prisma";
 import { InflowProduct } from "../types";
-import { syncBrand } from "./helpers";
-import { syncFeatures } from "./helpers";
-import { syncTags } from "./helpers";
+import { syncBrand, syncProductFeatures, syncProductTags } from "./helpers";
+import { syncGroupFeatures } from "./helpers";
+import { syncGroupTags } from "./helpers";
 import { syncImages } from "./helpers";
 import { syncPurchasingUom } from "./helpers";
 import { syncSalesUom } from "./helpers";
-import { genUniqueSlug } from "@/helpers/genUniqueSlug";
+import { genInflowUniqueSlug } from "@/helpers/genUniqueSlug";
 
 export async function syncProduct(
   tx: any,
-  product: InflowProduct
+  product: InflowProduct,
+  groupId?: string
 ) {
-  const brandId = await syncBrand(
-    tx,
-    product.customFields?.custom1
-  );
+  const brandId = await syncBrand(tx, product.customFields?.custom1);
 
-  const baseSlug = await genUniqueSlug(product.name || "product-variant", prisma.product);
+  const rawFeaturesString = product?.customFields?.custom2; // e.g., "Sensor:Full Frame|Max Resolution:8K 30p"
+  const rawTagsString = product?.customFields?.custom3;
+
+  const baseSlug = await genInflowUniqueSlug(product.name || "product-variant", prisma.product, product.productId);
   const productSlug = `${baseSlug}-${product.productId.slice(0, 5)}`;
 
   const dbProduct = await tx.product.upsert({
     where: {
-      inflowProductId: product.productId,
+      inflowId: product.productId,
     },
     create: {
-      inflowProductId: product.productId,
+      inflowId: product.productId,
       sku: product.sku,
       name: product.name,
       slug: productSlug,
@@ -64,16 +65,17 @@ export async function syncProduct(
   await syncSalesUom(tx, product);
   await syncImages(tx, product);
 
-  await syncFeatures(
-    tx,
-    dbProduct.id,
-    product.customFields?.custom2
-  );
+  // 3. Hand off Features & Tags processing to isolated sub-functions 🚀
+  if (product.productId && groupId) {
+    await syncGroupFeatures(tx, groupId, product.productId, rawFeaturesString);
+    await syncGroupTags(tx, groupId, product.productId, rawTagsString);
+  } else {
+    if (product.productId) {
+      await syncProductFeatures(tx, product.productId, rawFeaturesString);
+      await syncProductTags(tx, product.productId, rawTagsString);
+    }
+  }
 
-  await syncTags(
-    tx,
-    dbProduct.id,
-    product.customFields?.custom3
-  );
+  return dbProduct;
 }
 

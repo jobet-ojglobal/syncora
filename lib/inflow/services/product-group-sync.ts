@@ -1,8 +1,7 @@
 import { Prisma } from "@/generated/prisma/client";
 import { InflowProduct, InflowProductGroupResponse } from "../types";
-import { syncBrand, syncGroupImages } from "./helpers";
-import { genUniqueSlug } from "@/helpers/genUniqueSlug";
-import { prisma } from "@/lib/prisma";
+import { syncBrand, syncGroupFeatures, syncGroupImages, syncGroupTags } from "./helpers";
+import { genInflowUniqueSlug } from "@/helpers/genUniqueSlug";
 
 type Tx = Prisma.TransactionClient;
 
@@ -22,48 +21,13 @@ export async function syncProductGroup(
     brandId = await syncBrand(tx, brandName);
   }
 
-  // Parse structured features array: [{ key: "Sensor", value: "Full Frame" }]
-  const parsedFeatures = (rawFeaturesString ?? "")
-    .split("|")
-    .map((item) => {
-      const parts = item.split(":");
-      if (parts.length < 2) return null;
-      return {
-        key: parts[0].trim(),
-        value: parts.slice(1).join(":").trim(), // Handle nested colons safely
-      };
-    })
-    .filter((f): f is { key: string; value: string } => f !== null && f.key !== "");
+  const baseSlug = await genInflowUniqueSlug(group.name || "product-group", tx.productGroup, group.productGroupId);
 
-  // Parse structured tags array: ["hot-swap", "wireless"]
-  const parsedTags = (rawTagsString ?? "")
-    .split(",")
-    .map((t) => t.trim())
-    .filter(Boolean);
-
-  const baseSlug = await genUniqueSlug(group.name || "product-group", prisma.productGroup);
-  // Fallback random string appending logic can go here if your source data allows duplicate names
-  // const groupSlug = `${baseSlug}-${group.productGroupId.slice(0, 5)}`;
-
-  // 2. Perform Group Upsert
-  // Since we wipe and rebuild features/tags to avoid duplicates, we look up the internal ID first
-  const existingGroup = await tx.productGroup.findUnique({
-    where: { inflowProdGroupId: group.productGroupId },
-    select: { id: true },
-  });
-
-  if (existingGroup) {
-    // Clean up existing relations for this group id before re-syncing
-    await tx.productFeature.deleteMany({ where: { productGroupId: existingGroup.id } });
-    await tx.productTag.deleteMany({ where: { productGroupId: existingGroup.id } });
-  }
-
+  // 3. Upsert the master ProductGroup record
   const upsertedGroup = await tx.productGroup.upsert({
-    where: {
-      inflowProdGroupId: group.productGroupId,
-    },
+    where: { inflowId: group.productGroupId },
     create: {
-      inflowProdGroupId: group.productGroupId,
+      inflowId: group.productGroupId,
       categoryId: group.categoryId,
       defaultProductId: group.defaultProductId,
       defaultImageId: group.defaultImageId,
@@ -72,19 +36,6 @@ export async function syncProductGroup(
       brandId,
       isActive: group.isActive,
       timestamp: group.timestamp,
-      // Create fresh feature connections nested
-      productFeatures: {
-        create: parsedFeatures.map((f) => ({
-          key: f.key,
-          value: f.value,
-        })),
-      },
-      // Create fresh tag connections nested
-      productTags: {
-        create: parsedTags.map((tag) => ({
-          name: tag,
-        })),
-      },
     },
     update: {
       categoryId: group.categoryId,
@@ -94,19 +45,14 @@ export async function syncProductGroup(
       brandId,
       isActive: group.isActive,
       timestamp: group.timestamp,
-      features: {
-        create: parsedFeatures.map((f) => ({
-          key: f.key,
-          value: f.value,
-        })),
-      },
-      tags: {
-        create: parsedTags.map((tag) => ({
-          name: tag,
-        })),
-      },
     },
   });
+
+  // 3. Hand off Features & Tags processing to isolated sub-functions 🚀
+  if (group.defaultProductId) {
+    await syncGroupFeatures(tx, group.productGroupId, group.defaultProductId, rawFeaturesString);
+    await syncGroupTags(tx, group.productGroupId, group.defaultProductId, rawTagsString);
+  }
 
   // 3. Loop Through Options (e.g., "Color", "Size")
   for (const option of group.options ?? []) {
@@ -173,6 +119,95 @@ export async function syncProductGroup(
   await syncGroupImages(tx, group.productGroupId, group.images);
   return upsertedGroup;
 }
+
+
+  // Parse structured features array: [{ key: "Sensor", value: "Full Frame" }]
+  // const parsedFeatures = (rawFeaturesString ?? "")
+  //   .split("|")
+  //   .map((item) => {
+  //     const parts = item.split(":");
+  //     if (parts.length < 2) return null;
+  //     return {
+  //       key: parts[0].trim(),
+  //       value: parts.slice(1).join(":").trim(), // Handle nested colons safely
+  //     };
+  //   })
+  //   .filter((f): f is { key: string; value: string } => f !== null && f.key !== "");
+
+  // // Parse structured tags array: ["hot-swap", "wireless"]
+  // const parsedTags = (rawTagsString ?? "")
+  //   .split(",")
+  //   .map((t) => t.trim())
+  //   .filter(Boolean);
+
+  // const baseSlug = await genUniqueSlug(group.name || "product-group", prisma.productGroup);
+  // // Fallback random string appending logic can go here if your source data allows duplicate names
+  // // const groupSlug = `${baseSlug}-${group.productGroupId.slice(0, 5)}`;
+
+  // // 2. Perform Group Upsert
+  // // Since we wipe and rebuild features/tags to avoid duplicates, we look up the internal ID first
+  // const existingGroup = await tx.productGroup.findUnique({
+  //   where: { inflowProdGroupId: group.productGroupId },
+  //   select: { id: true },
+  // });
+
+  // if (existingGroup) {
+  //   // Clean up existing relations for this group id before re-syncing
+  //   await tx.productFeature.deleteMany({ where: { productGroupId: existingGroup.id } });
+  //   await tx.productTag.deleteMany({ where: { productGroupId: existingGroup.id } });
+  // }
+
+  // const upsertedGroup = await tx.productGroup.upsert({
+  //   where: {
+  //     inflowProdGroupId: group.productGroupId,
+  //   },
+  //   create: {
+  //     inflowProdGroupId: group.productGroupId,
+  //     categoryId: group.categoryId,
+  //     defaultProductId: group.defaultProductId,
+  //     defaultImageId: group.defaultImageId,
+  //     name: group.name,
+  //     slug: baseSlug,
+  //     brandId,
+  //     isActive: group.isActive,
+  //     timestamp: group.timestamp,
+  //     // Create fresh feature connections nested
+  //     productFeatures: {
+  //       create: parsedFeatures.map((f) => ({
+  //         key: f.key,
+  //         value: f.value,
+  //       })),
+  //     },
+  //     // Create fresh tag connections nested
+  //     productTags: {
+  //       create: parsedTags.map((tag) => ({
+  //         name: tag,
+  //       })),
+  //     },
+  //   },
+  //   update: {
+  //     categoryId: group.categoryId,
+  //     defaultProductId: group.defaultProductId,
+  //     defaultImageId: group.defaultImageId,
+  //     name: group.name,
+  //     brandId,
+  //     isActive: group.isActive,
+  //     timestamp: group.timestamp,
+  //     features: {
+  //       create: parsedFeatures.map((f) => ({
+  //         key: f.key,
+  //         value: f.value,
+  //       })),
+  //     },
+  //     tags: {
+  //       create: parsedTags.map((tag) => ({
+  //         name: tag,
+  //       })),
+  //     },
+  //   },
+  // });
+
+
   // await tx.productGroup.upsert({
   //   where: {
   //     inflowProdGroupId: group.productGroupId,

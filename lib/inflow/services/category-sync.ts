@@ -1,16 +1,19 @@
+import { generateSlug } from "@/helpers/genUniqueSlug";
+import { InflowCategory } from "../types";
 
 export async function syncCategory(
   tx: any,
-  category: any
+  category: InflowCategory
 ) {
   if (!category) return;
 
   let parentId: string | null = null;
+  const slug = generateSlug(category.name);
 
   if (category.parentCategoryId) {
     const parent = await tx.category.findUnique({
       where: {
-        inflowCategoryId: category.parentCategoryId,
+        inflowId: category.parentCategoryId,
       },
     });
 
@@ -21,19 +24,21 @@ export async function syncCategory(
 
   await tx.category.upsert({
     where: {
-      inflowCategoryId: category.categoryId,
+      inflowId: category.categoryId,
     },
     create: {
-      inflowCategoryId: category.categoryId,
+      inflowId: category.categoryId,
       name: category.name,
-      isDefault: category.isDefault,
-      timestamp: category.timestamp,
+      slug,
+      // isDefault: category.isDefault,
+      // timestamp: category.timestamp,
       parentId,
     },
     update: {
       name: category.name,
-      isDefault: category.isDefault,
-      timestamp: category.timestamp,
+      slug,
+      // isDefault: category.isDefault,
+      // timestamp: category.timestamp,
       parentId,
     },
   });
@@ -47,10 +52,10 @@ export async function syncCategory(
 
 //   await tx.category.upsert({
 //     where: {
-//       inflowCategoryId: category.categoryId,
+//       inflowId: category.categoryId,
 //     },
 //     create: {
-//       inflowCategoryId: category.categoryId,
+//       inflowId: category.categoryId,
 //       name: category.name,
 //       isDefault: category.isDefault,
 //       timestamp: category.timestamp,

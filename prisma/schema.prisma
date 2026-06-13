@@ -28,14 +28,18 @@ model SyncJob {
 }
 
 model Category {
-  id                String   @id @default(cuid())
-  inflowCategoryId  String   @unique
-  name              String
-  isDefault         Boolean  @default(false)
-  timestamp         String?
+  id          String   @id @default(cuid())
+  inflowId    String   @unique
+  name        String
+  slug        String @unique // e.g., "digital-cameras"
+  description String?
+  imageUrl    String?
+
+  // isDefault         Boolean  @default(false)
+  // timestamp         String?
 
   parentId          String?
-  parent            Category?  @relation("CategoryToCategory", fields: [parentId], references: [inflowCategoryId])
+  parent            Category?  @relation("CategoryToCategory", fields: [parentId], references: [inflowId])
   children          Category[] @relation("CategoryToCategory")
 
   productGroups     ProductGroup[]
@@ -48,19 +52,19 @@ model Category {
 
 model ProductGroup {
   id                String   @id @default(cuid())
-  inflowProdGroupId String   @unique
+  inflowId String   @unique
   name              String
   slug              String   @unique 
   description       String?  @db.Text
   brandId           String?
-  brand             Brand?   @relation(fields: [brandId], references: [id])
   categoryId        String?
   defaultProductId  String?
   defaultImageId    String?
   isActive          Boolean
   timestamp         String?
 
-  category          Category? @relation(fields: [categoryId], references: [inflowCategoryId])
+  brand             Brand?   @relation(fields: [brandId], references: [id])
+  category          Category? @relation(fields: [categoryId], references: [inflowId])
   variants          ProductVariant[]
   images            ProductImage[]
   options           ProductGroupOption[]
@@ -76,13 +80,13 @@ model ProductGroup {
 
 model ProductVariant {
   id                String   @id @default(cuid())
-  inflowVariantId   String   @unique
+  inflowId   String   @unique
   productGroupId    String
   productId         String   @unique
   defaultPrice      Decimal  @db.Decimal(18,5)
 
-  group             ProductGroup @relation(fields: [productGroupId], references: [inflowProdGroupId])
-  product           Product  @relation(fields: [productId], references: [inflowProductId])
+  group             ProductGroup @relation(fields: [productGroupId], references: [inflowId])
+  product           Product  @relation(fields: [productId], references: [inflowId])
   selections        ProductVariantSelection[]
 
   createdAt         DateTime @default(now())
@@ -95,7 +99,7 @@ model ProductVariant {
 
 model Product {
   id                      String   @id @default(cuid())
-  inflowProductId         String   @unique
+  inflowId         String   @unique
   sku                     String?
   name                    String
   slug                    String   @unique 
@@ -143,17 +147,19 @@ model Product {
   createdAt             DateTime @default(now())
   updatedAt             DateTime @updatedAt
 
+  deletedAt   DateTime?
+
   @@map("product")
 }
 
 model ProductBarcode {
   id                     String @id @default(cuid())
-  inflowProductBarcodeId String @unique
+  inflowId String @unique
   productId              String
   barcode                String @unique
   lineNum                Int
   timestamp              String?
-  product Product @relation(fields: [productId],references: [inflowProductId])
+  product Product @relation(fields: [productId],references: [inflowId])
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -170,7 +176,7 @@ model ProductUom {
   name               String
   standardQuantity   Decimal @db.Decimal(18,4)
   uomQuantity        Decimal @db.Decimal(18,4)
-  product            Product @relation(fields: [productId], references: [inflowProductId])
+  product            Product @relation(fields: [productId], references: [inflowId])
 
   @@map("product_uom")
 }
@@ -181,14 +187,14 @@ model ProductSalesUom {
   name               String
   standardQuantity   Decimal @db.Decimal(18,4)
   uomQuantity        Decimal @db.Decimal(18,4)
-  product            Product @relation(fields: [productId], references: [inflowProductId])
+  product            Product @relation(fields: [productId], references: [inflowId])
 
   @@map("product_sales_uom")
 }
 
 model ProductImage {
   id                  String @id @default(cuid())
-  inflowImageId       String @unique
+  inflowId       String @unique
   groupId             String?
   productId           String?
   position            Int @default(0)
@@ -199,8 +205,8 @@ model ProductImage {
   smallUrl            String?
   thumbUrl            String?
 
-  group               ProductGroup? @relation(fields: [groupId], references: [inflowProdGroupId])
-  product             Product? @relation(fields: [productId], references: [inflowProductId])
+  group               ProductGroup? @relation(fields: [groupId], references: [inflowId])
+  product             Product? @relation(fields: [productId], references: [inflowId])
 
   @@index([groupId, position])
   @@index([productId, position])
@@ -218,7 +224,7 @@ model ProductGroupOption {
   attributeId           String?
   attribute             Attribute? @relation(fields: [attributeId], references: [id])
 
-  productGroup          ProductGroup @relation(fields: [productGroupId],references: [inflowProdGroupId])
+  productGroup          ProductGroup @relation(fields: [productGroupId],references: [inflowId])
   values                ProductGroupOptionValue[]
   variantSelections     ProductVariantSelection[]
 
@@ -295,7 +301,7 @@ model ProductVariantSelection {
   optionId               String
   optionValueId          String
 
-  variant                ProductVariant @relation(fields: [variantId],references: [inflowVariantId])
+  variant                ProductVariant @relation(fields: [variantId],references: [inflowId])
   option                 ProductGroupOption @relation(fields: [optionId],references: [inflowId])
   optionValue            ProductGroupOptionValue @relation(fields: [optionValueId],references: [inflowId])
 
@@ -309,10 +315,17 @@ model ProductVariantSelection {
 model Brand {
   id          String @id @default(cuid())
   name        String @unique
+  description String?
+  logoUrl     String?
+  websiteUrl  String?
+
   products    Product[]
   groups      ProductGroup[]
+
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+
+  deletedAt   DateTime?
 
   @@map("brand")
 }
@@ -320,7 +333,7 @@ model Brand {
 // customFields.custom2
 model Feature {
   id          String @id @default(cuid())
-  name        String @unique
+  name        String @unique // e.g., "Sensor", "Max Resolution", "Weather Sealing"
   products    ProductFeature[]
 
   createdAt   DateTime @default(now())
@@ -345,9 +358,10 @@ model ProductFeature {
   productId      String
   groupId        String?
   featureId      String
+  value          String // 👈 Added: Holds the dynamic value constraint (e.g., "Full Frame", "8K 30p", "Yes")
   
-  group          ProductGroup? @relation(fields: [groupId], references: [inflowProdGroupId])
-  product        Product @relation(fields: [productId], references: [inflowProductId])
+  group          ProductGroup? @relation(fields: [groupId], references: [inflowId])
+  product        Product @relation(fields: [productId], references: [inflowId])
   feature        Feature @relation(fields: [featureId], references: [id])
 
   @@id([productId, featureId])
@@ -357,11 +371,11 @@ model ProductFeature {
 
 model ProductTag {
   productId      String
-  groupId             String?
+  groupId        String?
   tagId          String
 
-  group          ProductGroup? @relation(fields: [groupId], references: [inflowProdGroupId])
-  product        Product @relation(fields: [productId], references: [inflowProductId])
+  group          ProductGroup? @relation(fields: [groupId], references: [inflowId])
+  product        Product @relation(fields: [productId], references: [inflowId])
   tag            Tag @relation(fields: [tagId], references: [id])
 
   @@id([productId, tagId])
@@ -431,7 +445,7 @@ model Inventory {
   quantityAvailable   Decimal? @db.Decimal(18,4)
   quantityReserved    Decimal? @db.Decimal(18,4)
 
-  product             Product @relation(fields: [productId],references: [inflowProductId])
+  product             Product @relation(fields: [productId],references: [inflowId])
   location            Location @relation(fields: [locationId],references: [inflowId])
 
   bins                InventoryBin[]
@@ -454,7 +468,7 @@ model InventoryBin {
   quantity       Decimal @db.Decimal(18,4)
 
   inventory           Inventory @relation(fields: [inventoryId],references: [id])
-  product             Product @relation(fields: [productId],references: [inflowProductId])
+  product             Product @relation(fields: [productId],references: [inflowId])
   sublocation         Sublocation @relation(fields: [sublocationId],references: [id])
 
   createdAt           DateTime @default(now())

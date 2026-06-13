@@ -115,8 +115,8 @@ export function ProductGroupForm() {
       try {
         // Parallel fetch categories, attributes, and brand systems
         const [catRes, brandRes, attrRes] = await Promise.all([
-          fetch("/api/categories"),
-          fetch("/api/brands"), // 👈 Call new route
+          fetch("/api/categories/inflow"),
+          fetch("/api/brands/basic"), // 👈 Call new route
           fetch("/api/attributes"),
         ]);
         

@@ -1,7 +1,7 @@
 // lib/inflow/services/webhook-product.service.ts
 import { prisma } from "@/lib/prisma";
 import { getProduct } from "../data/products";
-import { syncCategory } from "./category.sync";
+import { syncCategory } from "./category-sync";
 import { syncProductGroup } from "./product-group-sync";
 import { syncProduct } from "./product.sync";
 import { syncVariant } from "./variant.sync";

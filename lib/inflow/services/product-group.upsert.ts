@@ -3,6 +3,7 @@ import { CreateProductGroupInput } from "@/schemas/product-group.schema";
 import { syncProductGroup } from "./product-group-sync";
 import { getProductGroup, upsertProductGroup } from "../data/product-group";
 import { upsertProduct } from "../data/products";
+import { syncCategory } from "./category-sync";
 
 // Helper function to generate clean, short SKU components from product text names
 function generateSkuSlug(text: string): string {
@@ -163,6 +164,7 @@ export async function createProductGroupToInflow(input: CreateProductGroupInput)
   // 3. Sync data locally
   const localDbRecord = await prisma.$transaction(async (tx) => {
     const targetProductGroup = await getProductGroup(inflowProductGroupResponse.productGroupId);
+    targetProductGroup.category ? await syncCategory(tx, targetProductGroup.category) : null;
     await syncProductGroup(tx, targetProductGroup, targetProductGroup.defaultProduct);
     return targetProductGroup;
   });

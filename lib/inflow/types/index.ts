@@ -137,6 +137,8 @@ export interface InflowProduct {
 
   timestamp: string;
 
+  category: InflowCategory | null;
+
   purchasingUom: InflowPurchasingUom | null;
 
   salesUom: InflowSalesUom | null;
@@ -151,6 +153,7 @@ export interface InflowProduct {
   inventoryLines: InflowInventoryLine[];
 
   productVariant: InflowProductVariant
+
 }
 
 // =====================================

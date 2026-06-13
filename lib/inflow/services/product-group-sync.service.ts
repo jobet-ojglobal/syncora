@@ -3,7 +3,7 @@
 import { prisma } from "@/lib/prisma";
 import { fetchProductGroup } from "../data/product-group";
 
-import { syncCategory } from "./category.sync";
+import { syncCategory } from "./category-sync";
 import { syncProductGroup } from "./product-group-sync";
 import { syncProduct } from "./product.sync";
 import { syncVariant } from "./variant.sync";
@@ -23,11 +23,11 @@ export class ProductGroupSyncService {
       const group = groups[i];
 
       await prisma.$transaction(async (tx) => {
-        await syncCategory(tx, group.category);
+        group.category ? await syncCategory(tx, group.category) : null;
         await syncProductGroup(tx, group, group.defaultProduct);
 
         for (const variant of group.productVariants ?? []) {
-          await syncProduct(tx, variant.product);
+          await syncProduct(tx, variant.product, group.productGroupId);
           await syncVariant(tx, group.productGroupId, variant);
         }
       });

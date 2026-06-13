@@ -184,6 +184,7 @@ const InflowWorkspace = () => {
               </CardHeader>
               <CardContent className="space-y-4 pt-0">
                 <SyncButton source="products" title="Sync Entire Catalog" />
+                <SyncButton source="categories" title="Sync Categories" />
                 <SyncButton source="inventory" title="Sync Inventory" />
                 <SyncButton source="customers" title="Sync All Customers" />
               </CardContent>

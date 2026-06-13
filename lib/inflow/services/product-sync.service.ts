@@ -1,7 +1,7 @@
 // services/sync/products/product-sync.service.ts
 import { prisma } from "@/lib/prisma";
 import { getProducts } from "../data/products"; 
-import { syncCategory } from "./category.sync";
+import { syncCategory } from "./category-sync";
 import { syncProductGroup } from "./product-group-sync";
 import { syncProduct } from "./product.sync";
 import { syncVariant } from "./variant.sync";
