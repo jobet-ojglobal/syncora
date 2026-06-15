@@ -51,8 +51,10 @@ export function DeleteButton({
         throw new Error(errorData.error || "Failed to remove item.");
       }
 
+      const data = await response.json()
+
       toast.success("Record Deleted", {
-        description: `Successfully wiped "${itemName}" from database systems.`,
+        description: data?.message || `Successfully wiped "${itemName}" from database systems.`,
       });
 
       setIsOpen(false);

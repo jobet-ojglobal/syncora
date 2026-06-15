@@ -29,10 +29,7 @@ export async function GET(
       );
 
     if (!category) {
-      return NextResponse.json({  
-        success: false,
-        message: `Category not found.`, 
-      }, { status: 404 });
+      return NextResponse.json({ error: "Category not found." }, { status: 400 });
     }
 
     return NextResponse.json(

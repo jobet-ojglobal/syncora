@@ -3,10 +3,10 @@ import { NotFoundStateCard } from "@/components/shared/not-found-state-card";
 const NotFoundPage = () => {
     return (
       <NotFoundStateCard
-        title="Category not found"
-        description="The requested category does not exist."
-        backHref="/admin/categories"
-        backLabel="Back to Categories"
+        title="Brand not found"
+        description="The requested brand does not exist."
+        backHref="/dashboard/brands"
+        backLabel="Back to Brands"
       />
     );
 };

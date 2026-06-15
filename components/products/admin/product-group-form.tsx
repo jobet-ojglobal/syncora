@@ -20,7 +20,6 @@ import { useEffect, useState } from "react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
 import { Plus, Trash2, X } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
 
 interface CategoryOption {
   id: string;

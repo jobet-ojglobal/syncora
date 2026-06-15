@@ -65,12 +65,14 @@ export function BrandForm({ initialData, onSuccess }: BrandFormProps) {
         description: `Successfully processed profiles for "${values.name}".`,
       });
 
-      if (!isEditMode) {
-        reset(); // Clear form values if creating fresh profiles
-      }
-
-      if (onSuccess) onSuccess();
+      router.push("/dashboard/brands");
       router.refresh();
+
+      // if (!isEditMode) {
+      //   reset(); // Clear form values if creating fresh profiles
+      // }
+
+      // if (onSuccess) onSuccess();
     } catch (err: any) {
       toast.error("Transaction Error", { description: err.message || "Failed to save profile structural assets." });
     }
@@ -112,9 +114,14 @@ export function BrandForm({ initialData, onSuccess }: BrandFormProps) {
           </FieldGroup>
         </FieldSet>
 
-        <Button type="submit" disabled={isSubmitting} className="w-full mt-2">
-          {isSubmitting ? "Writing data alterations..." : isEditMode ? "Save Profile Changes" : "Create Master Brand Profile"}
-        </Button>
+        <div className="flex flex-row items-center justify-end gap-4 w-full mt-2">
+          <Button type="button" variant="secondary" disabled={isSubmitting} onClick={() => form.reset()}>
+            Reset
+          </Button>
+          <Button type="submit" disabled={isSubmitting} >
+            {isSubmitting ? "Writing data alterations..." : isEditMode ? "Save Profile Changes" : "Create Master Brand Profile"}
+          </Button>
+        </div>
       </FieldGroup>
     </form>
   );

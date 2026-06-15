@@ -2,10 +2,9 @@ import Link from "next/link";
 import {
   ArrowLeft,
 } from "lucide-react";
-
-import { EditCategoryForm } from "@/components/category/edit-category-form";
 import { notFound } from "next/navigation";
 import PageHeader from "@/components/layout/dashboard/PageHeader";
+import { CategoryForm } from "@/components/category/category-form";
 
 async function getCategory(id: string) {
   try {
@@ -19,7 +18,7 @@ async function getCategory(id: string) {
     if (!response.ok) return null;
     return await response.json();
   } catch (error) {
-    console.error("Error loading product data:", error);
+    console.error("Error loading category data:", error);
     return null;
   }
 }
@@ -51,7 +50,7 @@ export default async function EditCategoryPage({ params }: Props) {
           description="Update category information and hierarchy." 
         />
 
-        <EditCategoryForm initialCategory={category} />
+        <CategoryForm initialData={category} />
       </div>
   );
 }

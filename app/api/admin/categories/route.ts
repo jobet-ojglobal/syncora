@@ -1,7 +1,6 @@
 // app/api/categories/basic/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { CategoryService } from "@/services/category.service";
-import { prisma } from "@/lib/prisma";
 
 // =====================================================
 // GET ALL CATEGORIES
@@ -48,26 +47,65 @@ export async function POST(
     }
 
     // 1. Fetch current database record to check if name changed
-    const findCategory = await prisma.category.findFirst({
-      where: { name: name as string },
-    });
-
-    if (findCategory) {
-      return NextResponse.json({  
-        success: false,
-        message: `${name} already exists`, 
-      }, { status: 409 });
+    const existing = await CategoryService.nameConflictCheck(name, null);
+    if (existing) {
+      return NextResponse.json({ error: `A category profile titled "${name.trim()}" already exists.` }, { status: 409 });
     }
+
+    const parentCategory = parentId == 'root-level' ? null : parentId;
 
     const newCategory =
       await CategoryService.createCategory({
-          name, description, imageUrl, parentId: parentId || null,
+        name, description, imageUrl, parentId: parentCategory ,
       });
 
     return NextResponse.json(newCategory, { status: 201 });
   } catch (error: any) {
     console.error("Critical failure during Category transaction writes:", error);
     return NextResponse.json({ error: "Internal Database Execution Error" }, { status: 500 });
+  }
+}
+
+// =====================================================
+// UPDATE CATEGORY
+// =====================================================
+
+export async function PATCH(
+  request: NextRequest
+) {
+  try {
+    const body = await request.json();
+    const { id, name, description, imageUrl, parentId } = body;
+
+    if (!id) {
+      return NextResponse.json({ error: "Missing required id target pointer token" }, { status: 400 });
+    }
+
+    if (!name?.trim()) {
+      return NextResponse.json({ error: "Category workspace name cannot be left empty" }, { status: 400 });
+    }
+
+    // 1. Fetch current database record to check if name changed
+    const currentCategory = await CategoryService.getBasicCategory(id);
+    if (!currentCategory) {
+      return NextResponse.json({ error: "Category not found in local system records" }, { status: 400 });
+    }
+
+    const conflictCheck = await CategoryService.nameConflictCheck(name, id);
+    if (conflictCheck) {
+      return NextResponse.json({ error: `Naming label "${name.trim()}" is already claimed by another active profile.` }, { status: 409 });
+    }
+
+    const parentCategory = parentId == 'root-level' ? null : parentId;
+
+    const updatedCategory = await CategoryService.updateCategory({
+      id, name, description, imageUrl, parentId: parentCategory,
+    });
+
+    return NextResponse.json(updatedCategory, { status: 200 });
+  } catch (error: any) {
+    console.error("Critical failure during Category model update writes:", error);
+    return NextResponse.json({ error: "Internal Database execution update error occurred" }, { status: 500 });
   }
 }
 

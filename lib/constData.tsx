@@ -187,21 +187,21 @@ export const data = {
     /*                                  BRANCHES                                  */
     /* -------------------------------------------------------------------------- */
 
-    // {
-    //   title: "Branches",
-    //   url: "/dashboard/branches",
-    //   icon: Building2,
-    //   items: [
-    //     {
-    //       title: "All Branches",
-    //       url: "/dashboard/branches",
-    //     },
-    //     {
-    //       title: "Create Branch",
-    //       url: "/dashboard/branches/create",
-    //     },
-    //   ],
-    // },
+    {
+      title: "Locations",
+      url: "/dashboard/locations",
+      icon: Building2,
+      items: [
+        {
+          title: "All Locations",
+          url: "/dashboard/locations",
+        },
+        {
+          title: "Create Branch",
+          url: "/dashboard/locations/create",
+        },
+      ],
+    },
 
     /* -------------------------------------------------------------------------- */
     /*                                  PRODUCTS                                  */
@@ -343,21 +343,21 @@ export const data = {
     /*                               TRANSFER ORDERS                              */
     /* -------------------------------------------------------------------------- */
 
-    // {
-    //   title: "Transfer Orders",
-    //   url: "/dashboard/transfer-orders",
-    //   icon: Truck,
-    //   items: [
-    //     {
-    //       title: "All Transfers",
-    //       url: "/dashboard/transfer-orders",
-    //     },
-    //     {
-    //       title: "Create Transfer",
-    //       url: "/dashboard/transfer-orders/create",
-    //     },
-    //   ],
-    // },
+    {
+      title: "Transfer Orders",
+      url: "/dashboard/transfers",
+      icon: Truck,
+      items: [
+        {
+          title: "All Transfers",
+          url: "/dashboard/transfers",
+        },
+        {
+          title: "Create Transfer",
+          url: "/dashboard/transfers/create",
+        },
+      ],
+    },
 
     /* -------------------------------------------------------------------------- */
     /*                               CUSTOMER ORDERS                              */

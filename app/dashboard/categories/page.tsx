@@ -212,7 +212,11 @@ export default function CategoriesListPage() {
   return (
     <div className="w-full max-w-5xl mx-auto p-6 space-y-6">
       {/* Upper Heading Banner Grid Content */}
-      <PageHeader title="Product Categories" description="Manage taxonomy groupings, track counts, and review catalog structures." >
+      <PageHeader 
+        className=" border-b pb-5" 
+        title="Product Categories" 
+        description="Manage taxonomy groupings, track counts, and review catalog structures." 
+        >
         <Button asChild size="sm" className="gap-1.5 shrink-0">
           <Link href="/dashboard/categories/create">
             <Plus className="w-4 h-4" /> Add Category

@@ -40,9 +40,9 @@ export class CategoryService {
     });
   }
 
-  static async findCategoryByNameForDuplicate(
-    id: string | null,
-    name: string
+  static async nameConflictCheck(
+    name: string,
+    id: string | null
   ) {
     return prisma.category.findFirst({
       where: {
@@ -78,18 +78,6 @@ export class CategoryService {
           },
         },
       },
-
-      // include: {
-      //   parent: true,
-      //   children: true,
-      //   _count: {
-      //     select: {
-      //       productGroups: true,
-      //       children: true,
-      //     },
-      //   },
-      // },
-
       orderBy: {
         name: "asc",
       },
@@ -138,6 +126,8 @@ export class CategoryService {
     const slug = await genUniqueSlug(data.name, prisma.category);
     const computedInflowId = crypto.randomUUID().toString();
 
+    console.log(computedInflowId, slug)
+
     return await prisma.category.create({
       data: {
         inflowId: computedInflowId,
@@ -179,8 +169,17 @@ export class CategoryService {
    * Note: You may want to handle children categories or products before deleting
    */
   static async deleteCategory(id: string) {
-    return await prisma.category.delete({
-      where: { id }
+    const category = await prisma.category.findUnique({
+      where: { id },
+      include: { _count: { select: { productGroups: true } } }
+    });
+
+    if (category?._count.productGroups && category._count.productGroups > 0) {
+      throw new Error(`Cannot delete category "${category.name}" because it is linked to ${category._count.productGroups} product groups.`);
+    }
+
+     return await prisma.category.delete({
+      where: { id },
     });
   }
 

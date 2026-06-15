@@ -31,7 +31,7 @@ model Category {
   id          String   @id @default(cuid())
   inflowId    String   @unique
   name        String
-  slug        String @unique // e.g., "digital-cameras"
+  slug        String   @unique // e.g., "digital-cameras"
   description String?
   imageUrl    String?
 
@@ -43,6 +43,7 @@ model Category {
   children          Category[] @relation("CategoryToCategory")
 
   productGroups     ProductGroup[]
+  products          Product[]
 
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
@@ -137,11 +138,15 @@ model Product {
   brandId           String?
   brand             Brand? @relation(fields: [brandId], references: [id])
 
+  categoryId        String?
+  category          Category? @relation(fields: [categoryId], references: [inflowId])
+
   features          ProductFeature[]
   tags              ProductTag[]
 
   inventories       Inventory[]
   inventoryBins     InventoryBin[]
+  transferOrderLines  TransferOrderLine[]
   barcodes          ProductBarcode[]
 
   createdAt             DateTime @default(now())
@@ -275,25 +280,7 @@ model AttributeValue {
   @@unique([attributeId, value])
 }
 
-// model ProductGroupOptionAttributeMap {
-//   id          String @id @default(cuid())
 
-//   optionId    String @unique
-//   attributeId String
-
-//   option      ProductGroupOption @relation(fields:[optionId], references:[inflowId])
-//   attribute   Attribute @relation(fields:[attributeId], references:[id])
-// }
-
-// model ProductGroupOptionValueAttributeValueMap {
-//   id               String @id @default(cuid())
-
-//   optionValueId    String @unique
-//   attributeValueId String
-
-//   optionValue      ProductGroupOptionValue @relation(fields:[optionValueId], references:[inflowId])
-//   attributeValue   AttributeValue @relation(fields:[attributeValueId], references:[id])
-// }
 
 model ProductVariantSelection {
   id                     String @id @default(cuid())
@@ -384,7 +371,6 @@ model ProductTag {
 }
 
 
-
 // Locations
 
 model Location {
@@ -398,9 +384,14 @@ model Location {
   address         LocationAddress?
   inventories     Inventory[]
   sublocations    Sublocation[]
+  
+  outgoingTransfers TransferOrder[] @relation("TransferSourceLocation")
+  incomingTransfers TransferOrder[]  @relation("TransferTargetLocation")
 
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
+
+  deletedAt   DateTime?
 
   @@map("location")
 }
@@ -418,6 +409,8 @@ model LocationAddress {
   addressType   String?
 
   location      Location @relation(fields: [locationId],references: [inflowId])
+
+  @@map("location_address")
 }
 
 model Sublocation {
@@ -426,6 +419,8 @@ model Sublocation {
   name            String
   location        Location @relation(fields: [locationId],references: [inflowId])
   inventoryBins   InventoryBin[]
+  sourceTransferLines TransferOrderLine[] @relation("TransferSourceSublocation")
+  targetTransferLines TransferOrderLine[] @relation("TransferTargetSublocation")
   
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
@@ -447,7 +442,6 @@ model Inventory {
 
   product             Product @relation(fields: [productId],references: [inflowId])
   location            Location @relation(fields: [locationId],references: [inflowId])
-
   bins                InventoryBin[]
 
   createdAt           DateTime @default(now())
@@ -478,6 +472,79 @@ model InventoryBin {
 
   @@map("inventory_bin")
 }
+
+model TransferOrder {
+  id                String   @id @default(cuid())
+  transferNumber    String   @unique
+  sourceLocationId  String
+  targetLocationId  String
+  status            TransferOrderStatus @default(DRAFT)
+  remarks           String?
+  transferredAt     DateTime?
+  receivedAt        DateTime?
+
+  sourceLocation    Location @relation("TransferSourceLocation",fields: [sourceLocationId],references: [inflowId])
+  targetLocation    Location @relation("TransferTargetLocation",fields: [targetLocationId],references: [inflowId])
+  lines             TransferOrderLine[]
+
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@index([sourceLocationId])
+  @@index([targetLocationId])
+
+  @@map("transfer_order")
+}
+
+model TransferOrderLine {
+  id                    String @id @default(cuid())
+  transferOrderId       String
+  productId             String
+  sourceSublocationId   String?
+  targetSublocationId   String?
+  quantity              Decimal @db.Decimal(18,4)
+
+  transferOrder         TransferOrder @relation(fields: [transferOrderId],references: [id])
+  product               Product @relation(fields: [productId],references: [inflowId])
+  sourceSublocation     Sublocation? @relation("TransferSourceSublocation",fields: [sourceSublocationId],references: [id])
+  targetSublocation     Sublocation? @relation("TransferTargetSublocation",fields: [targetSublocationId],references: [id])
+
+  createdAt             DateTime @default(now())
+
+  @@index([transferOrderId])
+  @@index([productId])
+
+  @@map("transfer_order_line")
+}
+
+enum TransferOrderStatus {
+  DRAFT
+  PENDING
+  IN_TRANSIT
+  RECEIVED
+  CANCELLED
+}
+
+// model ProductGroupOptionAttributeMap {
+//   id          String @id @default(cuid())
+
+//   optionId    String @unique
+//   attributeId String
+
+//   option      ProductGroupOption @relation(fields:[optionId], references:[inflowId])
+//   attribute   Attribute @relation(fields:[attributeId], references:[id])
+// }
+
+// model ProductGroupOptionValueAttributeValueMap {
+//   id               String @id @default(cuid())
+
+//   optionValueId    String @unique
+//   attributeValueId String
+
+//   optionValue      ProductGroupOptionValue @relation(fields:[optionValueId], references:[inflowId])
+//   attributeValue   AttributeValue @relation(fields:[attributeValueId], references:[id])
+// }
+
 
 
 

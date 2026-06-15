@@ -1,10 +1,7 @@
-"use client";
-
 import Link from "next/link";
 
 import {
   ArrowLeft,
-  FolderTree,
 } from "lucide-react";
 
 import { CategoryForm } from "@/components/category/category-form";

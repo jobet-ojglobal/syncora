@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { BrandService } from "@/services/brand.service";
 import { NextRequest, NextResponse } from "next/server";
 
 interface Props {
@@ -40,15 +41,7 @@ export async function GET(
       });
 
     if (!brand) {
-      return NextResponse.json(
-        {
-          message:
-            "Brand not found",
-        },
-        {
-          status: 404,
-        }
-      );
+      return NextResponse.json({ error: "Brand not found." }, { status: 400 });
     }
 
     return NextResponse.json(
@@ -56,63 +49,7 @@ export async function GET(
     );
   } catch (error) {
     console.error(error);
-
-    return NextResponse.json(
-      {
-        message:
-          "Failed to fetch brand",
-      },
-      {
-        status: 500,
-      }
-    );
-  }
-}
-
-// ======================================================
-// UPDATE BRAND
-// ======================================================
-
-export async function PATCH(
-  request: NextRequest,
-  { params }: Props
-) {
-  try {
-    const { id } = await params;
-
-    const body = await request.json();
-
-    const brand =
-      await prisma.brand.update({
-        where: {
-          id,
-        },
-
-        data: {
-          name: body.name,
-          description:
-            body.description,
-          logoUrl: body.logoUrl,
-          websiteUrl:
-            body.websiteUrl,
-        },
-      });
-
-    return NextResponse.json(
-      brand
-    );
-  } catch (error) {
-    console.error(error);
-
-    return NextResponse.json(
-      {
-        message:
-          "Failed to update brand",
-      },
-      {
-        status: 500,
-      }
-    );
+    return NextResponse.json({ error: "Failed to fetch brand" }, { status: 500 });
   }
 }
 
@@ -127,26 +64,13 @@ export async function DELETE(
   try {
     const { id } = await params;
 
-    await prisma.brand.delete({
-      where: {
-        id,
-      },
-    });
+    await BrandService.deleteBrand(id);
 
     return NextResponse.json({
-      success: true,
+      success: true
     });
   } catch (error) {
     console.error(error);
-
-    return NextResponse.json(
-      {
-        message:
-          "Failed to delete brand",
-      },
-      {
-        status: 500,
-      }
-    );
+    return NextResponse.json({ error: "Failed to delete brand" }, { status: 500 });
   }
 }

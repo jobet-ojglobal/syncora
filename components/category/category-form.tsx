@@ -4,7 +4,6 @@
 import { useEffect, useState } from "react";
 import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { createCategorySchema, CreateCategoryInput } from "@/schemas/category.schema";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -23,23 +22,40 @@ import {
   FieldLegend,
   FieldSet,
 } from "@/components/ui/field";
+import { CategoryInput, categorySchema } from "@/schemas/category.schema";
+import { useRouter } from "next/navigation";
 
 interface CategoryFlatOption {
   id: string;
   label: string;
 }
 
-export function CategoryForm() {
+interface BrandFormProps {
+  initialData?: {
+    id: string;
+    inflowId: string;
+    name: string;
+    description: string | null;
+    imageUrl: string | null;
+    parentId: string | null;
+  } | null;
+  onSuccess?: () => void;
+}
+
+export function CategoryForm({ initialData, onSuccess }: BrandFormProps) {
   const [flatCategories, setFlatCategories] = useState<CategoryFlatOption[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const router = useRouter();
+  const isEditMode = !!initialData;
 
-  const form = useForm<CreateCategoryInput>({
-    resolver: zodResolver(createCategorySchema),
+  const form = useForm<CategoryInput>({
+    resolver: zodResolver(categorySchema),
     defaultValues: {
-      name: "",
-      description: "",
-      imageUrl: "",
-      parentId: "root-level", // Select UI placeholder default
+      id: initialData?.id,
+      name: initialData?.name || "",
+      description: initialData?.description || "",
+      imageUrl: initialData?.imageUrl || "",
+      parentId: initialData?.parentId || "root-level", // Select UI placeholder default
     },
   });
 
@@ -50,8 +66,12 @@ export function CategoryForm() {
     try {
       const res = await fetch("/api/admin/categories/basic"); // Your endpoint returning inflowId + name
       if (res.ok) {
-        const data = await res.json();
-        setFlatCategories(data);
+          const data: CategoryFlatOption[] = await res.json();
+          
+          // 🛑 SAFEGUARD: Remove this specific item from options stack 
+          // to prevent circular dependencies (e.g. Cameras can't be a parent of Cameras)
+          const validParents = data.filter(cat => cat.id !== initialData?.inflowId);
+          setFlatCategories(validParents);
       }
     } catch (err) {
       console.error("Failed to fetch parent options:", err);
@@ -62,41 +82,30 @@ export function CategoryForm() {
     fetchCategoryOptions().then(() => setIsLoading(false));
   }, []);
 
-  const onSubmit = async (values: CreateCategoryInput) => {
+  const onSubmit = async (values: CategoryInput) => {
     try {
-      // Clean fallback string token back into an applicable DB null configuration
-      const payload = {
-        ...values,
-        parentId: values.parentId === "root-level" ? null : values.parentId,
-      };
+      const endpoint = "/api/admin/categories";
+      const method = isEditMode ? "PATCH" : "POST";
 
-      const response = await fetch("/api/admin/categories", {
-        method: "POST",
+      const response = await fetch(endpoint, {
+        method,
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
+        body: JSON.stringify(values),
       });
-
-      const res = await response.json();
 
       if (!response.ok) {
-        throw new Error(
-            res.message ||
-            "Could not process transactions"
-        );
-      }
+        const errData = await response.json();
+        throw new Error(errData.error || "Network transaction failed.");
+      } 
 
-      toast.success("Category Created", {
-        description: `Successfully added ${values.name} taxonomy.`,
+      toast.success(isEditMode ? "Category Updated" : "Category Created", {
+        description: `Successfully processed profiles for "${values.name}".`,
       });
 
-      // Clear layout and refresh parent options array dropdown stack
-      reset({ name: "", description: "", imageUrl: "", parentId: "root-level" });
-      await fetchCategoryOptions();
-    } catch (err) {
-      let error = err instanceof Error
-        ? err.message
-        : "Failed to create category listing."
-      toast.error("Error", { description: error});
+      router.push("/dashboard/categories");
+      router.refresh();
+    } catch (err: any) {
+      toast.error("Transaction Error", { description: err.message || "Failed to save profile structural assets." });
     }
   };
 
@@ -155,9 +164,14 @@ export function CategoryForm() {
           </FieldGroup>
         </FieldSet>
 
-        <Button type="submit" disabled={isSubmitting} className="w-full mt-2">
-          {isSubmitting ? "Creating structural record..." : "Save Classification"}
-        </Button>
+        <div className="flex flex-row items-center justify-end gap-4 w-full mt-2">
+          <Button type="button" variant="secondary" disabled={isSubmitting} onClick={() => form.reset()}>
+            Reset
+          </Button>
+          <Button type="submit" disabled={isSubmitting}>
+            {isSubmitting ? "Creating structural record..." : "Save Classification"}
+          </Button>
+        </div>
       </FieldGroup>
     </form>
   );
