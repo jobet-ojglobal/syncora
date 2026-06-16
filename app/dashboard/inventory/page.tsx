@@ -38,7 +38,7 @@ export default function InventoryListPage() {
 
   const fetchInventory = async () => {
     try {
-      const res = await fetch("/api/inventory");
+      const res = await fetch("/api/admin/inventory");
       if (res.ok) {
         const data = await res.json();
         setInventory(data);

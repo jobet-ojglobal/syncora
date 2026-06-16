@@ -5,9 +5,9 @@ export const productSchema = z.object({
   inflowId: z.string().optional(),
   sku: z.string().min(1, "SKU reference identifier is required").max(100),
   name: z.string().min(1, "Product name is required").max(255),
-  slug: z.string().min(1, "SEO URL slug is required").regex(/^[a-z0-9-_]+$/, "Must be valid alphanumeric slug URL structure"),
   description: z.string().nullable().optional(),
   itemType: z.string(),
+  categoryId: z.string().min(1, "Assigning a Category is required"),
   brandId: z.string().nullable().optional(),
   
   // ⚙️ Booleans Logistics Flags

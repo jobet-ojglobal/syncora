@@ -105,7 +105,7 @@ export async function POST(request: NextRequest) {
 export async function PATCH(request: NextRequest) {
   try {
     const body = await request.json();
-    const { id, productId, locationId, quantityOnHand, quantityReserved, quantityAvailable, bins } = body;
+    const { id, quantityOnHand, quantityReserved, quantityAvailable, bins } = body;
 
     if (!id) {
       return NextResponse.json({ error: "Missing master inventory record pointer ID identifier token." }, { status: 400 });

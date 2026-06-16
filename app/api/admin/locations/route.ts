@@ -5,6 +5,9 @@ import { prisma } from "@/lib/prisma";
 export async function GET() {
   try {
     const locations = await prisma.location.findMany({
+      where: {
+        deletedAt: null
+      },
       include: {
         address: true,
         _count: {

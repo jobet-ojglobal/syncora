@@ -5,9 +5,38 @@ import {
 import PageHeader from "@/components/layout/dashboard/PageHeader";
 import { ProductForm } from "@/components/products/product-form";
 import { prisma } from "@/lib/prisma";
+import { notFound } from "next/navigation";
 
-export default async function CreateBrandPage() {
-  const [brands, categories] = await Promise.all([
+async function getProduct(id: string) {
+  try {
+    const response = await fetch(
+      `${process.env.NEXT_PUBLIC_APP_URL}/api/admin/products/${id}/basic`,
+      {
+        cache: "no-store",
+      }
+    );
+
+    if (!response.ok) return null;
+    return await response.json();
+  } catch (error) {
+    console.error("Error loading product data:", error);
+    return null;
+  }
+}
+
+interface Props {
+  params: Promise<{
+    id: string;
+  }>;
+}
+
+export default async function EditProductPage({ params }: Props) {
+  const { id } = await params;
+  const product = await getProduct(id);
+
+  if(!product) notFound();
+  
+  const [ brands, categories] = await Promise.all([
     prisma.brand.findMany({
       select: {
         id: true,
@@ -39,7 +68,7 @@ export default async function CreateBrandPage() {
         title="Create Product"
         description=" Add a new product." 
       />
-      <ProductForm brands={brands} categories={categories} />
+      <ProductForm initialData={product} brands={brands} categories={categories} />
     </div>
   );
 }

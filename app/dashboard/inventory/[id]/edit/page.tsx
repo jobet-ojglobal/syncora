@@ -1,10 +1,13 @@
+// app/admin/inventory/[id]/edit/page.tsx
 import Link from "next/link";
 import {
   ArrowLeft,
 } from "lucide-react";
 import PageHeader from "@/components/layout/dashboard/PageHeader";
-import { BrandForm } from "@/components/brand/brand-form";
 import { notFound } from "next/navigation";
+import { InventoryForm } from "@/components/inventory/inventory-form.adjustment";
+import { prisma } from "@/lib/prisma";
+import { getCurrentUser } from "@/lib/user";
 
 
 async function getInventory(id: string) {
@@ -33,10 +36,40 @@ interface Props {
 export default async function InventoryAdjustmentPage({ params }: Props) {
   const { id } = await params;
   const inventory = await getInventory(id);
+  const currentUser = await getCurrentUser()
+
+
 
   if(!inventory) notFound();
+  
+  const [products, locations, sublocations] = await Promise.all([
+    prisma.product.findMany({
+      select: {
+        inflowId: true,
+        name: true,
+      },
+      orderBy: { name: "asc" },
+    }),
+
+    prisma.location.findMany({
+      select: {
+        inflowId: true,
+        name: true,
+      },
+      orderBy: { name: "asc" },
+    }),
+
+    prisma.sublocation.findMany({
+      select: {
+        id: true,
+        name: true,
+        locationId: true,
+      },
+      orderBy: { name: "asc" },
+    }),
+  ]);
   return (
-    <div className="w-full max-w-xl mx-auto p-6 space-y-6">
+    <div className="w-full max-w-2xl mx-auto p-6 space-y-6">
       {/* HEADER */}
       <Link
         href="/dashboard/inventory"
@@ -49,7 +82,18 @@ export default async function InventoryAdjustmentPage({ params }: Props) {
         title="Inventory Adjustment"
         description="Update inventory" 
       />
-      <BrandForm initialData={inventory} />
+      <InventoryForm 
+        currentUser={currentUser}
+        initialData={inventory} 
+        products={products.map((p) => ({
+          inflowId: p.inflowId,
+          name: p.name,
+        }))}
+        locations={locations.map((l) => ({
+          inflowId: l.inflowId,
+          name: l.name,
+        }))}
+        sublocations={sublocations} />
     </div>
   );
 }

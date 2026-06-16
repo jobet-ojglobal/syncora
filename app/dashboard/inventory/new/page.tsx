@@ -5,6 +5,7 @@ import {
 import PageHeader from "@/components/layout/dashboard/PageHeader";
 import { InventoryForm } from "@/components/inventory/inventory-form";
 import { prisma } from "@/lib/prisma";
+import { getCurrentUser } from "@/lib/user";
 
 export default async function NewInventoryPage() {
   const [products, locations, sublocations] = await Promise.all([
@@ -17,6 +18,10 @@ export default async function NewInventoryPage() {
     }),
 
     prisma.location.findMany({
+      where: {
+        isActive: true,
+        deletedAt: null
+      },
       select: {
         inflowId: true,
         name: true,
@@ -34,7 +39,7 @@ export default async function NewInventoryPage() {
     }),
   ]);
   return (
-    <div className="w-full max-w-xl mx-auto p-6 space-y-6">
+    <div className="w-full max-w-2xl mx-auto p-6 space-y-6">
       {/* HEADER */}
       <Link
         href="/dashboard/inventory"

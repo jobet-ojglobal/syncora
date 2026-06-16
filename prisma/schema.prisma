@@ -12,6 +12,30 @@ datasource db {
   provider = "postgresql"
 }
 
+model User {
+  id            String    @id
+  name          String
+  email         String
+  emailVerified Boolean
+  image         String?
+  createdAt     DateTime
+  updatedAt     DateTime
+  // role          UserRole @default(Customer)
+  // branchId      String?
+  // branch        Branch?  @relation(fields: [branchId], references: [id])
+  // cart          Cart?
+
+  // sessions      Session[]
+  // accounts      Account[]
+  // orders        CustomerOrder[]
+  // activities ActivityLog[]
+  adjustments      InventoryAdjustment[]
+
+
+  @@unique([email])
+  @@map("user")
+}
+
 model SyncJob {
   id        String   @id @default(cuid())
   source    String
@@ -132,6 +156,7 @@ model Product {
 
   purchasingUom         ProductUom?
   salesUom              ProductSalesUom?
+  
   variant               ProductVariant?
   images                ProductImage[]
 
@@ -146,8 +171,13 @@ model Product {
 
   inventories       Inventory[]
   inventoryBins     InventoryBin[]
+  adjustmentLines   InventoryAdjustmentLine[]
+
+  inventoryLedger   InventoryLedger[]
+  
   transferOrderLines  TransferOrderLine[]
   barcodes          ProductBarcode[]
+  
 
   createdAt             DateTime @default(now())
   updatedAt             DateTime @updatedAt
@@ -384,6 +414,8 @@ model Location {
   address         LocationAddress?
   inventories     Inventory[]
   sublocations    Sublocation[]
+  adjustmentLines     InventoryAdjustmentLine[]
+  inventoryLedger     InventoryLedger[]
   
   outgoingTransfers TransferOrder[] @relation("TransferSourceLocation")
   incomingTransfers TransferOrder[]  @relation("TransferTargetLocation")
@@ -410,6 +442,8 @@ model LocationAddress {
 
   location      Location @relation(fields: [locationId],references: [inflowId])
 
+  
+
   @@map("location_address")
 }
 
@@ -422,6 +456,8 @@ model Sublocation {
   sourceTransferLines TransferOrderLine[] @relation("TransferSourceSublocation")
   targetTransferLines TransferOrderLine[] @relation("TransferTargetSublocation")
   
+  adjustmentLines     InventoryAdjustmentLine[]
+
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
@@ -472,6 +508,78 @@ model InventoryBin {
 
   @@map("inventory_bin")
 }
+
+model InventoryAdjustment {
+  id                String   @id @default(cuid())
+  adjustmentNumber  String   @unique
+  reason            AdjustmentReason
+  notes             String?
+  performedById     String
+  performedBy       User     @relation(fields: [performedById], references: [id])
+  lines             InventoryAdjustmentLine[]
+  createdAt         DateTime @default(now())
+  @@map("inventory_adjustment")
+}
+
+model InventoryAdjustmentLine {
+  id                    String @id @default(cuid())
+  adjustmentId          String
+  productId             String
+  locationId            String
+  sublocationId         String?
+  quantityBefore        Decimal @db.Decimal(18,4)
+  quantityAdjusted      Decimal @db.Decimal(18,4)
+  quantityAfter         Decimal @db.Decimal(18,4)
+  reason                String?
+  adjustment            InventoryAdjustment @relation(fields: [adjustmentId], references: [id])
+  product               Product @relation(fields: [productId], references: [inflowId])
+  location              Location @relation(fields: [locationId], references: [inflowId])
+  sublocation           Sublocation? @relation(fields: [sublocationId], references: [id])
+  createdAt             DateTime @default(now())
+
+  @@index([productId])
+  @@index([locationId])
+
+  @@map("inventory_adjustment_line")
+}
+
+enum AdjustmentReason {
+  STOCK_COUNT
+  DAMAGE
+  LOSS
+  THEFT
+  EXPIRED
+  RETURN
+  CORRECTION
+  MANUAL
+}
+
+model InventoryLedger {
+  id                String @id @default(cuid())
+  productId         String
+  locationId        String
+  sublocationId     String?
+  transactionType   InventoryTransactionType
+  referenceType     String?
+  referenceId       String?
+  quantityChange    Decimal @db.Decimal(18,4)
+  quantityBefore    Decimal @db.Decimal(18,4)
+  quantityAfter     Decimal @db.Decimal(18,4)
+  performedById     String?
+  createdAt         DateTime @default(now())
+  product           Product @relation(fields: [productId], references: [inflowId])
+  location          Location @relation(fields: [locationId], references: [inflowId])
+}
+
+enum InventoryTransactionType {
+  ADJUSTMENT
+  TRANSFER_IN
+  TRANSFER_OUT
+  PURCHASE
+  SALE
+  RETURN
+}
+
 
 model TransferOrder {
   id                String   @id @default(cuid())
@@ -524,6 +632,8 @@ enum TransferOrderStatus {
   RECEIVED
   CANCELLED
 }
+
+
 
 // model ProductGroupOptionAttributeMap {
 //   id          String @id @default(cuid())

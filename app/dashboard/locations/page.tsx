@@ -32,7 +32,7 @@ export default function LocationsListPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [expandedRows, setExpandedRows] = useState<Record<string, boolean>>({});
-
+  
   const fetchLocations = async () => {
     try {
       const res = await fetch("/api/admin/locations");

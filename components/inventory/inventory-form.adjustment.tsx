@@ -1,13 +1,24 @@
 // components/InventoryForm.tsx
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { useForm, useFieldArray, Controller, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { inventorySchema, InventoryInput } from "@/schemas/inventory.schema";
+import { adjustmentSchema, AdjustmentInput } from "@/schemas/adjustment.schema";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Trash2, Plus, ArrowLeft, Boxes, Warehouse, AlertCircle, Info } from "lucide-react";
+import { Textarea } from "@/components/ui/textarea";
+import { 
+  Trash2, 
+  Plus, 
+  ArrowLeft, 
+  Boxes, 
+  Warehouse, 
+  AlertCircle, 
+  Info, 
+  ClipboardCheck, 
+  UserCheck 
+} from "lucide-react";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 import {
@@ -32,16 +43,17 @@ interface SublocationOption {
 interface InventoryFormProps {
   products: SelectionOption[];
   locations: SelectionOption[];
-  sublocations: SublocationOption[]; // Global list filtered reactively below
+  sublocations: SublocationOption[];
   initialData?: any | null;
+  currentUser?: { id: string; name: string } | null; // Added to map audit lines accurately
 }
 
-export function InventoryForm({ products, locations, sublocations, initialData }: InventoryFormProps) {
+export function InventoryForm({ products, locations, sublocations, initialData, currentUser }: InventoryFormProps) {
   const router = useRouter();
   const isEditMode = !!initialData;
 
-  const form = useForm<InventoryInput>({
-    resolver: zodResolver(inventorySchema),
+  const form = useForm<AdjustmentInput & { reason: string; notes: string; performedById: string }>({
+    resolver: zodResolver(adjustmentSchema),
     defaultValues: {
       id: initialData?.id,
       productId: initialData?.productId || "",
@@ -49,6 +61,9 @@ export function InventoryForm({ products, locations, sublocations, initialData }
       quantityOnHand: initialData?.quantityOnHand ? Number(initialData.quantityOnHand) : 0,
       quantityReserved: initialData?.quantityReserved ? Number(initialData.quantityReserved) : 0,
       quantityAvailable: initialData?.quantityAvailable ? Number(initialData.quantityAvailable) : 0,
+      reason: "MANUAL", // Audit default
+      notes: "",
+      performedById: currentUser?.id || "usr_system_agent", // Fallback system pointer
       bins: initialData?.bins?.map((b: any) => ({
         id: b.id,
         sublocationId: b.sublocationId,
@@ -73,13 +88,13 @@ export function InventoryForm({ products, locations, sublocations, initialData }
   // Filter sublocations down exclusively to zones matching the selected master facility location
   const availableSublocations = sublocations.filter(sub => sub.locationId === watchedLocationId);
 
-  // 📊 Equation 1: Calculate core stock availability metrics automatically
+  // 📊 Calculate core stock availability metrics automatically
   useEffect(() => {
     const computedAvailable = Number(watchedOnHand) - Number(watchedReserved);
     setValue("quantityAvailable", computedAvailable);
   }, [watchedOnHand, watchedReserved, setValue]);
 
-  // 🧮 Equation 2: Sum up sublocation bins to auto-populate absolute total stock values
+  // 🧮 Sum up sublocation bins to auto-populate absolute total stock values
   const handleDistributeBinsToTotal = () => {
     if (watchedBins.length > 0) {
       const sum = watchedBins.reduce((acc, current) => acc + (Number(current.quantity) || 0), 0);
@@ -87,9 +102,9 @@ export function InventoryForm({ products, locations, sublocations, initialData }
     }
   };
 
-  const onSubmit = async (values: InventoryInput) => {
+  const onSubmit = async (values: any) => {
     try {
-      const endpoint = "/api/admin/inventory";
+      const endpoint = `/api/admin/inventory/${initialData.id}/adjustment`;
       const method = isEditMode ? "PATCH" : "POST";
 
       const response = await fetch(endpoint, {
@@ -104,7 +119,7 @@ export function InventoryForm({ products, locations, sublocations, initialData }
       }
 
       toast.success(isEditMode ? "Stock Levels Updated" : "Inventory Initialized Successfully", {
-        description: "Balanced logistics records entry allocations.",
+        description: "Balanced logistics records entry allocations committed with structural audit log keys.",
       });
 
       router.push("/dashboard/inventory");
@@ -115,7 +130,7 @@ export function InventoryForm({ products, locations, sublocations, initialData }
   };
 
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className="w-full max-w-3xl mx-auto p-6 bg-card border rounded-xl shadow-sm space-y-6">
+    <form onSubmit={handleSubmit(onSubmit)} className="w-full max-w-3xl mx-auto p-6 bg-card border rounded-xl shadow-xs space-y-6">
       <FieldGroup className="gap-5">
         <FieldSet>
           <FieldLegend className="flex items-center gap-2">
@@ -129,7 +144,7 @@ export function InventoryForm({ products, locations, sublocations, initialData }
               <FieldLabel>Target Stock Product Variant *</FieldLabel>
               <select 
                 disabled={isEditMode}
-                className="w-full text-xs h-9 rounded-md border border-input bg-transparent px-3 py-1 shadow-sm select-none focus-visible:outline-hidden disabled:opacity-60"
+                className="w-full text-xs h-9 rounded-md border border-input bg-transparent px-3 py-1 shadow-xs select-none focus-visible:outline-hidden disabled:opacity-60"
                 {...register("productId")}
               >
                 <option value="">-- Select SKU Product Line --</option>
@@ -142,7 +157,7 @@ export function InventoryForm({ products, locations, sublocations, initialData }
               <FieldLabel>Holding Warehouse Facility *</FieldLabel>
               <select
                 disabled={isEditMode}
-                className="w-full text-xs h-9 rounded-md border border-input bg-transparent px-3 py-1 shadow-sm select-none focus-visible:outline-hidden disabled:opacity-60"
+                className="w-full text-xs h-9 rounded-md border border-input bg-transparent px-3 py-1 shadow-xs select-none focus-visible:outline-hidden disabled:opacity-60"
                 {...register("locationId")}
               >
                 <option value="">-- Select Storage Facility Hub --</option>
@@ -163,7 +178,6 @@ export function InventoryForm({ products, locations, sublocations, initialData }
               <Input 
                 type="number" 
                 step="0.0001" 
-                min={0}
                 placeholder="0.00" 
                 {...register("quantityOnHand", { valueAsNumber: true })} 
               />
@@ -177,7 +191,6 @@ export function InventoryForm({ products, locations, sublocations, initialData }
               <Input 
                 type="number" 
                 step="0.0001" 
-                min={0}
                 placeholder="0.00" 
                 {...register("quantityReserved", { valueAsNumber: true })} 
               />
@@ -232,65 +245,50 @@ export function InventoryForm({ products, locations, sublocations, initialData }
           </div>
 
           <div className="mt-3 space-y-2 max-h-[260px] overflow-y-auto pr-1">
-            {fields.map((field, index) => {
-              // 1. Gather all currently selected sublocation IDs across the field array
-              const selectedBinIds = watchedBins.map((b) => b?.sublocationId).filter(Boolean);
-              
-              // 2. Identify what this specific row has selected (if anything)
-              const currentSelection = watchedBins[index]?.sublocationId;
-
-              // 3. Filter the global list: must match location, AND must not be taken by another row
-              const uniquelyAvailableSublocations = availableSublocations.filter((sub) => {
-                const isSelectedByAnotherRow = selectedBinIds.includes(sub.id) && sub.id !== currentSelection;
-                return !isSelectedByAnotherRow;
-              });
-
-              return (
-                <div key={field.id} className="flex items-start gap-3 bg-muted/30 border p-2 rounded-xl relative">
-                  
-                  {/* Reactive filtered structural list picker */}
-                  <div className="flex-1">
-                    <select
-                      className="w-full text-xs h-9 rounded-md border border-input bg-background px-3 py-1 shadow-sm focus-visible:outline-hidden"
-                      {...register(`bins.${index}.sublocationId` as const)}
-                    >
-                      <option value="">-- Choose Sublocation Slot --</option>
-                      {uniquelyAvailableSublocations.map(s => (
-                        <option key={s.id} value={s.id}>{s.name}</option>
-                      ))}
-                    </select>
-                    {errors.bins?.[index]?.sublocationId && (
-                      <span className="text-[10px] text-destructive block mt-1">{errors.bins[index].sublocationId.message}</span>
-                    )}
-                  </div>
-
-                  {/* Specific assigned payload quantity volume input parameter */}
-                  <div className="w-44">
-                    <Input
-                      type="number"
-                      step="0.0001"
-                      min={0}
-                      placeholder="Volume"
-                      className="text-xs h-9 bg-background"
-                      {...register(`bins.${index}.quantity`, { valueAsNumber: true })}
-                    />
-                    {errors.bins?.[index]?.quantity && (
-                      <span className="text-[10px] text-destructive block mt-1">{errors.bins[index].quantity.message}</span>
-                    )}
-                  </div>
-
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => remove(index)}
-                    className="h-9 w-9 text-muted-foreground hover:text-destructive shrink-0"
+            {fields.map((field, index) => (
+              <div key={field.id} className="flex items-start gap-3 bg-muted/30 border p-2 rounded-xl relative">
+                
+                {/* Reactive filtered structural list picker */}
+                <div className="flex-1">
+                  <select
+                    className="w-full text-xs h-9 rounded-md border border-input bg-background px-3 py-1 shadow-xs focus-visible:outline-hidden"
+                    {...register(`bins.${index}.sublocationId` as const)}
                   >
-                    <Trash2 className="w-4 h-4" />
-                  </Button>
+                    <option value="">-- Choose Sublocation Slot --</option>
+                    {availableSublocations.map(s => (
+                      <option key={s.id} value={s.id}>{s.name}</option>
+                    ))}
+                  </select>
+                  {errors.bins?.[index]?.sublocationId && (
+                    <span className="text-[10px] text-destructive block mt-1">{errors.bins[index].sublocationId.message}</span>
+                  )}
                 </div>
-              );
-            })}
+
+                {/* Specific assigned payload quantity volume input parameter */}
+                <div className="w-44">
+                  <Input
+                    type="number"
+                    step="0.0001"
+                    placeholder="Volume"
+                    className="text-xs h-9 bg-background"
+                    {...register(`bins.${index}.quantity`, { valueAsNumber: true })}
+                  />
+                  {errors.bins?.[index]?.quantity && (
+                    <span className="text-[10px] text-destructive block mt-1">{errors.bins[index].quantity.message}</span>
+                  )}
+                </div>
+
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => remove(index)}
+                  className="h-9 w-9 text-muted-foreground hover:text-destructive shrink-0"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </Button>
+              </div>
+            ))}
 
             {fields.length === 0 && (
               <div className="flex items-center gap-2 border border-dashed rounded-xl p-4 text-xs text-muted-foreground italic bg-muted/10">
@@ -299,6 +297,54 @@ export function InventoryForm({ products, locations, sublocations, initialData }
               </div>
             )}
           </div>
+        </FieldSet>
+
+        {/* 📋 Mandatory Audit & Reconciliation Configuration Panel */}
+        <FieldSet className="border-t pt-5 bg-muted/20 p-4 rounded-xl border space-y-4">
+          <FieldLegend className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-muted-foreground">
+            <ClipboardCheck className="w-4 h-4 text-primary" /> Regulatory Stock Verification Logs
+          </FieldLegend>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <Field>
+              <FieldLabel>Reason Context Blueprint *</FieldLabel>
+              <select
+                className="w-full text-xs h-9 rounded-md border border-input bg-background px-3 py-1 shadow-xs focus-visible:outline-hidden"
+                {...register("reason")}
+              >
+                <option value="MANUAL">Manual Stock Count (Reconciliation)</option>
+                <option value="STOCK_COUNT">Scheduled Regular Inventory Cycle Audit</option>
+                <option value="CORRECTION">Administrative System Record Patch</option>
+                <option value="DAMAGE">Physical Asset Waste / Breakage Allocation</option>
+                <option value="LOSS">Unexplained Discrepancy Shrinkage</option>
+                <option value="THEFT">Security Incident Discrepancy</option>
+                <option value="EXPIRED">Perishable Life Out-of-Date Write-off</option>
+                <option value="RETURN">Customer Return Restoration</option>
+              </select>
+            </Field>
+
+            <Field className="opacity-75">
+              <FieldLabel className="flex items-center gap-1"><UserCheck className="w-3.5 h-3.5" /> Authorized Auditor Profile</FieldLabel>
+              <Input 
+                type="text" 
+                disabled 
+                className="bg-muted text-xs font-medium cursor-not-allowed" 
+                value={currentUser?.name || "System Administrative Terminal Agent"} 
+              />
+              <input type="hidden" {...register("performedById")} />
+            </Field>
+          </div>
+
+          <Field>
+            <FieldLabel>Justification Notes & Operational Description *</FieldLabel>
+            <Textarea 
+              placeholder="Provide context explaining why these adjustments are being made (e.g. 'Cycle count variance discovery in Aisle B'...)" 
+              rows={2} 
+              className="bg-background text-xs"
+              {...register("notes", { required: "A structural reason note is required for ledger generation validation." })} 
+            />
+            {errors.notes && <span className="text-xs text-destructive">{errors.notes.message}</span>}
+          </Field>
         </FieldSet>
 
         {/* Controls Actions Row */}
