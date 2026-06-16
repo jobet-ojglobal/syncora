@@ -580,7 +580,6 @@ enum InventoryTransactionType {
   RETURN
 }
 
-
 model TransferOrder {
   id                String   @id @default(cuid())
   transferNumber    String   @unique

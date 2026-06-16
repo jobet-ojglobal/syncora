@@ -343,21 +343,21 @@ export const data = {
     /*                               TRANSFER ORDERS                              */
     /* -------------------------------------------------------------------------- */
 
-    {
-      title: "Transfer Orders",
-      url: "/dashboard/transfers",
-      icon: Truck,
-      items: [
-        {
-          title: "All Transfers",
-          url: "/dashboard/transfers",
-        },
-        {
-          title: "Create Transfer",
-          url: "/dashboard/transfers/create",
-        },
-      ],
-    },
+    // {
+    //   title: "Transfer Orders",
+    //   url: "/dashboard/transfers",
+    //   icon: Truck,
+    //   items: [
+    //     {
+    //       title: "All Transfers",
+    //       url: "/dashboard/transfers",
+    //     },
+    //     {
+    //       title: "Create Transfer",
+    //       url: "/dashboard/transfers/create",
+    //     },
+    //   ],
+    // },
 
     /* -------------------------------------------------------------------------- */
     /*                               CUSTOMER ORDERS                              */
