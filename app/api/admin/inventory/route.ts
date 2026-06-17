@@ -1,42 +1,11 @@
 // app/api/admin/inventory/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { InventoryService } from "@/services/inventory.service";
 
 export async function GET() {
   try {
-    const stockItems = await prisma.inventory.findMany({
-      include: {
-        product: {
-          select: { name: true, slug: true }
-        },
-        location: {
-          select: { name: true }
-        },
-        bins: {
-          include: {
-            sublocation: { select: { name: true } }
-          }
-        }
-      },
-      orderBy: { updatedAt: "desc" }
-    });
-
-    const parsedStock = stockItems.map((item) => ({
-      id: item.id,
-      productId: item.productId,
-      productName: item.product.name,
-      productSlug: item.product.slug,
-      locationId: item.locationId,
-      locationName: item.location.name,
-      quantityOnHand: Number(item.quantityOnHand),
-      quantityReserved: Number(item.quantityReserved || 0),
-      quantityAvailable: Number(item.quantityAvailable || 0),
-      bins: item.bins.map(b => ({
-        id: b.id,
-        sublocationName: b.sublocation.name,
-        quantity: Number(b.quantity)
-      }))
-    }));
+    const parsedStock = await InventoryService.getInventoryLedgerWthIntransit();
 
     return NextResponse.json(parsedStock, { status: 200 });
   } catch (error) {
@@ -44,6 +13,7 @@ export async function GET() {
     return NextResponse.json({ error: "Internal inventory ledger query failure." }, { status: 500 });
   }
 }
+
 
 /**
  * 🟢 INITIALIZE FRESH STOCK LEDGER ENTRY

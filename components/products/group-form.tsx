@@ -1,34 +1,36 @@
+// components/ProductGroupForm.tsx
 "use client";
 
-import { useForm, Controller, useFieldArray } from "react-hook-form";
+import { useForm, useFieldArray, useWatch, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { createProductGroupSchema, CreateProductGroupInput } from "@/schemas/product-group.schema";
-
-import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
+import { productGroupSchema, ProductGroupInput } from "@/schemas/group.schema";
 import { Input } from "@/components/ui/input";
-import {
-  Field,
-  FieldDescription,
-  FieldGroup,
-  FieldLabel,
-  FieldLegend,
-  FieldSeparator,
-  FieldSet,
-} from "@/components/ui/field";
-import { useEffect, useState } from "react";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
+import { Switch } from "@/components/ui/switch";
+import { Layers, ArrowLeft, Plus, Trash2, X, Check } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { Plus, Trash2, X } from "lucide-react";
+import { Field, FieldDescription, FieldGroup, FieldLabel, FieldLegend, FieldSeparator, FieldSet } from "@/components/ui/field";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../ui/select";
+import { useEffect, useState } from "react";
 
-interface CategoryOption {
-  id: string;
-  label: string;
-}
+// Shadcn UI Dialog & Checkbox imports
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Checkbox } from "@/components/ui/checkbox";
 
-interface BrandOption {
+interface LookupItem {
   id: string;
+  inflowId?: string;
   name: string;
+  sku?: string | null;
 }
 
 interface AttributeValueOption {
@@ -44,50 +46,43 @@ interface AttributeGroup {
 }
 
 interface ProductGroupFormProps {
-  initialData?: any;
+  brands: LookupItem[];
+  categories: LookupItem[];
+  attributes: AttributeGroup[];
+  productsLookup: LookupItem[]; 
+  initialData?: any | null;
 }
 
-export function ProductGroupForm({
-  initialData,
-}: ProductGroupFormProps) {
-  const [categories, setCategories] = useState<CategoryOption[]>([]);
-  const [brands, setBrands] = useState<BrandOption[]>([]);
+export function ProductGroupForm({ brands, categories, attributes, initialData }: ProductGroupFormProps) {
+  const router = useRouter();
   const [tagInput, setTagInput] = useState("");
-  const [globalAttributes, setGlobalAttributes] = useState<AttributeGroup[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-
   const isEditMode = !!initialData;
 
-  const form = useForm<CreateProductGroupInput>({
-    resolver: zodResolver(createProductGroupSchema),
-    defaultValues: {
-      name: initialData?.name ?? "",
-      categoryId: initialData?.categoryId ?? "",
-      brandId: initialData?.brandId ?? null,
-      isActive: initialData?.isActive ?? true,
-      generateVariants: false,
+  // State to manage the attribute value selection dialog
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [activeOptionIndex, setActiveOptionIndex] = useState<number | null>(null);
+  const [selectedAttributeGroup, setSelectedAttributeGroup] = useState<AttributeGroup | null>(null);
+  const [pendingSelections, setPendingSelections] = useState<string[]>([]);
 
+  const form = useForm<ProductGroupInput>({
+    resolver: zodResolver(productGroupSchema),
+    defaultValues: initialData || {
+      name: "",
+      description: "",
+      brandId: "",
+      categoryId: "",
+      isActive: true,
       tags: initialData?.tags?.map((t: any) => t.value) ?? [],
-
-      features:
-        initialData?.features?.map((f: any) => ({
-          key: f.key,
-          value: f.value,
-        })) ?? [],
-
-      options:
-        initialData?.options?.map((option: any) => ({
-          name: option.name,
-          attributeId: option.attributeId ?? "",
-          values:
-            option.values?.map((v: any) => ({
-              value: v.value,
-            })) ?? [],
-        })) ?? [],
+      features: initialData?.features?.map((f: any) => ({ key: f.key, value: f.value })) ?? [],
+      options: initialData?.options?.map((option: any) => ({
+        name: option.name,
+        attributeId: option.attributeId ?? "",
+        values: option.values?.map((v: any) => ({ value: v.value })) ?? [],
+      })) ?? [],
     },
   });
 
-  const { register, handleSubmit, control, reset, setValue, watch, formState: { errors, isSubmitting } } = form;
+  const { register, control, handleSubmit, setValue, reset, watch, formState: { errors, isSubmitting } } = form;
 
   const { fields: optionFields, append: appendOption, remove: removeOption } = useFieldArray({
     control,
@@ -106,7 +101,6 @@ export function ProductGroupForm({
     if (e.key === "Enter" || e.key === ",") {
       e.preventDefault();
       const sanitized = tagInput.trim().replace(/,$/, "");
-      
       if (sanitized && !watchedTags.includes(sanitized)) {
         setValue("tags", [...watchedTags, sanitized]);
       }
@@ -118,469 +112,359 @@ export function ProductGroupForm({
     setValue("tags", watchedTags.filter(t => t !== tagToRemove));
   };
 
-  // Load baseline setup dropdown values on mount
-  // 1. Core taxonomy pull function
-  const fetchGlobalAttributes = async () => {
-    try {
-      const response = await fetch("/api/attributes");
-      if (response.ok) {
-        const data = await response.json();
-        setGlobalAttributes(data);
-      }
-    } catch (err) {
-      console.error("Failed background-refreshing global attributes collection:", err);
-    }
-  };
-
   useEffect(() => {
     if (!initialData) return;
-
     reset({
       name: initialData.name,
       categoryId: initialData.categoryId,
       brandId: initialData.brandId,
       isActive: initialData.isActive,
-      generateVariants: false,
-
       tags: initialData.tags?.map((t: any) => t.value) ?? [],
-
-      features:
-        initialData.features?.map((f: any) => ({
-          key: f.key,
-          value: f.value,
-        })) ?? [],
-
-      options:
-        initialData.options?.map((option: any) => ({
-          name: option.name,
-          attributeId: option.attributeId ?? "",
-          values:
-            option.values?.map((v: any) => ({
-              value: v.value,
-            })) ?? [],
-        })) ?? [],
+      features: initialData.features?.map((f: any) => ({ key: f.key, value: f.value })) ?? [],
+      options: initialData.options?.map((option: any) => ({
+        name: option.name,
+        attributeId: option.attributeId ?? "",
+        values: option.values?.map((v: any) => ({ value: v.value })) ?? [],
+      })) ?? [],
     });
   }, [initialData, reset]);
 
-  useEffect(() => {
-    async function loadInitialData() {
-      try {
-        // Parallel fetch categories, attributes, and brand systems
-        const [catRes, brandRes, attrRes] = await Promise.all([
-          fetch("/api/admin/categories/inflow"),
-          fetch("/api/admin/brands/basic"), // 👈 Call new route
-          fetch("/api/admin/attributes/basic"),
-        ]);
-        
-        if (catRes.ok) setCategories(await catRes.json());
-        if (brandRes.ok) setBrands(await brandRes.json());
-        if (attrRes.ok) setGlobalAttributes(await attrRes.json());
-      } catch (err) {
-        console.error("Initialization errors:", err);
-      } finally {
-        setIsLoading(false);
+  // Triggered when selecting an attribute from the dropdown
+  const handleSelectAttributeGroup = (val: string, optionIndex: number) => {
+    if (val === "custom-literal-mode") {
+      setValue(`options.${optionIndex}.attributeId`, "");
+      setValue(`options.${optionIndex}.name`, "");
+      setValue(`options.${optionIndex}.values`, []);
+    } else {
+      const group = attributes.find(ga => ga.attributeId === val);
+      if (group) {
+        setActiveOptionIndex(optionIndex);
+        setSelectedAttributeGroup(group);
+        // Pre-populate checkboxes with values already present in the form row, if any
+        const currentValues = watchedOptions[optionIndex]?.values?.map((v: any) => v.value) || [];
+        setPendingSelections(currentValues);
+        setDialogOpen(true);
       }
     }
-    loadInitialData();
-  }, []);
+  };
 
-  // Run initial data load on mount
-  // useEffect(() => {
-  //   async function loadInitialData() {
-  //     try {
-  //       const catRes = await fetch("/api/categories");
-  //       if (catRes.ok) setCategories(await catRes.json());
-  //       await fetchGlobalAttributes();
-  //     } catch (err) {
-  //       console.error("Initialization errors:", err);
-  //     } finally {
-  //       setIsLoading(false);
-  //     }
-  //   }
-  //   loadInitialData();
-  // }, []);
+  // Pushes selected checkbox items into react-hook-form fields
+  const handleConfirmValues = () => {
+    if (activeOptionIndex !== null && selectedAttributeGroup) {
+      setValue(`options.${activeOptionIndex}.attributeId`, selectedAttributeGroup.attributeId);
+      setValue(`options.${activeOptionIndex}.name`, selectedAttributeGroup.name);
+      
+      const mappedValues = pendingSelections.map(val => ({ value: val }));
+      setValue(`options.${activeOptionIndex}.values`, mappedValues);
+    }
+    setDialogOpen(false);
+    setActiveOptionIndex(null);
+    setSelectedAttributeGroup(null);
+  };
 
-  const onSubmit = async (values: CreateProductGroupInput) => {
+  const togglePendingSelection = (label: string) => {
+    setPendingSelections(prev => 
+      prev.includes(label) ? prev.filter(item => item !== label) : [...prev, label]
+    );
+  };
+
+  const onSubmit = async (values: ProductGroupInput) => {
     try {
-      const endpoint = isEditMode
-        ? `/api/admin/groups/${initialData.id}`
-        : "/api/admin/groups";
-
-      const method = isEditMode ? "PATCH" : "POST";
-
-      const response = await fetch(endpoint, {
-        method,
+      const response = await fetch("/api/admin/groups", {
+        method: isEditMode ? "PATCH" : "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(values),
       });
 
-      if (!response.ok) throw new Error("Failed to save product group transaction.");
+      if (!response.ok) {
+        const errPayload = await response.json();
+        throw new Error(errPayload.error || "Execution error posting grouped catalog lines.");
+      }
 
-      toast.success(
-        isEditMode ? "Product group updated." : "Product group created."
-      );
-      
-      // Reset form input fields back to initial states
-      reset({
-        name: "",
-        categoryId: values.categoryId, // Keep category active for fast repetitive entry
-        isActive: true,
-        options: []
-      });
-
-      // Re-fetch global attributes immediately 
-      // This pulls any new custom inline attributes created during this submission
-      await fetchGlobalAttributes();
-
-    } catch (error) {
-      console.error("Submission error:", error);
-      toast.error("Error", { description: "Could not create product group." });
+      toast.success(isEditMode ? "Product collection modifications saved" : "Matrix product grouping registered");
+      router.push("/dashboard/product-groups");
+      router.refresh();
+    } catch (err: any) {
+      toast.error("Pipeline Sync Interrupted", { description: err.message });
     }
   };
 
-  if (isLoading) return <div className="text-center p-6 text-sm text-muted-foreground">Loading schema requirements...</div>;
-
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className="w-full">
-      <FieldGroup className="gap-6">
-        
-        {/* Section 1: Group Identity */}
-        <FieldSet>
-          <FieldLegend>Product Group Properties</FieldLegend>
-          <FieldDescription>
-            Create a grouping container to collect variations of similar products (e.g., Apparel sets or varying size scales).
-          </FieldDescription>
-          <FieldGroup className="gap-4 mt-4">
-            <Field>
-              <FieldLabel htmlFor="pg-name">Group Name *</FieldLabel>
-              <Input id="pg-name" placeholder="e.g., Crewneck Sweatshirts" {...register("name")} />
+    <>
+      <form onSubmit={handleSubmit(onSubmit)} className="w-full max-w-5xl mx-auto p-6 bg-card border rounded-xl shadow-xs space-y-8">
+        <FieldGroup className="gap-6">
+          
+          {/* SECTION 1: Product Group Base Identity Card */}
+          <FieldSet className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <FieldLegend className="col-span-1 md:col-span-3 flex items-center gap-2 border-b pb-2">
+              <Layers className="w-4 h-4 text-primary" /> Root Classification Parent Specification
+            </FieldLegend>
+
+            <Field className="md:col-span-2">
+              <FieldLabel>Product Group Label Name *</FieldLabel>
+              <Input placeholder="e.g., Premium Cotton Hoodies Line" {...register("name")} />
               {errors.name && <span className="text-xs text-destructive">{errors.name.message}</span>}
             </Field>
 
-            {/* Dynamic Categories Dropdown Field */}
             <Field>
-              <FieldLabel htmlFor="pg-category">Target Category *</FieldLabel>
-              <Controller
-                control={control}
-                name="categoryId"
-                render={({ field }) => (
-                  <Select 
-                    onValueChange={field.onChange} 
-                    value={field.value}
-                    disabled={isLoading}
-                  >
-                    <SelectTrigger id="pg-category">
-                      <SelectValue placeholder={isLoading ? "Loading classifications..." : "Select a taxonomy bracket"} />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {categories.map((category) => (
-                        <SelectItem key={category.id} value={category.id}>
-                          {category.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                )}
-              />
-              {errors.categoryId && <span className="text-xs text-destructive">{errors.categoryId.message}</span>}
-            </Field>
-
-            <Field>
-                <FieldLabel htmlFor="pg-brand">Associated Brand</FieldLabel>
+              <FieldLabel>Global Status Visibility</FieldLabel>
+              <div className="flex items-center h-9 space-x-2 border px-3 rounded-md bg-muted/20">
                 <Controller
                   control={control}
-                  name="brandId"
+                  name="isActive"
                   render={({ field }) => (
-                    <Select onValueChange={field.onChange} value={field.value || "no-brand"}>
-                      <SelectTrigger id="pg-brand"><SelectValue placeholder="Select Brand Label (Optional)" /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="no-brand">None / Unbranded</SelectItem>
-                        {brands.map((b) => (
-                          <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <Switch checked={field.value} onCheckedChange={field.onChange} />
                   )}
                 />
-              </Field>
-          </FieldGroup>
-        </FieldSet>
-
-        <FieldSeparator />
-
-        <FieldSet>
-          <FieldLegend>Product Highlights & Discoverability</FieldLegend>
-          
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-4">
-            
-            {/* Dynamic Features List */}
-            <Field className="space-y-2">
-              <div className="flex justify-between items-center">
-                <div>
-                  <FieldLabel>Technical Specifications / Features</FieldLabel>
-                  <p className="text-[11px] text-muted-foreground">Pair values like Key: <b>Sensor</b> | Value: <b>Full Frame</b></p>
-                </div>
-                <Button 
-                  type="button" 
-                  variant="outline" 
-                  size="sm" 
-                  onClick={() => appendFeature({ key: "", value: "" })} // 👈 Append an empty key-value structure
-                  className="h-7 text-xs gap-1 shrink-0"
-                >
-                  <Plus className="w-3 h-3" /> Add Spec
-                </Button>
+                <span className="text-xs font-medium text-muted-foreground">Publish to storefront</span>
               </div>
-              
-              <div className="space-y-2 max-h-[260px] overflow-y-auto pr-1">
-                {featureFields.map((field, index) => (
-                  <div key={field.id} className="flex gap-2 items-start bg-muted/20 p-2 border rounded-lg relative group">
-                    <div className="grid grid-cols-2 gap-2 w-full">
-                      <div>
-                        <Input 
-                          placeholder="Label (e.g., Sensor)" 
-                          className="h-8 text-xs font-semibold"
-                          {...register(`features.${index}.key` as const)} 
-                        />
-                        {errors.features?.[index]?.key && (
-                          <span className="text-[10px] text-destructive">{errors.features[index]?.key?.message}</span>
-                        )}
-                      </div>
-                      <div>
-                        <Input 
-                          placeholder="Spec (e.g., Full Frame)" 
-                          className="h-8 text-xs"
-                          {...register(`features.${index}.value` as const)} 
-                        />
-                        {errors.features?.[index]?.value && (
-                          <span className="text-[10px] text-destructive">{errors.features[index]?.value?.message}</span>
-                        )}
-                      </div>
+            </Field>
+
+            <Field>
+              <FieldLabel>Brand Category Association</FieldLabel>
+              <select className="w-full text-xs h-9 rounded-md border border-input bg-background px-3 shadow-xs" {...register("brandId")}>
+                <option value="">-- No explicit brand map --</option>
+                {brands.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+              </select>
+            </Field>
+
+            <Field className="md:col-span-2">
+              <FieldLabel>Master Catalog Department Category</FieldLabel>
+              <select className="w-full text-xs h-9 rounded-md border border-input bg-background px-3 shadow-xs" {...register("categoryId")}>
+                <option value="">-- Choose department placement --</option>
+                {categories.map(c => <option key={c.inflowId} value={c.inflowId}>{c.name}</option>)}
+              </select>
+            </Field>
+
+            <Field className="md:col-span-3">
+              <FieldLabel>Collective Index Description Summary</FieldLabel>
+              <Textarea placeholder="Detail technical fabrics spec sheets, sizing guidelines or seasonal lines copy..." rows={3} {...register("description")} />
+            </Field>
+          </FieldSet>
+
+          <FieldSet>
+            <FieldLegend>Product Highlights & Discoverability</FieldLegend>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-4">
+                <Field className="space-y-2">
+                  <div className="flex justify-between items-center">
+                    <div>
+                      <FieldLabel>Technical Specifications / Features</FieldLabel>
+                      <p className="text-[11px] text-muted-foreground">Pair values like Key: <b>Sensor</b> | Value: <b>Full Frame</b></p>
                     </div>
-                    
                     <Button 
                       type="button" 
-                      variant="ghost" 
-                      size="icon" 
-                      onClick={() => removeFeature(index)}
-                      className="text-muted-foreground hover:text-destructive h-8 w-8 shrink-0 align-middle"
+                      variant="outline" 
+                      size="sm" 
+                      onClick={() => appendFeature({ key: "", value: "" })} 
+                      className="h-7 text-xs gap-1 shrink-0"
                     >
-                      <Trash2 className="w-3.5 h-3.5" />
+                      <Plus className="w-3 h-3" /> Add Spec
                     </Button>
                   </div>
-                ))}
-
-                {featureFields.length === 0 && (
-                  <p className="text-xs text-muted-foreground italic p-4 border border-dashed rounded-lg text-center bg-muted/10">
-                    No system specifications added yet.
-                  </p>
-                )}
-              </div>
-            </Field>
-
-            {/* Keyword Tags Manager */}
-            <Field className="space-y-2">
-              <FieldLabel htmlFor="tags-input">Search Keywords & Tags</FieldLabel>
-              <FieldDescription>Type a tag and press <kbd className="px-1 bg-muted border rounded text-[10px]">Enter</kbd> or <kbd className="px-1 bg-muted border rounded text-[10px]">,</kbd> to lock it in.</FieldDescription>
-              
-              <Input
-                id="tags-input"
-                placeholder="e.g., hot-swap, wireless, mechanical"
-                value={tagInput}
-                onChange={(e) => setTagInput(e.target.value)}
-                onKeyDown={handleTagKeyDown}
-              />
-
-              {/* Tags Output Array Display Box */}
-              <div className="flex flex-wrap gap-1.5 p-2 border rounded-lg min-h-[80px] bg-muted/20 align-top content-start">
-                {watchedTags.map((tag) => (
-                  <span 
-                    key={tag} 
-                    className="inline-flex items-center gap-1 bg-primary/10 text-primary border border-primary/20 rounded-md px-2 py-0.5 text-xs font-medium"
-                  >
-                    {tag}
-                    <button 
-                      type="button" 
-                      onClick={() => removeTag(tag)}
-                      className="hover:text-destructive text-muted-foreground/80 focus:outline-none"
-                    >
-                      <X className="w-3 h-3" />
-                    </button>
-                  </span>
-                ))}
-                {watchedTags.length === 0 && (
-                  <span className="text-xs text-muted-foreground italic m-auto">No tags assigned.</span>
-                )}
-              </div>
-            </Field>
-
-          </div>
-        </FieldSet>
-
-        <FieldSeparator />
-
-        {/* Section 2: Variant Attributes Custom Generator */}
-        <FieldSet>
-          <div className="flex justify-between items-center mb-2">
-            <div>
-              <FieldLegend>Variant Variations</FieldLegend>
-              <FieldDescription>Assign options and specify sub-variants.</FieldDescription>
-            </div>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              className="gap-1.5"
-              onClick={() => appendOption({ name: "", attributeId: "", values: [] })}
-            >
-              <Plus className="w-4 h-4" /> Add Option Attribute
-            </Button>
-          </div>
-
-          {errors.options?.root ? (
-            <div className="p-3 mb-2 text-xs font-medium border border-destructive/20 text-destructive bg-destructive/10 rounded-lg">
-              {errors.options.root.message}
-            </div>
-          ) : errors.options && !Array.isArray(errors.options) ? (
-            // Handles alternative root-level array string paths thrown by Zod
-            <div className="p-3 mb-2 text-xs font-medium border border-destructive/20 text-destructive bg-destructive/10 rounded-lg">
-              {(errors.options as any).message}
-            </div>
-          ) : null}
-
-          <FieldGroup className="gap-4 mt-4">
-            {optionFields.map((optionField, optionIndex) => {
-              // Determine if an existing attribute is selected for this specific row block
-              const selectedAttributeId = watchedOptions[optionIndex]?.attributeId;
-              const isGlobalSelected = Boolean(selectedAttributeId);
-
-              return (
-                <div key={optionField.id} className="p-4 border rounded-xl bg-muted/30 relative space-y-4">
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    className="absolute top-2 right-2 text-muted-foreground hover:text-destructive"
-                    onClick={() => removeOption(optionIndex)}
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </Button>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
-                    {/* Select global configuration class */}
-                    <Field>
-                      <FieldLabel>Global Option Class</FieldLabel>
-                     
-                      <Select
-                        value={selectedAttributeId || "custom-literal-mode"}
-                        onValueChange={(val) => {
-                          if (val === "custom-literal-mode") {
-                            setValue(`options.${optionIndex}.attributeId`, "");
-                            setValue(`options.${optionIndex}.name`, "");
-                            setValue(`options.${optionIndex}.values`, []);
-                          } else {
-                            const selectedGlobal = globalAttributes.find(ga => ga.attributeId === val);
-                            setValue(`options.${optionIndex}.attributeId`, val);
-                            setValue(`options.${optionIndex}.name`, selectedGlobal?.name || "");
-                            
-                            // Map existing pre-defined master options into form fields array immediately
-                            const mappedValues = (selectedGlobal?.options || []).map(opt => ({
-                              value: opt.label
-                            }));
-                            setValue(`options.${optionIndex}.values`, mappedValues);
-                          }
-                        }}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Match Existing Attribute" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="custom-literal-mode">Custom Attribute (None)</SelectItem>
-                          {globalAttributes.map((ga) => (
-                            <SelectItem key={ga.attributeId} value={ga.attributeId}>{ga.name}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </Field>
-
-                    {/* Literal text input: Hides or Disables gracefully based on selection */}
-                    {!isGlobalSelected ? (
-                      <Field>
-                        <FieldLabel>Custom Literal Name *</FieldLabel>
-                        <Input 
-                          placeholder="e.g., Fabric Weight (Custom)" 
-                          {...register(`options.${optionIndex}.name`)} 
-                        />
-                        {errors.options?.[optionIndex]?.name && (
-                          <span className="text-xs text-destructive">{errors.options[optionIndex]?.name?.message}</span>
-                        )}
-                      </Field>
-                    ) : (
-                      <Field className="opacity-60 cursor-not-allowed">
-                        <FieldLabel>Selected Attribute Name</FieldLabel>
-                        <Input 
-                          disabled 
-                          value={watchedOptions[optionIndex]?.name || ""} 
-                          className="bg-muted border-dashed"
-                        />
-                      </Field>
+                  
+                  <div className="space-y-2 max-h-[260px] overflow-y-auto pr-1">
+                    {featureFields.map((field, index) => (
+                      <div key={field.id} className="flex gap-2 items-start bg-muted/20 p-2 border rounded-lg relative group">
+                        <div className="grid grid-cols-2 gap-2 w-full">
+                          <div>
+                            <Input placeholder="Label (e.g., Sensor)" className="h-8 text-xs font-semibold" {...register(`features.${index}.key` as const)} />
+                            {errors.features?.[index]?.key && (
+                              <span className="text-[10px] text-destructive">{errors.features[index]?.key?.message}</span>
+                            )}
+                          </div>
+                          <div>
+                            <Input placeholder="Spec (e.g., Full Frame)" className="h-8 text-xs" {...register(`features.${index}.value` as const)} />
+                            {errors.features?.[index]?.value && (
+                              <span className="text-[10px] text-destructive">{errors.features[index]?.value?.message}</span>
+                            )}
+                          </div>
+                        </div>
+                        <Button type="button" variant="ghost" size="icon" onClick={() => removeFeature(index)} className="text-muted-foreground hover:text-destructive h-8 w-8 shrink-0 align-middle">
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </Button>
+                      </div>
+                    ))}
+                    {featureFields.length === 0 && (
+                      <p className="text-xs text-muted-foreground italic p-4 border border-dashed rounded-lg text-center bg-muted/10">No system specifications added yet.</p>
                     )}
                   </div>
+                </Field>
 
-                  {/* Sub-values tagging matrix cloud layout */}
-                  <div className="space-y-2">
-                    <FieldLabel>Attribute Tag Values *</FieldLabel>
-                    <ValuesSubArray optionIndex={optionIndex} control={control} register={register} errors={errors} />
+                <Field className="space-y-2">
+                  <FieldLabel htmlFor="tags-input">Search Keywords & Tags</FieldLabel>
+                  <FieldDescription>Type a tag and press <kbd className="px-1 bg-muted border rounded text-[10px]">Enter</kbd> or <kbd className="px-1 bg-muted border rounded text-[10px]">,</kbd> to lock it in.</FieldDescription>
+                  <Input id="tags-input" placeholder="e.g., hot-swap, wireless, mechanical" value={tagInput} onChange={(e) => setTagInput(e.target.value)} onKeyDown={handleTagKeyDown} />
+                  <div className="flex flex-wrap gap-1.5 p-2 border rounded-lg min-h-[80px] bg-muted/20 align-top content-start">
+                    {watchedTags.map((tag) => (
+                      <span key={tag} className="inline-flex items-center gap-1 bg-primary/10 text-primary border border-primary/20 rounded-md px-2 py-0.5 text-xs font-medium">
+                        {tag}
+                        <button type="button" onClick={() => removeTag(tag)} className="hover:text-destructive text-muted-foreground/80 focus:outline-none">
+                          <X className="w-3 h-3" />
+                        </button>
+                      </span>
+                    ))}
+                    {watchedTags.length === 0 && <span className="text-xs text-muted-foreground italic m-auto">No tags assigned.</span>}
                   </div>
+                </Field>
+              </div>
+          </FieldSet>
+
+          <FieldSeparator />
+
+          {/* Section 2: Variant Attributes Custom Generator */}
+          <FieldSet>
+            <div className="flex justify-between items-center mb-2">
+              <div>
+                <FieldLegend>Variant Variations</FieldLegend>
+                <FieldDescription>Assign options and specify sub-variants.</FieldDescription>
+              </div>
+              <Button type="button" variant="outline" size="sm" className="gap-1.5" onClick={() => appendOption({ name: "", attributeId: "", values: [] })}>
+                <Plus className="w-4 h-4" /> Add Option Attribute
+              </Button>
+            </div>
+
+            {errors.options?.root ? (
+              <div className="p-3 mb-2 text-xs font-medium border border-destructive/20 text-destructive bg-destructive/10 rounded-lg">
+                {errors.options.root.message}
+              </div>
+            ) : errors.options && !Array.isArray(errors.options) ? (
+              <div className="p-3 mb-2 text-xs font-medium border border-destructive/20 text-destructive bg-destructive/10 rounded-lg">
+                {(errors.options as any).message}
+              </div>
+            ) : null}
+
+            <FieldGroup className="gap-4 mt-4">
+              {optionFields.map((optionField, optionIndex) => {
+                const selectedAttributeId = watchedOptions[optionIndex]?.attributeId;
+                const isGlobalSelected = Boolean(selectedAttributeId);
+
+                return (
+                  <div key={optionField.id} className="p-4 border rounded-xl bg-muted/30 relative space-y-4">
+                    <Button type="button" variant="ghost" size="icon" className="absolute top-2 right-2 text-muted-foreground hover:text-destructive" onClick={() => removeOption(optionIndex)}>
+                      <Trash2 className="w-4 h-4" />
+                    </Button>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
+                      <Field>
+                        <FieldLabel>Global Option Class</FieldLabel>
+                        <Select
+                          value={selectedAttributeId || "custom-literal-mode"}
+                          onValueChange={(val) => handleSelectAttributeGroup(val, optionIndex)}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Match Existing Attribute" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="custom-literal-mode">Custom Attribute (None)</SelectItem>
+                            {attributes.map((ga) => (
+                              <SelectItem key={ga.attributeId} value={ga.attributeId}>{ga.name}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </Field>
+
+                      {!isGlobalSelected ? (
+                        <Field>
+                          <FieldLabel>Custom Literal Name *</FieldLabel>
+                          <Input placeholder="e.g., Fabric Weight (Custom)" {...register(`options.${optionIndex}.name`)} />
+                          {errors.options?.[optionIndex]?.name && (
+                            <span className="text-xs text-destructive">{errors.options[optionIndex]?.name?.message}</span>
+                          )}
+                        </Field>
+                      ) : (
+                        <Field className="opacity-60 cursor-not-allowed">
+                          <FieldLabel>Selected Attribute Name</FieldLabel>
+                          <div className="flex items-center justify-between h-9 w-full bg-muted border border-dashed rounded-md px-3 text-sm text-foreground">
+                            <span>{watchedOptions[optionIndex]?.name || ""}</span>
+                            <Button 
+                              type="button" 
+                              variant="link" 
+                              size="sm" 
+                              className="h-auto p-0 text-xs" 
+                              onClick={() => handleSelectAttributeGroup(selectedAttributeId, optionIndex)}
+                            >
+                              Edit Selections
+                            </Button>
+                          </div>
+                        </Field>
+                      )}
+                    </div>
+
+                    <div className="space-y-2">
+                      <FieldLabel>Attribute Tag Values *</FieldLabel>
+                      <ValuesSubArray optionIndex={optionIndex} control={control} register={register} errors={errors} />
+                    </div>
+                  </div>
+                );
+              })}
+            </FieldGroup>
+          </FieldSet>
+
+          <div className="flex items-center justify-between border-t pt-4">
+            <Button type="button" variant="ghost" size="sm" onClick={() => router.back()} className="text-xs gap-1.5">
+              <ArrowLeft className="w-4 h-4" /> Back
+            </Button>
+            <Button type="submit" disabled={isSubmitting} size="sm" className="min-w-[160px]">
+              {isSubmitting ? "Syncing collection rows..." : isEditMode ? "Save Group Options" : "Publish Product Group"}
+            </Button>
+          </div>
+        </FieldGroup>
+      </form>
+
+      {/* GLOBAL ATTRIBUTE VALUES CHECKBOX DIALOG */}
+      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Select {selectedAttributeGroup?.name} Options</DialogTitle>
+            <DialogDescription>
+              Choose which variations you want to apply to this product group bundle.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="grid gap-3 py-4 max-h-[300px] overflow-y-auto pr-1">
+            {selectedAttributeGroup?.options.map((opt) => {
+              const isChecked = pendingSelections.includes(opt.label);
+              return (
+                <div 
+                  key={opt.valueId} 
+                  className="flex items-center space-x-3 p-2 rounded-lg border hover:bg-muted/50 cursor-pointer transition-colors"
+                  onClick={() => togglePendingSelection(opt.label)}
+                >
+                  <Checkbox 
+                    id={opt.valueId} 
+                    checked={isChecked}
+                    onCheckedChange={() => togglePendingSelection(opt.label)}
+                  />
+                  <label
+                    htmlFor={opt.valueId}
+                    className="text-sm font-medium leading-none cursor-pointer flex-1 flex items-center justify-between"
+                    onClick={(e) => e.preventDefault()} // Stops double toggling because parent handles click
+                  >
+                    <span>{opt.label}</span>
+                    {opt.meta?.hexCode && (
+                      <span 
+                        className="w-4 h-4 rounded-full border border-muted" 
+                        style={{ backgroundColor: opt.meta.hexCode }} 
+                      />
+                    )}
+                  </label>
                 </div>
               );
             })}
-          </FieldGroup>
-        </FieldSet>
+          </div>
 
-        <FieldSeparator />
-
-        {/* Section 3: Group Status Toggles */}
-        <FieldSet>
-          <FieldGroup className="gap-4">
-            {/* Existing Status Checkbox */}
-            <Field orientation="horizontal" className="items-start gap-3">
-              <Controller control={control} name="isActive" render={({ field }) => (
-                <Checkbox id="pg-active" checked={field.value} onCheckedChange={field.onChange} className="mt-0.5" />
-              )} />
-              <div className="grid gap-1 leading-none">
-                <FieldLabel htmlFor="pg-active" className="cursor-pointer font-medium">Activate Group Status</FieldLabel>
-              </div>
-            </Field>
-
-            {/* 👈 New Generate Variants Checkbox */}
-            <Field orientation="horizontal" className="items-start gap-3 border-t pt-4">
-              <Controller control={control} name="generateVariants" render={({ field }) => (
-                <Checkbox id="pg-generate-variants" checked={field.value} onCheckedChange={field.onChange} className="mt-0.5" />
-              )} />
-              <div className="grid gap-1 leading-none">
-                <FieldLabel htmlFor="pg-generate-variants" className="cursor-pointer font-medium">Auto-Generate Product Variants</FieldLabel>
-                <p className="text-xs text-muted-foreground">
-                  Checking this automatically builds a unique inventory variant matrix item for every combination of options added above.
-                </p>
-              </div>
-            </Field>
-          </FieldGroup>
-        </FieldSet>
-
-        {/* Actions Block */}
-        <Field orientation="horizontal" className="justify-end gap-3 pt-4 border-t">
-          <Button variant="outline" type="button" onClick={() => reset()} disabled={isSubmitting}>Reset</Button>
-          <Button type="submit" disabled={isSubmitting}>
-            {isSubmitting ? "Generating Systems..." : "Create Product Group Combo"}
-          </Button>
-        </Field>
-
-      </FieldGroup>
-    </form>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>Cancel</Button>
+            <Button type="button" onClick={handleConfirmValues} className="gap-1.5">
+              <Check className="w-4 h-4" /> Inject Values ({pendingSelections.length})
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }
 
-// Sub-component to manage nested arrays cleanly without hitting component re-render loops
 function ValuesSubArray({ optionIndex, control, register, errors }: { optionIndex: number, control: any, register: any, errors: any }) {
   const { fields, append, remove } = useFieldArray({
     control,
@@ -596,11 +480,7 @@ function ValuesSubArray({ optionIndex, control, register, errors }: { optionInde
             placeholder="Value..."
             {...register(`options.${optionIndex}.values.${valIndex}.value`)}
           />
-          <button 
-            type="button" 
-            onClick={() => remove(valIndex)} 
-            className="text-muted-foreground hover:text-destructive p-0.5 rounded transition-colors"
-          >
+          <button type="button" onClick={() => remove(valIndex)} className="text-muted-foreground hover:text-destructive p-0.5 rounded transition-colors">
             <X className="w-3 h-3" />
           </button>
         </div>

@@ -1,5 +1,5 @@
 // app/dashboard/products/create/page.tsx
-import { ProductGroupForm } from "@/components/products/group-form";
+import { ProductGroupForm } from "@/components/products/inflow-group-form";
 import {
   Card,
   CardContent,
@@ -19,39 +19,39 @@ export default function Page() {
         </CardHeader>
         <CardContent>
           <ProductGroupForm
-          initialData={{
-          id: "grp1",
-          name: "Sony A7 IV",
-          categoryId: "camera",
-          brandId: "sony",
-          isActive: true,
-          tags: [
-            { value: "mirrorless" },
-            { value: "full-frame" },
-          ],
-          features: [
-            { key: "Sensor", value: "Full Frame" },
-            { key: "Megapixels", value: "33MP" },
-          ],
-          options: [
-            {
-              name: "Color",
-              attributeId: "attr_color",
-              values: [
-                { value: "Black" },
-                { value: "Silver" },
-              ],
-            },
-            {
-              name: "Lens Kit",
-              attributeId: "attr_lens",
-              values: [
-                { value: "Body Only" },
-                { value: "28-70mm" },
-              ],
-            },
-          ],
-        }} />
+            initialData={{
+            id: "grp1",
+            name: "Sony A7 IV",
+            categoryId: "camera",
+            brandId: "sony",
+            isActive: true,
+            tags: [
+              { value: "mirrorless" },
+              { value: "full-frame" },
+            ],
+            features: [
+              { key: "Sensor", value: "Full Frame" },
+              { key: "Megapixels", value: "33MP" },
+            ],
+            options: [
+              {
+                name: "Color",
+                attributeId: "attr_color",
+                values: [
+                  { value: "Black" },
+                  { value: "Silver" },
+                ],
+              },
+              {
+                name: "Lens Kit",
+                attributeId: "attr_lens",
+                values: [
+                  { value: "Body Only" },
+                  { value: "28-70mm" },
+                ],
+              },
+            ],
+          }} />
         </CardContent>
       </Card>
     </div>

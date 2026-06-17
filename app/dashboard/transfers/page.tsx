@@ -3,13 +3,25 @@
 
 import { useEffect, useState, Fragment } from "react";
 import Link from "next/link";
-import { Plus, Search, ArrowRightLeft, Warehouse, ArrowRight, Layers, FileText, ChevronDown, ChevronUp, Edit3 } from "lucide-react";
+import { Plus, Search, ArrowRightLeft, Warehouse, ArrowRight, FileText, ChevronDown, ChevronUp, Edit3 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { DeleteButton } from "@/components/shared/delete-button";
 import { TransferActionCell } from "@/components/transfer/transfer-action-cell";
+
+// Shadcn UI AlertDialog imports
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 interface LineDetail {
   id: string;
@@ -34,11 +46,24 @@ interface TransferOrderRow {
   lines: LineDetail[];
 }
 
+// State tracker for our custom confirmation modal
+interface PendingAction {
+  id: string;
+  status: TransferOrderRow["status"];
+  title: string;
+  description: string;
+  toastSuccess: string;
+}
+
 export default function TransferOrdersListPage() {
   const [orders, setOrders] = useState<TransferOrderRow[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [expandedRows, setExpandedRows] = useState<Record<string, boolean>>({});
+  
+  // Custom dialog control state
+  const [pendingAction, setPendingAction] = useState<PendingAction | null>(null);
+  const [isConfirming, setIsConfirming] = useState(false);
 
   const fetchTransfers = async () => {
     try {
@@ -76,6 +101,37 @@ export default function TransferOrdersListPage() {
         return "bg-destructive/10 text-destructive border-destructive/20";
       default:
         return "bg-muted text-muted-foreground";
+    }
+  };
+
+  // Handles executing the actual API route modification once confirmed
+  const handleExecuteStatusUpdate = async () => {
+    if (!pendingAction) return;
+    setIsConfirming(true);
+
+    try {
+      const r = await fetch(`/api/admin/transfers/${pendingAction.id}/status`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: pendingAction.id, status: pendingAction.status })
+      });
+
+      if (r.ok) {
+        if (pendingAction.status === 'CANCELLED') {
+          toast.warning(pendingAction.toastSuccess);
+        } else {
+          toast.success(pendingAction.toastSuccess);
+        }
+        await fetchTransfers();
+      } else {
+        const err = await r.json();
+        toast.error(err.error || "Execution pipeline failure.");
+      }
+    } catch {
+      toast.error("Network communication failure.");
+    } finally {
+      setIsConfirming(false);
+      setPendingAction(null);
     }
   };
 
@@ -151,7 +207,7 @@ export default function TransferOrdersListPage() {
                 </tr>
               </thead>
               <tbody className="divide-y text-xs">
-                {filteredOrders.map((order, idx) => {
+                {filteredOrders.map((order) => {
                   const isRowExpanded = !!expandedRows[order.id];
                   const isClosedRecord = order.status === "RECEIVED" || order.status === "CANCELLED";
                   
@@ -159,7 +215,6 @@ export default function TransferOrdersListPage() {
                     <Fragment key={order.id}>
                       <tr className={`hover:bg-muted/10 transition-colors ${isClosedRecord ? "bg-muted/5 opacity-80" : ""}`}>
                         
-                        {/* Expandable row dropdown trigger button link arrow */}
                         <td className="p-4 text-center">
                           <button
                             type="button"
@@ -171,12 +226,10 @@ export default function TransferOrdersListPage() {
                           </button>
                         </td>
 
-                        {/* Order Number column code identifier */}
                         <td className="p-4 font-mono font-bold text-foreground">
                           {order.transferNumber}
                         </td>
 
-                        {/* Source Facility Label */}
                         <td className="p-4 text-muted-foreground font-medium max-w-[160px] truncate">
                           <div className="flex items-center gap-1.5">
                             <Warehouse className="w-3.5 h-3.5 text-muted-foreground/60 shrink-0" />
@@ -184,12 +237,10 @@ export default function TransferOrdersListPage() {
                           </div>
                         </td>
 
-                        {/* Direction Arrow Vector Graphic */}
                         <td className="p-4 text-center text-muted-foreground/40">
                           <ArrowRight className="w-4 h-4 mx-auto" />
                         </td>
 
-                        {/* Destination Facility Label */}
                         <td className="p-4 text-muted-foreground font-medium max-w-[160px] truncate">
                           <div className="flex items-center gap-1.5">
                             <Warehouse className="w-3.5 h-3.5 text-blue-500/60 shrink-0" />
@@ -197,36 +248,29 @@ export default function TransferOrdersListPage() {
                           </div>
                         </td>
 
-                        {/* Individual Line Quantities count indicator pill */}
                         <td className="p-4 text-center">
                           <Badge variant="secondary" className="text-[10px] font-mono h-5 py-0 bg-muted px-1.5 text-muted-foreground font-normal">
                             {order.linesCount} {order.linesCount === 1 ? "SKU" : "SKUs"}
                           </Badge>
                         </td>
 
-                        {/* Stage Progress State Badge Option */}
                         <td className="p-4">
                           <Badge variant="outline" className={`text-[10px] tracking-tight font-semibold py-0.5 px-2 ${getStatusBadgeVariant(order.status)}`}>
                             {order.status}
                           </Badge>
                         </td>
 
-                        {/* Action Control Modifiers panel anchors */}
                         <td className="p-4">
                           <div className="flex items-center justify-end gap-2">
-                              {/* Contextual Pipeline Progress Buttons */}
-                              {order.status === "DRAFT" && (
+                              { (order.status === "DRAFT" && order.linesCount > 0) && (
                               <Button
-                                  onClick={async () => {
-                                  if(confirm("Confirm manifest approval request step?")) {
-                                      const r = await fetch('/api/admin/transfers', {
-                                      method: 'PATCH',
-                                      headers: {'Content-Type': 'application/json'},
-                                      body: JSON.stringify({ id: order.id, status: 'PENDING' })
-                                      });
-                                      if(r.ok) { toast.success("Manifest pending approval"); fetchTransfers(); }
-                                  }
-                                  }}
+                                  onClick={() => setPendingAction({
+                                    id: order.id,
+                                    status: 'PENDING',
+                                    title: "Confirm Authorization Request",
+                                    description: `Are you sure you want to request manifest approval step for ${order.transferNumber}?`,
+                                    toastSuccess: "Manifest pending approval"
+                                  })}
                                   variant="outline"
                                   className="h-7 text-[10px] px-2 font-bold text-blue-600 bg-blue-50/50 hover:bg-blue-100 border-blue-200"
                               >
@@ -236,17 +280,13 @@ export default function TransferOrdersListPage() {
 
                               {order.status === "PENDING" && (
                               <Button
-                                  onClick={async () => {
-                                  if(confirm("Deduct items from departure stock and mark shipment as Shipped?")) {
-                                      const r = await fetch('/api/admin/transfers', {
-                                      method: 'PATCH',
-                                      headers: {'Content-Type': 'application/json'},
-                                      body: JSON.stringify({ id: order.id, status: 'IN_TRANSIT' })
-                                      });
-                                      if(r.ok) { toast.success("Consignment Dispatched In-Transit"); fetchTransfers(); }
-                                      else { const err = await r.json(); toast.error(err.error); }
-                                  }
-                                  }}
+                                  onClick={() => setPendingAction({
+                                    id: order.id,
+                                    status: 'IN_TRANSIT',
+                                    title: "Confirm Cargo Dispatch",
+                                    description: `This action will deduct items from ${order.sourceLocationName} departure storage assets and set manifest status to Shipped.`,
+                                    toastSuccess: "Consignment Dispatched In-Transit"
+                                  })}
                                   variant="outline"
                                   className="h-7 text-[10px] px-2 font-bold text-purple-600 bg-purple-50/50 hover:bg-purple-100 border-purple-200"
                               >
@@ -257,16 +297,13 @@ export default function TransferOrdersListPage() {
                               {order.status === "IN_TRANSIT" && (
                               <Fragment>
                                   <Button
-                                  onClick={async () => {
-                                      if(confirm("Verify all components arrived safely? This will add quantities to destination terminal ledger storage.")) {
-                                      const r = await fetch('/api/admin/transfers', {
-                                          method: 'PATCH',
-                                          headers: {'Content-Type': 'application/json'},
-                                          body: JSON.stringify({ id: order.id, status: 'RECEIVED' })
-                                      });
-                                      if(r.ok) { toast.success("Consignment Received & Settled"); fetchTransfers(); }
-                                      }
-                                  }}
+                                  onClick={() => setPendingAction({
+                                    id: order.id,
+                                    status: 'RECEIVED',
+                                    title: "Confirm Receipt Settlement",
+                                    description: "Verify all container component components arrived safely. This permanently shifts stock balance volumes into destination ledger terminal slots.",
+                                    toastSuccess: "Consignment Received & Settled"
+                                  })}
                                   variant="outline"
                                   className="h-7 text-[10px] px-2 font-bold text-emerald-600 bg-emerald-50/50 hover:bg-emerald-100 border-emerald-200"
                                   >
@@ -274,50 +311,46 @@ export default function TransferOrdersListPage() {
                                   </Button>
 
                                   <Button
-                                  onClick={async () => {
-                                      if(confirm("Void cargo dispatch route? Quantities will be returned to origin bin storage indexes.")) {
-                                      const r = await fetch('/api/admin/transfers', {
-                                          method: 'PATCH',
-                                          headers: {'Content-Type': 'application/json'},
-                                          body: JSON.stringify({ id: order.id, status: 'CANCELLED' })
-                                      });
-                                      if(r.ok) { toast.warning("Shipment routing aborted"); fetchTransfers(); }
-                                      }
-                                  }}
-                                  variant="ghost"
-                                  className="h-7 text-[10px] px-2 font-medium text-destructive hover:bg-destructive/10"
+                                    onClick={() => setPendingAction({
+                                      id: order.id,
+                                      status: 'CANCELLED',
+                                      title: "Abort Freight Deployment",
+                                      description: "Void active transit routing allocations completely? Quantities will safely rollback to standard origin bin location indexes.",
+                                      toastSuccess: "Shipment routing aborted"
+                                    })}
+                                    variant="ghost"
+                                    className="h-7 text-[10px] px-2 font-medium text-destructive hover:bg-destructive/10"
                                   >
                                   Abort
                                   </Button>
                               </Fragment>
                               )}
 
-                              {/* Default Manage Anchor Controls */}
-                              <TransferActionCell orderId={order.id} />
-                              {/* <Button asChild variant="ghost" size="sm" className="h-7 px-2 font-semibold gap-1" disabled={isClosedRecord}>
-                              <Link href={`/dashboard/transfers/${order.id}/edit`}>
-                                  <Edit3 className="w-3 h-3" /> Manage
+                              { (order.status === "DRAFT" && order.linesCount > 0) && (
+                              <Link 
+                                href={`/dashboard/transfers/${order.id}/edit`}
+                                className="px-2 font-semibold gap-1 flex "
+                              >
+                                <Edit3 className="w-3 h-3" /> Manage
                               </Link>
-                              </Button> */}
-                              
+                              )}
+
                               <DeleteButton
-                              itemId={order.id}
-                              itemName={`Transfer manifest (${order.transferNumber})`}
-                              endpointUrl={`/api/admin/transfers/${order.id}`}
-                              onSuccess={fetchTransfers}
-                              variant="icon"
+                                itemId={order.id}
+                                itemName={`Transfer manifest (${order.transferNumber})`}
+                                endpointUrl={`/api/admin/transfers/${order.id}`}
+                                onSuccess={fetchTransfers}
+                                variant="icon"
                               />
                           </div>
                         </td>
                       </tr>
 
-                      {/* Dropdown Expander: Sub-table detailing discrete product row counts */}
                       {isRowExpanded && (
                         <tr key={`Sub_${order.id}`}>
                           <td colSpan={8} className="p-0 bg-muted/10 border-b">
                             <div className="px-14 py-4 space-y-3 animate-in fade-in duration-100">
                               
-                              {/* Summary Context Fields */}
                               <div className="flex flex-col sm:flex-row gap-4 text-[11px] text-muted-foreground border-b pb-2">
                                 <div>Issued Date: <strong className="text-foreground">{new Date(order.createdAt).toLocaleDateString()}</strong></div>
                                 {order.transferredAt && <div>Dispatched: <strong className="text-foreground">{new Date(order.transferredAt).toLocaleDateString()}</strong></div>}
@@ -328,7 +361,6 @@ export default function TransferOrdersListPage() {
                                 <FileText className="w-3.5 h-3.5" /> Consignment Manifest Stock breakdown lines
                               </div>
 
-                              {/* Nested items listing matrix table grids */}
                               <div className="border rounded-lg bg-background overflow-hidden shadow-2xs">
                                 <table className="w-full text-left border-collapse text-xs">
                                   <thead>
@@ -354,7 +386,6 @@ export default function TransferOrdersListPage() {
                                 </table>
                               </div>
 
-                              {/* Remarks footnotes indicator text wrapper box panel */}
                               {order.remarks && (
                                 <p className="text-[11px] text-muted-foreground bg-background border p-2 rounded-lg italic max-w-3xl">
                                   <strong>Logistical Manifest Remarks:</strong> {order.remarks}
@@ -373,6 +404,31 @@ export default function TransferOrdersListPage() {
           </div>
         </div>
       )}
+
+      {/* Reusable Global Confirm Alert Dialog Component Matrix */}
+      <AlertDialog open={!!pendingAction} onOpenChange={(open) => !open && setPendingAction(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{pendingAction?.title}</AlertDialogTitle>
+            <AlertDialogDescription>
+              {pendingAction?.description}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isConfirming}>Cancel</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={(e) => {
+                e.preventDefault(); // Holds modal open until task completion processing finishes
+                handleExecuteStatusUpdate();
+              }}
+              disabled={isConfirming}
+              className={pendingAction?.status === 'CANCELLED' ? "bg-destructive text-destructive-foreground hover:bg-destructive/90" : ""}
+            >
+              {isConfirming ? "Processing..." : "Confirm"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
     </div>
   );

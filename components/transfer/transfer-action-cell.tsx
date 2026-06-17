@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Edit3 } from "lucide-react";
 
-export function TransferActionCell({ orderId }: { orderId: string }) {
+export function TransferActionCell({ orderId, orderStatus }: { orderId: string, orderStatus: boolean }) {
   const router = useRouter();
 
   const handleNavigationBuster = () => {

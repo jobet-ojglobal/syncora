@@ -110,7 +110,7 @@ model ProductVariant {
   productId         String   @unique
   defaultPrice      Decimal  @db.Decimal(18,5)
 
-  group             ProductGroup @relation(fields: [productGroupId], references: [inflowId])
+  group             ProductGroup @relation(fields: [productGroupId], references: [inflowId], onDelete: Cascade)
   product           Product  @relation(fields: [productId], references: [inflowId])
   selections        ProductVariantSelection[]
 
@@ -290,28 +290,6 @@ model ProductGroupOptionValue {
   @@map("product_group_option_value")
 }
 
-model Attribute {
-  id        String @id @default(cuid())
-  name      String @unique
-  values    AttributeValue[]
-  inflowOptions ProductGroupOption[]
-
-  @@map("attribute")
-}
-
-model AttributeValue {
-  id          String @id @default(cuid())
-  value       String
-  hexCode     String?
-  attributeId String
-  attribute   Attribute @relation(fields: [attributeId], references: [id])
-  inflowValues ProductGroupOptionValue[]
-
-  @@unique([attributeId, value])
-}
-
-
-
 model ProductVariantSelection {
   id                     String @id @default(cuid())
   variantId              String
@@ -327,6 +305,29 @@ model ProductVariantSelection {
   @@unique([variantId,optionId])
   @@map("product_variant_selection")
 }
+
+model Attribute {
+  id        String @id @default(cuid())
+  name      String @unique
+  values    AttributeValue[]
+  inflowOptions ProductGroupOption[]
+
+  @@map("attribute")
+}
+
+model AttributeValue {
+  id          String @id @default(cuid())
+  value       String
+  hexCode     String?
+  attributeId String
+  attribute   Attribute @relation(fields: [attributeId], references: [id], onDelete: Cascade)
+  inflowValues ProductGroupOptionValue[]
+
+  @@unique([attributeId, value])
+}
+
+
+
 
 // customFields.custom1
 model Brand {
@@ -378,8 +379,8 @@ model ProductFeature {
   value          String // 👈 Added: Holds the dynamic value constraint (e.g., "Full Frame", "8K 30p", "Yes")
   
   group          ProductGroup? @relation(fields: [groupId], references: [inflowId])
-  product        Product @relation(fields: [productId], references: [inflowId])
-  feature        Feature @relation(fields: [featureId], references: [id])
+  product        Product @relation(fields: [productId], references: [inflowId], onDelete: Cascade)
+  feature        Feature @relation(fields: [featureId], references: [id], onDelete: Cascade)
 
   @@id([productId, featureId])
 
@@ -392,8 +393,8 @@ model ProductTag {
   tagId          String
 
   group          ProductGroup? @relation(fields: [groupId], references: [inflowId])
-  product        Product @relation(fields: [productId], references: [inflowId])
-  tag            Tag @relation(fields: [tagId], references: [id])
+  product        Product @relation(fields: [productId], references: [inflowId], onDelete: Cascade)
+  tag            Tag @relation(fields: [tagId], references: [id], onDelete: Cascade)
 
   @@id([productId, tagId])
 
@@ -451,7 +452,7 @@ model Sublocation {
   id              String @id @default(cuid())
   locationId      String
   name            String
-  location        Location @relation(fields: [locationId],references: [inflowId])
+  location        Location @relation(fields: [locationId],references: [inflowId], onDelete: Cascade)
   inventoryBins   InventoryBin[]
   sourceTransferLines TransferOrderLine[] @relation("TransferSourceSublocation")
   targetTransferLines TransferOrderLine[] @relation("TransferTargetSublocation")
@@ -476,6 +477,12 @@ model Inventory {
   quantityAvailable   Decimal? @db.Decimal(18,4)
   quantityReserved    Decimal? @db.Decimal(18,4)
 
+  // 🚀 REPLENISHMENT CONTROL FIELDS ADDED HERE:
+  reorderThreshold  Decimal  @default(0.0000) @db.Decimal(18,4) // Trigger point (e.g., alert if available < 10)
+  reorderQuantity   Decimal  @default(0.0000) @db.Decimal(18,4) // Economic order size to auto-request
+  isAutoReorderEnabled Boolean @default(false)                  // Automation switch flag
+  preferredSourceLocationId String?
+
   product             Product @relation(fields: [productId],references: [inflowId])
   location            Location @relation(fields: [locationId],references: [inflowId])
   bins                InventoryBin[]
@@ -497,7 +504,7 @@ model InventoryBin {
   sublocationId  String
   quantity       Decimal @db.Decimal(18,4)
 
-  inventory           Inventory @relation(fields: [inventoryId],references: [id])
+  inventory           Inventory @relation(fields: [inventoryId],references: [id], onDelete: Cascade)
   product             Product @relation(fields: [productId],references: [inflowId])
   sublocation         Sublocation @relation(fields: [sublocationId],references: [id])
 
@@ -531,7 +538,7 @@ model InventoryAdjustmentLine {
   quantityAdjusted      Decimal @db.Decimal(18,4)
   quantityAfter         Decimal @db.Decimal(18,4)
   reason                String?
-  adjustment            InventoryAdjustment @relation(fields: [adjustmentId], references: [id])
+  adjustment            InventoryAdjustment @relation(fields: [adjustmentId], references: [id], onDelete: Cascade)
   product               Product @relation(fields: [productId], references: [inflowId])
   location              Location @relation(fields: [locationId], references: [inflowId])
   sublocation           Sublocation? @relation(fields: [sublocationId], references: [id])
@@ -611,7 +618,7 @@ model TransferOrderLine {
   targetSublocationId   String?
   quantity              Decimal @db.Decimal(18,4)
 
-  transferOrder         TransferOrder @relation(fields: [transferOrderId],references: [id])
+  transferOrder         TransferOrder @relation(fields: [transferOrderId],references: [id], onDelete: Cascade)
   product               Product @relation(fields: [productId],references: [inflowId])
   sourceSublocation     Sublocation? @relation("TransferSourceSublocation",fields: [sourceSublocationId],references: [id])
   targetSublocation     Sublocation? @relation("TransferTargetSublocation",fields: [targetSublocationId],references: [id])

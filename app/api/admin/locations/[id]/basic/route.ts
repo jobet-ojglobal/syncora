@@ -20,7 +20,7 @@ export async function GET(
       await params;
 
     const location =
-      await LocationService.getBasicLocations(id);
+      await LocationService.getBasicLocation(id);
 
     if (!location) {
       return NextResponse.json({ error: "Location not found." }, { status: 400 });

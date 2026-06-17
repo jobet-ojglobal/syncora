@@ -220,6 +220,14 @@ export const data = {
           title: "Create Product",
           url: "/dashboard/products/create",
         },
+         {
+          title: "All Groups",
+          url: "/dashboard/groups",
+        },
+        {
+          title: "Create Group",
+          url: "/dashboard/groups/create",
+        },
       ],
     },
 
@@ -343,21 +351,21 @@ export const data = {
     /*                               TRANSFER ORDERS                              */
     /* -------------------------------------------------------------------------- */
 
-    // {
-    //   title: "Transfer Orders",
-    //   url: "/dashboard/transfers",
-    //   icon: Truck,
-    //   items: [
-    //     {
-    //       title: "All Transfers",
-    //       url: "/dashboard/transfers",
-    //     },
-    //     {
-    //       title: "Create Transfer",
-    //       url: "/dashboard/transfers/create",
-    //     },
-    //   ],
-    // },
+    {
+      title: "Transfer Orders",
+      url: "/dashboard/transfers",
+      icon: Truck,
+      items: [
+        {
+          title: "All Transfers",
+          url: "/dashboard/transfers",
+        },
+        {
+          title: "Create Transfer",
+          url: "/dashboard/transfers/create",
+        },
+      ],
+    },
 
     /* -------------------------------------------------------------------------- */
     /*                               CUSTOMER ORDERS                              */

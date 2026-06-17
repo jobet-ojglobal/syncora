@@ -131,8 +131,9 @@ export default function LocationsListPage() {
 
                     <div className="min-w-0 space-y-1">
                       <div className="flex items-center gap-2 flex-wrap">
-                        <h3 className="text-sm font-bold text-foreground tracking-tight truncate">{loc.name}</h3>
-                        
+                        <Link href={`/dashboard/locations/${loc.inflowId}/inventory`}>
+                          <h3 className="text-sm font-bold text-foreground hover:text-indigo-300 tracking-tight truncate">{loc.name}</h3>
+                        </Link>
                         {/* Status Badges Group */}
                         {loc.isDefault && (
                           <Badge className="text-[10px] tracking-tight bg-blue-500 hover:bg-blue-500 text-white font-semibold h-4 px-1.5">

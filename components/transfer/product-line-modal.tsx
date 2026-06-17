@@ -30,7 +30,7 @@ interface ProductLineModalProps {
   sublocations: SublocationLookup[];
   sourceLocationId: string;
   targetLocationId: string;
-  existingLines: any[];
+  existingLines: any[]; // These must be the actual live fields from useFieldArray
   editingLineIndex: number | null;
   onSave: (data: { productId: string; sourceSublocationId: string; targetSublocationId: string; quantity: number }) => void;
 }
@@ -52,24 +52,33 @@ export function ProductLineModal({
   const [quantity, setQuantity] = useState(1);
   const [validationError, setValidationError] = useState("");
 
-  // Live Stock balance structures
   const [stockData, setStockData] = useState<StockState>({ locations: [], bins: [] });
   const [isLoadingStock, setIsLoadingStock] = useState(false);
 
   const departureSublocations = sublocations.filter(s => s.locationId === sourceLocationId);
   const arrivalSublocations = sublocations.filter(s => s.locationId === targetLocationId);
 
+  // Single source of truth for initialization and state sync on Open/Edit transitions
   useEffect(() => {
-  if (editingLineIndex !== null && existingLines[editingLineIndex]) {
-    const target = existingLines[editingLineIndex];
+    if (isOpen) {
+      if (editingLineIndex !== null && existingLines[editingLineIndex]) {
+        const currentLine = existingLines[editingLineIndex];
+        setProductId(currentLine.productId || "");
+        setSourceSubId(currentLine.sourceSublocationId || "");
+        setTargetSubId(currentLine.targetSublocationId || "");
+        setQuantity(Number(currentLine.quantity) || 1);
+      } else {
+        // Reset to clean state for fresh additions
+        setProductId("");
+        setSourceSubId("");
+        setTargetSubId("");
+        setQuantity(1);
+      }
+      setValidationError("");
+    }
+  }, [isOpen, editingLineIndex, existingLines]);
 
-    setProductId(target.productId);
-    setSourceSubId(target.sourceSublocationId || "");
-    setTargetSubId(target.targetSublocationId || "");
-    setQuantity(target.quantity);
-  }
-}, [editingLineIndex, existingLines]);
-
+  // Live Metrics fetcher
   useEffect(() => {
     if (!productId) {
       setStockData({ locations: [], bins: [] });
@@ -81,7 +90,6 @@ export function ProductLineModal({
       try {
         const url = `/api/admin/stocks?productId=${productId}&sourceLocationId=${sourceLocationId}&targetLocationId=${targetLocationId}`;
         const res = await fetch(url);
-        
         if (res.ok) {
           const data = await res.json();
           setStockData(data);
@@ -96,62 +104,45 @@ export function ProductLineModal({
     fetchLiveMetrics();
   }, [productId, sourceLocationId, targetLocationId]);
 
-  // 3. Clean helper logic to resolve actual balances based on current inputs
   const getSourceStock = () => {
     if (isLoadingStock) return "...";
-    
-    // If a sublocation bin is picked, show its direct stock.
-    // Otherwise, fall back to the total available inventory at that location site.
     if (sourceSubId) {
       const binMatch = stockData.bins.find(b => b.sublocationId === sourceSubId);
       return binMatch ? binMatch.quantity : 0;
-    } else {
-      const locMatch = stockData.locations.find(l => l.locationId === sourceLocationId);
-      return locMatch ? locMatch.quantityAvailable : 0;
     }
+    const locMatch = stockData.locations.find(l => l.locationId === sourceLocationId);
+    return locMatch ? locMatch.quantityAvailable : 0;
   };
 
   const getTargetStock = () => {
     if (isLoadingStock) return "...";
-    
     if (targetSubId) {
       const binMatch = stockData.bins.find(b => b.sublocationId === targetSubId);
       return binMatch ? binMatch.quantity : 0;
-    } else {
-      const locMatch = stockData.locations.find(l => l.locationId === targetLocationId);
-      return locMatch ? locMatch.quantityAvailable : 0;
     }
+    const locMatch = stockData.locations.find(l => l.locationId === targetLocationId);
+    return locMatch ? locMatch.quantityAvailable : 0;
   };
 
-  // Initialize values if updating an existing record entry row path
-  useEffect(() => {
-    if (editingLineIndex !== null && existingLines[editingLineIndex]) {
-      const target = existingLines[editingLineIndex];
-      setProductId(target.productId);
-      setSourceSubId(target.sourceSublocationId || "");
-      setTargetSubId(target.targetSublocationId || "");
-      setQuantity(target.quantity);
-    }
-  }, [editingLineIndex, existingLines]);
-  
   const handleValidateAndCommit = () => {
     if (!productId) return setValidationError("Please choose a product SKU specification.");
     if (quantity <= 0) return setValidationError("Transfer allocations must exceed zero.");
 
-    // Prevent duplicate mapping paths
-    const localConflict = existingLines.some((line, index) => {
-      if (index === editingLineIndex) return false;
-      return (
-        line.productId === productId &&
-        (line.sourceSublocationId || "") === sourceSubId &&
-        (line.targetSublocationId || "") === targetSubId
-      );
+    // Strict duplicate configuration matching layout 
+    const isDuplicate = existingLines.some((line, index) => {
+      if (index === editingLineIndex) return false; // Ignore current row if modifying
+      
+      const matchProduct = line.productId === productId;
+      const matchSource = (line.sourceSublocationId || "") === sourceSubId;
+      const matchTarget = (line.targetSublocationId || "") === targetSubId;
+      
+      return matchProduct && matchSource && matchTarget;
     });
 
-    if (localConflict) {
+    if (isDuplicate) {
       return setValidationError("This exact product configuration pathway is already allocated inside this draft.");
     }
-  
+
     setValidationError("");
     onSave({
       productId,
@@ -167,7 +158,6 @@ export function ProductLineModal({
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4">
       <div className="bg-background border rounded-xl w-full max-w-lg shadow-xl overflow-hidden flex flex-col max-h-[90vh]">
         
-        {/* Header Title Section */}
         <div className="p-4 border-b flex items-center justify-between bg-muted/20">
           <div className="flex items-center gap-2">
             <ArrowRightLeft className="w-4 h-4 text-primary" />
@@ -180,7 +170,6 @@ export function ProductLineModal({
           </Button>
         </div>
 
-        {/* Form Controls Container */}
         <div className="p-4 space-y-4 overflow-y-auto flex-1">
           {validationError && (
             <p className="p-2.5 bg-destructive/10 border border-destructive/20 text-destructive text-[11px] rounded-lg font-medium">
@@ -188,7 +177,6 @@ export function ProductLineModal({
             </p>
           )}
 
-          {/* Product Select Option Field */}
           <Field>
             <FieldLabel className="text-xs font-semibold">Select Target Product SKU *</FieldLabel>
             <select
@@ -201,7 +189,6 @@ export function ProductLineModal({
             </select>
           </Field>
 
-          {/* Split Multi-Entity Stock Metric Ledger Layout */}
           {productId && (
             <div className="grid grid-cols-2 gap-3 bg-muted/30 p-3 rounded-lg border">
               <div>
@@ -229,7 +216,6 @@ export function ProductLineModal({
             </div>
           )}
 
-          {/* Bin Allocation Zones */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <Field>
               <FieldLabel className="text-xs">Source Bin Location / Zone</FieldLabel>
@@ -261,7 +247,6 @@ export function ProductLineModal({
             </Field>
           </div>
 
-          {/* Volume Allocation Factor */}
           <Field>
             <FieldLabel className="text-xs font-semibold">Transfer Volume Quantity *</FieldLabel>
             <Input
@@ -276,7 +261,6 @@ export function ProductLineModal({
           </Field>
         </div>
 
-        {/* Footer Processing Controls */}
         <div className="p-3 border-t bg-muted/10 flex items-center justify-end gap-2">
           <Button type="button" variant="ghost" size="sm" onClick={onClose} className="text-xs">
             Cancel
@@ -290,3 +274,28 @@ export function ProductLineModal({
     </div>
   );
 }
+
+// USAGE
+
+{/* Find this block at the bottom of your TransferOrderForm layout */}
+// { modalOpen && (
+//   <ProductLineModal
+//     isOpen={modalOpen}
+//     onClose={() => { setModalOpen(false); setEditingIndex(null); }}
+//     products={products}
+//     sublocations={sublocations}
+//     sourceLocationId={watchedSourceLocId}
+//     targetLocationId={watchedTargetLocId}
+//     existingLines={fields} // <-- Change from watchedLines to fields!
+//     editingLineIndex={editingIndex}
+//     onSave={(data) => {
+//       if (editingIndex !== null) {
+//         update(editingIndex, data);
+//       } else {
+//         append(data);
+//       }
+//       setModalOpen(false);
+//       setEditingIndex(null);
+//     }}
+//   />
+// )}

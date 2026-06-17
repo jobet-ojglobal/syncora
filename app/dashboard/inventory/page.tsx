@@ -3,7 +3,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Plus, Search, Warehouse, Package, Layers, AlertTriangle, Eye, ShieldAlert, Edit, Info } from "lucide-react";
+import { Plus, Search, Warehouse, Package, Layers, AlertTriangle, Edit, Info, Truck, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -25,15 +25,15 @@ interface InventoryStockRow {
   quantityOnHand: number;
   quantityReserved: number;
   quantityAvailable: number;
+  quantityInTransit: number; // 🚀 Registered new state metric
+  reorderThreshold: number;
   bins: BinDetail[];
 }
 
-export default function InventoryListPage() {
+export default function InventoryListIntransit() {
   const [inventory, setInventory] = useState<InventoryStockRow[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [isLoading, setIsLoading] = useState(true);
-  
-  // 🔍 Track which item's sublocation details are currently opened in the modal
   const [activeInspectionItem, setActiveInspectionItem] = useState<InventoryStockRow | null>(null);
 
   const fetchInventory = async () => {
@@ -63,8 +63,10 @@ export default function InventoryListPage() {
     );
   });
 
+  
+
   return (
-    <div className="w-full max-w-6xl mx-auto p-6 space-y-6">
+    <div className="w-full max-w-7xl mx-auto p-6 space-y-6">
       
       {/* Upper Title Segment */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b pb-5">
@@ -118,6 +120,7 @@ export default function InventoryListPage() {
                   <th className="p-4">Logistics Depot</th>
                   <th className="p-4 text-right">On Hand</th>
                   <th className="p-4 text-right">Committed</th>
+                  <th className="p-4 text-right">In Transit</th> 
                   <th className="p-4 text-right">Available for Sale</th>
                   <th className="p-4 text-center">Sub-bins</th>
                   <th className="p-4 text-right">Actions</th>
@@ -127,11 +130,12 @@ export default function InventoryListPage() {
                 {filteredItems.map((item) => {
                   const isOutOfStock = item.quantityAvailable <= 0;
                   const isStrained = item.quantityReserved > item.quantityOnHand * 0.5;
-
+                  const isLowStock = item.reorderThreshold > 0 && item.quantityAvailable <= item.reorderThreshold;
                   return (
                     <tr key={item.id} className="hover:bg-muted/20 transition-colors">
                       {/* Product Column */}
-                      <td className="p-4 max-w-[240px]">
+                      
+                      <td className="p-4 max-w-[220px]">
                         <div className="flex items-center gap-2.5">
                           <div className="w-7 h-7 bg-muted border rounded-md flex items-center justify-center shrink-0">
                             <Package className="w-3.5 h-3.5 text-muted-foreground/80" />
@@ -145,7 +149,7 @@ export default function InventoryListPage() {
 
                       {/* Location Column */}
                       <td className="p-4 text-muted-foreground font-medium">
-                        <div className="flex items-center gap-1.5 truncate max-w-[160px]">
+                        <div className="flex items-center gap-1.5 truncate max-w-[150px]">
                           <Warehouse className="w-3.5 h-3.5 opacity-60 shrink-0" />
                           <span className="truncate">{item.locationName}</span>
                         </div>
@@ -164,6 +168,18 @@ export default function InventoryListPage() {
                           </span>
                         ) : (
                           <span className="opacity-40">-</span>
+                        )}
+                      </td>
+
+                      {/* 🚀 In Transit Numeric Column */}
+                      <td className="p-4 text-right font-mono text-muted-foreground">
+                        {item.quantityInTransit > 0 ? (
+                          <span className="inline-flex items-center gap-1 bg-purple-50 text-purple-600 dark:bg-purple-950/40 dark:text-purple-400 font-bold px-1.5 py-0.5 rounded-sm text-[11px]">
+                            <Truck className="w-3 h-3 shrink-0" />
+                            {item.quantityInTransit.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 4 })}
+                          </span>
+                        ) : (
+                          <span className="opacity-30">-</span>
                         )}
                       </td>
 
@@ -206,7 +222,7 @@ export default function InventoryListPage() {
                           <DeleteButton
                             itemId={item.id}
                             itemName={`Inventory line (${item.productSlug})`}
-                            endpointUrl="/api/admin/inventory"
+                            endpointUrl={`/api/admin/inventory/${item.id}`}
                             onSuccess={fetchInventory}
                             variant="icon"
                           />
@@ -221,12 +237,10 @@ export default function InventoryListPage() {
         </div>
       )}
 
-      {/* 🗺️ Slide-out Inspection Modal Panel for Internal Sublocations Layout */}
+      {/* Slide-out Inspection Modal Panel */}
       {activeInspectionItem && (
         <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4">
           <div className="bg-card border w-full max-w-md rounded-xl p-5 shadow-lg space-y-4 animate-in fade-in zoom-in-95 duration-150">
-            
-            {/* Header section */}
             <div className="flex items-start justify-between border-b pb-3">
               <div>
                 <h3 className="text-sm font-bold text-foreground">Storage Layout Inspection</h3>
@@ -237,7 +251,6 @@ export default function InventoryListPage() {
               </Badge>
             </div>
 
-            {/* Matrix Listing Rows */}
             <div className="space-y-2 max-h-[240px] overflow-y-auto pr-1">
               <div className="text-[10px] uppercase font-bold tracking-wider text-muted-foreground mb-1">Assigned Layout Picking Slots</div>
               {activeInspectionItem.bins.map((bin) => (
@@ -253,7 +266,6 @@ export default function InventoryListPage() {
               ))}
             </div>
 
-            {/* Footer action closer trigger */}
             <div className="flex justify-end pt-2 border-t">
               <Button
                 type="button"
@@ -265,7 +277,6 @@ export default function InventoryListPage() {
                 Close View
               </Button>
             </div>
-
           </div>
         </div>
       )}

@@ -10,7 +10,7 @@ import { Trash2, Plus, ArrowLeft, Warehouse, Package, Lock, FileText, Edit3 } fr
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 import { Field, FieldGroup, FieldLabel, FieldLegend, FieldSet } from "@/components/ui/field";
-import { ProductLineModal } from "./product-line-modal";
+import { ProductLineModal } from "./product-lines-modal.granular";
 
 interface LookupItem {
   inflowId: string;
@@ -286,9 +286,7 @@ export function TransferOrderForm({ locations, products, sublocations, initialDa
         </div>
       </FieldGroup>
 
-      {/* <pre>{JSON.stringify(initialData.lines, null, 2)}</pre> */}
-
-      {/* Embedded Component Processing Modal Overlay */}
+      {/* Find this block at the bottom of your TransferOrderForm layout */}
       {modalOpen && (
         <ProductLineModal
           isOpen={modalOpen}
@@ -297,13 +295,19 @@ export function TransferOrderForm({ locations, products, sublocations, initialDa
           sublocations={sublocations}
           sourceLocationId={watchedSourceLocId}
           targetLocationId={watchedTargetLocId}
-          existingLines={watchedLines}
+          existingLines={fields} 
           editingLineIndex={editingIndex}
           onSave={(data) => {
             if (editingIndex !== null) {
+              // If modifying a single row path, save the direct object structure directly
               update(editingIndex, data);
             } else {
-              append(data);
+              // If data is returned as an array, push all elements onto useFieldArray lines bulk checklist
+              if (Array.isArray(data)) {
+                data.forEach(item => append(item));
+              } else {
+                append(data);
+              }
             }
             setModalOpen(false);
             setEditingIndex(null);

@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma"; // Adjust this path to your client instance
+import { prisma } from "@/lib/prisma";
+import { Prisma } from "@/generated/prisma/client";
 
 /**
- * 🟡 STATE ENGINE MODIFICATIONS & LEDGER LEDGER ADJUSTMENTS
+ * 🟡 STATE ENGINE MODIFICATIONS & LEDGER ADJUSTMENTS
  */
 export async function PATCH(request: NextRequest) {
   try {
@@ -35,21 +36,38 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json(updatedRemarks, { status: 200 });
     }
 
+    // EMPTY MANIFEST GUARD: Prevent processing orders with 0 lines unless cancelling
+    if (currentOrder.lines.length === 0 && targetStatus !== "CANCELLED") {
+      return NextResponse.json(
+        { error: "Invalid Action: Cannot process or submit a stock transfer manifest with 0 line items." }, 
+        { status: 422 }
+      );
+    }
+
     // Execute state adjustments transaction
     const processingResult = await prisma.$transaction(async (tx) => {
 
-      // SCENARIO 1: DISPATCH MANIFEST (DRAFT/PENDING -> IN_TRANSIT)
+      // ✅ NEW SCENARIO: SUBMIT FOR APPROVAL (DRAFT -> PENDING)
+      // Pure workflow state transition. No physical stock allocations change yet.
+      if (targetStatus === "PENDING" && oldStatus === "DRAFT") {
+        return await tx.transferOrder.update({
+          where: { id },
+          data: { status: "PENDING", remarks }
+        });
+      }
+
+      // SCENARIO 1: DISPATCH CARGO (DRAFT/PENDING -> IN_TRANSIT)
       if (targetStatus === "IN_TRANSIT" && (oldStatus === "DRAFT" || oldStatus === "PENDING")) {
         for (const line of currentOrder.lines) {
-          const qty = Number(line.quantity);
+          const qty = new Prisma.Decimal(line.quantity);
 
-          // A: Decrement stock from master base row location entry
+          // A: Decrement stock from master location profile entry
           const sourceInv = await tx.inventory.findUnique({
             where: { productId_locationId: { productId: line.productId, locationId: currentOrder.sourceLocationId } }
           });
 
-          if (!sourceInv || Number(sourceInv.quantityAvailable) < qty) {
-            throw new Error(`Inssuficient Stock: Missing item units for SKU reference token ${line.productId} at origin site.`);
+          if (!sourceInv || new Prisma.Decimal(sourceInv.quantityAvailable || 0).lessThan(qty)) {
+            throw new Error(`Insufficient Stock: Missing items for SKU reference ${line.productId} at origin site.`);
           }
 
           await tx.inventory.update({
@@ -60,18 +78,18 @@ export async function PATCH(request: NextRequest) {
             }
           });
 
-          // B: Decrement stock from exact source bin if mapped
+          // B: Decrement stock from specific source inventory bin node if mapped
           if (line.sourceSublocationId) {
             const sourceBin = await tx.inventoryBin.findFirst({
               where: { 
                 productId: line.productId, 
-                sublocationId: line.sourceSublocationId,
+                sublocationId: line.sourceSublocationId, // Safe: matches schema schema ID mapping
                 inventoryId: sourceInv.id
               }
             });
 
-            if (!sourceBin || Number(sourceBin.quantity) < qty) {
-              throw new Error(`Insufficient Sublocation Volume inside selected bin node.`);
+            if (!sourceBin || new Prisma.Decimal(sourceBin.quantity).lessThan(qty)) {
+              throw new Error(`Insufficient Sublocation Volume inside selected source bin node.`);
             }
 
             await tx.inventoryBin.update({
@@ -90,9 +108,9 @@ export async function PATCH(request: NextRequest) {
       // SCENARIO 2: ARRIVAL RECEIPTS SUCCESS (IN_TRANSIT -> RECEIVED)
       if (targetStatus === "RECEIVED" && oldStatus === "IN_TRANSIT") {
         for (const line of currentOrder.lines) {
-          const qty = Number(line.quantity);
+          const qty = new Prisma.Decimal(line.quantity);
 
-          // A: Upsert Master Inventory root node target layout block
+          // A: Upsert Master Inventory root node target location layout block
           let targetInv = await tx.inventory.findUnique({
             where: { productId_locationId: { productId: line.productId, locationId: currentOrder.targetLocationId } }
           });
@@ -151,12 +169,12 @@ export async function PATCH(request: NextRequest) {
         });
       }
 
-      // SCENARIO 3: SHIPPED CANCELATION REVERSION RECOVERY (IN_TRANSIT -> CANCELLED)
+      // SCENARIO 3: SHIPPED CANCELLATION REVERSION (IN_TRANSIT -> CANCELLED)
       if (targetStatus === "CANCELLED" && oldStatus === "IN_TRANSIT") {
         for (const line of currentOrder.lines) {
-          const qty = Number(line.quantity);
+          const qty = new Prisma.Decimal(line.quantity);
 
-          // Put stock back into original root location layout profile
+          // Return stock into master location inventory profile
           await tx.inventory.update({
             where: { productId_locationId: { productId: line.productId, locationId: currentOrder.sourceLocationId } },
             data: {
@@ -165,7 +183,7 @@ export async function PATCH(request: NextRequest) {
             }
           });
 
-          // Put stock back into specific source sublocation bin mapping node
+          // Return stock into explicit source sublocation bin mapping node
           if (line.sourceSublocationId) {
             const matchingInvRoot = await tx.inventory.findUnique({
               where: { productId_locationId: { productId: line.productId, locationId: currentOrder.sourceLocationId } }
