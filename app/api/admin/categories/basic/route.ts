@@ -8,15 +8,15 @@ import { CategoryService } from "@/services/category.service";
 export async function GET() {
   try {
     const categories =
-      await CategoryService.getBasicInflowCategories();
+      await CategoryService.getBasicCategories();
     
-    const formattedCategories = categories.map((cat) => ({
-      id: cat.inflowId,
-      label: cat.name,
-    }));
+    // const formattedCategories = categories.map((cat) => ({
+    //   id: cat.inflowId,
+    //   label: cat.name,
+    // }));
 
     return NextResponse.json(
-      formattedCategories
+      categories
     );
   } catch (error) {
     console.error(error);

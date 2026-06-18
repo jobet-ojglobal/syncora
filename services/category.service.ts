@@ -6,7 +6,7 @@ export class CategoryService {
 
   static async getBasicCategories() {
     return prisma.category.findMany({
-      select: { id: true, name: true},
+      select: { id: true, inflowId: true, name: true},
       orderBy: {
         name: "asc",
       },

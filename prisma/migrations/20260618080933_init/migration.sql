@@ -35,6 +35,20 @@ CREATE TABLE "sync_job" (
 );
 
 -- CreateTable
+CREATE TABLE "brand" (
+    "id" TEXT NOT NULL,
+    "name" TEXT NOT NULL,
+    "description" TEXT,
+    "logoUrl" TEXT,
+    "websiteUrl" TEXT,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+    "deletedAt" TIMESTAMP(3),
+
+    CONSTRAINT "brand_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
 CREATE TABLE "category" (
     "id" TEXT NOT NULL,
     "inflowId" TEXT NOT NULL,
@@ -58,10 +72,7 @@ CREATE TABLE "product_group" (
     "description" TEXT,
     "brandId" TEXT,
     "categoryId" TEXT,
-    "defaultProductId" TEXT,
-    "defaultImageId" TEXT,
     "isActive" BOOLEAN NOT NULL,
-    "timestamp" TEXT,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
     "deletedAt" TIMESTAMP(3),
@@ -72,10 +83,14 @@ CREATE TABLE "product_group" (
 -- CreateTable
 CREATE TABLE "product_variant" (
     "id" TEXT NOT NULL,
+    "sku" TEXT,
     "inflowId" TEXT NOT NULL,
     "productGroupId" TEXT NOT NULL,
     "productId" TEXT NOT NULL,
     "defaultPrice" DECIMAL(18,5) NOT NULL,
+    "isActive" BOOLEAN NOT NULL DEFAULT true,
+    "signature" TEXT NOT NULL,
+    "variantCount" INTEGER NOT NULL DEFAULT 0,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
 
@@ -177,34 +192,6 @@ CREATE TABLE "product_image" (
 );
 
 -- CreateTable
-CREATE TABLE "product_group_option" (
-    "id" TEXT NOT NULL,
-    "inflowId" TEXT NOT NULL,
-    "productGroupId" TEXT NOT NULL,
-    "lineNum" INTEGER NOT NULL,
-    "name" TEXT NOT NULL,
-    "attributeId" TEXT,
-    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updatedAt" TIMESTAMP(3) NOT NULL,
-
-    CONSTRAINT "product_group_option_pkey" PRIMARY KEY ("id")
-);
-
--- CreateTable
-CREATE TABLE "product_group_option_value" (
-    "id" TEXT NOT NULL,
-    "inflowId" TEXT NOT NULL,
-    "optionId" TEXT NOT NULL,
-    "lineNum" INTEGER NOT NULL,
-    "value" TEXT NOT NULL,
-    "attributeValueId" TEXT,
-    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updatedAt" TIMESTAMP(3) NOT NULL,
-
-    CONSTRAINT "product_group_option_value_pkey" PRIMARY KEY ("id")
-);
-
--- CreateTable
 CREATE TABLE "attribute" (
     "id" TEXT NOT NULL,
     "name" TEXT NOT NULL,
@@ -234,17 +221,29 @@ CREATE TABLE "product_variant_selection" (
 );
 
 -- CreateTable
-CREATE TABLE "brand" (
+CREATE TABLE "product_group_option" (
     "id" TEXT NOT NULL,
-    "name" TEXT NOT NULL,
-    "description" TEXT,
-    "logoUrl" TEXT,
-    "websiteUrl" TEXT,
+    "inflowId" TEXT NOT NULL,
+    "productGroupId" TEXT NOT NULL,
+    "lineNum" INTEGER NOT NULL,
+    "attributeId" TEXT NOT NULL,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
-    "deletedAt" TIMESTAMP(3),
 
-    CONSTRAINT "brand_pkey" PRIMARY KEY ("id")
+    CONSTRAINT "product_group_option_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "product_group_option_value" (
+    "id" TEXT NOT NULL,
+    "inflowId" TEXT NOT NULL,
+    "optionId" TEXT NOT NULL,
+    "lineNum" INTEGER NOT NULL,
+    "attributeValueId" TEXT NOT NULL,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "product_group_option_value_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
@@ -258,6 +257,33 @@ CREATE TABLE "feature" (
 );
 
 -- CreateTable
+CREATE TABLE "feature_value" (
+    "id" TEXT NOT NULL,
+    "featureId" TEXT NOT NULL,
+    "value" TEXT NOT NULL,
+
+    CONSTRAINT "feature_value_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "group_feature" (
+    "groupId" TEXT NOT NULL,
+    "featureId" TEXT NOT NULL,
+    "featureValueId" TEXT NOT NULL,
+
+    CONSTRAINT "group_feature_pkey" PRIMARY KEY ("groupId","featureId")
+);
+
+-- CreateTable
+CREATE TABLE "product_feature" (
+    "productId" TEXT NOT NULL,
+    "featureId" TEXT NOT NULL,
+    "featureValueId" TEXT NOT NULL,
+
+    CONSTRAINT "product_feature_pkey" PRIMARY KEY ("productId","featureId")
+);
+
+-- CreateTable
 CREATE TABLE "tag" (
     "id" TEXT NOT NULL,
     "name" TEXT NOT NULL,
@@ -268,19 +294,16 @@ CREATE TABLE "tag" (
 );
 
 -- CreateTable
-CREATE TABLE "product_feature" (
-    "productId" TEXT NOT NULL,
-    "groupId" TEXT,
-    "featureId" TEXT NOT NULL,
-    "value" TEXT NOT NULL,
+CREATE TABLE "group_tag" (
+    "groupId" TEXT NOT NULL,
+    "tagId" TEXT NOT NULL,
 
-    CONSTRAINT "product_feature_pkey" PRIMARY KEY ("productId","featureId")
+    CONSTRAINT "group_tag_pkey" PRIMARY KEY ("groupId","tagId")
 );
 
 -- CreateTable
 CREATE TABLE "product_tag" (
     "productId" TEXT NOT NULL,
-    "groupId" TEXT,
     "tagId" TEXT NOT NULL,
 
     CONSTRAINT "product_tag_pkey" PRIMARY KEY ("productId","tagId")
@@ -336,6 +359,10 @@ CREATE TABLE "inventory" (
     "quantityOnHand" DECIMAL(18,4) NOT NULL,
     "quantityAvailable" DECIMAL(18,4),
     "quantityReserved" DECIMAL(18,4),
+    "reorderThreshold" DECIMAL(18,4) NOT NULL DEFAULT 0.0000,
+    "reorderQuantity" DECIMAL(18,4) NOT NULL DEFAULT 0.0000,
+    "isAutoReorderEnabled" BOOLEAN NOT NULL DEFAULT false,
+    "preferredSourceLocationId" TEXT,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
 
@@ -479,6 +506,9 @@ CREATE INDEX "sync_job_status_idx" ON "sync_job"("status");
 CREATE INDEX "sync_job_createdAt_idx" ON "sync_job"("createdAt");
 
 -- CreateIndex
+CREATE UNIQUE INDEX "brand_name_key" ON "brand"("name");
+
+-- CreateIndex
 CREATE UNIQUE INDEX "category_inflowId_key" ON "category"("inflowId");
 
 -- CreateIndex
@@ -501,6 +531,12 @@ CREATE INDEX "product_variant_productGroupId_idx" ON "product_variant"("productG
 
 -- CreateIndex
 CREATE INDEX "product_variant_productId_idx" ON "product_variant"("productId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "product_variant_productGroupId_productId_key" ON "product_variant"("productGroupId", "productId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "product_variant_productGroupId_signature_key" ON "product_variant"("productGroupId", "signature");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "product_inflowId_key" ON "product"("inflowId");
@@ -536,10 +572,31 @@ CREATE INDEX "product_image_groupId_position_idx" ON "product_image"("groupId", 
 CREATE INDEX "product_image_productId_position_idx" ON "product_image"("productId", "position");
 
 -- CreateIndex
+CREATE UNIQUE INDEX "attribute_name_key" ON "attribute"("name");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "AttributeValue_attributeId_value_key" ON "AttributeValue"("attributeId", "value");
+
+-- CreateIndex
+CREATE INDEX "product_variant_selection_variantId_idx" ON "product_variant_selection"("variantId");
+
+-- CreateIndex
+CREATE INDEX "product_variant_selection_optionId_idx" ON "product_variant_selection"("optionId");
+
+-- CreateIndex
+CREATE INDEX "product_variant_selection_optionValueId_idx" ON "product_variant_selection"("optionValueId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "product_variant_selection_variantId_optionId_key" ON "product_variant_selection"("variantId", "optionId");
+
+-- CreateIndex
 CREATE UNIQUE INDEX "product_group_option_inflowId_key" ON "product_group_option"("inflowId");
 
 -- CreateIndex
 CREATE INDEX "product_group_option_productGroupId_idx" ON "product_group_option"("productGroupId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "product_group_option_productGroupId_attributeId_key" ON "product_group_option"("productGroupId", "attributeId");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "product_group_option_value_inflowId_key" ON "product_group_option_value"("inflowId");
@@ -548,19 +605,16 @@ CREATE UNIQUE INDEX "product_group_option_value_inflowId_key" ON "product_group_
 CREATE INDEX "product_group_option_value_optionId_idx" ON "product_group_option_value"("optionId");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "attribute_name_key" ON "attribute"("name");
+CREATE UNIQUE INDEX "product_group_option_value_optionId_attributeValueId_key" ON "product_group_option_value"("optionId", "attributeValueId");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "AttributeValue_attributeId_value_key" ON "AttributeValue"("attributeId", "value");
-
--- CreateIndex
-CREATE UNIQUE INDEX "product_variant_selection_variantId_optionId_key" ON "product_variant_selection"("variantId", "optionId");
-
--- CreateIndex
-CREATE UNIQUE INDEX "brand_name_key" ON "brand"("name");
+CREATE UNIQUE INDEX "product_group_option_value_optionId_lineNum_key" ON "product_group_option_value"("optionId", "lineNum");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "feature_name_key" ON "feature"("name");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "feature_value_featureId_value_key" ON "feature_value"("featureId", "value");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "tag_name_key" ON "tag"("name");
@@ -635,10 +689,10 @@ ALTER TABLE "product_group" ADD CONSTRAINT "product_group_brandId_fkey" FOREIGN 
 ALTER TABLE "product_group" ADD CONSTRAINT "product_group_categoryId_fkey" FOREIGN KEY ("categoryId") REFERENCES "category"("inflowId") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "product_variant" ADD CONSTRAINT "product_variant_productGroupId_fkey" FOREIGN KEY ("productGroupId") REFERENCES "product_group"("inflowId") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "product_variant" ADD CONSTRAINT "product_variant_productGroupId_fkey" FOREIGN KEY ("productGroupId") REFERENCES "product_group"("inflowId") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "product_variant" ADD CONSTRAINT "product_variant_productId_fkey" FOREIGN KEY ("productId") REFERENCES "product"("inflowId") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "product_variant" ADD CONSTRAINT "product_variant_productId_fkey" FOREIGN KEY ("productId") REFERENCES "product"("inflowId") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "product" ADD CONSTRAINT "product_brandId_fkey" FOREIGN KEY ("brandId") REFERENCES "brand"("id") ON DELETE SET NULL ON UPDATE CASCADE;
@@ -647,118 +701,133 @@ ALTER TABLE "product" ADD CONSTRAINT "product_brandId_fkey" FOREIGN KEY ("brandI
 ALTER TABLE "product" ADD CONSTRAINT "product_categoryId_fkey" FOREIGN KEY ("categoryId") REFERENCES "category"("inflowId") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "product_barcode" ADD CONSTRAINT "product_barcode_productId_fkey" FOREIGN KEY ("productId") REFERENCES "product"("inflowId") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "product_barcode" ADD CONSTRAINT "product_barcode_productId_fkey" FOREIGN KEY ("productId") REFERENCES "product"("inflowId") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "product_uom" ADD CONSTRAINT "product_uom_productId_fkey" FOREIGN KEY ("productId") REFERENCES "product"("inflowId") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "product_uom" ADD CONSTRAINT "product_uom_productId_fkey" FOREIGN KEY ("productId") REFERENCES "product"("inflowId") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "product_sales_uom" ADD CONSTRAINT "product_sales_uom_productId_fkey" FOREIGN KEY ("productId") REFERENCES "product"("inflowId") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "product_sales_uom" ADD CONSTRAINT "product_sales_uom_productId_fkey" FOREIGN KEY ("productId") REFERENCES "product"("inflowId") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "product_image" ADD CONSTRAINT "product_image_groupId_fkey" FOREIGN KEY ("groupId") REFERENCES "product_group"("inflowId") ON DELETE SET NULL ON UPDATE CASCADE;
+ALTER TABLE "product_image" ADD CONSTRAINT "product_image_groupId_fkey" FOREIGN KEY ("groupId") REFERENCES "product_group"("inflowId") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "product_image" ADD CONSTRAINT "product_image_productId_fkey" FOREIGN KEY ("productId") REFERENCES "product"("inflowId") ON DELETE SET NULL ON UPDATE CASCADE;
+ALTER TABLE "product_image" ADD CONSTRAINT "product_image_productId_fkey" FOREIGN KEY ("productId") REFERENCES "product"("inflowId") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "product_group_option" ADD CONSTRAINT "product_group_option_attributeId_fkey" FOREIGN KEY ("attributeId") REFERENCES "attribute"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+ALTER TABLE "AttributeValue" ADD CONSTRAINT "AttributeValue_attributeId_fkey" FOREIGN KEY ("attributeId") REFERENCES "attribute"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "product_group_option" ADD CONSTRAINT "product_group_option_productGroupId_fkey" FOREIGN KEY ("productGroupId") REFERENCES "product_group"("inflowId") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "product_variant_selection" ADD CONSTRAINT "product_variant_selection_variantId_fkey" FOREIGN KEY ("variantId") REFERENCES "product_variant"("inflowId") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "product_group_option_value" ADD CONSTRAINT "product_group_option_value_attributeValueId_fkey" FOREIGN KEY ("attributeValueId") REFERENCES "AttributeValue"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+ALTER TABLE "product_variant_selection" ADD CONSTRAINT "product_variant_selection_optionId_fkey" FOREIGN KEY ("optionId") REFERENCES "product_group_option"("inflowId") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "product_group_option_value" ADD CONSTRAINT "product_group_option_value_optionId_fkey" FOREIGN KEY ("optionId") REFERENCES "product_group_option"("inflowId") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "product_variant_selection" ADD CONSTRAINT "product_variant_selection_optionValueId_fkey" FOREIGN KEY ("optionValueId") REFERENCES "product_group_option_value"("inflowId") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "AttributeValue" ADD CONSTRAINT "AttributeValue_attributeId_fkey" FOREIGN KEY ("attributeId") REFERENCES "attribute"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "product_group_option" ADD CONSTRAINT "product_group_option_attributeId_fkey" FOREIGN KEY ("attributeId") REFERENCES "attribute"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "product_variant_selection" ADD CONSTRAINT "product_variant_selection_variantId_fkey" FOREIGN KEY ("variantId") REFERENCES "product_variant"("inflowId") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "product_group_option" ADD CONSTRAINT "product_group_option_productGroupId_fkey" FOREIGN KEY ("productGroupId") REFERENCES "product_group"("inflowId") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "product_variant_selection" ADD CONSTRAINT "product_variant_selection_optionId_fkey" FOREIGN KEY ("optionId") REFERENCES "product_group_option"("inflowId") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "product_group_option_value" ADD CONSTRAINT "product_group_option_value_attributeValueId_fkey" FOREIGN KEY ("attributeValueId") REFERENCES "AttributeValue"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "product_variant_selection" ADD CONSTRAINT "product_variant_selection_optionValueId_fkey" FOREIGN KEY ("optionValueId") REFERENCES "product_group_option_value"("inflowId") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "product_group_option_value" ADD CONSTRAINT "product_group_option_value_optionId_fkey" FOREIGN KEY ("optionId") REFERENCES "product_group_option"("inflowId") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "product_feature" ADD CONSTRAINT "product_feature_groupId_fkey" FOREIGN KEY ("groupId") REFERENCES "product_group"("inflowId") ON DELETE SET NULL ON UPDATE CASCADE;
+ALTER TABLE "feature_value" ADD CONSTRAINT "feature_value_featureId_fkey" FOREIGN KEY ("featureId") REFERENCES "feature"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "product_feature" ADD CONSTRAINT "product_feature_productId_fkey" FOREIGN KEY ("productId") REFERENCES "product"("inflowId") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "group_feature" ADD CONSTRAINT "group_feature_groupId_fkey" FOREIGN KEY ("groupId") REFERENCES "product_group"("inflowId") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "product_feature" ADD CONSTRAINT "product_feature_featureId_fkey" FOREIGN KEY ("featureId") REFERENCES "feature"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "group_feature" ADD CONSTRAINT "group_feature_featureId_fkey" FOREIGN KEY ("featureId") REFERENCES "feature"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "product_tag" ADD CONSTRAINT "product_tag_groupId_fkey" FOREIGN KEY ("groupId") REFERENCES "product_group"("inflowId") ON DELETE SET NULL ON UPDATE CASCADE;
+ALTER TABLE "group_feature" ADD CONSTRAINT "group_feature_featureValueId_fkey" FOREIGN KEY ("featureValueId") REFERENCES "feature_value"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "product_tag" ADD CONSTRAINT "product_tag_productId_fkey" FOREIGN KEY ("productId") REFERENCES "product"("inflowId") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "product_feature" ADD CONSTRAINT "product_feature_productId_fkey" FOREIGN KEY ("productId") REFERENCES "product"("inflowId") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "product_tag" ADD CONSTRAINT "product_tag_tagId_fkey" FOREIGN KEY ("tagId") REFERENCES "tag"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "product_feature" ADD CONSTRAINT "product_feature_featureId_fkey" FOREIGN KEY ("featureId") REFERENCES "feature"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "location_address" ADD CONSTRAINT "location_address_locationId_fkey" FOREIGN KEY ("locationId") REFERENCES "location"("inflowId") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "product_feature" ADD CONSTRAINT "product_feature_featureValueId_fkey" FOREIGN KEY ("featureValueId") REFERENCES "feature_value"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "sublocation" ADD CONSTRAINT "sublocation_locationId_fkey" FOREIGN KEY ("locationId") REFERENCES "location"("inflowId") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "group_tag" ADD CONSTRAINT "group_tag_groupId_fkey" FOREIGN KEY ("groupId") REFERENCES "product_group"("inflowId") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "inventory" ADD CONSTRAINT "inventory_productId_fkey" FOREIGN KEY ("productId") REFERENCES "product"("inflowId") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "group_tag" ADD CONSTRAINT "group_tag_tagId_fkey" FOREIGN KEY ("tagId") REFERENCES "tag"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "inventory" ADD CONSTRAINT "inventory_locationId_fkey" FOREIGN KEY ("locationId") REFERENCES "location"("inflowId") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "product_tag" ADD CONSTRAINT "product_tag_productId_fkey" FOREIGN KEY ("productId") REFERENCES "product"("inflowId") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "inventory_bin" ADD CONSTRAINT "inventory_bin_inventoryId_fkey" FOREIGN KEY ("inventoryId") REFERENCES "inventory"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "product_tag" ADD CONSTRAINT "product_tag_tagId_fkey" FOREIGN KEY ("tagId") REFERENCES "tag"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "inventory_bin" ADD CONSTRAINT "inventory_bin_productId_fkey" FOREIGN KEY ("productId") REFERENCES "product"("inflowId") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "location_address" ADD CONSTRAINT "location_address_locationId_fkey" FOREIGN KEY ("locationId") REFERENCES "location"("inflowId") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "inventory_bin" ADD CONSTRAINT "inventory_bin_sublocationId_fkey" FOREIGN KEY ("sublocationId") REFERENCES "sublocation"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "sublocation" ADD CONSTRAINT "sublocation_locationId_fkey" FOREIGN KEY ("locationId") REFERENCES "location"("inflowId") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "inventory_adjustment" ADD CONSTRAINT "inventory_adjustment_performedById_fkey" FOREIGN KEY ("performedById") REFERENCES "user"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "inventory" ADD CONSTRAINT "inventory_productId_fkey" FOREIGN KEY ("productId") REFERENCES "product"("inflowId") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "inventory_adjustment_line" ADD CONSTRAINT "inventory_adjustment_line_adjustmentId_fkey" FOREIGN KEY ("adjustmentId") REFERENCES "inventory_adjustment"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "inventory" ADD CONSTRAINT "inventory_locationId_fkey" FOREIGN KEY ("locationId") REFERENCES "location"("inflowId") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "inventory_adjustment_line" ADD CONSTRAINT "inventory_adjustment_line_productId_fkey" FOREIGN KEY ("productId") REFERENCES "product"("inflowId") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "inventory_bin" ADD CONSTRAINT "inventory_bin_inventoryId_fkey" FOREIGN KEY ("inventoryId") REFERENCES "inventory"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "inventory_adjustment_line" ADD CONSTRAINT "inventory_adjustment_line_locationId_fkey" FOREIGN KEY ("locationId") REFERENCES "location"("inflowId") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "inventory_bin" ADD CONSTRAINT "inventory_bin_productId_fkey" FOREIGN KEY ("productId") REFERENCES "product"("inflowId") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "inventory_adjustment_line" ADD CONSTRAINT "inventory_adjustment_line_sublocationId_fkey" FOREIGN KEY ("sublocationId") REFERENCES "sublocation"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+ALTER TABLE "inventory_bin" ADD CONSTRAINT "inventory_bin_sublocationId_fkey" FOREIGN KEY ("sublocationId") REFERENCES "sublocation"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "InventoryLedger" ADD CONSTRAINT "InventoryLedger_productId_fkey" FOREIGN KEY ("productId") REFERENCES "product"("inflowId") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "inventory_adjustment" ADD CONSTRAINT "inventory_adjustment_performedById_fkey" FOREIGN KEY ("performedById") REFERENCES "user"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "InventoryLedger" ADD CONSTRAINT "InventoryLedger_locationId_fkey" FOREIGN KEY ("locationId") REFERENCES "location"("inflowId") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "inventory_adjustment_line" ADD CONSTRAINT "inventory_adjustment_line_adjustmentId_fkey" FOREIGN KEY ("adjustmentId") REFERENCES "inventory_adjustment"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "transfer_order" ADD CONSTRAINT "transfer_order_sourceLocationId_fkey" FOREIGN KEY ("sourceLocationId") REFERENCES "location"("inflowId") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "inventory_adjustment_line" ADD CONSTRAINT "inventory_adjustment_line_productId_fkey" FOREIGN KEY ("productId") REFERENCES "product"("inflowId") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "transfer_order" ADD CONSTRAINT "transfer_order_targetLocationId_fkey" FOREIGN KEY ("targetLocationId") REFERENCES "location"("inflowId") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "inventory_adjustment_line" ADD CONSTRAINT "inventory_adjustment_line_locationId_fkey" FOREIGN KEY ("locationId") REFERENCES "location"("inflowId") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "transfer_order_line" ADD CONSTRAINT "transfer_order_line_transferOrderId_fkey" FOREIGN KEY ("transferOrderId") REFERENCES "transfer_order"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "inventory_adjustment_line" ADD CONSTRAINT "inventory_adjustment_line_sublocationId_fkey" FOREIGN KEY ("sublocationId") REFERENCES "sublocation"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "transfer_order_line" ADD CONSTRAINT "transfer_order_line_productId_fkey" FOREIGN KEY ("productId") REFERENCES "product"("inflowId") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "InventoryLedger" ADD CONSTRAINT "InventoryLedger_productId_fkey" FOREIGN KEY ("productId") REFERENCES "product"("inflowId") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "transfer_order_line" ADD CONSTRAINT "transfer_order_line_sourceSublocationId_fkey" FOREIGN KEY ("sourceSublocationId") REFERENCES "sublocation"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+ALTER TABLE "InventoryLedger" ADD CONSTRAINT "InventoryLedger_locationId_fkey" FOREIGN KEY ("locationId") REFERENCES "location"("inflowId") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "transfer_order_line" ADD CONSTRAINT "transfer_order_line_targetSublocationId_fkey" FOREIGN KEY ("targetSublocationId") REFERENCES "sublocation"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+ALTER TABLE "transfer_order" ADD CONSTRAINT "transfer_order_sourceLocationId_fkey" FOREIGN KEY ("sourceLocationId") REFERENCES "location"("inflowId") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "transfer_order" ADD CONSTRAINT "transfer_order_targetLocationId_fkey" FOREIGN KEY ("targetLocationId") REFERENCES "location"("inflowId") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "transfer_order_line" ADD CONSTRAINT "transfer_order_line_transferOrderId_fkey" FOREIGN KEY ("transferOrderId") REFERENCES "transfer_order"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "transfer_order_line" ADD CONSTRAINT "transfer_order_line_productId_fkey" FOREIGN KEY ("productId") REFERENCES "product"("inflowId") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "transfer_order_line" ADD CONSTRAINT "transfer_order_line_sourceSublocationId_fkey" FOREIGN KEY ("sourceSublocationId") REFERENCES "sublocation"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "transfer_order_line" ADD CONSTRAINT "transfer_order_line_targetSublocationId_fkey" FOREIGN KEY ("targetSublocationId") REFERENCES "sublocation"("id") ON DELETE CASCADE ON UPDATE CASCADE;

@@ -3,7 +3,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Plus, Search, Package, Image as ImageIcon, Barcode, CalendarClock, ShieldCheck, HelpCircle, Edit, Kanban, Power, PowerOff } from "lucide-react";
+import { Plus, Search, Package, Image as ImageIcon, Barcode, CalendarClock, ShieldCheck, HelpCircle, Edit, Kanban, Power, PowerOff, Edit3 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -247,15 +247,16 @@ export default function ProductsListPage() {
                       {/* Command Action Buttons Block Column */}
                       <td className="p-4 text-right">
                         <div className="flex items-center justify-end gap-1">
-                          <Button asChild variant="ghost" size="sm" className="h-7 px-2 font-semibold gap-1">
+                          <Button asChild variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-foreground hover:bg-muted" 
+                            title={`Modify ${product.name}`}>
                             <Link href={`/dashboard/products/${product.id}/edit`}>
-                              <Edit className="w-3 h-3" /> Edit
+                              <Edit3 className="w-3.5 h-3.5" />
                             </Link>
                           </Button>
                           <DeleteButton
                             itemId={product.id}
                             itemName={product.name}
-                            endpointUrl={`/api/admin/products/${product.id}/soft-delete`}
+                            endpointUrl={`/api/admin/products/${product.id}`}
                             onSuccess={fetchProducts}
                             variant="icon"
                           />

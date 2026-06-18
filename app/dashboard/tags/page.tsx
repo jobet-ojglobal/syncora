@@ -37,7 +37,7 @@ export default function TagsAdminPage() {
   const fetchTags = async () => {
     try {
       setLoading(true);
-      const res = await fetch("/api/admin/tags");
+      const res = await fetch("/api/admin/tags/list");
       if (!res.ok) throw new Error("Could not load the product tags index.");
       const data = await res.json();
       setTags(data);

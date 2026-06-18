@@ -183,23 +183,57 @@ export async function PATCH(request: NextRequest) {
       });
 
       // 2. Perform updates on 1:1 Purchasing/Sales UOM configurations
-      await tx.productUom.update({
-        where: { productId: inflowId },
-        data: {
+      await tx.productUom.upsert({
+        where: {
+          productId: inflowId,
+        },
+        update: {
           name: purchasingUom.name.trim(),
           standardQuantity: purchasingUom.standardQuantity,
           uomQuantity: purchasingUom.uomQuantity,
-        }
+        },
+        create: {
+          productId: inflowId,
+          name: purchasingUom.name.trim(),
+          standardQuantity: purchasingUom.standardQuantity,
+          uomQuantity: purchasingUom.uomQuantity,
+        },
       });
 
-      await tx.productSalesUom.update({
-        where: { productId: inflowId },
-        data: {
+      await tx.productSalesUom.upsert({
+        where: {
+          productId: inflowId,
+        },
+        update: {
           name: salesUom.name.trim(),
           standardQuantity: salesUom.standardQuantity,
           uomQuantity: salesUom.uomQuantity,
-        }
+        },
+        create: {
+          productId: inflowId,
+          name: salesUom.name.trim(),
+          standardQuantity: salesUom.standardQuantity,
+          uomQuantity: salesUom.uomQuantity,
+        },
       });
+
+      // await tx.productUom.update({
+      //   where: { productId: inflowId },
+      //   data: {
+      //     name: purchasingUom.name.trim(),
+      //     standardQuantity: purchasingUom.standardQuantity,
+      //     uomQuantity: purchasingUom.uomQuantity,
+      //   }
+      // });
+
+      // await tx.productSalesUom.update({
+      //   where: { productId: inflowId },
+      //   data: {
+      //     name: salesUom.name.trim(),
+      //     standardQuantity: salesUom.standardQuantity,
+      //     uomQuantity: salesUom.uomQuantity,
+      //   }
+      // });
 
       // 3. Reconcile nested barcode row collections
       await tx.productBarcode.deleteMany({ where: { productId: inflowId } });

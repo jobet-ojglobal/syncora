@@ -27,7 +27,8 @@ import { useRouter } from "next/navigation";
 
 interface CategoryFlatOption {
   id: string;
-  label: string;
+  inflowId: string;
+  name: string;
 }
 
 interface BrandFormProps {
@@ -139,8 +140,8 @@ export function CategoryForm({ initialData, onSuccess }: BrandFormProps) {
                     <SelectContent>
                       <SelectItem value="root-level">None (Top-Level Root Category)</SelectItem>
                       {flatCategories.map((cat) => (
-                        <SelectItem key={cat.id} value={cat.id}>
-                          {cat.label}
+                        <SelectItem key={cat.id} value={cat.inflowId}>
+                          {cat.name}
                         </SelectItem>
                       ))}
                     </SelectContent>
