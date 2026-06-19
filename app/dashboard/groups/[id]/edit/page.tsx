@@ -4,7 +4,6 @@ import {
 } from "lucide-react";
 import PageHeader from "@/components/layout/dashboard/PageHeader";
 import { ProductGroupForm } from "@/components/products/group-form";
-import { appAPI } from "@/lib/apiClient";
 import { notFound } from "next/navigation";
 
 async function getBrands() {

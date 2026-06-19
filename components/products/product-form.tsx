@@ -1,4 +1,3 @@
-// components/ProductForm.tsx
 "use client";
 
 import { useForm, useFieldArray, Controller, useWatch } from "react-hook-form";
@@ -25,8 +24,9 @@ import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 import { Field, FieldGroup, FieldLabel, FieldLegend, FieldSet } from "@/components/ui/field";
 import { generateSku2Variant2 } from "@/helpers/genSKU";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useEffect, useMemo } from "react";
+import { BrandSelect } from "../shared/brand-select";
+import { CategorySelect } from "../shared/category-select";
 
 interface BrandLookupOption {
   id: string;
@@ -38,13 +38,21 @@ interface CategoryOption {
   name: string;
 }
 
+interface UomLookupReference {
+  id: string;
+  code: string;
+  name: string;
+  category: string;
+}
+
 interface ProductFormProps {
   categories: CategoryOption[];
   brands: BrandLookupOption[];
+  uoms: UomLookupReference[]; // 🟢 Added global metrics dependency array
   initialData?: any | null;
 }
 
-export function ProductForm({ categories, brands, initialData }: ProductFormProps) {
+export function ProductForm({ categories, brands, uoms, initialData }: ProductFormProps) {
   const router = useRouter();
   const isEditMode = !!initialData;
 
@@ -75,14 +83,15 @@ export function ProductForm({ categories, brands, initialData }: ProductFormProp
       originCountry: initialData?.originCountry || "",
       hsTariffNumber: initialData?.hsTariffNumber || "",
       remarks: initialData?.remarks || "",
-      standardUomName: initialData?.standardUomName || "PCS",
+      // 🟢 Expects matching entity identifier mapping now rather than text placeholders
+      standardUomName: initialData?.standardUomName || "", 
       purchasingUom: {
-        name: initialData?.purchasingUom?.name || "Box",
+        name: initialData?.purchasingUom?.name || "",
         standardQuantity: initialData?.purchasingUom?.standardQuantity ? Number(initialData.purchasingUom.standardQuantity) : 1,
         uomQuantity: initialData?.purchasingUom?.uomQuantity ? Number(initialData.purchasingUom.uomQuantity) : 1,
       },
       salesUom: {
-        name: initialData?.salesUom?.name || "Each",
+        name: initialData?.salesUom?.name || "",
         standardQuantity: initialData?.salesUom?.standardQuantity ? Number(initialData.salesUom.standardQuantity) : 1,
         uomQuantity: initialData?.salesUom?.uomQuantity ? Number(initialData.salesUom.uomQuantity) : 1,
       },
@@ -149,67 +158,64 @@ export function ProductForm({ categories, brands, initialData }: ProductFormProp
           </FieldLegend>
 
           <Field className="md:col-span-2">
+            {/* <Product Master Display Title *></ProductDisplayTitle> */}
             <FieldLabel>Product Master Display Title *</FieldLabel>
             <Input placeholder="e.g. Premium Ergonomic Office Chair" {...register("name")} />
-            {errors.name && <span className="text-xs text-destructive">{errors.name.message}</span>}
+            {errors.name && <span className="text-xs text-destructive">{errors.name.message as string}</span>}
           </Field>
 
-          <Field>
+          <Field className="col-span-1">
             <FieldLabel>SKU / Custom Identity *</FieldLabel>
             <Input placeholder="PROD-CHAIR-001" disabled={isEditMode} {...register("sku")} />
-            {errors.sku && <span className="text-xs text-destructive">{errors.sku.message}</span>}
+            {errors.sku && <span className="text-xs text-destructive">{errors.sku.message as string}</span>}
           </Field>
 
-          <Field>
-            <FieldLabel htmlFor="pg-category">Target Category *</FieldLabel>
-            <Controller
-              control={control}
-              name="categoryId"
-              render={({ field }) => (
-                <Select onValueChange={field.onChange} value={field.value}>
-                  <SelectTrigger id="pg-category">
-                    <SelectValue placeholder="Select a taxonomy bracket" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {categories.map((category) => (
-                      <SelectItem key={category.inflowId} value={category.inflowId}>
-                        {category.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              )}
-            />
-            {errors.categoryId && <span className="text-xs text-destructive">{errors.categoryId.message}</span>}
-          </Field>
-
-          <Field>
+          <Field className="md:col-span-2">
             <FieldLabel>Manufacturer / Brand Assignment</FieldLabel>
-            <select className="w-full text-xs h-9 rounded-md border border-input bg-background px-3" {...register("brandId")}>
-              <option value="">-- Unassigned (White-label) --</option>
-              {brands.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
-            </select>
+            <Controller
+              name="brandId"
+              control={control}
+              render={({ field }) => <BrandSelect value={field.value ?? undefined} onChange={field.onChange} />}
+            />
           </Field>
 
-          <Field>
+          <Field className="md:col-span-2">
+            <FieldLabel>Master Catalog Department Category</FieldLabel>
+            <Controller
+              name="categoryId"
+              control={control}
+              render={({ field }) => <CategorySelect value={field.value ?? undefined} onChange={field.onChange} />}
+            />
+          </Field>
+
+          {/* 🟢 MODIFIED: Base System UOM is now a clean drop-down selection list */}
+          <Field className="col-span-1">
             <FieldLabel>Base System UOM *</FieldLabel>
-            <Input placeholder="e.g. PCS, UNIT, KG" {...register("standardUomName")} />
-            {errors.standardUomName && <span className="text-xs text-destructive">{errors.standardUomName.message}</span>}
+            <select 
+              className="w-full text-xs h-9 rounded-md border border-input bg-background px-3 shadow-2xs focus:ring-1 focus:ring-primary focus:outline-hidden"
+              {...register("standardUomName")}
+            >
+              <option value="">-- Choose Base Unit --</option>
+              {uoms.map((u) => (
+                <option key={u.id} value={u.code}>{u.name} ({u.code})</option>
+              ))}
+            </select>
+            {errors.standardUomName && <span className="text-xs text-destructive">{errors.standardUomName.message as string}</span>}
           </Field>
 
           <Field className="md:col-span-3">
             <FieldLabel>Public Summary Description</FieldLabel>
-            <Textarea placeholder="Provide descriptive high-fidelity characteristics detailing materials, finishes, and specs..." rows={3} {...register("description")} />
+            <Textarea placeholder="Provide descriptive high-fidelity characteristics detailing materials..." rows={3} {...register("description")} />
           </Field>
         </FieldSet>
 
-        {/* ⚙️ Operational Flow Settings */}
+        {/* Operational Flow Settings */}
         <FieldSet className="grid grid-cols-1 md:grid-cols-3 gap-6 border-t pt-4">
           <FieldLegend className="col-span-1 md:col-span-3 flex items-center gap-2 border-b pb-2">
             <Settings className="w-4 h-4 text-muted-foreground" /> Operational Configurations & Strategy
           </FieldLegend>
 
-          <Field>
+          <Field className="col-span-1">
             <FieldLabel>Item Classification Type</FieldLabel>
             <select className="w-full text-xs h-9 rounded-md border border-input bg-background px-3" {...register("itemType")}>
               <option value="Stock">Stock Item</option>
@@ -219,26 +225,26 @@ export function ProductForm({ categories, brands, initialData }: ProductFormProp
           </Field>
 
           <div className="md:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-4 bg-muted/10 p-4 border rounded-xl">
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between gap-4">
               <FieldLabel className="mb-0 text-xs font-semibold">Catalog Visibility Active</FieldLabel>
               <Controller control={control} name="isActive" render={({ field }) => <Switch checked={field.value} onCheckedChange={field.onChange} />} />
             </div>
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between gap-4">
               <FieldLabel className="mb-0 text-xs font-semibold">Is Manufacturable</FieldLabel>
               <Controller control={control} name="isManufacturable" render={({ field }) => <Switch checked={field.value} onCheckedChange={field.onChange} />} />
             </div>
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between gap-4">
               <FieldLabel className="mb-0 text-xs font-semibold">Auto-Assemble Bundles</FieldLabel>
               <Controller control={control} name="autoAssemble" render={({ field }) => <Switch checked={field.value} onCheckedChange={field.onChange} />} />
             </div>
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between gap-4">
               <FieldLabel className="mb-0 text-xs font-semibold">Include Buildable Qty</FieldLabel>
               <Controller control={control} name="includeQuantityBuildable" render={({ field }) => <Switch checked={field.value} onCheckedChange={field.onChange} />} />
             </div>
           </div>
         </FieldSet>
 
-        {/* 📐 Dimensions & Logistics Metrics Section */}
+        {/* Dimensions & Logistics Metrics Section */}
         <FieldSet className="grid grid-cols-2 md:grid-cols-4 gap-4 border-t pt-4">
           <FieldLegend className="col-span-2 md:col-span-4 flex items-center gap-2 border-b pb-2">
             <Scale className="w-4 h-4 text-muted-foreground" /> Dimensional Logistics & Compliance
@@ -271,7 +277,7 @@ export function ProductForm({ categories, brands, initialData }: ProductFormProp
           </Field>
         </FieldSet>
 
-        {/* 🔄 Advanced UOM Conversion Rules Configurations */}
+        {/* Operational Multi-tier UOM Calculations */}
         <FieldSet className="grid grid-cols-1 md:grid-cols-2 gap-6 border-t pt-4">
           <FieldLegend className="col-span-1 md:col-span-2 flex items-center gap-2 border-b pb-2">
             <Link2 className="w-4 h-4 text-muted-foreground" /> Operational Multi-tier UOM Calculations
@@ -282,19 +288,28 @@ export function ProductForm({ categories, brands, initialData }: ProductFormProp
             <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Inbound Supply / Purchasing Conversion</h4>
             <Field>
               <FieldLabel>Inbound UOM Unit Tag</FieldLabel>
-              <Input placeholder="e.g. Box, Case, Pallet" {...register("purchasingUom.name")} />
-              {errors.purchasingUom?.name && <span className="text-xs text-destructive">{errors.purchasingUom.name.message}</span>}
+              {/* 🟢 MODIFIED: Input text field replaced with dynamic UOM Selector */}
+              <select 
+                className="w-full text-xs h-9 rounded-md border border-input bg-background px-3 shadow-2xs focus:ring-1 focus:ring-primary focus:outline-hidden"
+                {...register("purchasingUom.name")}
+              >
+                <option value="">-- Select Inbound Unit --</option>
+                {uoms.map((u) => (
+                  <option key={u.id} value={u.code}>{u.name} ({u.code})</option>
+                ))}
+              </select>
+              {errors.purchasingUom?.name && <span className="text-xs text-destructive">{(errors.purchasingUom as any).name.message}</span>}
             </Field>
             <div className="grid grid-cols-2 gap-2">
               <Field>
                 <FieldLabel>Standard Base Qty</FieldLabel>
                 <Input type="number" step="0.0001" {...register("purchasingUom.standardQuantity", { valueAsNumber: true })} />
-                {errors.purchasingUom?.standardQuantity && <span className="text-xs text-destructive">{errors.purchasingUom.standardQuantity.message}</span>}
+                {errors.purchasingUom?.standardQuantity && <span className="text-xs text-destructive">{(errors.purchasingUom as any).standardQuantity.message}</span>}
               </Field>
               <Field>
                 <FieldLabel>Equal to Pack Volume</FieldLabel>
                 <Input type="number" step="0.0001" {...register("purchasingUom.uomQuantity", { valueAsNumber: true })} />
-                {errors.purchasingUom?.uomQuantity && <span className="text-xs text-destructive">{errors.purchasingUom.uomQuantity.message}</span>}
+                {errors.purchasingUom?.uomQuantity && <span className="text-xs text-destructive">{(errors.purchasingUom as any).uomQuantity.message}</span>}
               </Field>
             </div>
           </div>
@@ -304,47 +319,56 @@ export function ProductForm({ categories, brands, initialData }: ProductFormProp
             <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Outbound / Sales Channels Conversion</h4>
             <Field>
               <FieldLabel>Outbound UOM Unit Tag</FieldLabel>
-              <Input placeholder="e.g. Pack, Each, Blister" {...register("salesUom.name")} />
-              {errors.salesUom?.name && <span className="text-xs text-destructive">{errors.salesUom.name.message}</span>}
+              {/* 🟢 MODIFIED: Input text field replaced with dynamic UOM Selector */}
+              <select 
+                className="w-full text-xs h-9 rounded-md border border-input bg-background px-3 shadow-2xs focus:ring-1 focus:ring-primary focus:outline-hidden"
+                {...register("salesUom.name")}
+              >
+                <option value="">-- Select Outbound Unit --</option>
+                {uoms.map((u) => (
+                  <option key={u.id} value={u.code}>{u.name} ({u.code})</option>
+                ))}
+              </select>
+              {errors.salesUom?.name && <span className="text-xs text-destructive">{(errors.salesUom as any).name.message}</span>}
             </Field>
             <div className="grid grid-cols-2 gap-2">
               <Field>
                 <FieldLabel>Standard Base Qty</FieldLabel>
                 <Input type="number" step="0.0001" {...register("salesUom.standardQuantity", { valueAsNumber: true })} />
-                {errors.salesUom?.standardQuantity && <span className="text-xs text-destructive">{errors.salesUom.standardQuantity.message}</span>}
+                {errors.salesUom?.standardQuantity && <span className="text-xs text-destructive">{(errors.salesUom as any).standardQuantity.message}</span>}
               </Field>
               <Field>
                 <FieldLabel>Equal to Pack Volume</FieldLabel>
                 <Input type="number" step="0.0001" {...register("salesUom.uomQuantity", { valueAsNumber: true })} />
-                {errors.salesUom?.uomQuantity && <span className="text-xs text-destructive">{errors.salesUom.uomQuantity.message}</span>}
+                {errors.salesUom?.uomQuantity && <span className="text-xs text-destructive">{(errors.salesUom as any).uomQuantity.message}</span>}
               </Field>
             </div>
           </div>
         </FieldSet>
 
-        {/* 🧬 Batches, Traceability, and Expiry Tracking Rules Grid */}
+        {/* Traceability Control Flags */}
         <FieldSet className="border-t pt-4">
           <FieldLegend className="flex items-center gap-2 border-b pb-2">
             <Calendar className="w-4 h-4 text-muted-foreground" /> Traceability Control Flags
           </FieldLegend>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-3">
-            <div className="flex items-center justify-between border p-3 rounded-xl bg-muted/10">
+            <div className="flex items-center justify-between border p-3 rounded-xl bg-muted/10 gap-4">
               <div><FieldLabel className="mb-0 text-xs font-semibold">Lot Tracking</FieldLabel></div>
               <Controller control={control} name="trackLots" render={({ field }) => <Switch checked={field.value} onCheckedChange={field.onChange} />} />
             </div>
-            <div className="flex items-center justify-between border p-3 rounded-xl bg-muted/10">
+            <div className="flex items-center justify-between border p-3 rounded-xl bg-muted/10 gap-4">
               <div><FieldLabel className="mb-0 text-xs font-semibold">Serial Tracking</FieldLabel></div>
               <Controller control={control} name="trackSerials" render={({ field }) => <Switch checked={field.value} onCheckedChange={field.onChange} />} />
             </div>
-            <div className="flex items-center justify-between border p-3 rounded-xl bg-muted/10">
+            <div className="flex items-center justify-between border p-3 rounded-xl bg-muted/10 gap-4">
               <div><FieldLabel className="mb-0 text-xs font-semibold">Expiry Tracking</FieldLabel></div>
               <Controller control={control} name="trackExpiry" render={({ field }) => <Switch checked={field.value} onCheckedChange={field.onChange} />} />
             </div>
           </div>
         </FieldSet>
 
-        {/* ⏳ Lifespan Variables Block (Shows up conditionally if trackExpiry is checked) */}
+        {/* Lifespan Variables Block */}
         {watchedTrackExpiry && (
           <FieldSet className="grid grid-cols-1 sm:grid-cols-3 gap-4 border p-4 rounded-xl bg-amber-50/20 border-amber-200/60 transition-all">
             <FieldLegend className="col-span-1 sm:col-span-3 flex items-center gap-2 text-amber-800 font-medium text-xs uppercase tracking-wider">
@@ -365,15 +389,15 @@ export function ProductForm({ categories, brands, initialData }: ProductFormProp
           </FieldSet>
         )}
 
-        {/* 📝 Internal Administration Remarks */}
+        {/* Internal Administration Remarks */}
         <FieldSet className="border-t pt-4">
           <Field>
             <FieldLabel>Internal System Administrative Remarks</FieldLabel>
-            <Textarea placeholder="Add internal operational notices, storage conditions notes, or custom workflow comments..." rows={2} {...register("remarks")} />
+            <Textarea placeholder="Add internal operational notices..." rows={2} {...register("remarks")} />
           </Field>
         </FieldSet>
 
-        {/* 🏷️ Dynamic 1:Many Barcodes Registry Rows */}
+        {/* Dynamic 1:Many Barcodes Registry Rows */}
         <FieldSet className="border-t pt-4">
           <div className="flex items-center justify-between border-b pb-2">
             <FieldLegend className="flex items-center gap-2"><Barcode className="w-4 h-4 text-muted-foreground" /> Global Trade Barcode Identifiers Mapping</FieldLegend>
@@ -392,7 +416,7 @@ export function ProductForm({ categories, brands, initialData }: ProductFormProp
           </div>
         </FieldSet>
 
-        {/* 🖼️ Dynamic CDN Image Url Asset Links Array Mapping Block */}
+        {/* Dynamic CDN Image Url Asset Links Array Mapping Block */}
         <FieldSet className="border-t pt-4">
           <div className="flex items-center justify-between border-b pb-2">
             <FieldLegend className="flex items-center gap-2"><ImageIcon className="w-4 h-4 text-muted-foreground" /> Media Asset Resource link Registries</FieldLegend>
@@ -402,7 +426,7 @@ export function ProductForm({ categories, brands, initialData }: ProductFormProp
             {imageArray.fields.map((field, index) => (
               <div key={field.id} className="flex flex-col gap-1 bg-muted/10 p-2 border rounded-xl">
                 <div className="flex items-center gap-3">
-                  <Input placeholder="https://cdn.yourstore.com/assets/products/...jpg" className="text-xs h-8 flex-1 bg-background" {...register(`images.${index}.originalUrl` as const)} />
+                  <Input placeholder="https://cdn.yourstore.com/..." className="text-xs h-8 flex-1 bg-background" {...register(`images.${index}.originalUrl` as const)} />
                   <Button type="button" variant="ghost" size="icon" onClick={() => imageArray.remove(index)} className="h-8 w-8 text-muted-foreground hover:text-destructive shrink-0"><Trash2 className="w-3.5 h-3.5" /></Button>
                 </div>
                 {errors.images?.[index]?.originalUrl && <span className="text-[10px] text-destructive px-1">{errors.images[index].originalUrl?.message}</span>}

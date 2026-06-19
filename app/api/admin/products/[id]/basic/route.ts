@@ -31,17 +31,13 @@ export async function GET(
       },
       include: {
         purchasingUom: {
-          select: {
-            name: true,
-            standardQuantity: true,
-            uomQuantity: true
+          include: {
+            uom: { select: { code: true, name: true } }
           }
         },
         salesUom: {
-          select: {
-            name: true,
-            standardQuantity: true,
-            uomQuantity: true
+          include: {
+            uom: { select: { code: true, name: true } }
           }
         },
         barcodes: {
@@ -78,12 +74,12 @@ export async function GET(
       height: productProfile.height ? Number(productProfile.height) : null,
       length: productProfile.length ? Number(productProfile.length) : null,
       purchasingUom: productProfile.purchasingUom ? {
-        name: productProfile.purchasingUom.name,
+        name: productProfile.purchasingUom.uom?.code || productProfile.purchasingUom.uom?.name || "",
         standardQuantity: Number(productProfile.purchasingUom.standardQuantity),
         uomQuantity: Number(productProfile.purchasingUom.uomQuantity)
       } : null,
       salesUom: productProfile.salesUom ? {
-        name: productProfile.salesUom.name,
+        name: productProfile.salesUom.uom?.code || productProfile.salesUom.uom?.name || "",
         standardQuantity: Number(productProfile.salesUom.standardQuantity),
         uomQuantity: Number(productProfile.salesUom.uomQuantity)
       } : null

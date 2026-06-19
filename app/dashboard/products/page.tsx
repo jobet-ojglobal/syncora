@@ -22,6 +22,8 @@ interface ProductCatalogRow {
   trackLots: boolean;
   trackSerials: boolean;
   brandName: string;
+  categoryName: string; 
+  groupName: string | null;
   thumbnail: string | null;
   barcodesCount: number;
   primaryBarcode: string | null;
@@ -54,7 +56,7 @@ export default function ProductsListPage() {
 
   const handleToggleActiveState = async (inflowId: string, currentStatus: boolean) => {
     try {
-      const response = await fetch("/api/admin/products", {
+      const response = await fetch("/api/admin/products/toggle", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ inflowId, isActive: !currentStatus }),
@@ -74,6 +76,8 @@ export default function ProductsListPage() {
       p.name.toLowerCase().includes(matchStr) ||
       p.sku.toLowerCase().includes(matchStr) ||
       p.brandName.toLowerCase().includes(matchStr) ||
+      p.categoryName.toLowerCase().includes(matchStr) || 
+      (p.groupName && p.groupName.toLowerCase().includes(matchStr)) ||
       (p.primaryBarcode && p.primaryBarcode.includes(matchStr))
     );
   });
@@ -187,8 +191,15 @@ export default function ProductsListPage() {
                       </td>
 
                       {/* Brand Designation Column */}
-                      <td className="p-4 text-muted-foreground font-medium">
-                        <span className="block truncate max-w-[130px]">{product.brandName}</span>
+                      <td className="p-4">
+                        <span className="block font-medium text-foreground truncate max-w-[150px]" title={product.brandName}>
+                          {product.brandName}
+                        </span>
+                        {product.groupName && (
+                          <span className="block text-[10px] text-muted-foreground truncate max-w-[150px]" title={`Group: ${product.groupName}`}>
+                            Collection: {product.groupName}
+                          </span>
+                        )}
                       </td>
 
                       {/* Primary Barcode Data Field */}

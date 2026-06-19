@@ -22,6 +22,7 @@ export async function GET() {
             productId: true,
             product: {
               select: {
+                id: true,
                 sku: true,
                 name: true
               }
@@ -45,7 +46,7 @@ export async function GET() {
       // Remap the variant payload array to explicitly stream loose SKU details to the UI
       linkedSkus: group.variants.map(v => ({
         variantId: v.inflowId,
-        productId: v.productId,
+        productId: v.product.id,
         skuCode: v.product?.sku || "NO-SKU",
         productName: v.product?.name || "Unknown Product Line"
       }))

@@ -291,6 +291,22 @@ export const data = {
       ],
     },
 
+     {
+      title: "Uoms",
+      url: "/dashboard/uoms",
+      icon: Tags,
+      items: [
+        {
+          title: "All Uoms",
+          url: "/dashboard/uoms",
+        },
+        {
+          title: "Create Uom",
+          url: "/dashboard/uoms/create",
+        },
+      ],
+    },
+
     /* -------------------------------------------------------------------------- */
     /*                                 ATTRIBUTES                                 */
     /* -------------------------------------------------------------------------- */
@@ -758,49 +774,49 @@ export const breadcrumbsMap = [
       /* -------------------------------- Branches -------------------------------- */
 
       {
-        id: "admin-branches",
-        href: "/dashboard/branches",
-        label: "Branches",
+        id: "admin-locations",
+        href: "/dashboard/locations",
+        label: "Locations",
         children: [
           {
-            id: "admin-branches-create",
-            href: "/dashboard/branches/create",
+            id: "admin-locations-create",
+            href: "/dashboard/locations/create",
             label: "Create",
           },
 
           {
-            id: "admin-branches-view",
-            href: "/dashboard/branches/[id]",
+            id: "admin-locations-view",
+            href: "/dashboard/locations/[id]",
             label: "Overview",
 
             children: [
               {
-                id: "admin-branches-edit",
-                href: "/dashboard/branches/[id]/edit",
+                id: "admin-locations-edit",
+                href: "/dashboard/locations/[id]/edit",
                 label: "Edit",
               },
 
               {
-                id: "admin-branches-inventory",
-                href: "/dashboard/branches/[id]/inventory",
+                id: "admin-locations-inventory",
+                href: "/dashboard/locations/[id]/inventory",
                 label: "Inventory",
               },
 
               {
-                id: "admin-branches-orders",
-                href: "/dashboard/branches/[id]/orders",
+                id: "admin-locations-orders",
+                href: "/dashboard/locations/[id]/orders",
                 label: "Orders",
               },
 
               {
-                id: "admin-branches-transfers",
-                href: "/dashboard/branches/[id]/transfers",
+                id: "admin-locations-transfers",
+                href: "/dashboard/locations/[id]/transfers",
                 label: "Transfers",
               },
 
               {
-                id: "admin-branches-performance",
-                href: "/dashboard/branches/[id]/performance",
+                id: "admin-locations-performance",
+                href: "/dashboard/locations/[id]/performance",
                 label: "Performance",
               },
             ],
@@ -937,6 +953,26 @@ export const breadcrumbsMap = [
             id: "admin-tags-edit",
             href: "/dashboard/tags/[id]/edit",
             label: "Edit Tag",
+          },
+        ],
+      },
+
+      
+      {
+        id: "admin-uoms",
+        href: "/dashboard/uoms",
+        label: "Uoms",
+        children: [
+          {
+            id: "admin-uoms-create",
+            href: "/dashboard/uoms/create",
+            label: "Create",
+          },
+
+          {
+            id: "admin-uoms-edit",
+            href: "/dashboard/uoms/[id]/edit",
+            label: "Edit Uom",
           },
         ],
       },

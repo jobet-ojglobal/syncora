@@ -1,7 +1,7 @@
 // app/admin/groups/page.tsx
 "use client";
 
-import { useEffect, useState } from "react";
+import { Fragment, useEffect, useState } from "react";
 import Link from "next/link";
 import { Plus, Search, Layers, Settings2, Package, Edit3, Trash2, Eye, EyeOff, ChevronDown, ChevronRight, ArrowUpRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -135,7 +135,7 @@ export default function ProductGroupsListPage() {
             <table className="w-full text-left border-collapse">
               <thead>
                 <tr className="bg-muted/30 border-b text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-                  <th className="p-4 pl-5 w-[40px]"></th> {/* Toggle carets space */}
+                  <th className="p-4 pl-5 w-[40px]"></th>
                   <th className="p-4 w-[240px]">Group Specification</th>
                   <th className="p-4 w-[140px]">Department</th>
                   <th className="p-4 w-[130px]">Brand</th>
@@ -146,7 +146,7 @@ export default function ProductGroupsListPage() {
                 </tr>
               </thead>
               <tbody className="divide-y text-xs divide-border/50">
-                {filteredGroups.map((group) => (
+                { filteredGroups.map((group) => (
                   <ExpandableGroupRow 
                     key={group.id} 
                     group={group} 
@@ -174,126 +174,139 @@ interface ExpandableGroupRowProps {
   onDeleteGroup: (inflowId: string) => Promise<void>;
 }
 
-function ExpandableGroupRow({ group, onToggleActive, onDeleteGroup }: ExpandableGroupRowProps) {
+interface ExpandableGroupRowProps {
+  group: ProductGroupRow;
+  onToggleActive: (inflowId: string, currentStatus: boolean) => Promise<void>;
+  onDeleteGroup: (inflowId: string) => Promise<void>;
+}
+
+export function ExpandableGroupRow({ group, onToggleActive, onDeleteGroup }: ExpandableGroupRowProps) {
   const [isExpanded, setIsExpanded] = useState(false);
 
   return (
-    <>
-      <tr className={`hover:bg-muted/5 transition-colors ${isExpanded ? "bg-muted/15" : ""}`}>
+    <Fragment key={group.id}>
+      <tr className={`border-b transition-colors hover:bg-muted/30 ${isExpanded ? "bg-muted/50" : ""}`}>
         
-        {/* Toggle Expand Trigger Row Cell */}
+        {/* Toggle Expand Icon */}
         <td className="p-4 pl-5 text-center">
           {group.linkedSkus.length > 0 ? (
             <button 
               onClick={() => setIsExpanded(!isExpanded)}
-              className="p-1 rounded-md hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
-              title={isExpanded ? "Collapse SKU items list" : "Expand nested SKU listings details"}
+              className="p-1 rounded-md hover:bg-background border border-transparent hover:border-border text-muted-foreground hover:text-foreground transition-all"
+              title={isExpanded ? "Collapse SKU variants" : "Expand SKU variants"}
             >
-              { isExpanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+              {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
             </button>
           ) : (
-            <div className="w-4 h-4" /> // Spacing matching offset if empty
+            <div className="h-4 w-4" />
           )}
         </td>
 
-        {/* Identity Column */}
-        <td className="p-4 font-medium">
-          <div className="font-semibold text-foreground text-[13px] truncate">{group.name}</div>
-          <div className="font-mono text-[9px] text-muted-foreground mt-0.5 truncate">
-            handle: /{group.slug}
+        {/* Identity & Slug Handle */}
+        <td className="p-4 font-medium max-w-[200px]">
+          <div className="font-semibold text-foreground text-sm truncate">{group.name}</div>
+          <div className="font-mono text-xs text-muted-foreground mt-0.5 truncate">
+            /{group.slug}
           </div>
         </td>
 
-        {/* Category Placement */}
+        {/* Category Badge */}
         <td className="p-4 text-muted-foreground">
-          <Badge variant="outline" className="text-[10px] bg-muted/10 font-normal max-w-[120px] truncate">
+          <Badge variant="outline" className="bg-background text-xs font-normal max-w-[140px] truncate shadow-2xs">
             {group.categoryName}
           </Badge>
         </td>
 
         {/* Brand Meta Data */}
-        <td className="p-4 text-muted-foreground truncate max-w-[120px]">
-          {group.brandName}
+        <td className="p-4 text-muted-foreground truncate max-w-[140px]">
+          {group.brandName || <span className="text-muted-foreground/40">—</span>}
         </td>
 
-        {/* Dimensions Count Tally */}
+        {/* Option Attributes Count */}
         <td className="p-4 text-center">
-          <div className="flex items-center justify-center gap-1 text-muted-foreground">
-            <Settings2 className="w-3.5 h-3.5 text-slate-400" />
-            <span className="font-mono font-bold text-foreground">{group.optionsCount}</span>
+          <div className="flex items-center justify-center gap-1.5 text-muted-foreground">
+            <Settings2 className="h-4 w-4 text-muted-foreground/70" />
+            <span className="font-mono text-sm font-semibold text-foreground">{group.optionsCount}</span>
           </div>
         </td>
 
-        {/* Direct linked physical product item variants balance count row */}
+        {/* Variant Tally */}
         <td className="p-4 text-center">
-          <div className="flex items-center justify-center gap-1">
-            <Package className="w-3.5 h-3.5 text-primary/60" />
-            <span className="font-mono font-extrabold text-foreground bg-primary/5 px-2 py-0.5 rounded-md border border-primary/10">
+          <div className="flex items-center justify-center gap-1.5">
+            <Package className="h-4 w-4 text-primary/70" />
+            <span className="font-mono text-xs font-semibold text-foreground  px-2 py-0.5 rounded-md border border-primary/20">
               {group.linkedSkus.length}
             </span>
           </div>
         </td>
 
-        {/* Visibility Switch */}
+        {/* Visibility Toggle Switch */}
         <td className="p-4 text-center">
-          <div className="flex items-center justify-center gap-2">
+          <div className="flex items-center justify-center gap-2.5">
             <Switch 
               checked={group.isActive} 
               onCheckedChange={() => onToggleActive(group.inflowId, group.isActive)}
               className="scale-90"
             />
-            <span className="text-[10px] w-8 text-left font-semibold text-muted-foreground">
+            <span className="text-xs w-10 text-left font-medium">
               {group.isActive ? (
-                <span className="text-emerald-600 flex items-center gap-0.5"><Eye className="w-3 h-3" /> Live</span>
+                <span className="text-emerald-600 flex items-center gap-1"><Eye className="h-3.5 w-3.5" /> Live</span>
               ) : (
-                <span className="text-slate-400 flex items-center gap-0.5"><EyeOff className="w-3 h-3" /> Off</span>
+                <span className="text-muted-foreground/70 flex items-center gap-1"><EyeOff className="h-3.5 w-3.5" /> Off</span>
               )}
             </span>
           </div>
         </td>
 
-        {/* Controls Actions Column */}
+        {/* Action Controls Matrix */}
         <td className="p-4 pr-5 text-right">
           <div className="flex items-center justify-end gap-1">
-            <Button asChild variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-foreground hover:bg-muted" title="Modify Group Structure">
+            <Button 
+              asChild 
+              variant="ghost" 
+              size="icon" 
+              className="h-8 w-8 text-muted-foreground hover:text-foreground" 
+              title="Edit Group"
+            >
               <Link href={`/dashboard/groups/${group.id}/edit`}>
-                <Edit3 className="w-3.5 h-3.5" />
+                <Edit3 className="h-4 w-4" />
               </Link>
             </Button>
             <DeleteButton
-                itemId={group.inflowId}
-                itemName={group.name}
-                endpointUrl={`/api/admin/groups/${group.inflowId}/soft-delete`}
-                onSuccess={() => onDeleteGroup(group.inflowId)}
-                variant="icon"
+              itemId={group.inflowId}
+              itemName={group.name}
+              endpointUrl={`/api/admin/groups/${group.inflowId}/soft-delete`}
+              onSuccess={() => onDeleteGroup(group.inflowId)}
+              variant="icon"
             />
           </div>
         </td>
       </tr>
 
-      {/* 🛠️ NESTED EXPANSION DRAWER AREA */}
+      {/* Nested Expansion Content Grid */}
       {isExpanded && group.linkedSkus.length > 0 && (
-        <tr className="bg-muted/20 border-t border-b border-muted">
-          <td colSpan={8} className="p-4 pl-12 pr-5">
-            <div className="space-y-2 animate-in fade-in duration-150">
-              <div className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold flex items-center gap-1.5 mb-2">
-                <Package className="w-3.5 h-3.5 text-primary" /> Assigned Product Stock Keeping Units Variants Tree Details
+        <tr className="bg-muted/20 border-b">
+          <td colSpan={8} className="p-4 pl-14 pr-5 pb-5">
+            <div className="space-y-3 animate-in fade-in duration-150">
+              <div className="text-xs uppercase tracking-wider text-muted-foreground font-semibold flex items-center gap-1.5">
+                <Package className="h-4 w-4 text-muted-foreground" /> 
+                <span>Linked SKU Variants</span>
               </div>
               
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2.5">
                 {group.linkedSkus.map((sku) => (
                   <Link
                     key={sku.variantId}
-                    href={`/admin/products/edit/${sku.productId}`}
-                    className="group bg-background border rounded-lg p-2.5 flex flex-col justify-between hover:border-primary/50 hover:shadow-xs transition-all text-left"
-                    title={`Click to open inventory details form configuration dashboard loop for ${sku.productName}`}
+                    href={`/dashboard/products/${sku.productId}/edit`}
+                    className="group bg-background border rounded-lg p-3 flex flex-col justify-between hover:border-primary hover:shadow-xs transition-all text-left"
+                    title={`Edit ${sku.productName}`}
                   >
-                    <div>
-                      <div className="font-mono font-bold text-foreground text-xs select-all flex items-center justify-between">
-                        <span>{sku.skuCode}</span>
-                        <ArrowUpRight className="w-3 h-3 text-muted-foreground/40 group-hover:text-primary transition-colors" />
+                    <div className="space-y-1.5">
+                      <div className="font-mono font-bold text-foreground text-xs flex items-center justify-between">
+                        <span className="select-all tracking-tight">{sku.skuCode}</span>
+                        <ArrowUpRight className="h-3.5 w-3.5 text-muted-foreground/40 group-hover:text-primary transition-colors shrink-0 ml-1" />
                       </div>
-                      <div className="text-[11px] text-muted-foreground mt-1 truncate font-medium group-hover:text-foreground/90 transition-colors">
+                      <div className="text-xs text-muted-foreground truncate font-medium group-hover:text-foreground transition-colors">
                         {sku.productName}
                       </div>
                     </div>
@@ -304,6 +317,6 @@ function ExpandableGroupRow({ group, onToggleActive, onDeleteGroup }: Expandable
           </td>
         </tr>
       )}
-    </>
+    </Fragment>
   );
 }

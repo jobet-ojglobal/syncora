@@ -10,8 +10,30 @@ export async function GET() {
       include: {
         brand: { select: { name: true } },
         category: { select: { name: true } },
-        purchasingUom: true,
-        salesUom: true,
+        
+        // 🟢 NEW: Pull parent Variant structure node to resolve associated ProductGroups
+        variant: {
+          include: {
+            group: {
+              select: { name: true }
+            }
+          }
+        },
+        
+        // 🟢 FIXED: Include nested core UnitOfMeasure details
+        purchasingUom: {
+          include: {
+            uom: { select: { name: true, code: true } }
+          }
+        },
+        
+        // 🟢 FIXED: Include nested core UnitOfMeasure details
+        salesUom: {
+          include: {
+            uom: { select: { name: true, code: true } }
+          }
+        },
+        
         barcodes: { select: { barcode: true } },
         images: {
           orderBy: { position: "asc" },
@@ -22,34 +44,46 @@ export async function GET() {
       orderBy: { updatedAt: "desc" }
     });
 
-    const parsedProducts = catalogItems.map((prod) => ({
-      id: prod.id,
-      inflowId: prod.inflowId,
-      sku: prod.sku || "N/A",
-      name: prod.name,
-      slug: prod.slug,
-      itemType: prod.itemType || "Stock",
-      isActive: prod.isActive,
-      trackExpiry: prod.trackExpiry,
-      trackLots: prod.trackLots,
-      trackSerials: prod.trackSerials,
-      brandName: prod.brand?.name || "Generic / White-label",
-      categoryName: prod.category?.name || "",
-      thumbnail: prod.images[0]?.thumbUrl || prod.images[0]?.originalUrl || null,
-      barcodesCount: prod.barcodes.length,
-      primaryBarcode: prod.barcodes[0]?.barcode || null,
-      purchasingUomText: prod.purchasingUom 
-        ? `${prod.purchasingUom.name} (${Number(prod.purchasingUom.standardQuantity)}:${Number(prod.purchasingUom.uomQuantity)})`
-        : "Not Set",
-      salesUomText: prod.salesUom 
-        ? `${prod.salesUom.name} (${Number(prod.salesUom.standardQuantity)}:${Number(prod.salesUom.uomQuantity)})`
-        : "Not Set",
-    }));
+    const parsedProducts = catalogItems.map((prod) => {
+      // Safely extract structural strings from the new relational join schema layer
+      const purchasingCode = prod.purchasingUom?.uom?.code || prod.purchasingUom?.uom?.name;
+      const salesCode = prod.salesUom?.uom?.code || prod.salesUom?.uom?.name;
+
+      return {
+        id: prod.id,
+        inflowId: prod.inflowId,
+        sku: prod.sku || "N/A",
+        name: prod.name,
+        slug: prod.slug,
+        itemType: prod.itemType || "Stock",
+        isActive: prod.isActive,
+        trackExpiry: prod.trackExpiry,
+        trackLots: prod.trackLots,
+        trackSerials: prod.trackSerials,
+        brandName: prod.brand?.name || "Generic / White-label",
+        categoryName: prod.category?.name || "",
+        thumbnail: prod.images[0]?.thumbUrl || prod.images[0]?.originalUrl || null,
+        barcodesCount: prod.barcodes.length,
+        primaryBarcode: prod.barcodes[0]?.barcode || null,
+        
+        // 🟢 FIXED: Displays the actual looked-up code (e.g., BOX, PCS) along with conversion variables
+        purchasingUomText: prod.purchasingUom && purchasingCode
+          ? `${purchasingCode} (${Number(prod.purchasingUom.standardQuantity)}:${Number(prod.purchasingUom.uomQuantity)})`
+          : "Not Set",
+          
+        salesUomText: prod.salesUom && salesCode
+          ? `${salesCode} (${Number(prod.salesUom.standardQuantity)}:${Number(prod.salesUom.uomQuantity)})`
+          : "Not Set",
+      };
+    });
 
     return NextResponse.json(parsedProducts, { status: 200 });
-  } catch (error) {
+  } catch (error: any) {
     console.error("Master product catalog pipeline failure:", error);
-    return NextResponse.json({ error: "Internal product database query execution failure." }, { status: 500 });
+    return NextResponse.json(
+      { error: "Internal product database query execution failure.", details: error.message }, 
+      { status: 500 }
+    );
   }
 }
 
@@ -61,19 +95,48 @@ export async function POST(request: NextRequest) {
       autoAssemble, isActive, isManufacturable, includeQuantityBuildable,
       trackExpiry, trackLots, trackSerials, shelfLifeDays, sellBeforeExpiryDays,
       expiryNotificationDays, weight, width, height, length, originCountry,
-      hsTariffNumber, remarks, standardUomName, purchasingUom, salesUom, barcodes, images
+      hsTariffNumber, remarks, standardUomName, purchasingUom, salesUom, 
+      barcodes = [], 
+      images = [] 
     } = body;
 
+    // 1. Core Structural Validation Constraints
     if (!sku?.trim() || !name?.trim()) {
       return NextResponse.json({ error: "Missing required core SKU identity attributes entries." }, { status: 400 });
     }
 
-    const slug = await genUniqueSlug(name, prisma.product);
+    // 2. Pre-fetch target UOM IDs using the incoming Frontend Code Tokens
+    const codeLookups = Array.from(new Set([
+      purchasingUom?.name,
+      salesUom?.name
+    ].filter(Boolean)));
 
+    const matchingUoms = await prisma.unitOfMeasure.findMany({
+      where: {
+        code: { in: codeLookups }
+      },
+      select: { id: true, code: true }
+    });
+
+    // Transform database lookup results array into a fast key-value dictionary map
+    const uomMap = Object.fromEntries(matchingUoms.map(u => [u.code, u.id]));
+
+    const purchasingUomId = purchasingUom?.name ? uomMap[purchasingUom.name] : null;
+    const salesUomId = salesUom?.name ? uomMap[salesUom.name] : null;
+
+    // Reject transaction processing early if selections are invalid in the dictionary map
+    if ((purchasingUom?.name && !purchasingUomId) || (salesUom?.name && !salesUomId)) {
+      return NextResponse.json({ 
+        error: "Referenced operational Multi-tier calculation metric unit is not registered within system catalogs." 
+      }, { status: 400 });
+    }
+
+    const slug = await genUniqueSlug(name, prisma.product);
     const computedInflowId = crypto.randomUUID().toString();
 
+    // 3. Main Operational Database Transaction Chain Loop
     const outputTransaction = await prisma.$transaction(async (tx) => {
-      return tx.product.create({
+      return await tx.product.create({
         data: {
           inflowId: computedInflowId,
           sku: sku.trim(),
@@ -83,60 +146,76 @@ export async function POST(request: NextRequest) {
           itemType,
           brandId: brandId || null,
           categoryId: categoryId || null,
-          autoAssemble,
-          isActive,
-          isManufacturable,
-          includeQuantityBuildable,
-          trackExpiry,
-          trackLots,
-          trackSerials,
-          shelfLifeDays,
-          sellBeforeExpiryDays,
-          expiryNotificationDays,
-          weight, width, height, length,
+          autoAssemble: !!autoAssemble,
+          isActive: !!isActive,
+          isManufacturable: !!isManufacturable,
+          includeQuantityBuildable: !!includeQuantityBuildable,
+          trackExpiry: !!trackExpiry,
+          trackLots: !!trackLots,
+          trackSerials: !!trackSerials,
+          shelfLifeDays: Number(shelfLifeDays) || 0,
+          sellBeforeExpiryDays: Number(sellBeforeExpiryDays) || 0,
+          expiryNotificationDays: Number(expiryNotificationDays) || 0,
+          weight: Number(weight) || 0, 
+          width: Number(width) || 0, 
+          height: Number(height) || 0, 
+          length: Number(length) || 0,
           originCountry: originCountry?.trim() || null,
           hsTariffNumber: hsTariffNumber?.trim() || null,
           remarks: remarks?.trim() || null,
-          standardUomName,
-          purchasingUom: {
+          standardUomName: standardUomName.trim().toUpperCase(), 
+
+          // 🟢 FIXED: Linked via explicit model parameters using the looked-up uomId 
+          purchasingUom: purchasingUomId ? {
             create: {
-              name: purchasingUom.name.trim(),
-              standardQuantity: purchasingUom.standardQuantity,
-              uomQuantity: purchasingUom.uomQuantity,
+              uomId: purchasingUomId,
+              standardQuantity: Number(purchasingUom.standardQuantity) || 1,
+              uomQuantity: Number(purchasingUom.uomQuantity) || 1,
             }
-          },
-          salesUom: {
+          } : undefined,
+
+          // 🟢 FIXED: Linked via explicit model parameters using the looked-up uomId 
+          salesUom: salesUomId ? {
             create: {
-              name: salesUom.name.trim(),
-              standardQuantity: salesUom.standardQuantity,
-              uomQuantity: salesUom.uomQuantity,
+              uomId: salesUomId,
+              standardQuantity: Number(salesUom.standardQuantity) || 1,
+              uomQuantity: Number(salesUom.uomQuantity) || 1,
             }
-          },
-          barcodes: {
-            create: barcodes.map((b: any, index: number) => ({
-              inflowId: crypto.randomUUID().toString(),
-              barcode: b.barcode.trim(),
-              lineNum: index + 1,
-            }))
-          },
-          images: {
-            create: images.map((img: any, positionIndex: number) => ({
-              inflowId: crypto.randomUUID().toString(),
-              position: positionIndex,
-              originalUrl: img.originalUrl.trim(),
-              largeUrl: img.originalUrl.trim(),
-              mediumUrl: img.originalUrl.trim(),
-              thumbUrl: img.originalUrl.trim(),
-            }))
-          }
+          } : undefined,
+
+          barcodes: barcodes.length > 0 ? {
+            create: barcodes
+              .filter((b: any) => b?.barcode?.trim())
+              .map((b: any, index: number) => ({
+                inflowId: crypto.randomUUID().toString(),
+                barcode: b.barcode.trim(),
+                lineNum: index + 1,
+              }))
+          } : undefined,
+
+          images: images.length > 0 ? {
+            create: images
+              .filter((img: any) => img?.originalUrl?.trim())
+              .map((img: any, positionIndex: number) => ({
+                inflowId: crypto.randomUUID().toString(),
+                position: positionIndex,
+                originalUrl: img.originalUrl.trim(),
+                largeUrl: img.originalUrl.trim(),
+                mediumUrl: img.originalUrl.trim(),
+                thumbUrl: img.originalUrl.trim(),
+              }))
+          } : undefined
         }
       });
     });
 
     return NextResponse.json(outputTransaction, { status: 201 });
   } catch (error: any) {
-    console.error("Critical failure adding product mapping variant:", error);
-    return NextResponse.json({ error: "Internal Database insertion pipeline transaction aborted execution." }, { status: 500 });
+    console.error("Critical failure adding product configuration tracking metadata:", error);
+    return NextResponse.json(
+      { error: "Internal Database insertion pipeline transaction aborted execution.", details: error.message }, 
+      { status: 500 }
+    );
   }
 }
 
@@ -148,17 +227,46 @@ export async function PATCH(request: NextRequest) {
       autoAssemble, isActive, isManufacturable, includeQuantityBuildable,
       trackExpiry, trackLots, trackSerials, shelfLifeDays, sellBeforeExpiryDays,
       expiryNotificationDays, weight, width, height, length, originCountry,
-      hsTariffNumber, remarks, standardUomName, purchasingUom, salesUom, barcodes, images
+      hsTariffNumber, remarks, standardUomName, purchasingUom, salesUom, 
+      barcodes = [], 
+      images = []
     } = body;
 
+    // 1. Core Validation Constraints Guard Layer
     if (!inflowId) {
       return NextResponse.json({ error: "Missing required core identifying target reference pointer." }, { status: 400 });
     }
 
+    // 2. Pre-fetch corresponding operational UOM system IDs using Code mapping tokens
+    const codeLookups = Array.from(new Set([
+      purchasingUom?.name,
+      salesUom?.name
+    ].filter(Boolean)));
+
+    const matchingUoms = await prisma.unitOfMeasure.findMany({
+      where: {
+        code: { in: codeLookups }
+      },
+      select: { id: true, code: true }
+    });
+
+    const uomMap = Object.fromEntries(matchingUoms.map(u => [u.code, u.id]));
+
+    const purchasingUomId = purchasingUom?.name ? uomMap[purchasingUom.name] : null;
+    const salesUomId = salesUom?.name ? uomMap[salesUom.name] : null;
+
+    if ((purchasingUom?.name && !purchasingUomId) || (salesUom?.name && !salesUomId)) {
+      return NextResponse.json({ 
+        error: "Referenced operational Multi-tier calculation metric unit is not registered within system catalogs." 
+      }, { status: 400 });
+    }
+
     const slug = await genUniqueSlug(name, prisma.product);
 
+    // 3. Database Transaction Modification Process Chain
     const updatedCatalogEntity = await prisma.$transaction(async (tx) => {
-      // 1. Core update operations onto root node
+      
+      // A. Core modification operations on root product document item node
       await tx.product.update({
         where: { inflowId },
         data: {
@@ -168,78 +276,75 @@ export async function PATCH(request: NextRequest) {
           itemType,
           brandId: brandId || null,
           categoryId: categoryId || null,
-          autoAssemble,
-          isActive,
-          isManufacturable,
-          includeQuantityBuildable,
-          trackExpiry, trackLots, trackSerials,
-          shelfLifeDays, sellBeforeExpiryDays, expiryNotificationDays,
-          weight, width, height, length,
+          autoAssemble: !!autoAssemble,
+          isActive: !!isActive,
+          isManufacturable: !!isManufacturable,
+          includeQuantityBuildable: !!includeQuantityBuildable,
+          trackExpiry: !!trackExpiry, 
+          trackLots: !!trackLots, 
+          trackSerials: !!trackSerials,
+          shelfLifeDays: Number(shelfLifeDays) || 0, 
+          sellBeforeExpiryDays: Number(sellBeforeExpiryDays) || 0, 
+          expiryNotificationDays: Number(expiryNotificationDays) || 0,
+          weight: Number(weight) || 0, 
+          width: Number(width) || 0, 
+          height: Number(height) || 0, 
+          length: Number(length) || 0,
           originCountry: originCountry?.trim() || null,
           hsTariffNumber: hsTariffNumber?.trim() || null,
           remarks: remarks?.trim() || null,
-          standardUomName,
+          standardUomName: standardUomName.trim().toUpperCase(),
         }
       });
 
-      // 2. Perform updates on 1:1 Purchasing/Sales UOM configurations
-      await tx.productUom.upsert({
-        where: {
-          productId: inflowId,
-        },
-        update: {
-          name: purchasingUom.name.trim(),
-          standardQuantity: purchasingUom.standardQuantity,
-          uomQuantity: purchasingUom.uomQuantity,
-        },
-        create: {
-          productId: inflowId,
-          name: purchasingUom.name.trim(),
-          standardQuantity: purchasingUom.standardQuantity,
-          uomQuantity: purchasingUom.uomQuantity,
-        },
-      });
+      // B. Reconcile Purchasing UOM Configuration (1:1 Relation mapping node)
+      if (purchasingUomId) {
+        await tx.productUom.upsert({
+          where: { productId: inflowId },
+          update: {
+            uomId: purchasingUomId, // 🟢 FIXED: Points to uomId foreign key relation instead of .name string
+            standardQuantity: Number(purchasingUom.standardQuantity) || 1,
+            uomQuantity: Number(purchasingUom.uomQuantity) || 1,
+          },
+          create: {
+            productId: inflowId,
+            uomId: purchasingUomId, // 🟢 FIXED
+            standardQuantity: Number(purchasingUom.standardQuantity) || 1,
+            uomQuantity: Number(purchasingUom.uomQuantity) || 1,
+          },
+        });
+      } else {
+        // Safe fall-through drop protection if purchasing matrix is completely cleared out
+        await tx.productUom.deleteMany({ where: { productId: inflowId } });
+      }
 
-      await tx.productSalesUom.upsert({
-        where: {
-          productId: inflowId,
-        },
-        update: {
-          name: salesUom.name.trim(),
-          standardQuantity: salesUom.standardQuantity,
-          uomQuantity: salesUom.uomQuantity,
-        },
-        create: {
-          productId: inflowId,
-          name: salesUom.name.trim(),
-          standardQuantity: salesUom.standardQuantity,
-          uomQuantity: salesUom.uomQuantity,
-        },
-      });
+      // C. Reconcile Sales Channels UOM Configuration (1:1 Relation mapping node)
+      if (salesUomId) {
+        await tx.productSalesUom.upsert({
+          where: { productId: inflowId },
+          update: {
+            uomId: salesUomId, // 🟢 FIXED: Points to uomId foreign key relation instead of .name string
+            standardQuantity: Number(salesUom.standardQuantity) || 1,
+            uomQuantity: Number(salesUom.uomQuantity) || 1,
+          },
+          create: {
+            productId: inflowId,
+            uomId: salesUomId, // 🟢 FIXED
+            standardQuantity: Number(salesUom.standardQuantity) || 1,
+            uomQuantity: Number(salesUom.uomQuantity) || 1,
+          },
+        });
+      } else {
+        // Safe fall-through drop protection if sales channels matrix is completely cleared out
+        await tx.productSalesUom.deleteMany({ where: { productId: inflowId } });
+      }
 
-      // await tx.productUom.update({
-      //   where: { productId: inflowId },
-      //   data: {
-      //     name: purchasingUom.name.trim(),
-      //     standardQuantity: purchasingUom.standardQuantity,
-      //     uomQuantity: purchasingUom.uomQuantity,
-      //   }
-      // });
-
-      // await tx.productSalesUom.update({
-      //   where: { productId: inflowId },
-      //   data: {
-      //     name: salesUom.name.trim(),
-      //     standardQuantity: salesUom.standardQuantity,
-      //     uomQuantity: salesUom.uomQuantity,
-      //   }
-      // });
-
-      // 3. Reconcile nested barcode row collections
+      // D. Reconcile 1:Many nested barcode collections array
       await tx.productBarcode.deleteMany({ where: { productId: inflowId } });
-      if (barcodes && barcodes.length > 0) {
+      const validBarcodes = barcodes.filter((b: any) => b?.barcode?.trim());
+      if (validBarcodes.length > 0) {
         await tx.productBarcode.createMany({
-          data: barcodes.map((b: any, index: number) => ({
+          data: validBarcodes.map((b: any, index: number) => ({
             inflowId: crypto.randomUUID().toString(),
             productId: inflowId,
             barcode: b.barcode.trim(),
@@ -248,11 +353,12 @@ export async function PATCH(request: NextRequest) {
         });
       }
 
-      // 4. Reconcile nested CDN Image URL links array assets mapping
+      // E. Reconcile 1:Many nested image asset paths array
       await tx.productImage.deleteMany({ where: { productId: inflowId } });
-      if (images && images.length > 0) {
+      const validImages = images.filter((img: any) => img?.originalUrl?.trim());
+      if (validImages.length > 0) {
         await tx.productImage.createMany({
-          data: images.map((img: any, positionIndex: number) => ({
+          data: validImages.map((img: any, positionIndex: number) => ({
             inflowId: crypto.randomUUID().toString(),
             productId: inflowId,
             position: positionIndex,
@@ -270,7 +376,10 @@ export async function PATCH(request: NextRequest) {
     return NextResponse.json(updatedCatalogEntity, { status: 200 });
   } catch (error: any) {
     console.error("Product modification pipeline failure:", error);
-    return NextResponse.json({ error: "Internal Database modification transaction process crashed." }, { status: 500 });
+    return NextResponse.json(
+      { error: "Internal Database modification transaction process crashed.", details: error.message }, 
+      { status: 500 }
+    );
   }
 }
 

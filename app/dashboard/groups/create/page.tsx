@@ -75,7 +75,7 @@ export default async function CreateProductGroupPage() {
         brands={brands} 
         categories={categories} 
         attributes={attributes}
-        productsLookup={productsLookup} />
+        />
     </div>
   );
 }

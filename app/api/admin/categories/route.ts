@@ -1,4 +1,4 @@
-// app/api/categories/basic/route.ts
+// app/api/admin/categories/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { CategoryService } from "@/services/category.service";
 

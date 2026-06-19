@@ -7,6 +7,7 @@ import {
   SidebarProvider,
   SidebarTrigger,
 } from "@/components/ui/sidebar";
+import { ModeToggle } from "@/components/shared/theme-toggle";
 
 export default async function DashboardLayout({
   children,
@@ -17,7 +18,9 @@ export default async function DashboardLayout({
     <SidebarProvider>
       <AppSidebar />
       <SidebarInset>
-        <header className="flex h-16 shrink-0 items-center gap-2 transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-12 border-b px-4">
+        <header className="flex h-16 shrink-0 items-center justify-between border-b px-4 transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-12">
+          
+          {/* Left Side: Navigation & Identity Controls */}
           <div className="flex items-center gap-2">
             <SidebarTrigger className="-ml-1" />
             <Separator
@@ -26,9 +29,16 @@ export default async function DashboardLayout({
             />
             <Breadcrumb />
           </div>
+
+          {/* Right Side: Theme Switch Actions Matrix */}
+          <div className="flex items-center gap-2">
+            <ModeToggle />
+          </div>
+
         </header>
-        {/* Adjusted main element wrapper to work safely with SidebarInset flexbox architecture */}
-        <main className="flex-1 overflow-y-auto bg-slate-50/50">
+
+        {/* Adjusted workspace viewport node */}
+        <main className="flex-1 overflow-y-auto bg-background dark:bg-background">
           {children}
         </main>
       </SidebarInset>

@@ -7,8 +7,8 @@ export const productSchema = z.object({
   name: z.string().min(1, "Product name is required").max(255),
   description: z.string().nullable().optional(),
   itemType: z.string(),
-  categoryId: z.string().min(1, "Assigning a Category is required"),
-  brandId: z.string().nullable().optional(),
+  brandId: z.string().nullable().optional().or(z.literal("")),
+  categoryId: z.string().nullable().optional().or(z.literal("")),
   
   // ⚙️ Booleans Logistics Flags
   autoAssemble: z.boolean(),

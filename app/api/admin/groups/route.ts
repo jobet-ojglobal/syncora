@@ -6,6 +6,7 @@ import { genUniqueSlug } from "@/helpers/genUniqueSlug";
 
 // 🎯 Recursive algorithm to compute the Cartesian cross-product matrix 
 function getCartesianProduct(arrays: any[][]): any[][] {
+  if (arrays.length === 0) return [];
   return arrays.reduce(
     (acc, curr) => acc.flatMap((d) => curr.map((e) => [...d, e])),
     [[]]
@@ -210,6 +211,10 @@ export async function POST(request: NextRequest) {
           }))
         );
 
+      // if (valueArraysForCartesian.length === 0) {
+      //   return group; // or skip variant generation
+      // }
+
       // 7. Build dynamic cross product lines array using ONLY driver fields
       const cartesianIntersections = getCartesianProduct(valueArraysForCartesian);
 
@@ -343,47 +348,47 @@ export async function PATCH(request: NextRequest) {
       // 🟢 STEP 2: Update Primary Root ProductGroup Core Record Node
       const group = await tx.productGroup.update({
         where: { inflowId: groupId }, // ✨ FIX: Standardized key pointer
-        data: {
-          name,
-          slug: groupSlug,
-          description: description || null,
-          brandId: brandId || null,
-          categoryId: categoryId || null,
-          isActive: isActive ?? true,
-        }
-      });
-
-      // 🟢 STEP 3: Re-map Structural System Features Configuration Definitions
-      for (const feat of (features || [])) {
-        if (!feat.key?.trim() || !feat.value?.trim()) continue;
-        
-        const dbFeature = await tx.feature.upsert({
-          where: { name: feat.key.trim() },
-          update: {},
-          create: { name: feat.key.trim() }
+          data: {
+            name,
+            slug: groupSlug,
+            description: description || null,
+            brandId: brandId || null,
+            categoryId: categoryId || null,
+            isActive: isActive ?? true,
+          }
         });
 
-        const dbFeatureValue = await tx.featureValue.upsert({
-          where: {
-            featureId_value: {
+        // 🟢 STEP 3: Re-map Structural System Features Configuration Definitions
+        for (const feat of (features || [])) {
+          if (!feat.key?.trim() || !feat.value?.trim()) continue;
+          
+          const dbFeature = await tx.feature.upsert({
+            where: { name: feat.key.trim() },
+            update: {},
+            create: { name: feat.key.trim() }
+          });
+
+          const dbFeatureValue = await tx.featureValue.upsert({
+            where: {
+              featureId_value: {
+                featureId: dbFeature.id,
+                value: feat.value.trim()
+              }
+            },
+            update: {},
+            create: {
               featureId: dbFeature.id,
               value: feat.value.trim()
             }
-          },
-          update: {},
-          create: {
-            featureId: dbFeature.id,
-            value: feat.value.trim()
-          }
-        });
+          });
 
-        await tx.productGroupFeature.create({
-          data: {
-            groupId: group.inflowId,
-            featureId: dbFeature.id,
-            featureValueId: dbFeatureValue.id
-          }
-        });
+          await tx.productGroupFeature.create({
+            data: {
+              groupId: group.inflowId,
+              featureId: dbFeature.id,
+              featureValueId: dbFeatureValue.id
+            }
+          });
       }
 
       // 🟢 STEP 4: Re-map System Discoverability Search Keywords
@@ -493,6 +498,10 @@ export async function PATCH(request: NextRequest) {
             literalStr: v.literalStr
           }))
         );
+
+      // if (valueArraysForCartesian.length === 0) {
+      //   return group; // or skip variant generation
+      // }
 
       const newCartesianIntersections = getCartesianProduct(valueArraysForCartesian);
 
