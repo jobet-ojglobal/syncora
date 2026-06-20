@@ -208,6 +208,21 @@ export const data = {
     /* -------------------------------------------------------------------------- */
 
     {
+      title: "Groups",
+      url: "/dashboard/groups",
+      icon: Package,
+      items: [
+         {
+          title: "All Groups",
+          url: "/dashboard/groups",
+        },
+        {
+          title: "Create Group",
+          url: "/dashboard/groups/create",
+        },
+      ],
+    },
+    {
       title: "Products",
       url: "/dashboard/products",
       icon: Package,
@@ -219,14 +234,6 @@ export const data = {
         {
           title: "Create Product",
           url: "/dashboard/products/create",
-        },
-         {
-          title: "All Groups",
-          url: "/dashboard/groups",
-        },
-        {
-          title: "Create Group",
-          url: "/dashboard/groups/create",
         },
       ],
     },
@@ -437,25 +444,29 @@ export const data = {
     /*                                     ETL                                    */
     /* -------------------------------------------------------------------------- */
 
-    // {
-    //   title: "ETL",
-    //   url: "/dashboard/etl",
-    //   icon: Database,
-    //   items: [
-    //     {
-    //       title: "Logs",
-    //       url: "/dashboard/etl/logs",
-    //     },
-    //     {
-    //       title: "Sync",
-    //       url: "/dashboard/etl/sync",
-    //     },
-    //     {
-    //       title: "Schedules",
-    //       url: "/dashboard/etl/schedules",
-    //     },
-    //   ],
-    // },
+    {
+      title: "ETL",
+      url: "/dashboard/etl",
+      icon: Database,
+      items: [
+        {
+          title: "Inflow",
+          url: "/dashboard/etl/inflow",
+        },
+        {
+          title: "Logs",
+          url: "/dashboard/etl/logs",
+        },
+        {
+          title: "Sync",
+          url: "/dashboard/etl/sync",
+        },
+        {
+          title: "Schedules",
+          url: "/dashboard/etl/schedules",
+        },
+      ],
+    },
 
     /* -------------------------------------------------------------------------- */
     /*                                   REPORTS                                  */

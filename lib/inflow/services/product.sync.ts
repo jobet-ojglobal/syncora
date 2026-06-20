@@ -1,11 +1,16 @@
 import { prisma } from "@/lib/prisma";
 import { InflowProduct } from "../types";
-import { syncBrand, syncProductFeatures, syncProductTags } from "./helpers";
-import { syncGroupFeatures } from "./helpers";
-import { syncGroupTags } from "./helpers";
-import { syncImages } from "./helpers";
-import { syncPurchasingUom } from "./helpers";
-import { syncSalesUom } from "./helpers";
+import { 
+  syncBrand, 
+  syncProductFeatures, 
+  syncProductTags, 
+  syncGroupFeatures,
+  syncGroupTags,
+  syncImages,
+  syncPurchasingUom,
+  syncSalesUom
+} from "./helpers";
+
 import { genInflowUniqueSlug } from "@/helpers/genUniqueSlug";
 
 export async function syncProduct(
@@ -14,6 +19,9 @@ export async function syncProduct(
   groupId?: string
 ) {
   const brandId = await syncBrand(tx, product.customFields?.custom1);
+
+  const categoryId =
+  product.productVariant?.productGroup?.categoryId;
 
   const rawFeaturesString = product?.customFields?.custom2; // e.g., "Sensor:Full Frame|Max Resolution:8K 30p"
   const rawTagsString = product?.customFields?.custom3;
@@ -31,6 +39,8 @@ export async function syncProduct(
       name: product.name,
       slug: productSlug,
       description: product.description,
+      categoryId,
+      brandId,
       itemType: product.itemType,
       autoAssemble: product.autoAssemble,
       isActive: product.isActive,
@@ -48,14 +58,13 @@ export async function syncProduct(
       height: product.height,
       length: product.length,
       remarks: product.remarks,
-      brandId,
       timestamp: product.timestamp,
     },
     update: {
       sku: product.sku,
       name: product.name,
       description: product.description,
-      isActive: product.isActive,
+      categoryId,
       brandId,
       timestamp: product.timestamp,
     },
@@ -67,8 +76,8 @@ export async function syncProduct(
 
   // 3. Hand off Features & Tags processing to isolated sub-functions 🚀
   if (product.productId && groupId) {
-    await syncGroupFeatures(tx, groupId, product.productId, rawFeaturesString);
-    await syncGroupTags(tx, groupId, product.productId, rawTagsString);
+    await syncGroupFeatures(tx, groupId, rawFeaturesString);
+    await syncGroupTags(tx, groupId, rawTagsString);
   } else {
     if (product.productId) {
       await syncProductFeatures(tx, product.productId, rawFeaturesString);

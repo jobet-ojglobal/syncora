@@ -25,33 +25,29 @@ export async function syncProductGroup(
 
   // 3. Upsert the master ProductGroup record
   const upsertedGroup = await tx.productGroup.upsert({
-    where: { inflowId: group.productGroupId },
+    where: {
+      inflowId: group.productGroupId,
+    },
     create: {
       inflowId: group.productGroupId,
-      categoryId: group.categoryId,
-      defaultProductId: group.defaultProductId,
-      defaultImageId: group.defaultImageId,
+      categoryId: group.categoryId, // Category.inflowId
       name: group.name,
       slug: baseSlug,
       brandId,
       isActive: group.isActive,
-      timestamp: group.timestamp,
     },
     update: {
       categoryId: group.categoryId,
-      defaultProductId: group.defaultProductId,
-      defaultImageId: group.defaultImageId,
       name: group.name,
       brandId,
       isActive: group.isActive,
-      timestamp: group.timestamp,
     },
   });
 
   // 3. Hand off Features & Tags processing to isolated sub-functions 🚀
   if (group.defaultProductId) {
-    await syncGroupFeatures(tx, group.productGroupId, group.defaultProductId, rawFeaturesString);
-    await syncGroupTags(tx, group.productGroupId, group.defaultProductId, rawTagsString);
+    await syncGroupFeatures(tx, group.productGroupId, rawFeaturesString);
+    await syncGroupTags(tx, group.productGroupId, rawTagsString);
   }
 
   // 3. Loop Through Options (e.g., "Color", "Size")
@@ -65,17 +61,17 @@ export async function syncProductGroup(
     });
 
     await tx.productGroupOption.upsert({
-      where: { inflowId: option.productGroupOptionId },
+      where: {
+        inflowId: option.productGroupOptionId,
+      },
       create: {
         inflowId: option.productGroupOptionId,
-        productGroupId: upsertedGroup.id, // Links local DB auto-generated record ID
+        productGroupId: group.productGroupId,
         lineNum: option.lineNum,
-        name: option.name,
         attributeId: globalAttribute.id,
       },
       update: {
         lineNum: option.lineNum,
-        name: option.name,
         attributeId: globalAttribute.id,
       },
     });
@@ -99,17 +95,17 @@ export async function syncProductGroup(
       });
 
       await tx.productGroupOptionValue.upsert({
-        where: { inflowId: value.productGroupOptionValueId },
+        where: {
+          inflowId: value.productGroupOptionValueId,
+        },
         create: {
           inflowId: value.productGroupOptionValueId,
           optionId: option.productGroupOptionId,
           lineNum: value.lineNum,
-          value: value.value,
           attributeValueId: globalAttributeValue.id,
         },
         update: {
           lineNum: value.lineNum,
-          value: value.value,
           attributeValueId: globalAttributeValue.id,
         },
       });

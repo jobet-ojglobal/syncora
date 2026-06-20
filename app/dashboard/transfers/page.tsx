@@ -326,13 +326,13 @@ export default function TransferOrdersListPage() {
                               </Fragment>
                               )}
 
-                              { (order.status === "DRAFT" && order.linesCount > 0) && (
-                              <Link 
-                                href={`/dashboard/transfers/${order.id}/edit`}
-                                className="px-2 font-semibold gap-1 flex "
-                              >
-                                <Edit3 className="w-3 h-3" /> Manage
-                              </Link>
+                              { (order.status === "DRAFT" || order.linesCount === 0) && (
+                                <Link 
+                                  href={`/dashboard/transfers/${order.id}/edit`}
+                                  className="px-2 font-semibold gap-1 flex "
+                                >
+                                  <Edit3 className="w-3 h-3" /> Manage
+                                </Link>
                               )}
 
                               <DeleteButton

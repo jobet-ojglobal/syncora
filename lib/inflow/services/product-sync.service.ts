@@ -37,24 +37,39 @@ export class ProductSyncService {
             const groupData = variantRelation?.productGroup;
             const categoryData = groupData?.category;
 
-            // A. Sync Category (Only if never seen before in this entire sync run)
-            if (categoryData && !syncedCategoryIds.has(categoryData.categoryId)) {
+            if (
+              categoryData &&
+              !syncedCategoryIds.has(categoryData.categoryId)
+            ) {
               await syncCategory(tx, categoryData);
               syncedCategoryIds.add(categoryData.categoryId);
             }
 
-            // B. Sync Product Group (Only if never seen before in this entire sync run)
-            if (groupData && !syncedGroupIds.has(groupData.productGroupId)) {
-              await syncProductGroup(tx, groupData);
+            if (
+              groupData &&
+              !syncedGroupIds.has(groupData.productGroupId)
+            ) {
+              await syncProductGroup(
+                tx,
+                groupData,
+                fullProduct // <-- pass product
+              );
+
               syncedGroupIds.add(groupData.productGroupId);
             }
 
-            // C. Always sync the Product itself
-            await syncProduct(tx, fullProduct);
+            await syncProduct(
+              tx,
+              fullProduct,
+              groupData?.productGroupId
+            );
 
-            // D. Sync the Variant relation if it exists
             if (variantRelation && groupData) {
-              await syncVariant(tx, groupData.productGroupId, variantRelation);
+              await syncVariant(
+                tx,
+                groupData.productGroupId,
+                variantRelation
+              );
             }
           }
         }, {

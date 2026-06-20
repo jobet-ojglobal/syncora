@@ -322,24 +322,32 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ error: "Missing required identification metadata matrix options." }, { status: 400 });
     }
 
-    // 1. Resolve brand context for SKU prefixing patterns
     const brand = await prisma.brand.findUnique({
       where: { id: brandId || "" },
       select: { name: true }
     });
     const brandName = brand?.name || "GENERIC";
-
-    // 🎯 FIX: Consistently target inflowId if that is your primary client identifier field
     const groupSlug = await genUniqueSlug(name, prisma.productGroup, groupId);
+
+    // 🎯 FIX 1: Pre-deduplicate incoming tags & features in memory before transaction layer
+    const uniqueFeaturesMap = new Map<string, string>();
+    for (const feat of (features || [])) {
+      if (feat.key?.trim() && feat.value?.trim()) {
+        uniqueFeaturesMap.set(feat.key.trim(), feat.value.trim());
+      }
+    }
+
+    const uniqueTagsSet = new Set<string>();
+    for (const tagStr of (tags || [])) {
+      if (tagStr?.trim()) uniqueTagsSet.add(tagStr.trim());
+    }
 
     const updatedGroup = await prisma.$transaction(async (tx) => {
       
-      // 🟢 STEP 1: Purge Old Relational Join Mappings to Prevent Duplication Bloat
-      // We clear features, tags, and options safely; existing variants are managed manually below
+      // 🟢 STEP 1: Purge Old Relational Join Mappings
       await tx.productGroupFeature.deleteMany({ where: { groupId } });
       await tx.productGroupTag.deleteMany({ where: { groupId } });
       
-      // Cascading clean up of current option configurations inside this profile
       await tx.productGroupOptionValue.deleteMany({
         where: { option: { productGroupId: groupId } }
       });
@@ -347,57 +355,61 @@ export async function PATCH(request: NextRequest) {
 
       // 🟢 STEP 2: Update Primary Root ProductGroup Core Record Node
       const group = await tx.productGroup.update({
-        where: { inflowId: groupId }, // ✨ FIX: Standardized key pointer
-          data: {
-            name,
-            slug: groupSlug,
-            description: description || null,
-            brandId: brandId || null,
-            categoryId: categoryId || null,
-            isActive: isActive ?? true,
+        where: { inflowId: groupId },
+        data: {
+          name,
+          slug: groupSlug,
+          description: description || null,
+          brandId: brandId || null,
+          categoryId: categoryId || null,
+          isActive: isActive ?? true,
+        }
+      });
+
+      // 🎯 FIX 2: Declare variables with transaction-wide scope
+      const localizedFeaturesList: Array<{ id: string; val: string }> = [];
+      const localizedTagsList: string[] = [];
+
+      // 🟢 STEP 3: Re-map Structural System Features Configuration Definitions
+      for (const [featKey, featVal] of uniqueFeaturesMap.entries()) {
+        const dbFeature = await tx.feature.upsert({
+          where: { name: featKey },
+          update: {},
+          create: { name: featKey }
+        });
+
+        const dbFeatureValue = await tx.featureValue.upsert({
+          where: {
+            featureId_value: {
+              featureId: dbFeature.id,
+              value: featVal
+            }
+          },
+          update: {},
+          create: {
+            featureId: dbFeature.id,
+            value: featVal
           }
         });
 
-        // 🟢 STEP 3: Re-map Structural System Features Configuration Definitions
-        for (const feat of (features || [])) {
-          if (!feat.key?.trim() || !feat.value?.trim()) continue;
-          
-          const dbFeature = await tx.feature.upsert({
-            where: { name: feat.key.trim() },
-            update: {},
-            create: { name: feat.key.trim() }
-          });
+        await tx.productGroupFeature.create({
+          data: {
+            groupId: group.inflowId,
+            featureId: dbFeature.id,
+            featureValueId: dbFeatureValue.id
+          }
+        });
 
-          const dbFeatureValue = await tx.featureValue.upsert({
-            where: {
-              featureId_value: {
-                featureId: dbFeature.id,
-                value: feat.value.trim()
-              }
-            },
-            update: {},
-            create: {
-              featureId: dbFeature.id,
-              value: feat.value.trim()
-            }
-          });
-
-          await tx.productGroupFeature.create({
-            data: {
-              groupId: group.inflowId,
-              featureId: dbFeature.id,
-              featureValueId: dbFeatureValue.id
-            }
-          });
+        // Safe push into transaction scope
+        localizedFeaturesList.push({ id: dbFeature.id, val: featVal });
       }
 
       // 🟢 STEP 4: Re-map System Discoverability Search Keywords
-      for (const tagStr of (tags || [])) {
-        if (!tagStr?.trim()) continue;
+      for (const tagStr of uniqueTagsSet) {
         const dbTag = await tx.tag.upsert({
-          where: { name: tagStr.trim() },
+          where: { name: tagStr },
           update: {},
-          create: { name: tagStr.trim() }
+          create: { name: tagStr }
         });
 
         await tx.productGroupTag.create({
@@ -406,6 +418,9 @@ export async function PATCH(request: NextRequest) {
             tagId: dbTag.id
           }
         });
+
+        // Safe push into transaction scope
+        localizedTagsList.push(dbTag.id);
       }
 
       // 🟢 STEP 5: Populate Re-built Clean Database Metadata Configuration Rows
@@ -499,10 +514,6 @@ export async function PATCH(request: NextRequest) {
           }))
         );
 
-      // if (valueArraysForCartesian.length === 0) {
-      //   return group; // or skip variant generation
-      // }
-
       const newCartesianIntersections = getCartesianProduct(valueArraysForCartesian);
 
       // Fetch currently stored item variations for differential mapping updates
@@ -514,15 +525,16 @@ export async function PATCH(request: NextRequest) {
 
       // 🟢 STEP 7: Append Structural Additions (e.g., Material + Color additions)
       for (const intersection of newCartesianIntersections) {
-        // 🎯 FIX: Calculate the signature using the stable global fingerprintId
-        const newSignature = intersection.map(item => item.fingerprintId).sort().join("-");
+        if (intersection.length === 0) continue;
 
+        const newSignature = intersection.map(item => item.fingerprintId).sort().join("-");
         if (existingSignatures.includes(newSignature)) continue;
 
         const variationLabels = intersection.map(item => item.literalStr).join(" / ");
         const variantName = `${name} (${variationLabels})`;
         const childProductInflowId = crypto.randomUUID().toLowerCase();
 
+        // A. Insert base SKU catalog entity placeholder table record
         const childProduct = await tx.product.create({
           data: {
             inflowId: childProductInflowId,
@@ -530,9 +542,13 @@ export async function PATCH(request: NextRequest) {
             name: variantName,
             slug: await genUniqueSlug(variantName, tx.product),
             isActive: false,
+            brandId: brandId || null,
+            categoryId: categoryId || null,
+            description: description || null
           }
         });
 
+        // B. Connect the core inventory balance record with its relational matrix metadata 
         await tx.productVariant.create({
           data: {
             inflowId: crypto.randomUUID().toLowerCase(),
@@ -543,29 +559,57 @@ export async function PATCH(request: NextRequest) {
             variantCount: newCartesianIntersections.length,
             selections: {
               create: intersection.map((sel) => ({
-                optionId: sel.optionInflowId,      // Points to a valid active option
-                optionValueId: sel.valueInflowId,  // ✨ FIX: Points directly to your new valid optionValue!
+                optionId: sel.optionInflowId,      
+                optionValueId: sel.valueInflowId,  
               }))
             }
           }
         });
+
+        // C. 🎯 FIX: Relational specifications targeting FeatureValue layout
+        for (const featRelation of localizedFeaturesList) {
+          // Look up or establish the FeatureValue reference for the variant context safely
+          const dbFeatureValue = await tx.featureValue.upsert({
+            where: {
+              featureId_value: {
+                featureId: featRelation.id,
+                value: featRelation.val
+              }
+            },
+            update: {},
+            create: {
+              featureId: featRelation.id,
+              value: featRelation.val
+            }
+          });
+
+          await tx.productFeature.create({
+            data: {
+              productId: childProduct.inflowId,
+              featureId: featRelation.id,
+              featureValueId: dbFeatureValue.id // 👈 Matches your strict relational schema fields
+            }
+          });
+        }
+
+        // D. 🎯 FIX: Link contextual search filter tags cleanly
+        for (const tagId of localizedTagsList) {
+          await tx.productTag.create({
+            data: {
+              productId: childProduct.inflowId,
+              tagId: tagId
+            }
+          });
+        }
       }
 
       // 🟢 STEP 8: Process UI Table Differential Mutations Lifecycles
       for (const UIItem of (incomingVariantsManager || [])) {
         if (UIItem.isExisting) {
           if (UIItem.status === "unlink") {
-            // 1. Sever the selections attributes map holding the matrix relationship
             await tx.productVariantSelection.deleteMany({
-              where: { 
-                variant: {
-                  productId: UIItem.productId,
-                  productGroupId: groupId 
-                }
-              }
+              where: { variant: { productId: UIItem.productId, productGroupId: groupId } }
             });
-
-            // 2. Safely drop the Variant bridge record link
             await tx.productVariant.deleteMany({
               where: { productId: UIItem.productId, productGroupId: groupId }
             });
@@ -575,10 +619,41 @@ export async function PATCH(request: NextRequest) {
             await tx.productTag.deleteMany({ where: { productId: UIItem.productId } });
             await tx.product.delete({ where: { inflowId: UIItem.productId } });
           } else if (UIItem.status === "active") {
+            // Sync base catalog prices
             await tx.productVariant.updateMany({
               where: { productId: UIItem.productId, productGroupId: groupId },
               data: { defaultPrice: Number(UIItem.defaultPrice) }
             });
+
+            // Re-sync basic classifications if changed at root group level
+            await tx.product.update({
+              where: { inflowId: UIItem.productId },
+              data: { brandId: brandId || null, categoryId: categoryId || null }
+            });
+
+            // 🎯 Re-sync core features for existing rows cleanly matching new composite primary key constraints
+            for (const featRelation of localizedFeaturesList) {
+              const dbFeatureValue = await tx.featureValue.upsert({
+                where: { featureId_value: { featureId: featRelation.id, value: featRelation.val } },
+                update: {},
+                create: { featureId: featRelation.id, value: featRelation.val }
+              });
+
+              await tx.productFeature.upsert({
+                where: { productId_featureId: { productId: UIItem.productId, featureId: featRelation.id } },
+                update: { featureValueId: dbFeatureValue.id },
+                create: { productId: UIItem.productId, featureId: featRelation.id, featureValueId: dbFeatureValue.id }
+              });
+            }
+
+            // 🎯 Re-sync core tag items for existing rows cleanly 
+            for (const tagId of localizedTagsList) {
+              await tx.productTag.upsert({
+                where: { productId_tagId: { productId: UIItem.productId, tagId: tagId } },
+                update: {},
+                create: { productId: UIItem.productId, tagId: tagId }
+              });
+            }
           }
         }
       }

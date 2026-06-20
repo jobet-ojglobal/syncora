@@ -33,11 +33,6 @@ interface BrandLookupOption {
   name: string;
 }
 
-interface CategoryOption {
-  inflowId: string;
-  name: string;
-}
-
 interface UomLookupReference {
   id: string;
   code: string;
@@ -46,13 +41,12 @@ interface UomLookupReference {
 }
 
 interface ProductFormProps {
-  categories: CategoryOption[];
   brands: BrandLookupOption[];
   uoms: UomLookupReference[]; // 🟢 Added global metrics dependency array
   initialData?: any | null;
 }
 
-export function ProductForm({ categories, brands, uoms, initialData }: ProductFormProps) {
+export function ProductForm({  brands, uoms, initialData }: ProductFormProps) {
   const router = useRouter();
   const isEditMode = !!initialData;
 

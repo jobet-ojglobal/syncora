@@ -3,49 +3,169 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { genUniqueSlug } from "@/helpers/genUniqueSlug";
 
-export async function GET() {
-  try {
-    const catalogItems = await prisma.product.findMany({
-      where: { deletedAt: null }, // Global soft-delete filtering
-      include: {
-        brand: { select: { name: true } },
-        category: { select: { name: true } },
+// export async function GET() {
+//   try {
+//     const catalogItems = await prisma.product.findMany({
+//       where: { deletedAt: null }, // Global soft-delete filtering
+//       include: {
+//         brand: { select: { name: true } },
+//         category: { select: { name: true } },
         
-        // 🟢 NEW: Pull parent Variant structure node to resolve associated ProductGroups
-        variant: {
-          include: {
-            group: {
-              select: { name: true }
-            }
-          }
-        },
+//         // 🟢 NEW: Pull parent Variant structure node to resolve associated ProductGroups
+//         variant: {
+//           include: {
+//             group: {
+//               select: { name: true }
+//             }
+//           }
+//         },
         
-        // 🟢 FIXED: Include nested core UnitOfMeasure details
-        purchasingUom: {
-          include: {
-            uom: { select: { name: true, code: true } }
-          }
-        },
+//         // 🟢 FIXED: Include nested core UnitOfMeasure details
+//         purchasingUom: {
+//           include: {
+//             uom: { select: { name: true, code: true } }
+//           }
+//         },
         
-        // 🟢 FIXED: Include nested core UnitOfMeasure details
-        salesUom: {
-          include: {
-            uom: { select: { name: true, code: true } }
-          }
-        },
+//         // 🟢 FIXED: Include nested core UnitOfMeasure details
+//         salesUom: {
+//           include: {
+//             uom: { select: { name: true, code: true } }
+//           }
+//         },
         
-        barcodes: { select: { barcode: true } },
-        images: {
-          orderBy: { position: "asc" },
-          take: 1,
-          select: { thumbUrl: true, originalUrl: true }
-        }
-      },
-      orderBy: { updatedAt: "desc" }
-    });
+//         barcodes: { select: { barcode: true } },
+//         images: {
+//           orderBy: { position: "asc" },
+//           take: 1,
+//           select: { thumbUrl: true, originalUrl: true }
+//         }
+//       },
+//       orderBy: { updatedAt: "desc" }
+//     });
 
+//     const parsedProducts = catalogItems.map((prod) => {
+//       // Safely extract structural strings from the new relational join schema layer
+//       const purchasingCode = prod.purchasingUom?.uom?.code || prod.purchasingUom?.uom?.name;
+//       const salesCode = prod.salesUom?.uom?.code || prod.salesUom?.uom?.name;
+
+//       return {
+//         id: prod.id,
+//         inflowId: prod.inflowId,
+//         sku: prod.sku || "N/A",
+//         name: prod.name,
+//         groupName: prod.variant?.group.name,
+//         slug: prod.slug,
+//         itemType: prod.itemType || "Stock",
+//         isActive: prod.isActive,
+//         trackExpiry: prod.trackExpiry,
+//         trackLots: prod.trackLots,
+//         trackSerials: prod.trackSerials,
+//         brandName: prod.brand?.name || "Generic / White-label",
+//         categoryName: prod.category?.name || "Unassigned Dept",
+//         thumbnail: prod.images[0]?.thumbUrl || prod.images[0]?.originalUrl || null,
+//         barcodesCount: prod.barcodes.length,
+//         primaryBarcode: prod.barcodes[0]?.barcode || null,
+        
+//         // 🟢 FIXED: Displays the actual looked-up code (e.g., BOX, PCS) along with conversion variables
+//         purchasingUomText: prod.purchasingUom && purchasingCode
+//           ? `${purchasingCode} (${Number(prod.purchasingUom.standardQuantity)}:${Number(prod.purchasingUom.uomQuantity)})`
+//           : "Not Set",
+          
+//         salesUomText: prod.salesUom && salesCode
+//           ? `${salesCode} (${Number(prod.salesUom.standardQuantity)}:${Number(prod.salesUom.uomQuantity)})`
+//           : "Not Set",
+//       };
+//     });
+
+//     return NextResponse.json(parsedProducts, { status: 200 });
+//   } catch (error: any) {
+//     console.error("Master product catalog pipeline failure:", error);
+//     return NextResponse.json(
+//       { error: "Internal product database query execution failure.", details: error.message }, 
+//       { status: 500 }
+//     );
+//   }
+// }
+
+export async function GET(request: NextRequest) {
+  try {
+    const { searchParams } = new URL(request.url);
+
+    // Pagination Parameters
+    const page = Math.max(1, parseInt(searchParams.get("page") || "1"))
+    const limit = Math.max(1, parseInt(searchParams.get("limit") || "25"))
+    const skip = (page - 1) * limit
+
+    // Filter Parameters
+    const search = searchParams.get("search")?.trim() || ""
+    const statusParam = searchParams.get("status")
+    
+    // 🟢 Extract and convert array parameters safely
+    const brands = searchParams.get("brands")?.split(",").filter(Boolean) || []
+    const categories = searchParams.get("categories")?.split(",").filter(Boolean) || []
+
+    // Sorting Parameters
+    const sortBy = searchParams.get("sortBy") || ""
+    const sortOrder = searchParams.get("sortOrder") || "desc"
+
+    // Construct Prisma Query Object
+    const whereClause: any = { deletedAt: null }
+
+    if (search) {
+      whereClause.OR = [
+        { name: { contains: search, mode: "insensitive" } },
+        { sku: { contains: search, mode: "insensitive" } },
+      ]
+    }
+
+    if (statusParam === "active") {
+      whereClause.isActive = true
+    } else if (statusParam === "inactive") {
+      whereClause.isActive = false
+    }
+
+    // 🟢 Server-side relational database filters array processing
+    if (brands.length > 0) {
+      whereClause.brand = {
+        id: { in: brands }
+      }
+    }
+
+    if (categories.length > 0) {
+      whereClause.category = {
+        id: { in: categories }
+      }
+    }
+
+    // Sort evaluation block
+    let orderByClause: any = { updatedAt: "desc" }
+    if (sortBy === "sku" || sortBy === "name") {
+      orderByClause = { [sortBy]: sortOrder }
+    }
+
+    // Execute Concurrent Query Payload Requests
+    const [totalRecords, catalogItems] = await prisma.$transaction([
+      prisma.product.count({ where: whereClause }),
+      prisma.product.findMany({
+        where: whereClause,
+        skip,
+        take: limit,
+        include: {
+          brand: { select: { name: true } },
+          category: { select: { name: true } },
+          variant: { include: { group: { select: { name: true } } } },
+          purchasingUom: { include: { uom: { select: { name: true, code: true } } } },
+          salesUom: { include: { uom: { select: { name: true, code: true } } } },
+          barcodes: { select: { barcode: true } },
+          images: { orderBy: { position: "asc" }, take: 1, select: { thumbUrl: true, originalUrl: true } }
+        },
+        orderBy: orderByClause
+      })
+    ]);
+
+    // 5. Parse Data to match your table shape
     const parsedProducts = catalogItems.map((prod) => {
-      // Safely extract structural strings from the new relational join schema layer
       const purchasingCode = prod.purchasingUom?.uom?.code || prod.purchasingUom?.uom?.name;
       const salesCode = prod.salesUom?.uom?.code || prod.salesUom?.uom?.name;
 
@@ -54,6 +174,7 @@ export async function GET() {
         inflowId: prod.inflowId,
         sku: prod.sku || "N/A",
         name: prod.name,
+        groupName: prod.variant?.group.name,
         slug: prod.slug,
         itemType: prod.itemType || "Stock",
         isActive: prod.isActive,
@@ -61,23 +182,30 @@ export async function GET() {
         trackLots: prod.trackLots,
         trackSerials: prod.trackSerials,
         brandName: prod.brand?.name || "Generic / White-label",
-        categoryName: prod.category?.name || "",
+        categoryName: prod.category?.name || "Unassigned Dept",
         thumbnail: prod.images[0]?.thumbUrl || prod.images[0]?.originalUrl || null,
         barcodesCount: prod.barcodes.length,
         primaryBarcode: prod.barcodes[0]?.barcode || null,
-        
-        // 🟢 FIXED: Displays the actual looked-up code (e.g., BOX, PCS) along with conversion variables
         purchasingUomText: prod.purchasingUom && purchasingCode
           ? `${purchasingCode} (${Number(prod.purchasingUom.standardQuantity)}:${Number(prod.purchasingUom.uomQuantity)})`
           : "Not Set",
-          
         salesUomText: prod.salesUom && salesCode
           ? `${salesCode} (${Number(prod.salesUom.standardQuantity)}:${Number(prod.salesUom.uomQuantity)})`
           : "Not Set",
       };
     });
 
-    return NextResponse.json(parsedProducts, { status: 200 });
+    // Return the items along with total counters for your pagination components
+    return NextResponse.json({
+      data: parsedProducts,
+      meta: {
+        totalRecords,
+        totalPages: Math.ceil(totalRecords / limit),
+        currentPage: page,
+        limit
+      }
+    }, { status: 200 });
+
   } catch (error: any) {
     console.error("Master product catalog pipeline failure:", error);
     return NextResponse.json(

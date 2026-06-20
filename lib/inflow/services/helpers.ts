@@ -2,6 +2,7 @@
 
 import { Prisma } from "@/generated/prisma/client";
 import { InflowInventoryLine, InflowProduct, InflowProductGroupImage } from "../types";
+import { syncUom } from "./uom-sync";
 
 type Tx = Prisma.TransactionClient;
 
@@ -32,34 +33,116 @@ export async function syncBrand(
 export async function syncGroupFeatures(
   tx: Tx,
   groupId: string,
-  productId: string,
   rawFeatures?: string | null
 ) {
-  // Clear old feature links for this group block to prevent stale variations or key collisions
-  await tx.productFeature.deleteMany({ 
-    where: { groupId } 
+  await tx.productGroupFeature.deleteMany({
+    where: { groupId },
   });
 
   if (!rawFeatures?.trim()) return;
 
-  // Parse pipeline map: "Sensor:Full Frame|Max Resolution:8K 30p"
   const parsedFeatures = parseFeatures(rawFeatures);
 
   for (const f of parsedFeatures) {
-    // Step A: Ensure global feature key classification exists
-    const globalFeature = await tx.feature.upsert({
-      where: { name: f.key },
-      create: { name: f.key },
+    const feature = await tx.feature.upsert({
+      where: {
+        name: f.key,
+      },
+      create: {
+        name: f.key,
+      },
       update: {},
     });
 
-    // Step B: Connect join row using the newly added value field
-    await tx.productFeature.create({
-      data: {
-        productId,
-        groupId,
-        featureId: globalFeature.id,
+    const featureValue = await tx.featureValue.upsert({
+      where: {
+        featureId_value: {
+          featureId: feature.id,
+          value: f.value,
+        },
+      },
+      create: {
+        featureId: feature.id,
         value: f.value,
+      },
+      update: {},
+    });
+
+    await tx.productGroupFeature.upsert({
+      where: {
+        groupId_featureId: {
+          groupId,
+          featureId: feature.id,
+        },
+      },
+      create: {
+        groupId,
+        featureId: feature.id,
+        featureValueId: featureValue.id,
+      },
+      update: {
+        featureValueId: featureValue.id,
+      },
+    });
+  }
+}
+
+
+/**
+ * 📸 Separated Feature Synchronization Layer
+ */
+export async function syncProductFeatures(
+  tx: Tx,
+  productId: string,
+  rawFeatures?: string | null
+) {
+  await tx.productFeature.deleteMany({
+    where: { productId },
+  });
+
+  if (!rawFeatures?.trim()) return;
+
+  const parsedFeatures = parseFeatures(rawFeatures);
+
+  for (const f of parsedFeatures) {
+    const feature = await tx.feature.upsert({
+      where: {
+        name: f.key,
+      },
+      create: {
+        name: f.key,
+      },
+      update: {},
+    });
+
+    const featureValue = await tx.featureValue.upsert({
+      where: {
+        featureId_value: {
+          featureId: feature.id,
+          value: f.value,
+        },
+      },
+      create: {
+        featureId: feature.id,
+        value: f.value,
+      },
+      update: {},
+    });
+
+    await tx.productFeature.upsert({
+      where: {
+        productId_featureId: {
+          productId,
+          featureId: feature.id,
+        },
+      },
+      create: {
+        productId,
+        featureId: feature.id,
+        featureValueId: featureValue.id,
+      },
+      update: {
+        featureValueId: featureValue.id,
       },
     });
   }
@@ -71,11 +154,10 @@ export async function syncGroupFeatures(
 export async function syncGroupTags(
   tx: Tx,
   groupId: string,
-  productId: string,
   rawTags?: string | null
 ) {
   // Clear old tag connections for this group execution
-  await tx.productTag.deleteMany({ 
+  await tx.productGroupTag.deleteMany({ 
     where: { groupId } 
   });
 
@@ -93,48 +175,10 @@ export async function syncGroupTags(
     });
 
     // Step B: Map join connection row records
-    await tx.productTag.create({
+    await tx.productGroupTag.create({
       data: {
-        productId,
         groupId,
         tagId: globalTag.id,
-      },
-    });
-  }
-}
-
-/**
- * 📸 Separated Feature Synchronization Layer
- */
-export async function syncProductFeatures(
-  tx: Tx,
-  productId: string,
-  rawFeatures?: string | null
-) {
-  // Clear old feature links for this group block to prevent stale variations or key collisions
-  await tx.productFeature.deleteMany({ 
-    where: { productId } 
-  });
-
-  if (!rawFeatures?.trim()) return;
-
-  // Parse pipeline map: "Sensor:Full Frame|Max Resolution:8K 30p"
-  const parsedFeatures = parseFeatures(rawFeatures);
-    
-  for (const f of parsedFeatures) {
-    // Step A: Ensure global feature key classification exists
-    const globalFeature = await tx.feature.upsert({
-      where: { name: f.key },
-      create: { name: f.key },
-      update: {},
-    });
-
-    // Step B: Connect join row using the newly added value field
-    await tx.productFeature.create({
-      data: {
-        productId,
-        featureId: globalFeature.id,
-        value: f.value,
       },
     });
   }
@@ -207,9 +251,13 @@ export async function syncPurchasingUom(
   tx: Tx,
   product: InflowProduct
 ) {
-  if (!product.purchasingUom) {
-    return;
-  }
+  if (!product.purchasingUom) return;
+
+  const uom = await syncUom(
+    tx,
+    product.purchasingUom.name.toUpperCase(),
+    product.purchasingUom.name
+  );
 
   await tx.productUom.upsert({
     where: {
@@ -217,22 +265,18 @@ export async function syncPurchasingUom(
     },
     create: {
       productId: product.productId,
-      name: product.purchasingUom.name,
+      uomId: uom.id,
       standardQuantity:
-        product.purchasingUom.conversionRatio
-          .standardQuantity,
+        product.purchasingUom.conversionRatio.standardQuantity,
       uomQuantity:
-        product.purchasingUom.conversionRatio
-          .uomQuantity,
+        product.purchasingUom.conversionRatio.uomQuantity,
     },
     update: {
-      name: product.purchasingUom.name,
+      uomId: uom.id,
       standardQuantity:
-        product.purchasingUom.conversionRatio
-          .standardQuantity,
+        product.purchasingUom.conversionRatio.standardQuantity,
       uomQuantity:
-        product.purchasingUom.conversionRatio
-          .uomQuantity,
+        product.purchasingUom.conversionRatio.uomQuantity,
     },
   });
 }
@@ -241,9 +285,13 @@ export async function syncSalesUom(
   tx: Tx,
   product: InflowProduct
 ) {
-  if (!product.salesUom) {
-    return;
-  }
+  if (!product.salesUom) return;
+
+  const uom = await syncUom(
+    tx,
+    product.salesUom.name.toUpperCase(),
+    product.salesUom.name
+  );
 
   await tx.productSalesUom.upsert({
     where: {
@@ -251,22 +299,18 @@ export async function syncSalesUom(
     },
     create: {
       productId: product.productId,
-      name: product.salesUom.name,
+      uomId: uom.id,
       standardQuantity:
-        product.salesUom.conversionRatio
-          .standardQuantity,
+        product.salesUom.conversionRatio.standardQuantity,
       uomQuantity:
-        product.salesUom.conversionRatio
-          .uomQuantity,
+        product.salesUom.conversionRatio.uomQuantity,
     },
     update: {
-      name: product.salesUom.name,
+      uomId: uom.id,
       standardQuantity:
-        product.salesUom.conversionRatio
-          .standardQuantity,
+        product.salesUom.conversionRatio.standardQuantity,
       uomQuantity:
-        product.salesUom.conversionRatio
-          .uomQuantity,
+        product.salesUom.conversionRatio.uomQuantity,
     },
   });
 }

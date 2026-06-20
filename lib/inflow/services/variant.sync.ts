@@ -3,50 +3,53 @@ export async function syncVariant(
   productGroupId: string,
   variant: any
 ) {
+  const optionEntries = Object.entries(
+    variant.variantOption ?? {}
+  );
 
+  const signature = optionEntries
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([optionId, valueId]) => `${optionId}:${valueId}`)
+    .join("|");
+
+  const variantCount = optionEntries.length;
 
   await tx.productVariant.upsert({
     where: {
-      inflowVariantId:
-        variant.productVariantId,
+      inflowId: variant.productVariantId,
     },
     create: {
-      inflowVariantId:
-        variant.productVariantId,
+      inflowId: variant.productVariantId,
       productGroupId,
       productId: variant.productId,
-      defaultPrice:
-        variant.defaultPrice,
+      defaultPrice: variant.defaultPrice,
+      sku: variant.sku ?? null,
+      signature,
+      variantCount,
     },
     update: {
-      defaultPrice:
-        variant.defaultPrice,
+      defaultPrice: variant.defaultPrice,
+      sku: variant.sku ?? null,
+      signature,
+      variantCount,
     },
   });
 
-  for (const [optionId, optionValueId] of Object.entries(
-    variant.variantOption ?? {}
-  )) {
+  for (const [optionId, optionValueId] of optionEntries) {
     await tx.productVariantSelection.upsert({
       where: {
         variantId_optionId: {
-          variantId:
-            variant.productVariantId,
+          variantId: variant.productVariantId,
           optionId,
         },
       },
       create: {
-        variantId:
-          variant.productVariantId,
+        variantId: variant.productVariantId,
         optionId,
-        optionValueId: String(
-          optionValueId
-        ),
+        optionValueId: String(optionValueId),
       },
       update: {
-        optionValueId: String(
-          optionValueId
-        ),
+        optionValueId: String(optionValueId),
       },
     });
   }
