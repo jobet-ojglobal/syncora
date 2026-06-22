@@ -26,10 +26,16 @@ export async function GET(
     // Query product data with all related tables needed for the editing form schema
     const productProfile = await prisma.product.findFirst({
       where: { 
-        id: id,
+        id,
         deletedAt: null // Safeguard to ensure soft-deleted rows are hidden
       },
       include: {
+        variant: {
+          select: {
+            productGroupId: true,
+            signature: true
+          }
+        },
         purchasingUom: {
           include: {
             uom: { select: { code: true, name: true } }

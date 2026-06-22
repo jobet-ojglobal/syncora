@@ -11,7 +11,7 @@ import { toast } from "sonner";
 interface HydrationPayload {
   uoms: any[];
   brands: any[];
-  categories: any[];
+  groups: any[];
   initialProductData: any | null;
 }
 
@@ -28,14 +28,14 @@ export default function EditProductPage() {
     async function loadFormRequirements() {
       try {
         // Run all fetch pipelines concurrently to eliminate network waterfall delays
-        const [uomRes, brandRes, catRes, productRes] = await Promise.all([
+        const [uomRes, brandRes, groupRes, productRes] = await Promise.all([
           fetch("/api/admin/uoms/form-hydration"),
           fetch("/api/admin/brands/basic"),
-          fetch("/api/admin/categories/basic"),
+          fetch("/api/admin/groups/matrix"),
           fetch(`/api/admin/products/${id}/basic`), // Fetches the single product route we updated earlier
         ]);
 
-        if (!uomRes.ok || !brandRes.ok || !catRes.ok) {
+        if (!uomRes.ok || !brandRes.ok || !groupRes.ok ) {
           throw new Error("One or more core configuration pipelines failed to download data layers.");
         }
 
@@ -47,10 +47,10 @@ export default function EditProductPage() {
           throw new Error("Failed compiling specific inventory variant profile parameter states.");
         }
 
-        const [uomData, brandData, catData, productData] = await Promise.all([
+        const [uomData, brandData, groupData, productData] = await Promise.all([
           uomRes.json(),
           brandRes.json(),
-          catRes.json(),
+          groupRes.json(),
           productRes.json(),
         ]);
 
@@ -58,7 +58,7 @@ export default function EditProductPage() {
         setHydrationData({
           uoms: uomData.uomListLookup || [],
           brands: brandData || [],
-          categories: catData || [],
+          groups: groupData || [],
           initialProductData: productData,
         });
       } catch (err: any) {
@@ -106,8 +106,8 @@ export default function EditProductPage() {
       {/* PRODUCT CONFIGURATION FORM */}
       <ProductForm 
         brands={hydrationData.brands} 
-        categories={hydrationData.categories} 
         uoms={hydrationData.uoms} 
+        groups={hydrationData.groups}
         initialData={hydrationData.initialProductData} // Pass initial database fields right here
       />
     </div>

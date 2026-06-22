@@ -183,18 +183,6 @@ export async function POST(request: NextRequest) {
         });
       }
 
-      // 6. Extract arrays of values to construct the permutation array layer matrix
-      // const valueArraysForCartesian = structuralOptionsMap.map(opt => 
-      //   opt.values.map(v => ({
-      //     optionInflowId: opt.optionInflowId,
-      //     valueInflowId: v.valueInflowId,
-      //     literalStr: v.literalStr
-      //   }))
-      // );
-
-      // // 7. Build dynamic cross product lines array
-      // const cartesianIntersections = getCartesianProduct(valueArraysForCartesian);
-
       const driverOptions = options.filter((opt: any) => opt.isDriver !== false);
 
       const valueArraysForCartesian = structuralOptionsMap
@@ -210,10 +198,6 @@ export async function POST(request: NextRequest) {
             literalStr: v.literalStr
           }))
         );
-
-      // if (valueArraysForCartesian.length === 0) {
-      //   return group; // or skip variant generation
-      // }
 
       // 7. Build dynamic cross product lines array using ONLY driver fields
       const cartesianIntersections = getCartesianProduct(valueArraysForCartesian);
@@ -247,6 +231,7 @@ export async function POST(request: NextRequest) {
         
         // Calculated unique option combination deterministic signature string
         const variantSignature = intersection.map(item => item.valueInflowId).sort().join("-");
+        // const variantSignature = `custom-${crypto.randomUUID().slice(0, 8)}`;
 
         await tx.productVariant.create({
           data: {

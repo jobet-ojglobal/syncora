@@ -10,6 +10,7 @@ interface HydrationPayload {
   uoms: any[];
   brands: any[];
   categories: any[];
+  groups: any[];
 }
 
 export default function CreateProductPage() {
@@ -20,9 +21,10 @@ export default function CreateProductPage() {
     async function loadFormRequirements() {
       try {
         // Run all fetch pipelines concurrently to eliminate network waterfall delays
-        const [uomRes, brandRes, catRes] = await Promise.all([
+        const [uomRes, brandRes, groupRes, catRes] = await Promise.all([
           fetch("/api/admin/uoms/form-hydration"),
           fetch("/api/admin/brands/basic"),
+          fetch("/api/admin/groups/matrix"),
           fetch("/api/admin/categories/basic"),
         ]);
 
@@ -30,9 +32,10 @@ export default function CreateProductPage() {
           throw new Error("One or more configuration pipelines failed to download data layers.");
         }
 
-        const [uomData, brandData, catData] = await Promise.all([
+        const [uomData, brandData, groupData, catData] = await Promise.all([
           uomRes.json(),
           brandRes.json(),
+          groupRes.json(),
           catRes.json(),
         ]);
 
@@ -40,6 +43,7 @@ export default function CreateProductPage() {
         setHydrationData({
           uoms: uomData.uomListLookup || [],
           brands: brandData || [],
+          groups: groupData || [],
           categories: catData || [],
         });
       } catch (err: any) {
@@ -86,7 +90,7 @@ export default function CreateProductPage() {
       {/* PRODUCT CONFIGURATION FORM */}
       <ProductForm 
         brands={hydrationData.brands} 
-        categories={hydrationData.categories} 
+        groups={hydrationData.groups}
         uoms={hydrationData.uoms} 
       />
     </div>

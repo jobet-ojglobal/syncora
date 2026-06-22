@@ -40,13 +40,77 @@ interface UomLookupReference {
   category: string;
 }
 
+export interface GroupAttributeValueDetails {
+  id: string;
+  value: string;
+}
+
+export interface GroupOptionValueNode {
+  inflowId: string;
+  lineNum: number;
+  attributeValue: GroupAttributeValueDetails;
+}
+
+export interface GroupOptionMatrixStructure {
+  inflowId: string;
+  lineNum: number;
+  attribute: {
+    id: string;
+    name: string;
+  };
+  values: GroupOptionValueNode[];
+}
+
+export interface VariantSelectionMapping {
+  optionId: string;
+  optionValueId: string;
+  optionValue: {
+    attributeValue: {
+      value: string; // Used to compute labels like "Red / Large" on the frontend
+    };
+  };
+}
+
+export interface GroupVariantSlot {
+  inflowId: string;
+  signature: string;
+  productId: string | null; // Nullable if the slot is open for connection
+  defaultPrice: number | string;
+  isActive: boolean;
+  product?: {
+    sku: string | null;
+    name: string;
+  } | null;
+  selections: VariantSelectionMapping[];
+}
+
+// 🎯 The Main Product Group Interface Type Definition
+export interface ProductGroupLookupDetail {
+  id: string;
+  inflowId: string;
+  name: string;
+  slug: string;
+  description: string | null;
+  isActive: boolean;
+  brandId: string | null;
+  categoryId: string | null;
+  brand?: BrandLookupOption | null;
+  category?: {
+    inflowId: string;
+    name: string;
+  } | null;
+  variants: GroupVariantSlot[];
+  options: GroupOptionMatrixStructure[];
+}
+
 interface ProductFormProps {
   brands: BrandLookupOption[];
   uoms: UomLookupReference[]; // 🟢 Added global metrics dependency array
+  groups: ProductGroupLookupDetail[];
   initialData?: any | null;
 }
 
-export function ProductForm({  brands, uoms, initialData }: ProductFormProps) {
+export function ProductForm({  brands, uoms, initialData, groups: productGroups }: ProductFormProps) {
   const router = useRouter();
   const isEditMode = !!initialData;
 
@@ -54,6 +118,8 @@ export function ProductForm({  brands, uoms, initialData }: ProductFormProps) {
     resolver: zodResolver(productSchema),
     defaultValues: {
       inflowId: initialData?.inflowId,
+      productGroupId: (initialData as any)?.variant?.productGroupId || "",
+      variantSignature: (initialData as any)?.variant?.signature || "",
       sku: initialData?.sku || "",
       name: initialData?.name || "",
       description: initialData?.description || "",
@@ -77,7 +143,6 @@ export function ProductForm({  brands, uoms, initialData }: ProductFormProps) {
       originCountry: initialData?.originCountry || "",
       hsTariffNumber: initialData?.hsTariffNumber || "",
       remarks: initialData?.remarks || "",
-      // 🟢 Expects matching entity identifier mapping now rather than text placeholders
       standardUomName: initialData?.standardUomName || "", 
       purchasingUom: {
         name: initialData?.purchasingUom?.name || "",
@@ -95,6 +160,98 @@ export function ProductForm({  brands, uoms, initialData }: ProductFormProps) {
   });
 
   const { register, control, handleSubmit, setValue, formState: { errors, isSubmitting } } = form;
+
+  // Watch the matrix relationship variables
+  const watchedGroupId = useWatch({ control, name: "productGroupId" });
+  const watchedVariantSignature = useWatch({ control, name: "variantSignature" });
+
+  const selectedGroupDetails = useMemo(() => {
+    if (!watchedGroupId || !productGroups) return null;
+    return productGroups.find(g => g.inflowId === watchedGroupId);
+  }, [watchedGroupId, productGroups]);
+
+  const computedVariantSlotsFromOptions = useMemo(() => {
+    if (!selectedGroupDetails || !selectedGroupDetails.options || selectedGroupDetails.options.length === 0) {
+      return [];
+    }
+
+    // 1. Extract option structural array trees with the global attribute value ID included
+    const arraysToCombine = selectedGroupDetails.options.map(opt => 
+      opt.values.map(val => ({
+        optionId: opt.inflowId,
+        optionValueId: val.inflowId,
+        // 🎯 CRUCIAL FIX: Bring down the core attribute ID that matches your backend fingerprintId
+        attributeValueId: val.attributeValue?.id || "", 
+        value: val.attributeValue?.value || ""
+      }))
+    );
+
+    // Classic Cartesian Product calculation function
+    const getCartesian = (arrays: any[][]): any[][] => {
+      return arrays.reduce((acc, curr) => acc.flatMap(d => curr.map(e => [...d, e])), [[]]);
+    };
+
+    const intersections = getCartesian(arraysToCombine);
+
+    return intersections.map((combination: any[]) => {
+      // 🎯 CRUCIAL FIX: Build signature matching the backend sorted attributeValue.id architecture
+      const signature = combination.map(c => c.attributeValueId).sort().join("-");
+      const labelString = combination.map(c => c.value).join(" / ");
+
+      // Now this exact lookup will find your DB variant records seamlessly!
+      const matchedDbVariant = selectedGroupDetails.variants?.find(v => v.signature === signature);
+
+      return {
+        signature,
+        labelString,
+        productId: matchedDbVariant?.productId || null,
+        product: matchedDbVariant?.product || null,
+        selections: combination.map(c => ({
+          optionId: c.optionId,
+          optionValueId: c.optionValueId,
+          optionValue: { attributeValue: { value: c.value } }
+        }))
+      };
+    });
+  }, [selectedGroupDetails]);
+
+   const currentSelectionBreakdown = useMemo(() => {
+    if (!watchedVariantSignature || !computedVariantSlotsFromOptions) return [];
+
+    // 1. Find the current selected variant intersection slot
+    const activeSlot = computedVariantSlotsFromOptions.find(
+      (slot) => slot.signature === watchedVariantSignature
+    );
+
+    if (!activeSlot || !selectedGroupDetails?.options) return [];
+
+    // 2. Decode the signature or combinations array back into an explicit UI layout map
+    return activeSlot.selections.map((selection: any) => {
+      // Find matching base group option text for this specific selection node
+      const groupOption = selectedGroupDetails.options.find(
+        (opt) => opt.inflowId === selection.optionId
+      );
+      
+      // Find the specific string value assigned to this selection
+      const optionValue = groupOption?.values.find(
+        (v) => v.inflowId === selection.optionValueId
+      );
+
+      return {
+        attributeName: groupOption?.attribute?.name || "Attribute",
+        valueText: optionValue?.attributeValue?.value || "Unassigned"
+      };
+    });
+  }, [watchedVariantSignature, computedVariantSlotsFromOptions, selectedGroupDetails])
+
+  // 2. 🎯 Streamlined Label constructor targeting the combined schema data
+  const getVariantLabel = (variant: any) => {
+    const baseLabel = variant.labelString || "Unknown Option Configuration Slot";
+    
+    return variant.product
+      ? `${baseLabel} (Occupied by SKU: ${variant.product.sku})`
+      : `${baseLabel} (Available Connection)`;
+  };
 
   const barcodeArray = useFieldArray({ control, name: "barcodes" });
   const imageArray = useFieldArray({ control, name: "images" });
@@ -143,8 +300,13 @@ export function ProductForm({  brands, uoms, initialData }: ProductFormProps) {
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="w-full max-w-5xl mx-auto p-6 bg-card border rounded-xl shadow-xs space-y-6">
+      
+      
+      
       <FieldGroup className="gap-6">
+
         
+
         {/* Core Properties Row */}
         <FieldSet className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <FieldLegend className="col-span-1 md:col-span-3 flex items-center gap-2 border-b pb-2">
@@ -152,7 +314,6 @@ export function ProductForm({  brands, uoms, initialData }: ProductFormProps) {
           </FieldLegend>
 
           <Field className="md:col-span-2">
-            {/* <Product Master Display Title *></ProductDisplayTitle> */}
             <FieldLabel>Product Master Display Title *</FieldLabel>
             <Input placeholder="e.g. Premium Ergonomic Office Chair" {...register("name")} />
             {errors.name && <span className="text-xs text-destructive">{errors.name.message as string}</span>}
@@ -163,6 +324,125 @@ export function ProductForm({  brands, uoms, initialData }: ProductFormProps) {
             <Input placeholder="PROD-CHAIR-001" disabled={isEditMode} {...register("sku")} />
             {errors.sku && <span className="text-xs text-destructive">{errors.sku.message as string}</span>}
           </Field>
+
+          <FieldSet className="grid grid-cols-1 md:grid-cols-2 gap-4 border-t pt-4 md:col-span-3">
+            <FieldLegend className="col-span-1 md:col-span-2 flex items-center gap-2 border-b pb-2">
+              Matrix Relationship Binding
+            </FieldLegend>
+
+            {/* 1. Select the Product Group cluster */}
+            <Field>
+              <FieldLabel>Product Group Cluster</FieldLabel>
+              <select 
+                className="w-full text-xs h-9 rounded-md border border-input bg-background px-3"
+                {...register("productGroupId")}
+                onChange={(e) => {
+                  register("productGroupId").onChange(e);
+                  setValue("variantSignature", ""); 
+                }}
+              >
+                <option value="">-- No Group (Standalone Product) --</option>
+                {productGroups?.map((group) => (
+                  <option key={group.inflowId} value={group.inflowId}>{group.name}</option>
+                ))}
+              </select>
+            </Field>
+
+            {/* 2. Select the specific Variant Intersection slot */}
+            {selectedGroupDetails && (
+              <Field>
+                <FieldLabel>Target Matrix Attribute Configuration Slot</FieldLabel>
+                <select 
+                  className="w-full text-xs h-9 rounded-md border border-input bg-background px-3 animate-in fade-in duration-200 focus:ring-1 focus:ring-primary"
+                  {...register("variantSignature")}
+                >
+                  <option value="">-- Assign to New Custom Variant Slot --</option>
+                  {computedVariantSlotsFromOptions.map((v) => {
+                    // A slot is marked as occupied if a productId exists, unless matched to our active entity frame
+                    const isOccupiedByOther = v.productId && v.productId !== form.getValues("inflowId");
+
+                    return (
+                      <option 
+                        key={v.signature} 
+                        value={v.signature}
+                        disabled={!!isOccupiedByOther} // Locks out slots belonging to alternate products
+                      >
+                        {getVariantLabel(v)}
+                      </option>
+                    );
+                  })}
+                </select>
+                {errors.variantSignature && (
+                  <span className="text-xs text-destructive">{errors.variantSignature.message as string}</span>
+                )}
+              </Field>
+            )}
+          </FieldSet>
+
+          {/* 📊 Active Matrix Attribute Configuration Dashboard Block */}
+          {selectedGroupDetails && (
+            <div className="col-span-1 md:col-span-3 rounded-lg border border-dashed p-4 bg-muted/30 space-y-3 animate-in fade-in duration-200">
+              <div>
+                <h4 className="text-xs font-semibold tracking-wide uppercase text-muted-foreground">
+                  Active Group Matrix Metadata View: <span className="text-foreground normal-case font-medium">{selectedGroupDetails.name}</span>
+                </h4>
+              </div>
+
+              {/* 🎯 FIX 1: Alerts placed outside the badge flexbox wrapper for proper structural layout */}
+              {(() => {
+                const activeSlot = computedVariantSlotsFromOptions.find(s => s.signature === watchedVariantSignature);
+                const currentProductId = initialData?.inflowId || form.getValues("inflowId");
+                
+                if (activeSlot?.productId && activeSlot.productId !== currentProductId) {
+                  return (
+                    <div className="text-xs bg-destructive/10 border border-destructive/20 text-destructive px-3 py-2 rounded-md font-medium animate-pulse w-full">
+                      ⚠️ Warning: This exact variant selection is currently locked by SKU: {activeSlot.product?.sku || "Another Product"}
+                    </div>
+                  );
+                }
+                if (activeSlot?.productId && activeSlot.productId === currentProductId) {
+                  return (
+                    <div className="text-xs bg-green-500/10 border border-green-500/20 text-green-600 px-3 py-2 rounded-md font-medium w-full">
+                      ✓ Current Selection: This slot is already bound to this active item document.
+                    </div>
+                  );
+                }
+                return null;
+              })()}
+
+              {/* 🟢 Badges Display Layer */}
+              {currentSelectionBreakdown.length > 0 ? (
+                <div className="flex flex-wrap gap-2 pt-1">
+                  {currentSelectionBreakdown.map((item, idx) => (
+                    <div 
+                      key={idx} 
+                      className="flex items-center gap-1.5 text-xs bg-primary/10 border border-primary/20 text-primary px-2.5 py-1 rounded-md"
+                    >
+                      <span className="font-semibold text-muted-foreground/70">{item.attributeName}:</span>
+                      <span className="font-medium font-mono">{item.valueText}</span>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-xs text-muted-foreground italic pt-1">
+                  No concrete variant configuration node matched yet. Select a slot above or configure custom matrix values.
+                </div>
+              )}
+
+              {/* Fallback layout mapping to show all total options assigned to the base group structure */}
+              <div className="pt-2 border-t border-dashed grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px]">
+                <span className="col-span-1 sm:col-span-2 text-muted-foreground/60 font-medium">Available Core Options Matrix Parameters:</span>
+                {selectedGroupDetails.options?.map((opt) => (
+                  <div key={opt.inflowId} className="bg-background border rounded px-2 py-1 flex items-center justify-between">
+                    <span className="font-medium text-muted-foreground">{opt.attribute.name}</span>
+                    <span className="text-foreground font-mono truncate max-w-[180px]">
+                      {opt.values.map(v => v.attributeValue?.value).join(", ")}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           <Field className="md:col-span-2">
             <FieldLabel>Manufacturer / Brand Assignment</FieldLabel>

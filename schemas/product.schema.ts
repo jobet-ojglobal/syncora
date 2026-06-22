@@ -3,6 +3,8 @@ import { z } from "zod";
 
 export const productSchema = z.object({
   inflowId: z.string().optional(),
+  productGroupId: z.string().optional().nullable(),
+  variantSignature: z.string().optional().nullable(),
   sku: z.string().min(1, "SKU reference identifier is required").max(100),
   name: z.string().min(1, "Product name is required").max(255),
   description: z.string().nullable().optional(),
