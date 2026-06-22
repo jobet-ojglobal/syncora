@@ -550,10 +550,11 @@ model Location {
   sublocations    Sublocation[]
   adjustmentLines     InventoryAdjustmentLine[]
   inventoryLedger     InventoryLedger[]
+  teamLocations      TeamMemberLocation[]
   
   outgoingTransfers TransferOrder[] @relation("TransferSourceLocation")
   incomingTransfers TransferOrder[]  @relation("TransferTargetLocation")
-
+  
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
@@ -771,6 +772,103 @@ enum TransferOrderStatus {
   CANCELLED
 }
 
+model TeamMember {
+  id                  String   @id @default(cuid())
+
+  inflowId            String   @unique
+  name                String
+  email               String   @unique
+
+  isActive            Boolean  @default(true)
+  canBeSalesRep       Boolean  @default(false)
+
+  accessAllLocations  Boolean  @default(false)
+
+  accessRights        TeamMemberAccessRight[]
+  locations           TeamMemberLocation[]
+
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+  deletedAt           DateTime?
+
+  @@map("team_member")
+}
+
+model TeamMemberAccessRight {
+  id            String     @id @default(cuid())
+
+  teamMemberId  String
+  rightName     String
+
+  teamMember    TeamMember @relation(fields: [teamMemberId], references: [id], onDelete: Cascade)
+
+  @@unique([teamMemberId, rightName])
+  @@index([rightName])
+
+  @@map("team_member_access_right")
+}
+
+model TeamMemberLocation {
+  id                String     @id @default(cuid())
+
+  teamMemberId      String
+  locationInflowId  String
+
+  teamMember        TeamMember @relation(fields: [teamMemberId], references: [id], onDelete: Cascade)
+
+  location          Location   @relation(fields: [locationInflowId],references: [inflowId], onDelete: Cascade)
+
+  @@unique([teamMemberId, locationInflowId])
+
+  @@map("team_member_location")
+}
+
+
+// INFLOW MODELs
+
+model InflowWebhook {
+  id                      String   @id // webHookSubscriptionId
+  url                     String   @unique // <--- ADD THIS @unique ANNOTATION
+
+  secret                  String?
+  events                  Json
+  isDisabled              Boolean  @default(false)
+  consecutiveFailureCount Int      @default(0)
+  lastFailureMessage      String?
+
+  createdAt               DateTime @default(now())
+  updatedAt               DateTime @updatedAt
+
+  @@map("inflow_webhook")
+}
+
+// model InflowIntegration {
+//   id          String   @id @default(cuid())
+//   webhookId   String?  @unique
+//   webhookUrl  String?
+//   secret      String?
+//   isConnected Boolean @default(false)
+
+//   createdAt   DateTime @default(now())
+//   updatedAt   DateTime @updatedAt
+
+//   @@map("inflow_integration")
+// }
+
+model InflowWebhookEvent {
+  id          String   @id @default(cuid())
+  eventType   String
+  payload     Json
+  processed   Boolean @default(false)
+  receivedAt  DateTime @default(now())
+
+  @@index([eventType])
+  @@index([receivedAt])
+
+  @@map("inflow_webhook_event")
+}
+
+
 
 
 // model ProductGroupOptionAttributeMap {
@@ -842,45 +940,3 @@ enum TransferOrderStatus {
 
 //   @@map("inflow_webhook")
 // }
-
-model InflowWebhook {
-  id                      String   @id // webHookSubscriptionId
-  url                     String   @unique // <--- ADD THIS @unique ANNOTATION
-
-  secret                  String?
-  events                  Json
-  isDisabled              Boolean  @default(false)
-  consecutiveFailureCount Int      @default(0)
-  lastFailureMessage      String?
-
-  createdAt               DateTime @default(now())
-  updatedAt               DateTime @updatedAt
-
-  @@map("inflow_webhook")
-}
-
-model InflowIntegration {
-  id          String   @id @default(cuid())
-  webhookId   String?  @unique
-  webhookUrl  String?
-  secret      String?
-  isConnected Boolean @default(false)
-
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-
-  @@map("inflow_integration")
-}
-
-model InflowWebhookEvent {
-  id          String   @id @default(cuid())
-  eventType   String
-  payload     Json
-  processed   Boolean @default(false)
-  receivedAt  DateTime @default(now())
-
-  @@index([eventType])
-  @@index([receivedAt])
-
-  @@map("inflow_webhook_event")
-}

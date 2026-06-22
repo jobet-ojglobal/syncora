@@ -73,7 +73,7 @@ export class CategoryService {
         parentId: true,
         _count: {
           select: {
-            productGroups: true,
+            products: true,
             children: true,
           },
         },
@@ -171,17 +171,62 @@ export class CategoryService {
   static async deleteCategory(id: string) {
     const category = await prisma.category.findUnique({
       where: { id },
-      include: { _count: { select: { productGroups: true } } }
+      include: {
+        _count: {
+          select: {
+            productGroups: true,
+            products: true,
+          },
+        },
+      },
     });
 
-    if (category?._count.productGroups && category._count.productGroups > 0) {
-      throw new Error(`Cannot delete category "${category.name}" because it is linked to ${category._count.productGroups} product groups.`);
+    if (!category) {
+      throw new Error("Category not found");
     }
 
-     return await prisma.category.delete({
+    const blockers: string[] = [];
+
+    if (category._count.productGroups > 0) {
+      blockers.push(`${category._count.productGroups} product groups`);
+    }
+
+    if (category._count.products > 0) {
+      blockers.push(`${category._count.products} products`);
+    }
+
+    if (blockers.length > 0) {
+      throw new Error(
+        `Cannot delete category "${category.name}" because it is linked to ${blockers.join(" and ")}.`
+      );
+    }
+
+    // return prisma.category.update({
+    //   where: { id },
+    //   data: {
+    //     deletedAt: new Date(),
+    //   },
+    // });
+
+    return prisma.category.delete({
       where: { id },
     });
   }
+  // static async deleteCategory(id: string) {
+  //   const category = await prisma.category.findUnique({
+  //     where: { id },
+  //     include: { _count: { select: { productGroups: true, products: true } } }
+  //   });
+
+  //   if (category?._count.productGroups && category._count.productGroups > 0) {
+  //     throw new Error(`Cannot delete category "${category.name}" because it is linked to ${category._count.productGroups} product groups.`);
+  //   }
+
+  //    return await prisma.category.delete({
+  //     where: { id },
+  //   });
+  // }
+
 
   /**
    * Helper: Generate a URL-friendly slug

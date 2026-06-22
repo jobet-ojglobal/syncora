@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
-import { Layers, ArrowLeft, Plus, Trash2, X, Check, Sliders, AlertCircle } from "lucide-react";
+import { Layers, ArrowLeft, Plus, Trash2, X, Check, Sliders, AlertCircle, Barcode, Settings2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Field, FieldDescription, FieldGroup, FieldLabel, FieldLegend, FieldSeparator, FieldSet } from "@/components/ui/field";
@@ -20,6 +20,7 @@ import { useEffect, useState } from "react";
 // Shadcn UI Dialog & Checkbox imports
 import {
   Dialog,
+  DialogClose,
   DialogContent,
   DialogDescription,
   DialogFooter,
@@ -27,6 +28,8 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Checkbox } from "@/components/ui/checkbox";
+import { BrandSelect } from "../shared/brand-select";
+import { CategorySelect } from "../shared/category-select";
 
 interface LookupItem {
   id: string;
@@ -54,6 +57,31 @@ interface ProductGroupFormProps {
   initialData?: any | null;
 }
 
+function computeLocalCartesianCount(
+  options: Array<{ name: string; isDriver?: boolean; values?: Array<{ value: string; isSkuDriver?: boolean }> }>
+): { labels: string[]; totalCount: number } {
+  const driverOptionGroups = options
+    .map((opt) => {
+      // 🎯 Short circuit rule: if the attribute row itself is skipped, skip child checks
+      if (!opt.isDriver) return [];
+
+      return (opt.values || [])
+        .filter((v) => v.isSkuDriver ?? true)
+        .map((v) => v.value);
+    })
+    .filter((group) => group.length > 0);
+
+  if (driverOptionGroups.length === 0) return { labels: [], totalCount: 0 };
+
+  const result = driverOptionGroups.reduce<string[][]>(
+    (a, b) => a.flatMap((d) => b.map((e) => [...d, e])),
+    [[]]
+  );
+
+  const labels = result.map((combination) => combination.join(" / "));
+  return { labels, totalCount: labels.length };
+}
+
 
 export function ProductGroupForm({ brands, categories, attributes, initialData }: ProductGroupFormProps) {
   const router = useRouter();
@@ -62,6 +90,9 @@ export function ProductGroupForm({ brands, categories, attributes, initialData }
 
   // State to manage the attribute value selection dialog
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [confirmDialogOpen, setConfirmDialogOpen] = useState<boolean>(false);
+  const [formPayload, setFormPayload] = useState<ProductGroupInput | null>(null);
+
   const [activeOptionIndex, setActiveOptionIndex] = useState<number | null>(null);
   const [selectedAttributeGroup, setSelectedAttributeGroup] = useState<AttributeGroup | null>(null);
   const [pendingSelections, setPendingSelections] = useState<string[]>([]);
@@ -81,6 +112,8 @@ export function ProductGroupForm({ brands, categories, attributes, initialData }
     defaultValues: initialData || {
       id: initialData?.id,
       name: "",
+      skuPattern: initialData?.skuPattern ?? "[BRAND]-[VAL_1]-[VAL_2]-[INDEX]",
+      skuSeparator: "-",
       description: "",
       brandId: "",
       categoryId: "",
@@ -91,7 +124,7 @@ export function ProductGroupForm({ brands, categories, attributes, initialData }
         name: option.name,
         attributeId: option.attributeId ?? "",
         isDriver: option.isDriver ?? false,
-        values: option.values?.map((v: any) => ({ value: v.value })) ?? [],
+        values: option.values?.map((v: any) => ({ value: v.value, isSkuDriver: v.isSkuDriver ?? true })) ?? [],
       })) ?? [],
       variants: initialData?.variants ?? [],
     },
@@ -132,6 +165,8 @@ export function ProductGroupForm({ brands, categories, attributes, initialData }
     reset({
       id: initialData?.id,
       name: initialData.name,
+      skuPattern: initialData?.skuPattern ?? "[BRAND]-[VAL_1]-[VAL_2]-[INDEX]",
+      skuSeparator: "-",
       categoryId: initialData.categoryId,
       brandId: initialData.brandId,
       isActive: initialData.isActive,
@@ -141,7 +176,7 @@ export function ProductGroupForm({ brands, categories, attributes, initialData }
         name: option.name,
         attributeId: option.attributeId ?? "",
         isDriver: option.isDriver ?? false,
-        values: option.values?.map((v: any) => ({ value: v.value })) ?? [],
+        values: option.values?.map((v: any) => ({ value: v.value, isSkuDriver: v.isSkuDriver ?? true})) ?? [],
       })) ?? [],
       variants: initialData.variants ?? [],
     });
@@ -172,7 +207,7 @@ export function ProductGroupForm({ brands, categories, attributes, initialData }
       setValue(`options.${activeOptionIndex}.attributeId`, selectedAttributeGroup.attributeId);
       setValue(`options.${activeOptionIndex}.name`, selectedAttributeGroup.name);
       
-      const mappedValues = pendingSelections.map(val => ({ value: val }));
+      const mappedValues = pendingSelections.map(val => ({ value: val, isSkuDriver: true }));
       setValue(`options.${activeOptionIndex}.values`, mappedValues);
     }
     setDialogOpen(false);
@@ -186,22 +221,68 @@ export function ProductGroupForm({ brands, categories, attributes, initialData }
     );
   };
 
+  // Stage A: Form Level Interception & Validation
   const onSubmit = async (values: ProductGroupInput) => {
+    // 1. Run your existing structural validation checks
     const customCollisions = values.options.filter(opt => {
-    const isCustom = !opt.attributeId || opt.attributeId === "custom";
+      const isCustom = !opt.attributeId || opt.attributeId === "custom-literal-mode";
       return isCustom && attributes.some(g => g.name.toLowerCase() === opt.name.toLowerCase());
     });
 
     if (customCollisions.length > 0) {
-      // Treat as error or alert block execution
+      toast.error("Naming Conflict", { 
+        description: "Custom attribute names cannot match global system types." 
+      });
       return;
     }
-    
+
+    // 2. Count active drivers across all options arrays
+    const totalSkuDriversCount = values.options.reduce((acc, opt) => {
+      // If the whole attribute row is not a driver, ignore its values entirely
+      if (!opt.isDriver) return acc; 
+      
+      const activeValuesInOption = (opt.values || []).filter(v => v.isSkuDriver ?? true);
+      return acc + activeValuesInOption.length;
+    }, 0);
+
+    // 3. Conditional Modal Routing Logic
+    if (totalSkuDriversCount > 0) {
+      // 🎯 Case A: Drivers exist. Freeze the payload state and trigger the shadcn preview dialog
+      setFormPayload(values);
+      setConfirmDialogOpen(true);
+    } else {
+      // 🎯 Case B: No active generation drivers found. Fast-track straight to database execution
+      try {
+        const response = await fetch("/api/admin/groups", {
+          method: isEditMode ? "PATCH" : "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(values),
+        });
+
+        if (!response.ok) {
+          const errPayload = await response.json();
+          throw new Error(errPayload.error || "Execution error posting grouped catalog lines.");
+        }
+
+        toast.success(isEditMode ? "Product collection modifications saved" : "Standard product grouping registered");
+        router.push("/dashboard/groups");
+        router.refresh();
+      } catch (err: any) {
+        toast.error("Pipeline Sync Interrupted", { description: err.message });
+      } 
+    }
+  };
+
+  // Stage B: Secure Transaction Push Triggered from inside Modal Layout
+  const executeDatabaseWrite = async () => {
+    if (!formPayload) return;
+    setConfirmDialogOpen(false); // Close modal cleanly
+
     try {
       const response = await fetch("/api/admin/groups", {
         method: isEditMode ? "PATCH" : "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(values),
+        body: JSON.stringify(formPayload),
       });
 
       if (!response.ok) {
@@ -214,8 +295,41 @@ export function ProductGroupForm({ brands, categories, attributes, initialData }
       router.refresh();
     } catch (err: any) {
       toast.error("Pipeline Sync Interrupted", { description: err.message });
+    } finally {
+      setFormPayload(null);
     }
   };
+
+  // const onSubmit = async (values: ProductGroupInput) => {
+  //   const customCollisions = values.options.filter(opt => {
+  //   const isCustom = !opt.attributeId || opt.attributeId === "custom";
+  //     return isCustom && attributes.some(g => g.name.toLowerCase() === opt.name.toLowerCase());
+  //   });
+
+  //   if (customCollisions.length > 0) {
+  //     // Treat as error or alert block execution
+  //     return;
+  //   }
+    
+  //   try {
+  //     const response = await fetch("/api/admin/groups", {
+  //       method: isEditMode ? "PATCH" : "POST",
+  //       headers: { "Content-Type": "application/json" },
+  //       body: JSON.stringify(values),
+  //     });
+
+  //     if (!response.ok) {
+  //       const errPayload = await response.json();
+  //       throw new Error(errPayload.error || "Execution error posting grouped catalog lines.");
+  //     }
+
+  //     toast.success(isEditMode ? "Product collection modifications saved" : "Matrix product grouping registered");
+  //     router.push("/dashboard/groups");
+  //     router.refresh();
+  //   } catch (err: any) {
+  //     toast.error("Pipeline Sync Interrupted", { description: err.message });
+  //   }
+  // };
 
   return (
     <>
@@ -255,7 +369,25 @@ export function ProductGroupForm({ brands, categories, attributes, initialData }
               </div>
             </Field>
 
-            <Field>
+            <Field className="md:col-span-1">
+              <FieldLabel>Manufacturer / Brand Assignment</FieldLabel>
+              <Controller
+                name="brandId"
+                control={control}
+                render={({ field }) => <BrandSelect value={field.value ?? undefined} onChange={field.onChange} />}
+              />
+            </Field>
+  
+            <Field className="md:col-span-2">
+              <FieldLabel>Master Catalog Department Category</FieldLabel>
+              <Controller
+                name="categoryId"
+                control={control}
+                render={({ field }) => <CategorySelect value={field.value ?? undefined} onChange={field.onChange} />}
+              />
+            </Field>
+
+            {/* <Field>
               <FieldLabel>Brand Category Association</FieldLabel>
               <select className="w-full text-xs h-9 rounded-md border border-input bg-background px-3 shadow-xs" {...register("brandId")}>
                 <option value="">-- No explicit brand map --</option>
@@ -269,7 +401,7 @@ export function ProductGroupForm({ brands, categories, attributes, initialData }
                 <option value="">-- Choose department placement --</option>
                 {categories.map(c => <option key={c.inflowId} value={c.inflowId}>{c.name}</option>)}
               </select>
-            </Field>
+            </Field> */}
 
             <Field className="md:col-span-3">
               <FieldLabel>Collective Index Description Summary</FieldLabel>
@@ -346,171 +478,454 @@ export function ProductGroupForm({ brands, categories, attributes, initialData }
 
           <FieldSeparator />
 
-          {/* Section 2: Variant Attributes Custom Generator */}
-          <FieldSet>
-            <div className="flex justify-between items-center mb-2">
-              <div>
-                <FieldLegend>Variant Variations</FieldLegend>
-                <FieldDescription>Assign options and specify sub-variants.</FieldDescription>
-              </div>
-              <Button type="button" variant="outline" size="sm" className="gap-1.5" onClick={() => appendOption({ name: "", attributeId: "", isDriver: true, values: [] })}>
-                <Plus className="w-4 h-4" /> Add Option Attribute
-              </Button>
+          {/* 🟢 SECTION 2: Variant Attributes Custom Generator */}
+          <div className="border p-6 rounded-xl bg-background space-y-6 shadow-xs">
+            <div>
+              <h3 className="text-base font-semibold tracking-tight text-foreground flex items-center gap-2">
+                <Settings2 className="w-4 h-4 text-primary" /> Define Matrix Variant Attributes & SKU Drivers
+              </h3>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Add option configuration classes. Check the individual tag values you want to actively compile into variant products.
+              </p>
             </div>
 
-            {errors?.options?.root?.message}
+            <div className="space-y-4">
+              {optionFields.map((field, optionIndex) => {
+                const currentOption = watchedOptions[optionIndex];
+                const selectedAttributeId = currentOption?.attributeId;
+                const isCustomMode = !selectedAttributeId || selectedAttributeId === "custom-literal-mode";
+                const currentValues = currentOption?.values || [];
+                const currentValuesCount = currentValues.length;
 
-            {errors.options?.root ? (
-              <div className="p-3 mb-2 text-xs font-medium border border-destructive/20 text-destructive bg-destructive/10 rounded-lg">
-                {errors.options.root.message}
-              </div>
-            ) : errors.options && !Array.isArray(errors.options) ? (
-              <div className="p-3 mb-2 text-xs font-medium border border-destructive/20 text-destructive bg-destructive/10 rounded-lg">
-                {(errors.options as any).message}
-              </div>
-            ) : null}
-
-            <FieldGroup className="gap-4 mt-4">
-              {optionFields.map((optionField, optionIndex) => {
-                // Inside optionFields.map((optionField, optionIndex) => { ... })
-                const selectedAttributeId = watchedOptions[optionIndex]?.attributeId;
-                const isGlobalSelected = Boolean(selectedAttributeId);
-                const currentValuesCount = watchedOptions[optionIndex]?.values?.length || 0;
+                // Locate global metadata layout config if matching active selection context
+                const globalGroup = attributes.find(ga => ga.attributeId === selectedAttributeId);
 
                 return (
-                  <div key={optionField.id} className="p-5 border rounded-xl bg-card relative shadow-xs border-muted/80 space-y-4 hover:shadow-md transition-shadow">
-                    
-                    {/* Delete Option Row Action Button */}
-                    <Button 
-                      type="button" 
-                      variant="ghost" 
-                      size="icon" 
-                      className="absolute top-3 right-3 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-lg h-8 w-8" 
-                      onClick={() => removeOption(optionIndex)}
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </Button>
-
-                    {/* 📊 Top Configuration Grid Bar */}
-                    <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-start pt-2">
-                      
-                      {/* 1. Global Option Class Selector */}
-                      <Field className="md:col-span-5">
-                        <FieldLabel className="text-xs font-semibold text-foreground/80">Option Classification Source</FieldLabel>
-                        <Select
-                          value={selectedAttributeId || "custom-literal-mode"}
-                          onValueChange={(val) => handleSelectAttributeGroup(val, optionIndex)}
-                        >
-                          <SelectTrigger className="h-9 bg-background border-muted-foreground/20 focus:ring-1">
-                            <SelectValue placeholder="Match Existing Attribute" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="custom-literal-mode" className="font-medium text-amber-600 dark:text-amber-400">
-                              ✨ Custom Attribute (Standalone)
-                            </SelectItem>
-                            {attributes.map((ga) => (
-                              <SelectItem key={ga.attributeId} value={ga.attributeId}>
-                                📦 {ga.name}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                  <div 
+                    key={field.id} 
+                    className="p-4 rounded-lg border bg-muted/30 relative space-y-3 transition-colors hover:border-muted-foreground/30"
+                  >
+                    {/* Top Line Controls */}
+                    <div className="flex flex-wrap items-center justify-between gap-2 border-b pb-2">
+                      <div className="flex items-center gap-3">
+                        <span className="text-xs font-bold text-muted-foreground font-mono">
+                          #{optionIndex + 1}
+                        </span>
                         
-                        {errors.options?.[optionIndex]?.attributeId && (
-                          <span className="text-[11px] text-destructive block mt-1 font-medium animate-in fade-in-50">
-                            ⚠ {errors.options[optionIndex]?.attributeId?.message}
-                          </span>
-                        )}
-                      </Field>
-
-                      {/* 2. Dynamic Attribute Name Display OR Custom Literal Input */}
-                      <Field className="md:col-span-4">
-                        {!isGlobalSelected ? (
-                          <>
-                            <FieldLabel className="text-xs font-semibold text-foreground/80">Custom Attribute Label *</FieldLabel>
-                            <Input 
-                              placeholder="e.g., Fabric Weight, Material" 
-                              className="h-9 font-sans"
-                              {...register(`options.${optionIndex}.name`)} 
-                            />
-                          </>
-                        ) : (
-                          <>
-                            <FieldLabel className="text-xs font-semibold text-foreground/80">Configured System Attribute</FieldLabel>
-                            <button
-                              type="button"
-                              onClick={() => handleSelectAttributeGroup(selectedAttributeId, optionIndex)}
-                              className="flex items-center justify-between h-9 w-full bg-muted/40 hover:bg-muted/80 border border-dashed border-primary/30 rounded-lg px-3 text-xs font-medium text-foreground transition-all group text-left shadow-2xs cursor-pointer focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-ring"
-                            >
-                              <span className="truncate max-w-[140px] font-semibold text-primary">{watchedOptions[optionIndex]?.name || ""}</span>
-                              <span className="text-[11px] bg-blue-50 dark:bg-blue-950 text-blue-600 dark:text-blue-300 px-2 py-0.5 rounded-md font-bold flex items-center gap-1 group-hover:bg-blue-100 dark:group-hover:bg-blue-900 transition-colors shrink-0">
-                                <Sliders className="w-2.5 h-2.5" /> Modify ({currentValuesCount})
-                              </span>
-                            </button>
-                          </>
-                        )}
-
-                        {errors.options?.[optionIndex]?.name && (
-                          <span className="text-[11px] text-destructive block mt-1 font-medium animate-in fade-in-50">
-                            ⚠ {errors.options[optionIndex]?.name?.message}
-                          </span>
-                        )}
-                      </Field>
-
-                      {/* 3. Variation Driver Control Checkbox */}
-                      <Field className="md:col-span-3 h-full flex flex-col justify-end pb-1 pt-2 md:pt-0">
-                        <div className="flex items-center space-x-2.5 bg-muted/30 hover:bg-muted/50 border rounded-lg px-3 h-9 transition-colors cursor-pointer select-none">
-                          <Controller
-                            control={control}
-                            name={`options.${optionIndex}.isDriver` as const}
-                            render={({ field }) => (
-                              <Checkbox 
-                                id={`driver-${optionIndex}`} 
-                                checked={field.value ?? false} 
-                                onCheckedChange={field.onChange} 
-                                className="data-[state=checked]:bg-blue-600 data-[state=checked]:border-blue-600"
-                              />
-                            )}
+                        {/* Is Driver Switch Checkbox */}
+                        <label className="flex items-center gap-1.5 text-xs font-semibold select-none cursor-pointer">
+                          <input
+                            type="checkbox"
+                            {...register(`options.${optionIndex}.isDriver` as const)}
+                            className="rounded border-input text-primary focus:ring-primary w-3.5 h-3.5"
                           />
-                          <label htmlFor={`driver-${optionIndex}`} className="text-xs font-semibold text-muted-foreground hover:text-foreground cursor-pointer flex-1 py-2">
-                            Generate Variant SKU
-                          </label>
+                          Use in SKU Generation Formula
+                        </label>
+                      </div>
+
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 text-xs text-destructive hover:text-destructive hover:bg-destructive/10 px-2 rounded"
+                        onClick={() => removeOption(optionIndex)}
+                      >
+                        Remove Attribute
+                      </Button>
+                    </div>
+
+                    {/* Configuration Inputs row */}
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <div className="space-y-1">
+                        <label className="text-[11px] font-bold text-foreground/70 block">Select Class Type</label>
+                        <select
+                          value={selectedAttributeId || "custom-literal-mode"}
+                          onChange={(e) => handleSelectAttributeGroup(e.target.value, optionIndex)}
+                          className="w-full text-xs h-9 rounded-md border border-input bg-background px-3 font-medium"
+                        >
+                          <option value="custom-literal-mode">✨ Custom Text Input Mode</option>
+                          {attributes.map((attr) => (
+                            <option key={attr.attributeId} value={attr.attributeId}>
+                              Global: {attr.name}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div className="md:col-span-2 space-y-1">
+                        <label className="text-[11px] font-bold text-foreground/70 block">Attribute Handle / Name</label>
+                        <Input
+                          {...register(`options.${optionIndex}.name` as const)}
+                          disabled={!isCustomMode}
+                          placeholder="e.g., Color, Size, Material"
+                          className="text-xs h-9 bg-background font-medium"
+                        />
+                        {errors.options?.[optionIndex]?.name && (
+                          <span className="text-[11px] text-destructive block font-medium">
+                            {errors.options[optionIndex]?.name?.message}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* 🎯 THE VALUE COMBINATION SELECTION MATRIX (SHOWING CHIPS + MODIFY INTERFACE) */}
+                    <div className="space-y-1.5 pt-1">
+                      <div className="flex items-center justify-between">
+                        <label className="text-[11px] font-bold text-foreground/70 block">
+                          Active Attribute Generation Selections ({currentValuesCount}):
+                        </label>
+
+                        {/* Dynamic Modify Trigger for Managed/Global System Attributes */}
+                        {!isCustomMode && globalGroup && (
+                          <Button
+                            type="button"
+                            variant="secondary"
+                            className="h-6 text-[10px] font-semibold px-2 py-0 flex items-center gap-1 bg-primary/10 text-primary border border-primary/20 hover:bg-primary/20 dark:text-blue-300 dark:hover:bg-blue-900"
+                            onClick={() => handleSelectAttributeGroup(selectedAttributeId, optionIndex)}
+                          >
+                            <Sliders className="w-2.5 h-2.5" /> Modify
+                          </Button>
+                        )}
+                      </div>
+                      
+                      {isCustomMode ? (
+                        /* Custom Input Inline Value Adding Mode */
+                        <div className="space-y-2">
+                          <div className="flex gap-2">
+                            <Input
+                              id={`custom-val-input-${optionIndex}`}
+                              placeholder="Type raw value option (e.g. Small, Red, XL) then click Add"
+                              className="text-xs h-8 bg-background max-w-xs"
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter") {
+                                  e.preventDefault();
+                                  const inputEl = e.currentTarget;
+                                  const rawVal = inputEl.value.trim();
+                                  if (!rawVal) return;
+                                  
+                                  if (!currentValues.some(v => v.value.toLowerCase() === rawVal.toLowerCase())) {
+                                    setValue(`options.${optionIndex}.values`, [...currentValues, { value: rawVal, isSkuDriver: true  }]);
+                                  }
+                                  inputEl.value = "";
+                                }
+                              }}
+                            />
+                            <Button 
+                              type="button" 
+                              variant="secondary" 
+                              className="h-8 text-xs font-semibold px-3"
+                              onClick={() => {
+                                const inputEl = document.getElementById(`custom-val-input-${optionIndex}`) as HTMLInputElement;
+                                const rawVal = inputEl?.value.trim();
+                                if (!rawVal) return;
+                                
+                                if (!currentValues.some(v => v.value.toLowerCase() === rawVal.toLowerCase())) {
+                                  setValue(`options.${optionIndex}.values`, [...currentValues, { value: rawVal, isSkuDriver: true }]);
+                                }
+                                inputEl.value = "";
+                              }}
+                            >
+                              Add Value
+                            </Button>
+                          </div>
                         </div>
-                      </Field>
+                      ) : (
+                        /* ➕ ADDED: Global Attribute Mode - Inline Target Append Input Row */
+                        <div className="space-y-2">
+                          <div className="flex gap-2">
+                            <Input
+                              id={`global-val-append-input-${optionIndex}`}
+                              placeholder={`Add new tag variant directly to global ${currentOption?.name || 'attribute'}...`}
+                              className="text-xs h-8 bg-background max-w-xs border-dashed border-primary/40 focus-visible:border-solid"
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter") {
+                                  e.preventDefault();
+                                  const inputEl = e.currentTarget;
+                                  const rawVal = inputEl.value.trim();
+                                  if (!rawVal) return;
+                                  
+                                  if (!currentValues.some(v => v.value.toLowerCase() === rawVal.toLowerCase())) {
+                                    setValue(`options.${optionIndex}.values`, [...currentValues, { value: rawVal, isSkuDriver: true  }]);
+                                  }
+                                  inputEl.value = "";
+                                }
+                              }}
+                            />
+                            <Button 
+                              type="button" 
+                              variant="outline" 
+                              className="h-8 text-xs font-bold px-3 border-dashed border-primary/40 text-primary hover:bg-primary/5 shadow-xs"
+                              onClick={() => {
+                                const inputEl = document.getElementById(`global-val-append-input-${optionIndex}`) as HTMLInputElement;
+                                const rawVal = inputEl?.value.trim();
+                                if (!rawVal) return;
+                                
+                                if (!currentValues.some(v => v.value.toLowerCase() === rawVal.toLowerCase())) {
+                                  setValue(`options.${optionIndex}.values`, [...currentValues, { value: rawVal, isSkuDriver: true  }]);
+                                }
+                                inputEl.value = "";
+                              }}
+                            >
+                              Quick Append
+                            </Button>
+                          </div>
+                        </div>
+                      )}
 
-                    </div>
+                      {/* Display Current Appended Values Only */}
+                      <div className="flex flex-wrap gap-2 p-2 rounded border bg-background/50 min-h-11 items-center">
+                        {currentValuesCount > 0 ? (
+                          currentValues.map((v: any, valIdx: number) => {
+                            const isDriver = v.isSkuDriver ?? true;
+                            return (
+                              <span 
+                                key={valIdx} 
+                                className={`inline-flex items-center gap-1.5 pl-2 pr-1 py-1 rounded-md text-xs font-medium border transition-all ${
+                                  isDriver 
+                                    ? "bg-primary/10 border-primary text-primary font-semibold" 
+                                    : "bg-muted border-input text-muted-foreground line-through opacity-70"
+                                }`}
+                              >
+                                {v.value}
+                                
+                                {/* Active Driver Toggle Button Indicator */}
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const updated = [...currentValues];
+                                    updated[valIdx] = { ...updated[valIdx], isSkuDriver: !isDriver };
+                                    setValue(`options.${optionIndex}.values`, updated);
+                                  }}
+                                  className={`text-[9px] px-1 py-0.5 rounded-xs font-bold tracking-wider uppercase transition-colors select-none ${
+                                    isDriver 
+                                      ? "bg-primary text-primary-foreground hover:bg-primary/80" 
+                                      : "bg-muted-foreground/20 text-muted-foreground hover:bg-muted-foreground/30 line-normal"
+                                  }`}
+                                  title={isDriver ? "Click to exclude from variations compilation" : "Click to include in variation generation formula"}
+                                >
+                                  {isDriver ? "SKU" : "Skip"}
+                                </button>
 
-                    {/* ⚠ Empty State Warning Prompt */}
-                    {isGlobalSelected && currentValuesCount === 0 && (
-                      <div className="bg-amber-50/50 dark:bg-amber-950/10 border border-amber-200/60 text-amber-800 dark:text-amber-300 rounded-lg p-2.5 text-[11px] flex items-center gap-2 animate-in slide-in-from-top-1 duration-200">
-                        <AlertCircle className="w-3.5 h-3.5 text-amber-600 shrink-0" />
-                        <span>This option class has no active variations loaded. Click <b>"Modify"</b> to inject values into the grid matrix.</span>
+                                {/* Remove Value Tag */}
+                                <button
+                                  type="button"
+                                  className="text-muted-foreground hover:text-destructive font-bold text-[11px] px-0.5"
+                                  onClick={() => {
+                                    const filtered = currentValues.filter((_, idx) => idx !== valIdx);
+                                    setValue(`options.${optionIndex}.values`, filtered);
+                                  }}
+                                >
+                                  ✕
+                                </button>
+                              </span>
+                            );
+                          })
+                        ) : (
+                          <span className="text-[11px] text-muted-foreground italic self-center pl-1">
+                            No structural parameters configured. Enter custom terms or map a global attribute above.
+                          </span>
+                        )}
                       </div>
-                    )}
 
-                    {/* Sub-values tag injection ledger container */}
-                    <div className="space-y-1.5 border-t border-dashed pt-3 mt-1">
-                      <div className="flex justify-between items-center">
-                        <FieldLabel className="text-xs font-bold text-foreground/70">Selected Option Tags Matrix</FieldLabel>
-                      </div>
-                      <ValuesSubArray optionIndex={optionIndex} control={control} register={register} errors={errors} />
+                      {errors.options?.[optionIndex]?.values && (
+                        <span className="text-[11px] text-destructive block font-medium">
+                          ⚠ {errors.options[optionIndex]?.values?.message}
+                        </span>
+                      )}
                     </div>
-
                   </div>
                 );
               })}
-            </FieldGroup>
-          </FieldSet>
 
-          <FieldSeparator />
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="w-full h-9 border-dashed text-xs font-semibold gap-1.5"
+                onClick={() => appendOption({ name: "", attributeId: "", isDriver: true, values: [] })}
+              >
+                ➕ Add New Attribute Dimension Row
+              </Button>
+            </div>
+          </div>
+
+
+          {/* 🏷️ SECTION 2.5: Dynamic SKU Generation Configuration Panel */}
+          {watchedOptions.filter((o) => o.isDriver && o.name).length > 0 && (
+            <>
+              <FieldSeparator />
+
+              <FieldSet className="border p-5 rounded-xl bg-muted/20 space-y-4">
+                <div>
+                  <FieldLegend className="text-sm font-semibold flex items-center gap-2">
+                    <Barcode className="w-4 h-4 text-primary" /> Automated Variant SKU Compiler Rules
+                  </FieldLegend>
+                  <FieldDescription>
+                    Design your dynamic variant SKU templates by mixing standard syntax layout strings with active option tokens.
+                  </FieldDescription>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
+                  {/* Formula Template Input */}
+                  <div className="md:col-span-2 space-y-2">
+                    <FieldLabel className="text-xs font-semibold text-foreground/80">SKU Construction Formula Structure</FieldLabel>
+                    <Input 
+                      {...register("skuPattern")} 
+                      placeholder="e.g., [PARENT_SKU]-[COLOR]-[SIZE]" 
+                      className="font-mono bg-background text-xs h-9"
+                    />
+                    {errors.skuPattern && (
+                      <span className="text-xs text-destructive block mt-1 font-medium">
+                        ⚠ {errors.skuPattern.message}
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Separator Selection Field */}
+                  <div className="space-y-2">
+                    <FieldLabel className="text-xs font-semibold text-foreground/80 font-sans">Default Token Separator</FieldLabel>
+                    <select 
+                      {...register("skuSeparator")}
+                      className="w-full text-xs h-9 rounded-md border border-input bg-background px-3 shadow-xs font-medium cursor-pointer"
+                    >
+                      <option value="-">Hyphen ( - )</option>
+                      <option value="_">Underscore ( _ )</option>
+                      <option value="/">Slash ( / )</option>
+                      <option value="">No Separator (Concatenation)</option>
+                    </select>
+                  </div>
+                </div>
+
+                {/* Dynamic Action Trigger Token Row */}
+                <div className="space-y-1.5">
+                  <span className="text-[11px] font-semibold text-muted-foreground block">
+                    Available Layout Syntax Tokens (Click to append at cursor position):
+                  </span>
+                  <div className="flex flex-wrap gap-1.5">
+                    {/* Parent SKU Token */}
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="h-6 text-[10px] font-mono border-dashed bg-background font-semibold"
+                      onClick={() => {
+                        const current = watch("skuPattern") || "";
+                        const sep = current ? watch("skuSeparator") || "" : "";
+                        setValue("skuPattern", current + sep + "[PARENT_SKU]");
+                      }}
+                    >
+                      [PARENT_SKU]
+                    </Button>
+
+                    {/* Brand Token */}
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="h-6 text-[10px] font-mono border-dashed bg-background font-semibold text-emerald-600 dark:text-emerald-400"
+                      onClick={() => {
+                        const current = watch("skuPattern") || "";
+                        const sep = current ? watch("skuSeparator") || "" : "";
+                        setValue("skuPattern", current + sep + "[BRAND]");
+                      }}
+                    >
+                      [BRAND]
+                    </Button>
+
+                    {/* 🎯 ADDED: Auto-Increment Index Token */}
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="h-6 text-[10px] font-mono border-dashed bg-background font-semibold text-amber-600 dark:text-amber-400"
+                      onClick={() => {
+                        const current = watch("skuPattern") || "";
+                        const sep = current ? watch("skuSeparator") || "" : "";
+                        setValue("skuPattern", current + sep + "[INDEX]");
+                      }}
+                    >
+                      [INDEX]
+                    </Button>
+                    
+                    {/* Map every custom or system option checking driver boxes */}
+                    {watchedOptions
+                      .filter((opt) => opt.isDriver && opt.name?.trim())
+                      .map((opt, idx) => {
+                        const tokenStr = `[${opt.name.trim().toUpperCase().replace(/\s+/g, "_")}]`;
+                        return (
+                          <Button
+                            key={idx}
+                            type="button"
+                            variant="secondary"
+                            size="sm"
+                            className="h-6 text-[10px] font-mono bg-blue-500/10 hover:bg-blue-500/20 text-blue-600 dark:text-blue-400 font-bold"
+                            onClick={() => {
+                              const current = watch("skuPattern") || "";
+                              const sep = current ? watch("skuSeparator") || "" : "";
+                              setValue("skuPattern", current + sep + tokenStr);
+                            }}
+                          >
+                            {tokenStr}
+                          </Button>
+                        );
+                      })}
+                  </div>
+                </div>
+
+                {/* Real-Time Live Sandbox Engine Preview Component */}
+                {(() => {
+                  const parentMock = watch("name") 
+                    ? watch("name").toUpperCase().substring(0, 6).replace(/\s+/g, "") + "-100" 
+                    : "PARENT";
+                    
+                  const activeBrandId = watch("brandId");
+                  const activeBrandItem = brands.find(b => b.id === activeBrandId);
+                  const brandMock = activeBrandItem 
+                    ? activeBrandItem.name.toUpperCase().substring(0, 3).replace(/\s+/g, "") 
+                    : "BRD";
+
+                  const pattern = watch("skuPattern") || "";
+                  
+                  // 🎯 Swap static placeholders, including our new sequential index preview mockup
+                  let previewCompiled = pattern
+                    .replace("[PARENT_SKU]", parentMock)
+                    .replace("[BRAND]", brandMock)
+                    .replace("[INDEX]", "001"); // Mocking the first increment sequence row
+                  
+                  // Handle dynamic variant parameter selections loop
+                  watchedOptions.forEach((opt) => {
+                    if (opt.isDriver && opt.name) {
+                      const targetToken = `[${opt.name.trim().toUpperCase().replace(/\s+/g, "_")}]`;
+                      const fallbackVal = opt.values?.[0]?.value || "XYZ";
+                      previewCompiled = previewCompiled.split(targetToken).join(fallbackVal.toUpperCase().replace(/\s+/g, ""));
+                    }
+                  });
+
+                  return (
+                    <div className="p-3 rounded-lg border bg-background text-[11px] font-mono flex items-center justify-between text-muted-foreground shadow-2xs">
+                      <span className="font-sans font-medium">Dynamic Live Output Preview:</span>
+                      <span className="font-bold text-primary bg-primary/5 px-2.5 py-1 rounded border border-primary/20 tracking-wider">
+                        {previewCompiled || "EMPTY_TEMPLATE"}
+                      </span>
+                    </div>
+                  );
+                })()}
+              </FieldSet>
+            </>
+          )}
+
 
           {/* 🟢 SECTION 3: Live Matrix Variance Lifecycle Row Management */}
           {watch("variants")?.length > 0 && (
-            <VariantsManagerTable 
-              control={control} 
-              register={register} 
-              watch={watch} 
-            />
+            <>
+              <FieldSeparator />
+
+              <VariantsManagerTable 
+                control={control} 
+                register={register} 
+                watch={watch} 
+              />
+            </>
           )}
 
           <div className="flex items-center justify-between border-t pt-4">
@@ -522,6 +937,80 @@ export function ProductGroupForm({ brands, categories, attributes, initialData }
             </Button>
           </div>
         </FieldGroup>
+
+
+        {/* 📦 SHADCN DYNAMIC COMPILATION REVIEW DIALOG */}
+        <Dialog open={confirmDialogOpen} onOpenChange={setConfirmDialogOpen}>
+          <DialogContent className="md:max-w-[480px]">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2 text-base">
+                <Layers className="w-4 h-4 text-primary" /> Matrix Compilation Pipeline Review
+              </DialogTitle>
+              <DialogDescription className="text-xs">
+                Review the simulated cross-product results before executing relational transaction layers in the core database.
+              </DialogDescription>
+            </DialogHeader>
+
+            {formPayload && (() => {
+              const { labels, totalCount } = computeLocalCartesianCount(formPayload.options);
+              const sampleLimit = 5;
+
+              return (
+                <div className="space-y-4 py-2">
+                  {/* Summary Metric Strip */}
+                  <div className="p-3 bg-muted/40 rounded-lg border flex items-center justify-between text-xs">
+                    <span className="font-medium text-muted-foreground">Calculated Child Variations:</span>
+                    <span className="font-bold text-sm text-primary px-2 py-0.5 bg-primary/10 rounded border border-primary/20">
+                      {totalCount} Products
+                    </span>
+                  </div>
+
+                  {/* Combinations Live List Area */}
+                  {totalCount > 0 ? (
+                    <div className="space-y-1.5">
+                      <span className="text-[11px] font-bold text-foreground/70 block">
+                        Upstream Naming Matrix Sneak-Peek (Showing first {Math.min(totalCount, sampleLimit)}):
+                      </span>
+                      <div className="max-h-[180px] overflow-y-auto border rounded-lg p-2 bg-background font-mono text-[11px] text-muted-foreground divide-y divide-border/40">
+                        {labels.slice(0, sampleLimit).map((label, idx) => (
+                          <div key={idx} className="py-1 first:pt-0 last:pb-0 truncate">
+                            • {formPayload.name || "Unnamed"} ({label})
+                          </div>
+                        ))}
+                        {labels.length > sampleLimit && (
+                          <div className="pt-1.5 text-[10px] italic text-primary font-sans">
+                            ...and {labels.length - sampleLimit} additional variant paths queued for generation.
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="p-3 border border-dashed rounded-lg bg-amber-500/5 text-amber-600 dark:text-amber-400 text-xs font-medium">
+                      ⚠ No values are currently checked as SKU generation drivers. This operation will register structural option keys only, without child item balances.
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
+
+            <DialogFooter className="gap-2 sm:gap-0">
+              <DialogClose asChild>
+                <Button type="button" variant="ghost" size="sm" className="text-xs font-semibold h-9">
+                  Cancel & Edit
+                </Button>
+              </DialogClose>
+              <Button 
+                type="button" 
+                size="sm" 
+                onClick={executeDatabaseWrite} 
+                disabled={isSubmitting}
+                className="text-xs font-semibold h-9 px-4 shadow-sm"
+              >
+                {isSubmitting ? "Generating..." : "Confirm & Write Matrix"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </form>
 
       {/* GLOBAL ATTRIBUTE VALUES CHECKBOX DIALOG */}
@@ -575,44 +1064,6 @@ export function ProductGroupForm({ brands, categories, attributes, initialData }
         </DialogContent>
       </Dialog>
     </>
-  );
-}
-
-function ValuesSubArray({ optionIndex, control, register, errors }: { optionIndex: number, control: any, register: any, errors: any }) {
-  const { fields, append, remove } = useFieldArray({
-    control,
-    name: `options.${optionIndex}.values`,
-  });
-
-  return (
-    <div className="flex flex-wrap gap-2 items-center min-h-[40px] p-2 border rounded-lg bg-background/50">
-      {fields.map((field, valIndex) => (
-        <div key={field.id} className="flex items-center gap-1 bg-muted border rounded-md pl-2 pr-1 py-1 shadow-sm transition-all focus-within:ring-1 focus-within:ring-ring">
-          <input
-            className="bg-transparent text-sm focus:outline-none w-20 sm:w-24 font-medium"
-            placeholder="Value..."
-            {...register(`options.${optionIndex}.values.${valIndex}.value`)}
-          />
-          <button type="button" onClick={() => remove(valIndex)} className="text-muted-foreground hover:text-destructive p-0.5 rounded transition-colors">
-            <X className="w-3 h-3" />
-          </button>
-        </div>
-      ))}
-      
-      <Button
-        type="button"
-        variant="outline"
-        size="sm"
-        className="h-8 px-2.5 border-dashed gap-1 text-xs hover:bg-background"
-        onClick={() => append({ value: "" })}
-      >
-        <Plus className="w-3 h-3" /> Add Value
-      </Button>
-      
-      {errors.options?.[optionIndex]?.values?.message && (
-        <p className="text-xs text-destructive block w-full mt-1">{errors.options[optionIndex]?.values?.message}</p>
-      )}
-    </div>
   );
 }
 

@@ -444,7 +444,7 @@ export function ProductForm({  brands, uoms, initialData, groups: productGroups 
             </div>
           )}
 
-          <Field className="md:col-span-2">
+          <Field className="md:col-span-1">
             <FieldLabel>Manufacturer / Brand Assignment</FieldLabel>
             <Controller
               name="brandId"
@@ -453,7 +453,7 @@ export function ProductForm({  brands, uoms, initialData, groups: productGroups 
             />
           </Field>
 
-          <Field className="md:col-span-2">
+          <Field className="md:col-span-1">
             <FieldLabel>Master Catalog Department Category</FieldLabel>
             <Controller
               name="categoryId"

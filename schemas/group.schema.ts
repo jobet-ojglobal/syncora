@@ -10,6 +10,10 @@ export const createProductGroupSchema = (globalAttributes: GlobalAttributeLookup
   return z.object({
     id: z.string().optional(),
     name: z.string().min(1, "Product group designation name is required"),
+    skuPattern: z
+      .string()
+      .min(1, "SKU template formula structure cannot be empty"),
+    skuSeparator: z.string(),
     description: z.string().nullable().optional(),
     brandId: z.string().nullable().optional().or(z.literal("")),
     categoryId: z.string().nullable().optional().or(z.literal("")),
@@ -29,6 +33,7 @@ export const createProductGroupSchema = (globalAttributes: GlobalAttributeLookup
         values: z.array(
           z.object({
             value: z.string().min(1, "Value cannot be empty"),
+            isSkuDriver: z.boolean(),
           })
         ).min(1, "At least one tag value is required for this option"),
       })
@@ -52,6 +57,16 @@ export const createProductGroupSchema = (globalAttributes: GlobalAttributeLookup
 
     // Lowercase names of global attributes for case-insensitive matching
     const globalNamesLower = globalAttributes.map(attr => attr.name.toLowerCase());
+
+    if (data.options.some(opt => opt.isDriver)) {
+      if (data.skuPattern && !data.skuPattern.includes("[BRAND]")) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "Your SKU template layout must contain the '[BRAND]' anchor variable tag.",
+          path: ["skuPattern"],
+        });
+      }  
+    }
 
     data.options.forEach((option, index) => {
       const normalizedName = option.name.trim().toLowerCase();

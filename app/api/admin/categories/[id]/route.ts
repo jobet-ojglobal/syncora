@@ -58,8 +58,8 @@ export async function DELETE(
     return NextResponse.json({
       success: true,
     });
-  } catch (error) {
+  } catch (error: any) {
     console.error(error);
-    return NextResponse.json({ error: "Failed to delete category" }, { status: 500 });
+    return NextResponse.json({ error: error.message || "Failed to delete category" }, { status: 500 });
   }
 }

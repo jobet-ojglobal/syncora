@@ -300,6 +300,26 @@ export interface InflowProductLocationSublocation {
 }
 
 
+//  TEAM MEMBERS
+
+export interface InflowTeamMember {
+  teamMemberId: string;
+  accessAllLocations: boolean;
+  accessLocationIds: string[];
+  accessRights: string[];
+  canBeSalesRep: boolean;
+  email: string;
+  isActive: boolean;
+  name: string;
+}
+
+export interface InflowTeamMembersResponse {
+  success: boolean;
+  message: string;
+  data: InflowTeamMember[];
+}
+
+
 // ======= INFLOW INTEGRATIONS 
 
 // import { 
