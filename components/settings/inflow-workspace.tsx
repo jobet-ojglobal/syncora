@@ -182,11 +182,20 @@ const InflowWorkspace = () => {
                 <CardTitle>Batch Diagnostics</CardTitle>
                 <CardDescription>Force historical inventory execution sweeps manually.</CardDescription>
               </CardHeader>
-              <CardContent className="space-y-4 pt-0">
-                <SyncButton source="products" title="Sync Entire Catalog" />
-                <SyncButton source="categories" title="Sync Categories" />
-                <SyncButton source="inventory" title="Sync Inventory" />
-                <SyncButton source="customers" title="Sync All Customers" />
+              <CardContent className="space-y-4 pt-0 max-h-[300px] overflow-y-auto">
+                <SyncButton source="products" title="Products" />
+                <SyncButton source="categories" title="Categories" />
+                <SyncButton source="inventory" title="Inventory" />
+                <SyncButton source="team_members" title="Team Members" />
+                <SyncButton source="taxing_schemes" title="Taxing Schemes" />
+                <SyncButton source="currencies" title="Currencies" />
+                <SyncButton source="adjustment_reasons" title="Adjustment Reasons" />
+                <SyncButton source="pricing_schemes" title="Pricing Schemes" />
+                <SyncButton source="payment_terms" title="Payment Terms" />
+                <SyncButton source="product_cost_adjustments" title="Product Cost Adjustments" />
+                <SyncButton source="customers" title="Customers" />
+
+                
               </CardContent>
             </Card>
 

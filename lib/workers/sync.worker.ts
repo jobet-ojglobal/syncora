@@ -10,6 +10,13 @@ import { CustomerSyncService } from "@/lib/inflow/services/customer-sync.service
 import { InventorySyncService } from "@/lib/inflow/services/inventory-sync.service";
 import { LocationSyncService } from "@/lib/inflow/services/location-sync.service";
 import { CategorySyncService } from "../inflow/services/category-sync.service";
+import { TeamMemberSyncService } from "../inflow/services/team-members-sync.service";
+import { TaxingSchemeSyncService } from "../inflow/services/taxing-scheme-sync.service";
+import { CurrencySyncService } from "../inflow/services/currency-sync.service";
+import { AdjustmentReasonSyncService } from "../inflow/services/adjustment-sync.service";
+import { PricingSchemeSyncService } from "../inflow/services/pricing-scheme-syn.service";
+import { ProductCostAdjustmentSyncService } from "../inflow/services/product-cost-adjustment-sync.service";
+import { PaymentTermSyncService } from "../inflow/services/payment-term-sync.service";
 
 const testService = new TestSyncService();
 const categoryService = new CategorySyncService();
@@ -17,6 +24,13 @@ const productService = new ProductSyncService();
 const customerService = new CustomerSyncService();
 const inventoryService = new InventorySyncService();
 const locationService = new LocationSyncService();
+const teamMemberService = new TeamMemberSyncService();
+const taxingSchemeService = new TaxingSchemeSyncService();
+const currencyService = new CurrencySyncService();
+const adjustmentReasonService = new AdjustmentReasonSyncService();
+const pricingSchemeService = new PricingSchemeSyncService();
+const productCostAdjustmentService = new ProductCostAdjustmentSyncService();
+const paymentTermService = new PaymentTermSyncService();
 
 
 type SyncOptions = {
@@ -54,7 +68,7 @@ const worker = new Worker(
 
       switch (source) {
          case "categories":
-          result = await categoryService.sync();
+          result = await categoryService.sync(syncOptions);
           break;
 
         case "products":
@@ -62,7 +76,7 @@ const worker = new Worker(
           break;
 
         case "customers":
-          result = await customerService.sync();
+          result = await customerService.sync(syncOptions);
           break;
 
         case "inventory":
@@ -71,6 +85,34 @@ const worker = new Worker(
         
         case "locations":
           result = await locationService.sync(syncOptions);
+          break;
+
+        case "team_members":
+          result = await teamMemberService.sync(syncOptions);
+          break;
+        
+        case "taxing_schemes":
+          result = await taxingSchemeService.sync(syncOptions);
+          break;
+        
+        case "currencies":
+          result = await currencyService.sync(syncOptions);
+          break;
+
+        case "pricing_schemes":
+          result = await pricingSchemeService.sync(syncOptions);
+          break;
+
+        case "payment_terms":
+          result = await paymentTermService.sync(syncOptions);
+          break;
+
+        case "adjustment_reasons":
+          result = await adjustmentReasonService.sync(syncOptions);
+          break;
+
+        case "product_cost_adjustments":
+          result = await productCostAdjustmentService.sync(syncOptions);
           break;
         
         case "test":

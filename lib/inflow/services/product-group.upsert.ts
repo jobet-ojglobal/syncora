@@ -159,11 +159,11 @@ export async function createProductGroupToInflow(input: CreateProductGroupInput)
     productVariants: computedVariants,
   };
 
-  const inflowProductGroupResponse = await upsertProductGroup(inflowPayload);
+  const inflowProductGroup = await upsertProductGroup(inflowPayload);
 
   // 3. Sync data locally
   const localDbRecord = await prisma.$transaction(async (tx) => {
-    const targetProductGroup = await getProductGroup(inflowProductGroupResponse.productGroupId);
+    const targetProductGroup = await getProductGroup(inflowProductGroup.productGroupId);
     targetProductGroup.category ? await syncCategory(tx, targetProductGroup.category) : null;
     await syncProductGroup(tx, targetProductGroup, targetProductGroup.defaultProduct);
     return targetProductGroup;
@@ -298,12 +298,12 @@ export async function createProductGroupToInflow(input: CreateProductGroupInput)
 //   };
 
 //   // 4. Send PUT request out to the API
-//   const inflowProductGroupResponse = await upsertProductGroup(inflowPayload);
+//   const inflowProductGroup = await upsertProductGroup(inflowPayload);
 
 //   // 5. Save locally using a single database transaction context wrapper
 //   const localDbRecord = await prisma.$transaction(async (tx) => {
 //     // Read clean server response object mapping from remote
-//     const targetProductGroup = await getProductGroup(inflowProductGroupResponse.productGroupId);
+//     const targetProductGroup = await getProductGroup(inflowProductGroup.productGroupId);
     
 //     // Execute data sync mutations across tables
 //     await syncProductGroup(tx, targetProductGroup);

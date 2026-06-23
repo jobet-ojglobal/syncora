@@ -1,13 +1,19 @@
 import { inflow } from "@/lib/inflow/inflow.client";
+import { InflowTaxingScheme } from "../types";
 
 export async function getTaxingSchemes() {
-  return inflow.get("/taxing-schemes");
+  const response =
+    await inflow.get<InflowTaxingScheme[]>(
+      "/taxing-schemes?include=taxCodes"
+    );
+
+  return response;
 }
 
 export async function getTaxingScheme(taxSchemeId: string) {
-  return inflow.get(`/taxing-schemes/${taxSchemeId}`);
+  return inflow.get<InflowTaxingScheme>(`/taxing-schemes/${taxSchemeId}`);
 }
 
 export async function upsertTaxingScheme(payload: any) {
-  return inflow.put(`/taxing-schemes`, payload);
+  return inflow.put<InflowTaxingScheme>(`/taxing-schemes`, payload);
 }

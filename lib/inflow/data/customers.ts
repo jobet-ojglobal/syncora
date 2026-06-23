@@ -1,25 +1,38 @@
 import { inflow } from "@/lib/inflow/inflow.client";
+import { InflowCustomer } from "../types";
 
-export async function getCustomers() {
-  return inflow.get("/customers");
+export async function getCustomers(
+  count = 100,
+  after?: string
+) {
+  const params = new URLSearchParams({
+    count: String(count),
+    include: "addresses,balances,credits,defaultBillingAddress,defaultLocation,defaultPaymentTerms,defaultSalesRepTeamMember,defaultShippingAddress,dues,lastModifiedBy,pricingScheme,taxingScheme",
+  });
+
+  if (after) {
+    params.append("after", after);
+  }
+
+ return await inflow.get<InflowCustomer[]>(
+    `/customers?${params.toString()}`
+  );
 }
 
 export async function getCustomer(customerId: string) {
-  return inflow.get(
+  return inflow.get<InflowCustomer>(
     `/customers/${customerId}`
   );
 }
 
-export async function createCustomer(data: any) {
-  return inflow.post("/customers", data);
-}
-
-export async function updateCustomer(
+export async function upsertCustomer(
   customerId: string,
   data: any
 ) {
-  return inflow.put(
+  return await inflow.put<InflowCustomer>(
     `/customers/${customerId}`,
     data
   );
 }
+
+

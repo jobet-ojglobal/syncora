@@ -135,7 +135,7 @@ export default function AdminServerSideProductsPage() {
   }
 
   return (
-    <div className="w-full max-w-7xl mx-auto py-6 space-y-6">
+    <div className="w-full max-w-7xl mx-auto  p-6  space-y-6">
       <PageHeader 
         className=" border-b pb-5" 
         title="Master Product Catalog" 

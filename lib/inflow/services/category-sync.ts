@@ -1,4 +1,4 @@
-import { generateSlug } from "@/helpers/genUniqueSlug";
+import { genInflowUniqueSlug } from "@/helpers/genUniqueSlug";
 import { InflowCategory } from "../types";
 
 export async function syncCategory(
@@ -8,7 +8,11 @@ export async function syncCategory(
   if (!category) return;
 
   let parentId: string | null = null;
-  const slug = generateSlug(category.name);
+  const slug = await genInflowUniqueSlug(
+    category.name, 
+    tx.category,
+    category.categoryId
+  );
 
   if (category.parentCategoryId) {
     const parent = await tx.category.findUnique({
@@ -30,15 +34,11 @@ export async function syncCategory(
       inflowId: category.categoryId,
       name: category.name,
       slug,
-      // isDefault: category.isDefault,
-      // timestamp: category.timestamp,
       parentId,
     },
     update: {
       name: category.name,
       slug,
-      // isDefault: category.isDefault,
-      // timestamp: category.timestamp,
       parentId,
     },
   });

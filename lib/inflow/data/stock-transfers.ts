@@ -12,10 +12,10 @@ export async function getStockTransfer(
   );
 }
 
-export async function createStockTransfer(
+export async function upsertStockTransfer(
   data: any
 ) {
-  return inflow.post(
+  return await inflow.put(
     "/stock-transfers",
     data
   );

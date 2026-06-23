@@ -1,5 +1,5 @@
 import { Prisma } from "@/generated/prisma/client";
-import { InflowProduct, InflowProductGroupResponse } from "../types";
+import { InflowProduct, InflowProductGroup } from "../types";
 import { syncBrand, syncGroupFeatures, syncGroupImages, syncGroupTags } from "./helpers";
 import { genInflowUniqueSlug } from "@/helpers/genUniqueSlug";
 
@@ -7,7 +7,7 @@ type Tx = Prisma.TransactionClient;
 
 export async function syncProductGroup(
   tx: Tx,
-  group: InflowProductGroupResponse,
+  group: InflowProductGroup,
   firstProductInGroup?: InflowProduct // Pass the base product object to grab its customFields brand name
 ) {
 

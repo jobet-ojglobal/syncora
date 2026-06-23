@@ -1,9 +1,15 @@
 import { inflow } from "@/lib/inflow/inflow.client";
+import { InflowTaxCode } from "../types";
 
 export async function getTaxCodes() {
-  return inflow.get("/tax-codes");
+  const response =
+    await inflow.get<InflowTaxCode[]>(
+      "/tax-codes"
+    );
+
+  return response;
 }
 
 export async function getTaxCode(taxID: string) {
-  return inflow.get(`/tax-codes/${taxID}`);
+  return inflow.get<InflowTaxCode>(`/tax-codes/${taxID}`);
 }

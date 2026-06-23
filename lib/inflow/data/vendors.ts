@@ -1,13 +1,26 @@
-import { inflow } from "@/lib/inflow/inflow.client";
+// import { inflow } from "@/lib/inflow/inflow.client";
 
-export async function getVendors() {
-  return inflow.get("/vendors");
-}
+// export async function getVendors( count = 100,
+//   after?: string
+// ) {
+//   const params = new URLSearchParams({
+//     count: String(count),
+//   });
 
-export async function getVendor(vendorId: string) {
-  return inflow.get(`/vendors/${vendorId}`);
-}
+//   if (after) {
+//     params.append("after", after);
+//   }
 
-export async function createVendor(data: any) {
-  return inflow.post("/vendors", data);
-}
+//   return await inflow.get<InflowVendor[]>(
+//     `/vendors?${params.toString()}`
+//   );
+
+// }
+
+// export async function getVendor(vendorId: string) {
+//   return inflow.get(`/vendors/${vendorId}`);
+// }
+
+// export async function createVendor(data: any) {
+//   return inflow.post("/vendors", data);
+// }
