@@ -102,14 +102,11 @@ export interface InflowProduct {
   sku: string | null;
   name: string;
   description: string | null;
-
-  itemType: string;
-
+  itemType: "stockedProduct" | "serializedProduct" | "service" | string;
   autoAssemble: boolean;
   isActive: boolean;
   isManufacturable: boolean;
   includeQuantityBuildable: boolean;
-
   standardUomName: string | null;
 
   trackExpiry: boolean;
@@ -128,34 +125,142 @@ export interface InflowProduct {
   originCountry: string | null;
   hsTariffNumber: string | null;
   remarks: string | null;
-
   categoryId: string;
-
   lastVendorId: string | null;
   lastModifiedById: string | null;
-
   createdDttm: string;
   lastModifiedDateTime: string;
-
   timestamp: string;
-
   category: InflowCategory | null;
-
   purchasingUom: InflowPurchasingUom | null;
-
   salesUom: InflowSalesUom | null;
-
   customFields: InflowCustomFields;
-
   images: InflowProductImage[];
-
-  cost?: InflowProductCost;
   defaultPrice?: InflowProductPrice;
-
   inventoryLines: InflowInventoryLine[];
-
   productVariant: InflowProductVariant
 
+  productBarcodes?: InflowProductBarcode[];
+  taxCodes?: InflowProductTaxCode[];
+  reorderSettings?: InflowReorderSetting[];
+  productOperations?: InflowProductOperation[];
+  prices?: InflowProductPrice[];
+  cost?: InflowProductCost | null;
+  itemBoms?: InflowItemBom[];
+  attachments?: InflowProductAttachment[];
+
+}
+
+/**
+ * Nested Include Array Interfaces
+ */
+export interface InflowProductBarcode {
+  productBarcodeId: string;
+  barcode: string;
+  lineNum: number | string; // Handled as number or string from variations
+  productId: string;
+  timestamp: string;
+  product?: InflowProduct;
+}
+
+export interface InflowProductTaxCode {
+  productTaxCodeId: string;
+  productId: string;
+  taxCodeId: string;
+  taxingSchemeId: string;
+  timestamp: string;
+  product?: InflowProduct;
+  taxCode?: InflowTaxCode;
+  taxingScheme?: InflowTaxingScheme;
+}
+
+export interface InflowReorderSetting {
+  reorderSettingsId: string;
+  productId: string;
+  locationId: string;
+  defaultSublocation: string | null;
+  enableReordering: boolean;
+  fromLocationId: string | null;
+  reorderMethod: "purchaseOrder" | "PurchaseOrder" | string;
+  reorderPoint: string;
+  reorderQuantity: string;
+  timestamp: string;
+  vendorId: string | null;
+  fromLocation?: InflowLocation;
+  location?: InflowLocation;
+  product?: any;
+  vendor?: InflowVendor;
+}
+
+export interface InflowOperationType {
+  operationTypeId: string;
+  name: string;
+  estimatedPerHourCost: string;
+  isActive: boolean;
+  isDefault: boolean;
+  timestamp: string;
+  trackTime: boolean;
+}
+
+export interface InflowProductOperation {
+  productOperationId: string;
+  productId: string;
+  operationTypeId: string;
+  cost: string;
+  estimatedPerHourCost: string;
+  estimatedSeconds: string;
+  instructions: string | null;
+  lineNum: number | string;
+  timestamp: string;
+  trackTime: boolean;
+  operationType?: InflowOperationType;
+  product?: InflowProduct;
+}
+
+export interface InflowProductPrice {
+  productPriceId: string;
+  productId: string;
+  pricingSchemeId: string;
+  priceType: "fixedPrice" | "FixedPrice" | string;
+  fixedMarkup?: string | null;
+  unitPrice: string;
+  timestamp: string;
+  pricingScheme?: InflowPricingScheme;
+  product?: InflowProduct;
+}
+
+export interface InflowProductCost {
+  productCostId: string;
+  productId: string;
+  cost: string;
+  product?: InflowProduct;
+}
+
+export interface InflowBomQuantity {
+  standardQuantity: string;
+  uomQuantity: string;
+  uom: string | null;
+  serialNumbers?: string[];
+}
+
+export interface InflowItemBom {
+  itemBomId: string;
+  productId: string;
+  childProductId: string;
+  quantity: InflowBomQuantity;
+  timestamp: string;
+  childProduct?: InflowProduct;
+  product?: InflowProduct;
+}
+
+export interface InflowProductAttachment {
+  attachmentId: string;
+  attachmentUrl: string;
+  fileName: string;
+  fileSize: any; // Object or number variations across payloads
+  lastModDttm: string;
+  lastModifiedById: string;
+  lastModifiedBy?: InflowTeamMember;
 }
 
 // =====================================
@@ -179,11 +284,11 @@ export interface InflowInventoryLine {
 // Product Cost
 // =====================================
 
-export interface InflowProductCost {
-  productCostId: string;
-  cost: string;
-  productId: string;
-}
+// export interface InflowProductCost {
+//   productCostId: string;
+//   cost: string;
+//   productId: string;
+// }
 
 // =====================================
 // Product Price
@@ -198,17 +303,17 @@ export interface InflowProductCost {
 //   unitPrice: string;
 // }
 
-export interface InflowProductPrice {
-  productPriceId: string;
-  pricingSchemeId: string;
-  productId: string;
-  priceType: ProductPriceType;
-  unitPrice?: string;
-  fixedMarkup?: string;
-  timestamp: string;
+// export interface InflowProductPrice {
+//   productPriceId: string;
+//   pricingSchemeId: string;
+//   productId: string;
+//   priceType: ProductPriceType;
+//   unitPrice?: string;
+//   fixedMarkup?: string;
+//   timestamp: string;
 
-  product?: InflowProduct
-}
+//   product?: InflowProduct
+// }
 
 
 
@@ -481,12 +586,51 @@ export interface InflowPaymentTerms {
   timestamp: string;
 }
 
+
+// ========== GLOBAL ============
+
+export interface InflowAttachment {
+  inflowId: string;
+  fileName: string | null;
+  fileUrl: string | null;
+  fileSize: number | null;
+  contentType: string | null;
+  timestamp: string | null;
+}
+
+
+export interface InflowCustomFields {
+  custom1?: string;
+  custom2?: string;
+  custom3?: string;
+  custom4?: string;
+  custom5?: string;
+  custom6?: string;
+  custom7?: string;
+  custom8?: string;
+  custom9?: string;
+  custom10?: string;
+}
+
+export interface InflowAddress {
+  address1?: string;
+  address2?: string;
+  city?: string;
+  state?: string;
+  country?: string;
+  postalCode?: string;
+  remarks?: string;
+  addressType?: string | null;
+}
+
+// ========== x GLOBAL x ============
+
 // Customer 
 
 export interface InflowCustomer {
   customerId: string;
   contactName?: string | null;
-  customFields?: InflowCustomerCustomFields;
+  customFields?: InflowCustomFields;
   defaultBillingAddressId?: string | null;
   defaultCarrier?: string | null;
   defaultLocationId?: string | null;
@@ -513,62 +657,30 @@ export interface InflowCustomer {
   balances?: InflowCustomerBalance[];
   credits?: InflowCustomerCredit[];
   dues?: InflowCustomerDue[];
+  attachments?: InflowAttachment[];
+
+  orderHistory?: {
+    id: string;
+    lastOrderDate: string
+  } | null
+
   defaultBillingAddress?: InflowCustomerAddress | null;
   defaultShippingAddress?: InflowCustomerAddress | null;
-  defaultLocation?: {
-    locationId: string;
-    name: string;
-  } | null;
-  defaultPaymentTerms?: {
-    paymentTermsId: string;
-    name: string;
-  } | null;
-  defaultSalesRepTeamMember?: {
-    teamMemberId: string;
-    name: string;
-  } | null;
-  lastModifiedBy?: {
-    teamMemberId: string;
-    name: string;
-  } | null;
-  pricingScheme?: {
-    pricingSchemeId: string;
-    name: string;
-  } | null;
-  taxingScheme?: {
-    taxingSchemeId: string;
-    name: string;
-  } | null;
-}
-
-export interface InflowCustomerCustomFields {
-  custom1?: string;
-  custom2?: string;
-  custom3?: string;
-  custom4?: string;
-  custom5?: string;
-  custom6?: string;
-  custom7?: string;
-  custom8?: string;
-  custom9?: string;
-  custom10?: string;
+  defaultLocation?: InflowLocation | null;
+  
+  defaultPaymentTerms?: InflowPaymentTerms | null;
+  defaultSalesRepTeamMember?: InflowTeamMember | null;
+  lastModifiedBy?: InflowTeamMember | null;
+  pricingScheme?: InflowPricingScheme | null;
+  taxingScheme?: InflowTaxingScheme | null;
 }
 
 export interface InflowCustomerAddress {
   customerAddressId: string;
   customerId: string;
-  name?: string | null;
-  timestamp?: string | null;
-  address?: {
-    address1?: string | null;
-    address2?: string | null;
-    city?: string | null;
-    state?: string | null;
-    country?: string | null;
-    postalCode?: string | null;
-    remarks?: string | null;
-    addressType?: string | null;
-  };
+  name?: string;
+  timestamp?: string;
+  address: InflowAddress;
 }
 
 export interface InflowCustomerDue {
@@ -594,6 +706,202 @@ export interface InflowCustomerCredit {
   credit: string;
 }
 
+
+// Vendor 
+
+export interface InflowVendorAddress {
+  vendorAddressId: string;
+  vendorId: string;
+  name?: string;
+  timestamp?: string;
+  address: InflowAddress;
+}
+
+export interface InflowVendorBalance {
+  vendorBalanceId: string;
+  vendorId: string;
+  currencyId: string;
+  balance: string;
+  currency?: InflowCurrency | null;
+}
+
+export interface InflowVendorCredit {
+  vendorCreditId: string;
+  vendorId: string;
+  currencyId: string;
+  credit: string;
+  currency?: InflowCurrency | null;
+}
+
+export interface InflowVendorDue {
+  vendorDueId: string;
+  currencyId: string;
+
+  amountCurrent: string;
+  amount1To30: string;
+  amount31To60: string;
+  amount61Plus: string;
+
+  currency?: InflowCurrency | null;
+}
+
+export interface InflowVendorItem {
+  vendorItemId: string;
+  cost: string | null;
+  leadTimeDays: number | null;
+  lineNum: number | null;
+  productId: string;
+  timestamp: string;
+  vendorId: string;
+  vendorItemCode: string | null; // Maps to Prisma vendorSku
+}
+
+export interface InflowVendor {
+  vendorId: string;
+  name: string;
+  contactName: string | null;
+  currencyId: string | null;
+  customFields: InflowCustomFields | null;
+  defaultAddressId: string | null;
+  defaultCarrier: string | null;
+  defaultPaymentMethod: string | null;
+  defaultPaymentTermsId: string | null;
+  discount: string | null;
+  email: string | null;
+  fax: string | null;
+  isActive: boolean;
+  isTaxInclusivePricing: boolean;
+  lastModifiedById: string | null;
+  lastModifiedDttm: string | null;
+  leadTimeDays: number | null;
+  phone: string | null;
+  remarks: string | null;
+  taxingSchemeId: string | null;
+  timestamp: string;
+  website: string | null;
+  
+  // Included relations via API payload definition parameters
+  addresses?: InflowVendorAddress[];
+  attachments?: InflowAttachment[];
+  balances?: InflowVendorBalance[];
+  credits?: any[]; // Array structure following balance formatting rules if used
+  currency?: InflowCurrency | null;
+  dues?: InflowVendorDue[];
+  lastModifiedBy?: InflowTeamMember | null;
+  taxingScheme?: InflowTaxingScheme| null;
+  vendorItems?: InflowVendorItem[];
+}
+
+// Shared Attachment
+
+
+// export interface InflowVendor {
+//   vendorId: string;
+//   contactName?: string | null;
+//   currencyId: string;
+//   customFields?: InflowVendorCustomFields;
+//   defaultAddressId?: string | null;
+//   defaultCarrier?: string | null;
+//   defaultPaymentMethod?: string | null;
+//   defaultPaymentTermsId?: string | null;
+//   discount?: string | null;
+//   email?: string | null;
+//   fax?: string | null;
+//   isActive: boolean;
+//   isTaxInclusivePricing: false;
+//   lastModifiedById?: string | null;
+//   lastModifiedDttm?: string | null;
+//   leadTimeDays: number;
+//   name: string;
+//   phone?: string | null;
+//   remarks?: string | null;
+//   taxingSchemeId?: string | null;
+//   timestamp?: string | null;
+//   website?: string | null;
+//   addresses?: InflowVendorAddress[];
+//   // attachments?: InflowAttachments[];
+//   balances?: InflowVendorBalance[];
+//   credits?: InflowVendorCredit[];
+//   currency: InflowCurrency;
+//   dues?: InflowVendorDue[];
+//   defaultBillingAddress?: InflowVendorAddress | null;
+//   defaultShippingAddress?: InflowVendorAddress | null;
+//   defaultLocation?: InflowLocation | null;
+//   defaultPaymentTerms?: {
+//     paymentTermsId: string;
+//     name: string;
+//   } | null;
+//   defaultSalesRepTeamMember?: {
+//     teamMemberId: string;
+//     name: string;
+//   } | null;
+//   lastModifiedBy?: {
+//     teamMemberId: string;
+//     name: string;
+//   } | null;
+//   pricingScheme?: {
+//     pricingSchemeId: string;
+//     name: string;
+//   } | null;
+//   taxingScheme?: {
+//     taxingSchemeId: string;
+//     name: string;
+//   } | null;
+// }
+
+// export interface InflowVendorCustomFields {
+//   custom1?: string;
+//   custom2?: string;
+//   custom3?: string;
+//   custom4?: string;
+//   custom5?: string;
+//   custom6?: string;
+//   custom7?: string;
+//   custom8?: string;
+//   custom9?: string;
+//   custom10?: string;
+// }
+
+// export interface InflowVendorAddress {
+//   vendorAddressId: string;
+//   vendorId: string;
+//   name?: string | null;
+//   timestamp?: string | null;
+//   address?: {
+//     address1?: string | null;
+//     address2?: string | null;
+//     city?: string | null;
+//     state?: string | null;
+//     country?: string | null;
+//     postalCode?: string | null;
+//     remarks?: string | null;
+//     addressType?: string | null;
+//   };
+  
+// }
+
+// export interface InflowVendorDue {
+//   vendorDueId: string;
+//   currencyId?: string;
+//   amountCurrent: string;
+//   amount1To30: string;
+//   amount31To60: string;
+//   amount61Plus: string;
+// }
+
+// export interface InflowVendorBalance {
+//   vendorBalanceId: string;
+//   vendorId?: string;
+//   currencyId: string;
+//   balance: string;
+// }
+
+// export interface InflowVendorCredit {
+//   vendorCreditId: string;
+//   vendorId?: string;
+//   currencyId: string;
+//   credit: string;
+// }
 
 // ======= INFLOW INTEGRATIONS 
 

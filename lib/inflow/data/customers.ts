@@ -7,7 +7,7 @@ export async function getCustomers(
 ) {
   const params = new URLSearchParams({
     count: String(count),
-    include: "addresses,balances,credits,defaultBillingAddress,defaultLocation,defaultPaymentTerms,defaultSalesRepTeamMember,defaultShippingAddress,dues,lastModifiedBy,pricingScheme,taxingScheme",
+    include: "addresses,attachments,balances,credits,defaultBillingAddress,defaultLocation,defaultPaymentTerms,defaultSalesRepTeamMember,defaultShippingAddress,dues,lastModifiedBy,pricingScheme,taxingScheme,orderHistory",
   });
 
   if (after) {
@@ -20,7 +20,7 @@ export async function getCustomers(
 }
 
 export async function getCustomer(customerId: string) {
-  return inflow.get<InflowCustomer>(
+  return await inflow.get<InflowCustomer>(
     `/customers/${customerId}`
   );
 }

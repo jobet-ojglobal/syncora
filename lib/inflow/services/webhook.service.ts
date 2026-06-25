@@ -106,40 +106,6 @@ export async function createOrUpdateWebhook(events: InflowEvent[]) {
   return updatedWebhook;
 }
 
-// export async function createOrUpdateWebhook(events: InflowEvent[]) {
-//   const existing = await findWebhook();
-//   const webhookId = existing?.webHookSubscriptionId ?? randomUUID();
-  
-//   // inFlow uses PUT for both creation and updates
-//   const updatedWebhook = await inflow.put<InflowWebhook>("/webhooks", {
-//     webHookSubscriptionId: webhookId,
-//     webHookSubscriptionRequestId: randomUUID(),
-//     url: existing?.url ?? WEBHOOK_URL, // Keep existing remote URL if matched via fallback
-//     events,
-//   });
-
-//   console.log('update web hook')
-
-//   // Sync locally to DB
-//   await prisma.inflowWebhook.upsert({
-//     where: { id: updatedWebhook.webHookSubscriptionId },
-//     create: {
-//       id: updatedWebhook.webHookSubscriptionId,
-//       url: updatedWebhook.url,
-//       events: updatedWebhook.events,
-//       isDisabled: updatedWebhook.isDisabled ?? false,
-//       consecutiveFailureCount: updatedWebhook.consecutiveFailureCount ?? 0,
-//     },
-//     update: {
-//       url: updatedWebhook.url,
-//       events: updatedWebhook.events,
-//       isDisabled: updatedWebhook.isDisabled ?? false,
-//       consecutiveFailureCount: updatedWebhook.consecutiveFailureCount ?? 0,
-//     },
-//   });
-
-//   return updatedWebhook;
-// }
 
 export async function deleteWebhook(webhookId: string) {
   // Use the raw delete or handle the empty response
@@ -155,23 +121,6 @@ export async function deleteWebhook(webhookId: string) {
   }
 }
 
-// export async function listWebhooks() {
-//   return inflow.get<InflowWebhook[]>(
-//     "/webhooks"
-//   );
-// }
-
-// export async function findWebhook() {
-//   const webhooks =
-//     await inflow.get<InflowWebhook[]>(
-//       "/webhooks"
-//     );
-
-//   return webhooks.find(
-//     webhook =>
-//       webhook.url === WEBHOOK_URL
-//   );
-// }
 
 export async function getWebhook(
   id: string
@@ -180,32 +129,6 @@ export async function getWebhook(
     `/webhooks/${id}`
   );
 }
-
-// export async function syncWebhooks() {
-//   const webhooks = await listWebhooks();
-
-//   for (const webhook of webhooks) {
-//     await prisma.inflowWebhook.upsert({
-//       where: { id: webhook.webHookSubscriptionId },
-//       create: {
-//         id: webhook.webHookSubscriptionId,
-//         url: webhook.url,
-//         events: webhook.events,
-//         // Make sure these match what the inFlow API sends down
-//         isDisabled: webhook.isDisabled ?? false,
-//         consecutiveFailureCount: webhook.consecutiveFailureCount ?? 0,
-//       },
-//       update: {
-//         url: webhook.url,
-//         events: webhook.events,
-//         isDisabled: webhook.isDisabled ?? false,
-//         consecutiveFailureCount: webhook.consecutiveFailureCount ?? 0,
-//       },
-//     });
-//   }
-//   return webhooks;
-// }
-
 
 export async function ensureWebhook() {
   let webhook =
@@ -277,6 +200,87 @@ export async function subscribeWebhook() {
     }
   );
 }
+
+
+
+// export async function createOrUpdateWebhook(events: InflowEvent[]) {
+//   const existing = await findWebhook();
+//   const webhookId = existing?.webHookSubscriptionId ?? randomUUID();
+  
+//   // inFlow uses PUT for both creation and updates
+//   const updatedWebhook = await inflow.put<InflowWebhook>("/webhooks", {
+//     webHookSubscriptionId: webhookId,
+//     webHookSubscriptionRequestId: randomUUID(),
+//     url: existing?.url ?? WEBHOOK_URL, // Keep existing remote URL if matched via fallback
+//     events,
+//   });
+
+//   console.log('update web hook')
+
+//   // Sync locally to DB
+//   await prisma.inflowWebhook.upsert({
+//     where: { id: updatedWebhook.webHookSubscriptionId },
+//     create: {
+//       id: updatedWebhook.webHookSubscriptionId,
+//       url: updatedWebhook.url,
+//       events: updatedWebhook.events,
+//       isDisabled: updatedWebhook.isDisabled ?? false,
+//       consecutiveFailureCount: updatedWebhook.consecutiveFailureCount ?? 0,
+//     },
+//     update: {
+//       url: updatedWebhook.url,
+//       events: updatedWebhook.events,
+//       isDisabled: updatedWebhook.isDisabled ?? false,
+//       consecutiveFailureCount: updatedWebhook.consecutiveFailureCount ?? 0,
+//     },
+//   });
+
+//   return updatedWebhook;
+// }
+
+
+// export async function listWebhooks() {
+//   return inflow.get<InflowWebhook[]>(
+//     "/webhooks"
+//   );
+// }
+
+// export async function findWebhook() {
+//   const webhooks =
+//     await inflow.get<InflowWebhook[]>(
+//       "/webhooks"
+//     );
+
+//   return webhooks.find(
+//     webhook =>
+//       webhook.url === WEBHOOK_URL
+//   );
+// }
+
+// export async function syncWebhooks() {
+//   const webhooks = await listWebhooks();
+
+//   for (const webhook of webhooks) {
+//     await prisma.inflowWebhook.upsert({
+//       where: { id: webhook.webHookSubscriptionId },
+//       create: {
+//         id: webhook.webHookSubscriptionId,
+//         url: webhook.url,
+//         events: webhook.events,
+//         // Make sure these match what the inFlow API sends down
+//         isDisabled: webhook.isDisabled ?? false,
+//         consecutiveFailureCount: webhook.consecutiveFailureCount ?? 0,
+//       },
+//       update: {
+//         url: webhook.url,
+//         events: webhook.events,
+//         isDisabled: webhook.isDisabled ?? false,
+//         consecutiveFailureCount: webhook.consecutiveFailureCount ?? 0,
+//       },
+//     });
+//   }
+//   return webhooks;
+// }
 
 // export async function deleteWebhook(
 //   webhookId: string

@@ -1,16 +1,15 @@
-// app/api/settings/inflow/route.ts
+// app/api/settings/partner/route.ts
 import { NextResponse } from "next/server";
 import { 
-  InflowEvent,
-  findWebhook, 
-  createOrUpdateWebhook, 
-  deleteWebhook 
-} from "@/lib/inflow/services/webhook.service";
+  findPartnerWebhook, 
+  createOrUpdatePartnerWebhook, 
+  deletePartnerWebhook,
+} from "@/lib/partner/services/webhook.service";
+import { InflowEvent, PartnerWebhook } from "@/lib/partner/types/webhook";
 
-// GET /api/settings/inflow -> Fetch status
 export async function GET() {
   try {
-    const webhook = await findWebhook();
+    const webhook = await findPartnerWebhook();
     return NextResponse.json({ success: true, webhook: webhook ?? null });
   } catch (error) {
     return NextResponse.json(
@@ -20,36 +19,30 @@ export async function GET() {
   }
 }
 
-// POST /api/settings/inflow -> Connect, Disconnect, or Update Events
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { action, webhookId, events } = body;
+    const { action, subscriptionId, events } = body;
 
     if (action === "connect") {
-      const defaultEvents: InflowEvent[] = ["product.updated", "salesOrder.updated"];
-      const webhook = await createOrUpdateWebhook(defaultEvents);
+      const defaultEvents: InflowEvent[] = ["salesOrder.updated", "customer.updated"];
+      const webhook = await createOrUpdatePartnerWebhook(defaultEvents);
       return NextResponse.json({ success: true, webhook });
     }
 
     if (action === "disconnect") {
-      // Logic for disconnect
-      if (!webhookId) {
-        // Fallback: If no ID provided, try to find the current one automatically
-        const current = await findWebhook();
-        if (current) {
-          await deleteWebhook(current.webHookSubscriptionId);
-        }
+      if (!subscriptionId) {
+        const current = await findPartnerWebhook();
+        if (current) await deletePartnerWebhook(current.webHookSubscriptionId);
       } else {
-        await deleteWebhook(webhookId);
+        await deletePartnerWebhook(subscriptionId);
       }
-      return NextResponse.json({ success: true }); // Always return a valid JSON object
+      return NextResponse.json({ success: true });
     }
 
     if (action === "update_events") {
       if (!events) throw new Error("Missing events array");
-      
-      const webhook = await createOrUpdateWebhook(events);
+      const webhook = await createOrUpdatePartnerWebhook(events);
       return NextResponse.json({ success: true, webhook });
     }
 

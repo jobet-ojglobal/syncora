@@ -25,13 +25,13 @@ export async function syncInventoryLines(
           name: locData.name,
           isActive: locData.isActive,
           isDefault: locData.isDefault,
-          timestamp: locData.timestamp,
+          // timestamp: locData.timestamp,
         },
         update: {
           name: locData.name,
           isActive: locData.isActive,
           isDefault: locData.isDefault,
-          timestamp: locData.timestamp,
+          // timestamp: locData.timestamp,
         },
       });
 

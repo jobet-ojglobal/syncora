@@ -17,11 +17,13 @@ import { AdjustmentReasonSyncService } from "../inflow/services/adjustment-sync.
 import { PricingSchemeSyncService } from "../inflow/services/pricing-scheme-syn.service";
 import { ProductCostAdjustmentSyncService } from "../inflow/services/product-cost-adjustment-sync.service";
 import { PaymentTermSyncService } from "../inflow/services/payment-term-sync.service";
+import { VendorSyncService } from "../inflow/services/vendor-sync.service";
 
 const testService = new TestSyncService();
 const categoryService = new CategorySyncService();
 const productService = new ProductSyncService();
 const customerService = new CustomerSyncService();
+const vendorService = new VendorSyncService();
 const inventoryService = new InventorySyncService();
 const locationService = new LocationSyncService();
 const teamMemberService = new TeamMemberSyncService();
@@ -78,6 +80,10 @@ const worker = new Worker(
         case "customers":
           result = await customerService.sync(syncOptions);
           break;
+
+        case "vendors":
+          result = await vendorService.sync(syncOptions);
+          break;          
 
         case "inventory":
           result = await inventoryService.sync(syncOptions);

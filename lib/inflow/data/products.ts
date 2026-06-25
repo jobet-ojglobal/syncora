@@ -7,7 +7,7 @@ export async function getProducts(
 ) {
   const params = new URLSearchParams({
     count: String(count),
-    include: "images,productVariant.productGroup.category,productVariant.productGroup.options.optionValues,productVariant.productGroup.images.image",
+    include: "images,productBarcodes,taxCodes,reorderSettings,productOperations,prices,cost,itemBoms,attachments,productVariant.productGroup.category,productVariant.productGroup.options.optionValues,productVariant.productGroup.images.image",
   });
 
   if (after) {

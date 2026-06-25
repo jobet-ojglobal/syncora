@@ -1,21 +1,15 @@
-// lib/inflow/types/inflow.ts
+// lib/partner/types/inflow.ts
 
 export type InflowEvent =
   | "customer.created" | "customer.updated"
-  | "vendor.created" | "vendor.updated"
-  | "purchaseOrder.created" | "purchaseOrder.updated"
-  | "salesOrder.created" | "salesOrder.updated"
-  | "product.created" | "product.updated";
+  | "salesOrder.created" | "salesOrder.updated";
 
 export const INFLOW_EVENTS: InflowEvent[] = [
   "customer.created", "customer.updated",
-  "vendor.created", "vendor.updated",
-  "purchaseOrder.created", "purchaseOrder.updated",
   "salesOrder.created", "salesOrder.updated",
-  "product.created", "product.updated",
 ];
 
-export interface InflowWebhook {
+export interface PartnerWebhook {
   webHookSubscriptionId: string;
   url: string;
   events: string[];

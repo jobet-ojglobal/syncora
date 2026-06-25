@@ -194,8 +194,7 @@ const InflowWorkspace = () => {
                 <SyncButton source="payment_terms" title="Payment Terms" />
                 <SyncButton source="product_cost_adjustments" title="Product Cost Adjustments" />
                 <SyncButton source="customers" title="Customers" />
-
-                
+                <SyncButton source="vendors" title="Vendors" />
               </CardContent>
             </Card>
 

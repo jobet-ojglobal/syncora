@@ -11,11 +11,11 @@ function required(name: string) {
 }
 
 export const env = {
-  LOCAL001_API_URL: required(
-    "LOCAL001_API_URL"
+  PARTNER_API_URL: required(
+    "PARTNER_API_URL"
   ),
-  LOCAL001_API_KEY: required(
-    "LOCAL001_API_KEY"
+  PARTNER_API_KEY: required(
+    "PARTNER_API_KEY"
   ),
   APP_URL: required(
     "APP_URL"

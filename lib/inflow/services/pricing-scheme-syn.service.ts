@@ -51,7 +51,7 @@ export class PricingSchemeSyncService {
                   thousandsSeparator: curData?.thousandsSeparator || ",",
                   isSymbolFirst: curData?.isSymbolFirst ?? true,
                   negativeType: curData?.negativeType || "leading",
-                  timestamp: curData?.timestamp || scheme.timestamp,
+                  // timestamp: curData?.timestamp || scheme.timestamp,
                 },
                 update: {
                   name: curData?.name || "Unknown Currency",
@@ -62,7 +62,7 @@ export class PricingSchemeSyncService {
                   thousandsSeparator: curData?.thousandsSeparator || ",",
                   isSymbolFirst: curData?.isSymbolFirst ?? true,
                   negativeType: curData?.negativeType || "leading",
-                  timestamp: curData?.timestamp || scheme.timestamp,
+                  // timestamp: curData?.timestamp || scheme.timestamp,
                 },
               });
               verifiedCurrencyIds.add(scheme.currencyId);
@@ -78,7 +78,7 @@ export class PricingSchemeSyncService {
                 isActive: scheme.isActive,
                 isDefault: scheme.isDefault,
                 isTaxInclusive: scheme.isTaxInclusive,
-                timestamp: scheme.timestamp,
+                // timestamp: scheme.timestamp,
               },
               update: {
                 currencyId: scheme.currencyId,
@@ -86,7 +86,7 @@ export class PricingSchemeSyncService {
                 isActive: scheme.isActive,
                 isDefault: scheme.isDefault,
                 isTaxInclusive: scheme.isTaxInclusive,
-                timestamp: scheme.timestamp,
+                // timestamp: scheme.timestamp,
               },
             });
           }
@@ -133,7 +133,7 @@ export class PricingSchemeSyncService {
                   priceType: this.mapPriceType(price.priceType),
                   unitPrice: price.unitPrice ? new Prisma.Decimal(price.unitPrice) : null,
                   fixedMarkup: price.fixedMarkup ? new Prisma.Decimal(price.fixedMarkup) : null,
-                  timestamp: price.timestamp,
+                  // timestamp: price.timestamp,
                 },
                 update: {
                   pricingSchemeId: price.pricingSchemeId,
@@ -141,7 +141,7 @@ export class PricingSchemeSyncService {
                   priceType: this.mapPriceType(price.priceType),
                   unitPrice: price.unitPrice ? new Prisma.Decimal(price.unitPrice) : null,
                   fixedMarkup: price.fixedMarkup ? new Prisma.Decimal(price.fixedMarkup) : null,
-                  timestamp: price.timestamp,
+                  // timestamp: price.timestamp,
                 },
               });
             }

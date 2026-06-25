@@ -450,8 +450,12 @@ export const data = {
       icon: Database,
       items: [
         {
-          title: "Inflow",
+          title: "Inflow Cloud",
           url: "/dashboard/etl/inflow",
+        },
+        {
+          title: "Partner App",
+          url: "/dashboard/etl/partner",
         },
         {
           title: "Logs",

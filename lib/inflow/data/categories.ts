@@ -11,7 +11,7 @@ export async function getCategories() {
 }
 
 export async function getCategory(categoryID: string) {
-  return inflow.get<InflowCategory>(`/categories/${categoryID}`);
+  return await inflow.get<InflowCategory>(`/categories/${categoryID}`);
 }
 
 
