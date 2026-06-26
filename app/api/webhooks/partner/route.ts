@@ -40,12 +40,12 @@ export async function POST(request: NextRequest) {
           // Pass the target item ID along with the audit log entry reference
           // await InflowProductWebhookService.handleProductCreate(inflowId, loggedEvent.id);
 
-            // partnerApi.post("/transactions/sales/cloud-ack", {
-            //   "batch_id": payload.batch_id,
-            //   "outbound_audit_id": payload.outboundAuditId,
-            //   "cloud_status": "SUCCESS",
-            //   "message": "Committed from cloud"
-            // })
+          partnerApi.post("/transactions/sales/cloud-ack", {
+            "batch_id": payload.batch_id,
+            "outbound_audit_id": payload.outboundAuditId,
+            "cloud_status": "SUCCESS",
+            "message": "Committed from cloud"
+          })
         }
         break;
       }
@@ -56,12 +56,12 @@ export async function POST(request: NextRequest) {
         if (inflowId) {
         //   await InflowProductWebhookService.handleProductUpdate(inflowId, loggedEvent.id);
 
-            // partnerApi.post("/transactions/sales/cloud-ack", {
-            //   "batch_id": payload.batch_id,
-            //   "outbound_audit_id": payload.outboundAuditId,
-            //   "cloud_status": "SUCCESS",
-            //   "message": "Committed from cloud"
-            // })
+          partnerApi.post("/transactions/sales/cloud-ack", {
+            "batch_id": payload.batch_id,
+            "outbound_audit_id": payload.outboundAuditId,
+            "cloud_status": "SUCCESS",
+            "message": "Committed from cloud"
+          })
         }
         break;
       }

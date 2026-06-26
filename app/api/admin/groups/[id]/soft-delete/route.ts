@@ -24,7 +24,7 @@ export async function DELETE(request: NextRequest) {
     }
 
     // Apply logical soft-delete to protect historic ledger consistency
-    const archivedItem = await prisma.product.update({
+    const archivedItem = await prisma.productGroup.update({
       where: { id },
       data: { 
         deletedAt: new Date(),
@@ -32,7 +32,7 @@ export async function DELETE(request: NextRequest) {
       }
     });
 
-    return NextResponse.json({ success: true, archivedSku: archivedItem.sku }, { status: 200 });
+    return NextResponse.json({ success: true, groupName: archivedItem.name }, { status: 200 });
   } catch (error) {
     console.error("Critical failure during product catalog record deletion:", error);
     return NextResponse.json({ error: "Internal Database transaction pipeline modification failure." }, { status: 500 });

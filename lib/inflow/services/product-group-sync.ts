@@ -1,4 +1,5 @@
-import { Prisma } from "@/generated/prisma/client";
+// services/sync/products/product-group-sync.ts
+import { Prisma } from "@/generated/prisma/client"; // Adjust path according to your workspace generation path
 import { InflowProduct, InflowProductGroup } from "../types";
 import { syncBrand, syncGroupFeatures, syncGroupImages, syncGroupTags } from "./helpers";
 import { genInflowUniqueSlug } from "@/helpers/genUniqueSlug";
@@ -8,13 +9,12 @@ type Tx = Prisma.TransactionClient;
 export async function syncProductGroup(
   tx: Tx,
   group: InflowProductGroup,
-  firstProductInGroup?: InflowProduct // Pass the base product object to grab its customFields brand name
+  firstProductInGroup?: InflowProduct 
 ) {
-
-  // 1. Extract values from your inFlow product custom fields
+  // 1. Extract values safely from inFlow product custom fields schema metadata layout references
   const brandName = firstProductInGroup?.customFields?.custom1;
-  const rawFeaturesString = firstProductInGroup?.customFields?.custom2; // e.g., "Sensor:Full Frame|Max Resolution:8K 30p"
-  const rawTagsString = firstProductInGroup?.customFields?.custom3;     // e.g., "hot-swap, wireless"
+  const rawFeaturesString = firstProductInGroup?.customFields?.custom2; 
+  const rawTagsString = firstProductInGroup?.customFields?.custom3;     
 
   let brandId: string | null = null;
   if (brandName) {
@@ -23,35 +23,38 @@ export async function syncProductGroup(
 
   const baseSlug = await genInflowUniqueSlug(group.name || "product-group", tx.productGroup, group.productGroupId);
 
-  // 3. Upsert the master ProductGroup record
+  // 2. Upsert the master ProductGroup record node
   const upsertedGroup = await tx.productGroup.upsert({
     where: {
       inflowId: group.productGroupId,
     },
     create: {
       inflowId: group.productGroupId,
-      categoryId: group.categoryId, // Category.inflowId
+      categoryId: group.categoryId || null, 
       name: group.name,
       slug: baseSlug,
       brandId,
-      isActive: group.isActive,
+      isActive: group.isActive ?? true,
     },
     update: {
-      categoryId: group.categoryId,
+      categoryId: group.categoryId || null,
       name: group.name,
       brandId,
-      isActive: group.isActive,
+      isActive: group.isActive ?? true,
     },
   });
 
-  // 3. Hand off Features & Tags processing to isolated sub-functions 🚀
-  if (group.defaultProductId) {
+  // 3. Run explicit feature and metadata parsing parameters conditionally
+  if (rawFeaturesString) {
     await syncGroupFeatures(tx, group.productGroupId, rawFeaturesString);
+  }
+  if (rawTagsString) {
     await syncGroupTags(tx, group.productGroupId, rawTagsString);
   }
 
-  // 3. Loop Through Options (e.g., "Color", "Size")
+  // 4. Loop through Option matrix layout structures (e.g., "Color", "Size")
   for (const option of group.options ?? []) {
+    if (!option.name) continue;
     const trimmedOptionName = option.name.trim();
 
     const globalAttribute = await tx.attribute.upsert({
@@ -67,17 +70,18 @@ export async function syncProductGroup(
       create: {
         inflowId: option.productGroupOptionId,
         productGroupId: group.productGroupId,
-        lineNum: option.lineNum,
+        lineNum: option.lineNum ?? 1,
         attributeId: globalAttribute.id,
       },
       update: {
-        lineNum: option.lineNum,
+        lineNum: option.lineNum ?? 1,
         attributeId: globalAttribute.id,
       },
     });
 
-    // 4. Loop Through Values for this Option
+    // 5. Loop through matching configuration values for this Option Node element
     for (const value of option.optionValues ?? []) {
+      if (!value.value) continue;
       const trimmedValue = value.value.trim();
 
       const globalAttributeValue = await tx.attributeValue.upsert({
@@ -101,20 +105,142 @@ export async function syncProductGroup(
         create: {
           inflowId: value.productGroupOptionValueId,
           optionId: option.productGroupOptionId,
-          lineNum: value.lineNum,
+          lineNum: value.lineNum ?? 1,
           attributeValueId: globalAttributeValue.id,
         },
         update: {
-          lineNum: value.lineNum,
+          lineNum: value.lineNum ?? 1,
           attributeValueId: globalAttributeValue.id,
         },
       });
     }
   }
 
-  await syncGroupImages(tx, group.productGroupId, group.images);
+  // 6. Synchronize group images safely only if included in the execution payload context
+  if (group.images) {
+    await syncGroupImages(tx, group.productGroupId, group.images);
+  }
+
   return upsertedGroup;
 }
+
+// import { Prisma } from "@/generated/prisma/client";
+// import { InflowProduct, InflowProductGroup } from "../types";
+// import { syncBrand, syncGroupFeatures, syncGroupImages, syncGroupTags } from "./helpers";
+// import { genInflowUniqueSlug } from "@/helpers/genUniqueSlug";
+
+// type Tx = Prisma.TransactionClient;
+
+// export async function syncProductGroup(
+//   tx: Tx,
+//   group: InflowProductGroup,
+//   firstProductInGroup?: InflowProduct // Pass the base product object to grab its customFields brand name
+// ) {
+
+//   // 1. Extract values from your inFlow product custom fields
+//   const brandName = firstProductInGroup?.customFields?.custom1;
+//   const rawFeaturesString = firstProductInGroup?.customFields?.custom2; // e.g., "Sensor:Full Frame|Max Resolution:8K 30p"
+//   const rawTagsString = firstProductInGroup?.customFields?.custom3;     // e.g., "hot-swap, wireless"
+
+//   let brandId: string | null = null;
+//   if (brandName) {
+//     brandId = await syncBrand(tx, brandName);
+//   }
+
+//   const baseSlug = await genInflowUniqueSlug(group.name || "product-group", tx.productGroup, group.productGroupId);
+
+//   // 3. Upsert the master ProductGroup record
+//   const upsertedGroup = await tx.productGroup.upsert({
+//     where: {
+//       inflowId: group.productGroupId,
+//     },
+//     create: {
+//       inflowId: group.productGroupId,
+//       categoryId: group.categoryId, // Category.inflowId
+//       name: group.name,
+//       slug: baseSlug,
+//       brandId,
+//       isActive: group.isActive,
+//     },
+//     update: {
+//       categoryId: group.categoryId,
+//       name: group.name,
+//       brandId,
+//       isActive: group.isActive,
+//     },
+//   });
+
+//   // 3. Hand off Features & Tags processing to isolated sub-functions 🚀
+//   if (group.defaultProductId) {
+//     await syncGroupFeatures(tx, group.productGroupId, rawFeaturesString);
+//     await syncGroupTags(tx, group.productGroupId, rawTagsString);
+//   }
+
+//   // 3. Loop Through Options (e.g., "Color", "Size")
+//   for (const option of group.options ?? []) {
+//     const trimmedOptionName = option.name.trim();
+
+//     const globalAttribute = await tx.attribute.upsert({
+//       where: { name: trimmedOptionName },
+//       create: { name: trimmedOptionName },
+//       update: {},
+//     });
+
+//     await tx.productGroupOption.upsert({
+//       where: {
+//         inflowId: option.productGroupOptionId,
+//       },
+//       create: {
+//         inflowId: option.productGroupOptionId,
+//         productGroupId: group.productGroupId,
+//         lineNum: option.lineNum,
+//         attributeId: globalAttribute.id,
+//       },
+//       update: {
+//         lineNum: option.lineNum,
+//         attributeId: globalAttribute.id,
+//       },
+//     });
+
+//     // 4. Loop Through Values for this Option
+//     for (const value of option.optionValues ?? []) {
+//       const trimmedValue = value.value.trim();
+
+//       const globalAttributeValue = await tx.attributeValue.upsert({
+//         where: {
+//           attributeId_value: {
+//             attributeId: globalAttribute.id,
+//             value: trimmedValue,
+//           },
+//         },
+//         create: {
+//           attributeId: globalAttribute.id,
+//           value: trimmedValue,
+//         },
+//         update: {},
+//       });
+
+//       await tx.productGroupOptionValue.upsert({
+//         where: {
+//           inflowId: value.productGroupOptionValueId,
+//         },
+//         create: {
+//           inflowId: value.productGroupOptionValueId,
+//           optionId: option.productGroupOptionId,
+//           lineNum: value.lineNum,
+//           attributeValueId: globalAttributeValue.id,
+//         },
+//         update: {
+//           lineNum: value.lineNum,
+//           attributeValueId: globalAttributeValue.id,
+//         },
+//       });
+//     }
+//   }
+
+//   await syncGroupImages(tx, group.productGroupId, group.images);
+//   return upsertedGroup;
+// }
 
 
   // Parse structured features array: [{ key: "Sensor", value: "Full Frame" }]

@@ -1,6 +1,6 @@
 // services/sync/products/product-sync.service.ts
 import { prisma } from "@/lib/prisma";
-import { getProducts } from "../data/products"; 
+import { getEntireCatalogs } from "../data/products"; 
 import { syncCategory } from "./category-sync";
 import { syncProductGroup } from "./product-group-sync";
 import { syncProduct } from "./product.sync";
@@ -9,9 +9,10 @@ import { syncVariant } from "./variant.sync";
 type SyncOptions = {
   onProgress?: (processedCount: number) => Promise<void>;
   batchSize?: number;
+ 
 };
 
-export class ProductSyncService {
+export class EntireCatalogSyncService {
   async sync(options?: SyncOptions,  includes?: string[]) {
     const BATCH_SIZE = options?.batchSize || 10;
     
@@ -26,7 +27,7 @@ export class ProductSyncService {
 
     while (true) {
       // 1. Fetch the batch (This ALREADY includes the deep relations!)
-      const batch = await getProducts(BATCH_SIZE, after, includes);
+      const batch = await getEntireCatalogs(BATCH_SIZE, after, includes);
       if (!batch || batch.length === 0) break;
 
       // 2. Process the batch inside a single Database Transaction

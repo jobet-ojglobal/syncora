@@ -420,43 +420,34 @@ export async function syncSalesUom(
   });
 }
 
+
 export async function syncImages(
-  tx: Tx,
+  tx: any,
   product: InflowProduct
 ) {
-  for (
-    let index = 0;
-    index < (product.images ?? []).length;
-    index++
-  ) {
-    const image = product.images[index];
+  // 1. Wipe old images assigned to this group to drop any removed images
+  await tx.productImage.deleteMany({
+    where: { productId: product.productId },
+  });
 
-    await tx.productImage.upsert({
-      where: {
-        inflowId: image.imageId,
-      },
-      create: {
-        inflowId: image.imageId,
-        productId: product.productId,
-        position: index,
-        largeUrl: image.largeUrl,
-        mediumUncroppedUrl:
-          image.mediumUncroppedUrl,
-        mediumUrl: image.mediumUrl,
-        originalUrl: image.originalUrl,
-        smallUrl: image.smallUrl,
-        thumbUrl: image.thumbUrl,
-      },
-      update: {
-        position: index,
-        largeUrl: image.largeUrl,
-        mediumUncroppedUrl:
-          image.mediumUncroppedUrl,
-        mediumUrl: image.mediumUrl,
-        originalUrl: image.originalUrl,
-        smallUrl: image.smallUrl,
-        thumbUrl: image.thumbUrl,
-      },
+  // 2. Perform a bulk save if new images exist
+  if (product.images && product.images.length > 0) {
+    await tx.productImage.createMany({
+      data: product.images.map((image, index) => {
+        return {
+          inflowId: image.imageId,
+          groupId: null,
+          productId: product.productId, 
+          position: index,
+          largeUrl: image.largeUrl || image.originalUrl || null,
+          mediumUncroppedUrl: image.mediumUncroppedUrl || image.originalUrl || null,
+          mediumUrl: image.mediumUrl || image.originalUrl || null,
+          originalUrl: image.originalUrl || null,
+          smallUrl: image.smallUrl || image.originalUrl || null,
+          thumbUrl: image.thumbUrl || image.originalUrl || null,
+        };
+      }),
+      skipDuplicates: true,
     });
   }
 }
@@ -466,41 +457,31 @@ export async function syncGroupImages(
   groupId: string,
   images: InflowProductGroupImage[]
 ) {
-  for (
-    let index = 0;
-    index < images.length;
-    index++
-  ) {
-    const groupImage = images[index];
-    const image = groupImage.image;
+  // 1. Wipe old images assigned to this group to drop any removed images
+  await tx.productImage.deleteMany({
+    where: { groupId },
+  });
 
-    await tx.productImage.upsert({
-      where: {
-        inflowId: image.imageId,
-      },
-      create: {
-        inflowId: image.imageId,
-        groupId,
-        position: index,
-        largeUrl: image.largeUrl,
-        mediumUncroppedUrl:
-          image.mediumUncroppedUrl,
-        mediumUrl: image.mediumUrl,
-        originalUrl: image.originalUrl,
-        smallUrl: image.smallUrl,
-        thumbUrl: image.thumbUrl,
-      },
-      update: {
-        groupId,
-        position: index,
-        largeUrl: image.largeUrl,
-        mediumUncroppedUrl:
-          image.mediumUncroppedUrl,
-        mediumUrl: image.mediumUrl,
-        originalUrl: image.originalUrl,
-        smallUrl: image.smallUrl,
-        thumbUrl: image.thumbUrl,
-      },
+  // 2. Perform a bulk save if new images exist
+  if (images && images.length > 0) {
+    await tx.productImage.createMany({
+      data: images.map((groupImage, index) => {
+        const image = groupImage.image;
+        
+        return {
+          inflowId: image.imageId || `${groupId}-img-${index}`,
+          groupId,
+          productId: null, // Keeps the product foreign key null since it belongs to the group
+          position: index,
+          largeUrl: image.largeUrl || image.originalUrl || null,
+          mediumUncroppedUrl: image.mediumUncroppedUrl || image.originalUrl || null,
+          mediumUrl: image.mediumUrl || image.originalUrl || null,
+          originalUrl: image.originalUrl || null,
+          smallUrl: image.smallUrl || image.originalUrl || null,
+          thumbUrl: image.thumbUrl || image.originalUrl || null,
+        };
+      }),
+      skipDuplicates: true,
     });
   }
 }
@@ -605,6 +586,94 @@ export async function syncInventoryLines1(
     }
   }
 }
+
+
+// export async function syncImages(
+//   tx: Tx,
+//   product: InflowProduct
+// ) {
+//   for (
+//     let index = 0;
+//     index < (product.images ?? []).length;
+//     index++
+//   ) {
+//     const image = product.images[index];
+
+//     await tx.productImage.upsert({
+//       where: {
+//         inflowId: image.imageId,
+//       },
+//       create: {
+//         inflowId: image.imageId,
+//         productId: product.productId,
+//         position: index,
+//         largeUrl: image.largeUrl,
+//         mediumUncroppedUrl:
+//           image.mediumUncroppedUrl,
+//         mediumUrl: image.mediumUrl,
+//         originalUrl: image.originalUrl,
+//         smallUrl: image.smallUrl,
+//         thumbUrl: image.thumbUrl,
+//       },
+//       update: {
+//         position: index,
+//         largeUrl: image.largeUrl,
+//         mediumUncroppedUrl:
+//           image.mediumUncroppedUrl,
+//         mediumUrl: image.mediumUrl,
+//         originalUrl: image.originalUrl,
+//         smallUrl: image.smallUrl,
+//         thumbUrl: image.thumbUrl,
+//       },
+//     });
+//   }
+// }
+
+// export async function syncGroupImages(
+//   tx: any,
+//   groupId: string,
+//   images: InflowProductGroupImage[]
+// ) {
+//   for (
+//     let index = 0;
+//     index < images.length;
+//     index++
+//   ) {
+//     const groupImage = images[index];
+//     const image = groupImage.image;
+
+//     await tx.productImage.upsert({
+//       where: {
+//         inflowId: image.imageId,
+//       },
+//       create: {
+//         inflowId: image.imageId,
+//         groupId,
+//         position: index,
+//         largeUrl: image.largeUrl,
+//         mediumUncroppedUrl:
+//           image.mediumUncroppedUrl,
+//         mediumUrl: image.mediumUrl,
+//         originalUrl: image.originalUrl,
+//         smallUrl: image.smallUrl,
+//         thumbUrl: image.thumbUrl,
+//       },
+//       update: {
+//         groupId,
+//         position: index,
+//         largeUrl: image.largeUrl,
+//         mediumUncroppedUrl:
+//           image.mediumUncroppedUrl,
+//         mediumUrl: image.mediumUrl,
+//         originalUrl: image.originalUrl,
+//         smallUrl: image.smallUrl,
+//         thumbUrl: image.thumbUrl,
+//       },
+//     });
+//   }
+// }
+
+
 
 
 

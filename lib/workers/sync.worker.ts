@@ -5,7 +5,6 @@ import { prisma } from "@/lib/prisma";
 import { connection } from "@/lib/redis";
 
 import { TestSyncService } from "@/lib/inflow/services/test-sync.service"
-import { ProductSyncService } from "@/lib/inflow/services/product-sync.service";
 import { CustomerSyncService } from "@/lib/inflow/services/customer-sync.service";
 import { InventorySyncService } from "@/lib/inflow/services/inventory-sync.service";
 import { LocationSyncService } from "@/lib/inflow/services/location-sync.service";
@@ -18,10 +17,36 @@ import { PricingSchemeSyncService } from "../inflow/services/pricing-scheme-syn.
 import { ProductCostAdjustmentSyncService } from "../inflow/services/product-cost-adjustment-sync.service";
 import { PaymentTermSyncService } from "../inflow/services/payment-term-sync.service";
 import { VendorSyncService } from "../inflow/services/vendor-sync.service";
+import { ProductSyncService } from "@/lib/inflow/services/product-sync.service";
+import { ProductBarcodeSyncService } from "../inflow/services/produc-barcode-sync.service";
+import { ProductImageSyncService } from "../inflow/services/product-image-sync.service";
+import { ProductTaxCodeSyncService } from "../inflow/services/product-tax-code-sync.service";
+import { ProductReorderSettingSyncService } from "../inflow/services/product-reorder-setting-sync.service";
+import { ProductOperationSyncService } from "../inflow/services/product-operation-sync.service";
+import { ProductPriceSyncService } from "../inflow/services/product-price-sync.service";
+import { ProductItemBomSyncService } from "../inflow/services/product-item-bom-sync.service";
+import { ProductAttachmentSyncService } from "../inflow/services/product-attachment-sync.service";
+import { ProductGroupSyncService } from "../inflow/services/product-group-sync.service";
+import { ProductVariantSyncService } from "../inflow/services/product-variant-sync.service";
+import { ProductGroupImageSyncService } from "../inflow/services/product-group-image-sync.service";
 
 const testService = new TestSyncService();
 const categoryService = new CategorySyncService();
+
+const productGroupService = new ProductGroupSyncService();
+const productGroupImageService = new ProductGroupImageSyncService();
+const productVariantService = new ProductVariantSyncService();
+
 const productService = new ProductSyncService();
+const productImageService = new ProductImageSyncService();
+const productBarcodeService = new ProductBarcodeSyncService();
+const productTaxService = new ProductTaxCodeSyncService();
+const productReorderService = new ProductReorderSettingSyncService();
+const productOperationService = new ProductOperationSyncService();
+const productPriceService = new ProductPriceSyncService();
+const productBomService = new ProductItemBomSyncService();
+const productAttachmentService = new ProductAttachmentSyncService();
+
 const customerService = new CustomerSyncService();
 const vendorService = new VendorSyncService();
 const inventoryService = new InventorySyncService();
@@ -42,7 +67,7 @@ type SyncOptions = {
 const worker = new Worker(
   "sync",
   async (job) => {
-    const { jobId, source } = job.data;
+    const { jobId, source, includes } = job.data;
     
     const syncOptions: SyncOptions = {
       onProgress: async (progress) => {
@@ -56,6 +81,10 @@ const worker = new Worker(
         // console.log(`  Progress: ${progress}%`);
       },
     };
+
+    if (source === "products") {
+      
+    }
 
     try {
       await prisma.syncJob.update({
@@ -72,59 +101,78 @@ const worker = new Worker(
          case "categories":
           result = await categoryService.sync(syncOptions);
           break;
-
-        case "products":
-          result = await productService.sync(syncOptions);
+        case "product_groups":
+          result = await productGroupService.sync(syncOptions, includes);
           break;
-
+        case "product_group_images":
+          result = await productGroupImageService.sync(syncOptions);
+          break;
+        case "product_variants":
+          result = await productVariantService.sync(syncOptions);
+          break;
+        case "products":
+          result = await productService.sync(syncOptions, includes);
+          break;
+        case "product_images":
+          result = await productImageService.sync(syncOptions);
+          break;
+        case "product_barcodes":
+          result = await productBarcodeService.sync(syncOptions);
+          break;
+        case "product_taxes":
+          result = await productTaxService.sync(syncOptions);
+          break;
+        case "product_reorder_settings":
+          result = await productReorderService.sync(syncOptions);
+          break;
+        case "product_operations":
+          result = await productOperationService.sync(syncOptions);
+          break;
+        case "product_prices":
+          result = await productPriceService.sync(syncOptions);
+          break;
+        case "product_boms":
+          result = await productBomService.sync(syncOptions);
+          break;
+        case "product_attachments":
+          result = await productAttachmentService.sync(syncOptions);
+          break;
         case "customers":
           result = await customerService.sync(syncOptions);
           break;
-
         case "vendors":
           result = await vendorService.sync(syncOptions);
           break;          
-
         case "inventory":
           result = await inventoryService.sync(syncOptions);
           break;
-        
         case "locations":
           result = await locationService.sync(syncOptions);
           break;
-
         case "team_members":
           result = await teamMemberService.sync(syncOptions);
           break;
-        
         case "taxing_schemes":
           result = await taxingSchemeService.sync(syncOptions);
           break;
-        
         case "currencies":
           result = await currencyService.sync(syncOptions);
           break;
-
         case "pricing_schemes":
           result = await pricingSchemeService.sync(syncOptions);
           break;
-
         case "payment_terms":
           result = await paymentTermService.sync(syncOptions);
           break;
-
         case "adjustment_reasons":
           result = await adjustmentReasonService.sync(syncOptions);
           break;
-
         case "product_cost_adjustments":
           result = await productCostAdjustmentService.sync(syncOptions);
           break;
-        
         case "test":
           result = await testService.sync(source, syncOptions);
           break;
-
         default:
           throw new Error(
             `Unsupported sync source: ${source}`

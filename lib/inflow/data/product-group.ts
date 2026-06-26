@@ -41,12 +41,60 @@ export async function upsertProductGroup(payload: Partial<InflowGroupPayload>) {
   return inflow.put<InflowProductGroup>("/product-groups", payload);
 }
 
-export async function fetchProductGroup() {
-  const data = await inflow.get<InflowProductGroup[]>(
-    "/product-groups?include=defaultProduct,category,images.image,options.optionValues,productVariants.product.images"
+export async function getProductGroups(
+  count = 100,
+  after?: string,
+  includes: string[] = []
+) {
+  // 1. Core nesting fields required by your system architecture
+  const baseIncludes = [
+    "category",
+    "options.optionValues",
+  ];
+
+  // 2. Merge unique structural values & join them as a comma-separated string
+  const mergedIncludes = Array.from(new Set([...baseIncludes, ...includes])).join(",");
+
+  const params = new URLSearchParams({
+    count: String(count),
+    include: mergedIncludes,
+  });
+
+  if (after) {
+    params.append("after", after);
+  }
+
+  return inflow.get<InflowProductGroup[]>(
+    `/product-groups?${params.toString()}`
   );
-  return data;
 }
+
+export async function getProductGroupsInclude(
+  count = 100,
+  after?: string,
+  includes: string[] = []
+) {
+  // 1. Core structural include required to access variants inside the group
+  const baseIncludes = ["category"];
+  
+  // 2. Append any dynamic sub-relations passed down from the client checklist
+  const mergedIncludes = Array.from(new Set([...baseIncludes, ...includes])).join(",");
+
+  const params = new URLSearchParams({
+    count: String(count),
+    include: mergedIncludes,
+  });
+
+  if (after) {
+    params.append("after", after);
+  }
+
+  return inflow.get<InflowProductGroup[]>(
+    `/product-groups?${params.toString()}`
+  );
+}
+
+
 
 export async function getProductGroup(groupId: string) {
   const data = await inflow.get<InflowProductGroup>(

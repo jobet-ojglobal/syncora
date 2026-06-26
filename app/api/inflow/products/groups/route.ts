@@ -1,11 +1,10 @@
 import { NextResponse } from 'next/server';
-import { getProducts } from '@/lib/inflow/data/products';
-import { fetchProductGroup } from '@/lib/inflow/data/product-group';
+import { getProductGroups } from '@/lib/inflow/data/product-group';
 
 export async function GET() {
   try {
     const data =
-        await fetchProductGroup();
+        await getProductGroups();
 
     return NextResponse.json({
       success: true,

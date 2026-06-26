@@ -36,7 +36,7 @@ const worker = new Worker(
           data: { progress: i },
         });
 
-        console.log(`  Progress: ${i}%`);
+        console.log(`Progress: ${i}%`);
       }
 
       // Mark job as completed and save data

@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge"
 import Image from "next/image"
 import { CellAction } from "./status-cell-action"
 import { RowActions } from "./row-actions"
+import { Checkbox } from "@/components/ui/checkbox"
 
 // Shape matching your API Map payload precisely
 export type ParsedProduct = {
@@ -31,6 +32,28 @@ export type ParsedProduct = {
 }
 
 export const columns: ColumnDef<ParsedProduct>[] = [
+  {
+    id: "select",
+    header: ({ table }) => (
+      <Checkbox
+        checked={
+          table.getIsAllPageRowsSelected() ||
+          (table.getIsSomePageRowsSelected() && "indeterminate")
+        }
+        onCheckedChange={(value) => table.toggleAllPageRowsSelected(!!value)}
+        aria-label="Select all"
+      />
+    ),
+    cell: ({ row }) => (
+      <Checkbox
+        checked={row.getIsSelected()}
+        onCheckedChange={(value) => row.toggleSelected(!!value)}
+        aria-label="Select row"
+      />
+    ),
+    enableSorting: false,
+    enableHiding: false,
+  },
   {
     accessorKey: "isActive",
     header: "Status",

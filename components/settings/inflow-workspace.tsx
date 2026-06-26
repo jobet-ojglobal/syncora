@@ -11,7 +11,7 @@ import { toast } from "sonner";
 import { INFLOW_EVENTS } from "@/lib/inflow/types/inflow";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "../ui/dialog";
-import { SyncButton } from "../shared/sync-button";
+import { SyncButtonOptions } from "../shared/sync-button";
 
 const InflowWorkspace = () => {
   const [pending, startTransition] = useTransition();
@@ -183,18 +183,30 @@ const InflowWorkspace = () => {
                 <CardDescription>Force historical inventory execution sweeps manually.</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4 pt-0 max-h-[300px] overflow-y-auto">
-                <SyncButton source="products" title="Products" />
-                <SyncButton source="categories" title="Categories" />
-                <SyncButton source="inventory" title="Inventory" />
-                <SyncButton source="team_members" title="Team Members" />
-                <SyncButton source="taxing_schemes" title="Taxing Schemes" />
-                <SyncButton source="currencies" title="Currencies" />
-                <SyncButton source="adjustment_reasons" title="Adjustment Reasons" />
-                <SyncButton source="pricing_schemes" title="Pricing Schemes" />
-                <SyncButton source="payment_terms" title="Payment Terms" />
-                <SyncButton source="product_cost_adjustments" title="Product Cost Adjustments" />
-                <SyncButton source="customers" title="Customers" />
-                <SyncButton source="vendors" title="Vendors" />
+                <SyncButtonOptions source="categories" title="Categories" />
+                <SyncButtonOptions source="locations" title="Locations" />
+                <SyncButtonOptions source="team_members" title="Team Members" />
+                <SyncButtonOptions source="taxing_schemes" title="Taxing Schemes" />
+                <SyncButtonOptions source="currencies" title="Currencies" />
+                <SyncButtonOptions source="pricing_schemes" title="Pricing Schemes" />
+                <SyncButtonOptions source="payment_terms" title="Payment Terms" />
+                <SyncButtonOptions source="adjustment_reasons" title="Adjustment Reasons" />
+                <SyncButtonOptions source="product_groups" title="Product Groups" />
+                <SyncButtonOptions source="product_group_images" title="Product Group Images" />
+                <SyncButtonOptions source="product_variants" title="Product Variants" />
+                <SyncButtonOptions source="products" title="Products" />
+                <SyncButtonOptions source="product_images" title="Product Images" />
+                <SyncButtonOptions source="product_attachments" title="Product Attachments" />
+                <SyncButtonOptions source="product_barcodes" title="Product Barcodes" />
+                <SyncButtonOptions source="product_taxes" title="Product Taxes" />
+                <SyncButtonOptions source="product_reorder_settings" title="Reorder Settings" />
+                <SyncButtonOptions source="product_operations" title="Product Operations" />
+                <SyncButtonOptions source="product_prices" title="Product Prices" />
+                <SyncButtonOptions source="product_boms" title="Bills of Materials (BOM)" />
+                <SyncButtonOptions source="product_cost_adjustments" title="Cost Adjustments" />
+                <SyncButtonOptions source="customers" title="Customers" />
+                <SyncButtonOptions source="vendors" title="Vendors" />
+                <SyncButtonOptions source="inventory" title="Inventory Levels" />
               </CardContent>
             </Card>
 

@@ -7,7 +7,7 @@ export const dynamic = "force-dynamic";
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { source } = body;
+    const { source, includes } = body;
 
     if (!source) {
       return NextResponse.json(
@@ -25,11 +25,12 @@ export async function POST(request: NextRequest) {
     });
 
     // Add job to queue
-    const job = await syncQueue.add(
+    await syncQueue.add(
       "sync",
       { 
         jobId: syncJob.id,
         source, 
+        includes: includes || [],
         timestamp: new Date().toISOString() 
       },
       { attempts: 3, backoff: { type: "exponential", delay: 2000 } }

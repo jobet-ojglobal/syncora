@@ -34,6 +34,7 @@ import {
 import { SlidersHorizontal } from "lucide-react"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { DataTablePagination } from "@/components/shared/data-table-pagination"
+import { DataTableBulkDelete } from "@/components/shared/data-table-bulk-delete"
 
 // 🟢 Extend props to receive server control hooks from the parent container
 interface DataTableProps<TData extends ParsedProduct, TValue> {
@@ -65,6 +66,7 @@ interface DataTableProps<TData extends ParsedProduct, TValue> {
   // Row mutation bubbles
   onRowDataUpdate?: (inflowId: string, updatedFields: Partial<TData>) => void
   onRowDelete?: (id: string) => void
+  onBulkDelete?: (ids: string[]) => void
 }
 
 export function ProductDataTable<TData extends ParsedProduct, TValue>({
@@ -83,6 +85,7 @@ export function ProductDataTable<TData extends ParsedProduct, TValue>({
   onPaginationChange,
   onRowDataUpdate,
   onRowDelete,
+  onBulkDelete
 }: DataTableProps<TData, TValue>) {
 
    
@@ -93,6 +96,7 @@ export function ProductDataTable<TData extends ParsedProduct, TValue>({
     tracking: false,
     primaryBarcode: false,
   })
+  const [rowSelection, setRowSelection] = React.useState({})
 
   const table = useReactTable({
     data,
@@ -109,12 +113,13 @@ export function ProductDataTable<TData extends ParsedProduct, TValue>({
     onColumnFiltersChange,
     onPaginationChange,
     onColumnVisibilityChange: setColumnVisibility,
-    
+    onRowSelectionChange: setRowSelection,
     state: {
       sorting,
       columnFilters,
       columnVisibility,
       pagination,
+      rowSelection,
     },
     meta: {
       updateRowData: (inflowId: string, isActive: boolean) => {
@@ -164,8 +169,25 @@ export function ProductDataTable<TData extends ParsedProduct, TValue>({
 
   const currentStatusValue = (columnFilters.find((f) => f.id === "isActive")?.value as string) ?? "all"
 
+  const selectedRows = table.getFilteredSelectedRowModel().rows
+
+  const handleBulkDeleteExecution = async () => {
+    if (!onBulkDelete) return
+    const selectedIds = selectedRows.map((row) => row.original.id)
+    
+    // Bubble up your core API promises to the component shell wrapper
+    onBulkDelete(selectedIds)
+    table.resetRowSelection() // Wipe column selection checkboxes clean on complete
+  }
+
   return (
     <div className="space-y-4 w-full">
+
+      <div className="flex-1 text-sm text-muted-foreground">
+        {table.getFilteredSelectedRowModel().rows.length} of{" "}
+        {table.getFilteredRowModel().rows.length} row(s) selected.
+      </div>
+
       {/* Filters Toolbar */}
       <div className="flex items-center justify-between gap-4 w-full">
         <div className="flex flex-1 items-center gap-2">
@@ -217,6 +239,10 @@ export function ProductDataTable<TData extends ParsedProduct, TValue>({
               options={categoryOptions}
             />
           )}
+          <DataTableBulkDelete
+            selectedCount={selectedRows.length}
+            onConfirm={handleBulkDeleteExecution}
+          />
         </div>
 
         <div className="flex items-center gap-3">
@@ -300,6 +326,8 @@ export function ProductDataTable<TData extends ParsedProduct, TValue>({
           </TableBody>
         </Table>
       </div>
+
+      
 
       {/* Pagination Controls */}
       <DataTablePagination

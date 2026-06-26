@@ -275,7 +275,7 @@ export function ExpandableGroupRow({ group, onToggleActive, onDeleteGroup }: Exp
             <DeleteButton
               itemId={group.inflowId}
               itemName={group.name}
-              endpointUrl={`/api/admin/groups/${group.inflowId}/soft-delete`}
+              endpointUrl={`/api/admin/groups/${group.inflowId}`}
               onSuccess={() => onDeleteGroup(group.inflowId)}
               variant="icon"
             />

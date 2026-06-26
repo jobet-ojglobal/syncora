@@ -3,8 +3,6 @@
 // Root
 // =====================================
 
-import { ProductPriceType } from "@/generated/prisma/enums";
-
 export interface InflowProductGroup {
   productGroupId: string;
   categoryId: string;
