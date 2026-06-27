@@ -94,7 +94,12 @@ export async function getProductGroupsInclude(
   );
 }
 
-
+export async function getVariantProductGroup(groupId: string) {
+  const data = await inflow.get<InflowProductGroup>(
+    `/product-groups/${groupId}?include=defaultProduct,category,images.image,options.optionValues`
+  );
+  return data;
+}
 
 export async function getProductGroup(groupId: string) {
   const data = await inflow.get<InflowProductGroup>(
@@ -102,3 +107,25 @@ export async function getProductGroup(groupId: string) {
   );
   return data;
 }
+
+
+// "products": [
+//     { id: "images", label: "Product Images", apiField: "images" },
+//     { id: "productBarcodes", label: "Barcodes & Identifiers", apiField: "productBarcodes" },
+//     { id: "taxCodes", label: "Tax Codes & Schemes", apiField: "taxCodes" },
+//     { id: "reorderSettings", label: "Location Reorder Settings", apiField: "reorderSettings" },
+//     { id: "productOperations", label: "Manufacturing Operations", apiField: "productOperations" },
+//     { id: "prices", label: "Price Schemes & Matrix Lists", apiField: "prices" },
+//     { id: "itemBoms", label: "Bill of Materials (BOM Components)", apiField: "itemBoms" },
+//     { id: "attachments", label: "File Attachments", apiField: "attachments" },
+//     { 
+//       id: "resolveGroupRelations", 
+//       label: "Link & Sync Parent Variant Groups", 
+//       apiField: "productVariant.productGroup.category,productVariant.productGroup.options.optionValues" 
+//     }
+//   ],
+//   "product_groups": [
+//     { id: "groupImages", label: "Product Group Shared Gallery", apiField: "images.image" },
+//     { id: "defaultProduct", label: "Default Product Fallback Reference", apiField: "defaultProduct" },
+//     { id: "groupVariants", label: "Deep Variant Tree Resolution", apiField: "productVariants.product" },
+//   ]

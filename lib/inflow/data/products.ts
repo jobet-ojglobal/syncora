@@ -73,6 +73,12 @@ export async function getProductsInclude(
   );
 }
 
+export async function getProductVariantGroup(productId: string) {
+  return inflow.get<InflowProduct>(
+    `/products/${productId}?include=images,productBarcodes,taxCodes,reorderSettings,productOperations,prices,cost,itemBoms,attachments,productVariant.productGroup.category,productVariant.productGroup.options.optionValues,productVariant.productGroup.images.image`
+  );
+}
+
 export async function getProduct(productId: string) {
   return inflow.get<InflowProduct>(
     `/products/${productId}?include=images,productBarcodes,taxCodes,reorderSettings,productOperations,prices,cost,itemBoms,attachments,productVariant.productGroup.category,productVariant.productGroup.options.optionValues,productVariant.productGroup.images.image`

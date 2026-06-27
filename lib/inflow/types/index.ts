@@ -887,6 +887,41 @@ export interface InflowShipLine {
   timestamp: string;
 }
 
+export interface InflowAllocationLine {
+  salesOrderPickAllocationLineId: string;
+  productId: string;
+  lineNum?: string | number | null;
+  locationId?: string | null;
+  sublocation?: string | null;
+  quantity?: any | null;
+  timestamp: string;
+}
+
+export interface InflowAllocationFailure {
+  salesOrderPickAllocationFailureId: string;
+  productId: string;
+  lineNum?: string | number | null;
+  hasExpiredLotsInStock: boolean;
+  quantity?: any | null;
+  timestamp: string;
+}
+
+export interface InflowRestockLine {
+  salesOrderRestockLineId: string;
+  productId: string;
+  description?: string | null;
+  locationId?: string | null;
+  sublocation?: string | null;
+  restockDate?: string | null;
+  quantity?: any | null;
+  timestamp: string;
+}
+
+export interface InflowCostOfGoodsSold {
+  salesOrderCostOfGoodsSoldId: string;
+  costOfGoodsSold: string;
+}
+
 // ==========================================
 // Root Sales Order Interface
 // ==========================================
@@ -976,13 +1011,22 @@ export interface InflowSalesOrder {
   tax2Rate: string;
 
   // Nested Arrays (from full response document)
-  customer?: Partial<InflowCustomer>;
+  // customer?: Partial<InflowCustomer>;
+  // lines: InflowSalesOrderLine[];
+  // packLines?: InflowPackLine[];
+  // paymentLines?: InflowPaymentLine[];
+  // pickLines?: InflowPickLine[];
+  // shipLines?: InflowShipLine[];
+  // location?: Partial<InflowLocation>;
   lines: InflowSalesOrderLine[];
-  packLines?: InflowPackLine[];
-  paymentLines?: InflowPaymentLine[];
-  pickLines?: InflowPickLine[];
-  shipLines?: InflowShipLine[];
-  location?: Partial<InflowLocation>;
+  packLines: InflowPackLine[];
+  pickLines: InflowPickLine[];
+  pickAllocationLines: InflowAllocationLine[];
+  pickAllocationFailures: InflowAllocationFailure[];
+  restockLines: InflowRestockLine[];
+  shipLines: InflowShipLine[];
+  paymentLines: InflowPaymentLine[];
+  costOfGoodsSold?: InflowCostOfGoodsSold | null;
 
   currency: InflowCurrency;
   lastModifiedBy: InflowTeamMember;

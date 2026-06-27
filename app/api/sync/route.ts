@@ -1,3 +1,4 @@
+// app/api/sync/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { syncQueue } from "@/lib/queues/sync.queue";

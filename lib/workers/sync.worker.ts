@@ -87,10 +87,6 @@ const worker = new Worker(
       },
     };
 
-    if (source === "products") {
-      
-    }
-
     try {
       await prisma.syncJob.update({
         where: { id: jobId },
@@ -215,7 +211,12 @@ const worker = new Worker(
       throw error;
     }
   },
-  { connection }
+  { 
+    connection,
+    // Concurrency controls how many webhooks this worker processes simultaneously.
+    // Webhooks are fast, so you can safely handle multiple concurrently.
+    concurrency: 5 
+    }
 );
 
 worker.on("completed", (job) => {
