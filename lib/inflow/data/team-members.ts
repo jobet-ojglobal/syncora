@@ -16,9 +16,3 @@ export async function getTeamMembers( count = 100,
     `/team-members?${params.toString()}`
   );
 }
-
-export async function getTeamMember(memberId: string) {
-  return inflow.get<InflowTeamMember>(
-    `/team-members/${memberId}`
-  );
-}

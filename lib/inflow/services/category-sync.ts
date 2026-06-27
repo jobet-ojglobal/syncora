@@ -26,7 +26,7 @@ export async function syncCategory(
       : null;
   }
 
-  await tx.category.upsert({
+  return await tx.category.upsert({
     where: {
       inflowId: category.categoryId,
     },

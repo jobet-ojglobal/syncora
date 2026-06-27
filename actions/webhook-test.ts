@@ -1,7 +1,7 @@
 "use server";
 
 import { inflow } from "@/lib/inflow/inflow.client";
-import { findWebhook, subscribeWebhook } from "@/lib/inflow/services/webhook.service";
+import { findWebhook, subscribeWebhook } from "@/lib/inflow/webhooks/webhook.service";
 import { prisma } from "@/lib/prisma";
 
 export type ConnectionResult =

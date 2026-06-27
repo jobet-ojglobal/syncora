@@ -12,6 +12,8 @@ import {
 } from "./helpers";
 import { genInflowUniqueSlug } from "@/helpers/genUniqueSlug";
 import { Prisma } from "@/generated/prisma/client";
+import { getVendor } from "../data/vendors";
+import { syncVendor } from "./vendor.sync";
 
 export async function syncProduct(
   tx: any,
@@ -54,7 +56,7 @@ export async function syncProduct(
     }
   }
 
-  // 3. 🛡️ FOREIGN KEY GUARD: Check if the TeamMember exists before assigning lastModifiedById
+  // 3. 🛡️ SELF-HEALING FOREIGN KEY GUARD: Vendor
   let validLastVendorId: string | null = null;
   if (product.lastVendorId) {
     const localVendor = await tx.vendor.findUnique({
@@ -65,9 +67,22 @@ export async function syncProduct(
     if (localVendor) {
       validLastVendorId = localVendor.inflowId;
     } else {
-      console.warn(
-        `[Sync Notification] Vendor with inflowId "${product.lastVendorId}" not synced yet. Setting product.lastVendorId to null to avoid constraint errors.`
-      );
+      try {
+        console.log(`[JIT Sync] Vendor "${product.lastVendorId}" missing locally. Fetching from cloud...`);
+        const cloudVendor = await getVendor(product.lastVendorId);
+        if (cloudVendor) {
+          // Initialize empty caches required by your modular single vendor sync component
+          const vendorCaches = {
+            verifiedPaymentTermsIds: new Set<string>(),
+            verifiedCurrencyIds: new Set<string>(),
+          };
+          const syncedVendor = await syncVendor(tx, cloudVendor, vendorCaches);
+          validLastVendorId = syncedVendor.inflowId;
+        }
+      } catch (err) {
+        console.error(`[JIT Sync Error] Could not recover Vendor "${product.lastVendorId}":`, err);
+        // Fallback safely to null to preserve primary process stability if cloud asset was deleted
+      }
     }
   }
 

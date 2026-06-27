@@ -5,7 +5,7 @@ import {
   findWebhook, 
   createOrUpdateWebhook, 
   deleteWebhook 
-} from "@/lib/inflow/services/webhook.service";
+} from "@/lib/inflow/webhooks/webhook.service";
 
 // GET /api/settings/inflow -> Fetch status
 export async function GET() {

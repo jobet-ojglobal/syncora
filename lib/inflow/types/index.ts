@@ -790,6 +790,356 @@ export interface InflowVendor {
   vendorItems?: InflowVendorItem[];
 }
 
+// ==========================================
+// Reusable Shared Types / JSON Sub-structures
+// ==========================================
+
+export interface InflowDiscount {
+  value: string; // "0.00000"
+  isPercent: boolean;
+}
+
+export interface InflowQuantity {
+  standardQuantity: string;
+  uomQuantity: string;
+  uom: string;
+  serialNumbers: string[];
+}
+
+export interface InflowValueItem {
+  value: string;
+  isPercent: boolean;
+}
+
+export interface InflowUOMConversion {
+  name: string;
+  conversionRatio: {
+    standardQuantity: string;
+    uomQuantity: string;
+  };
+}
+
+// ==========================================
+// Order Sub-Line Interfaces
+// ==========================================
+
+export interface InflowSalesOrderLine {
+  salesOrderLineId: string;
+  description: string | null;
+  discount: InflowDiscount;
+  isDiscarded: boolean;
+  productId: string;
+  quantity: InflowQuantity;
+  returnDate: string | null;
+  serviceCompleted: boolean | null;
+  subTotal: string;
+  tax1Rate: string;
+  tax2Rate: string;
+  taxCodeId: string | null;
+  timestamp: string;
+  unitPrice: string;
+  product?: Partial<InflowProduct>;
+}
+
+export interface InflowPackLine {
+  salesOrderPackLineId: string;
+  containerNumber: string | null;
+  description: string | null;
+  productId: string;
+  quantity: Partial<InflowQuantity>;
+  timestamp: string;
+  product?: Partial<InflowProduct>;
+}
+
+export interface InflowPickLine {
+  salesOrderPickLineId: string;
+  lineNum: string | null;
+  locationId: string | null;
+  sublocation: string | null;
+  pickDate: string | null;
+  productId: string;
+  quantity: InflowQuantity;
+  timestamp: string;
+  description?: string | null;
+}
+
+export interface InflowPaymentLine {
+  salesOrderPaymentHistoryLineId: string;
+  lineNum: number;
+  amount: string;
+  datePaid: string | null;
+  paymentMethod: string | null;
+  paymentType: string | null;
+  referenceNumber: string | null;
+  remarks: string | null;
+  timestamp: string;
+}
+
+export interface InflowShipLine {
+  salesOrderShipLineId: string;
+  carrier: string | null;
+  shippedDate: string | null;
+  trackingNumber: string | null;
+  easyPostShipmentId: string | null;
+  easyPostShipmentStatus: string | null;
+  easyPostConfirmationEmailAddress: string | null;
+  containers: any[]; 
+  timestamp: string;
+}
+
+// ==========================================
+// Root Sales Order Interface
+// ==========================================
+
+export interface InflowSalesOrder {
+  salesOrderId: string;
+  orderNumber: string;
+  poNumber: string | null;
+  externalId: string | null;
+  source: string | null;
+  
+  // Financials
+  subTotal: string;
+  total: string;
+  amountPaid: string;
+  balance: string;
+  orderFreight: string;
+  returnFee: string;
+  returnFreight: string;
+  exchangeRate: number;
+  exchangeRateAutoPulled: string | null;
+  
+  // Statuses & Flags
+  paymentStatus: string;
+  inventoryStatus: string;
+  isCancelled: boolean;
+  isCompleted: boolean;
+  isFullyPicked: boolean;
+  isInvoiced: boolean;
+  isPicking: boolean;
+  isPrioritized: boolean;
+  isQuote: boolean;
+  isTaxInclusive: boolean;
+  needsConfirmation: boolean;
+  
+  // Dates
+  orderDate: string | null;
+  dueDate: string | null;
+  invoicedDate: string | null;
+  paidDate: string | null;
+  requestedShipDate: string | null;
+  shippedDate: string | null;
+  
+  // Contacts & Remarks
+  contactName: string | null;
+  email: string | null;
+  phone: string | null;
+  orderRemarks: string | null;
+  packRemarks: string | null;
+  pickRemarks: string | null;
+  restockRemarks: string | null;
+  returnRemarks: string | null;
+  shipRemarks: string | null;
+  shipToCompanyName: string | null;
+  showShipping: boolean;
+  timestamp: string;
+  
+  // Addresses & Custom Data
+  billingAddress: InflowAddress | null;
+  shippingAddress: InflowAddress | null;
+  customFields: InflowCustomFields;
+  nonCustomerCost: InflowValueItem | null;
+  sameBillingAndShipping: boolean;
+
+  // Foreign Identifiers
+  customerId: string;
+  locationId: string | null;
+  assignedToTeamMemberId: string | null;
+  confirmerTeamMemberId: string | null;
+  salesRepTeamMemberId: string | null;
+  salesRep: string | null;
+  paymentTermsId: string | null;
+  pricingSchemeId: string | null;
+  taxingSchemeId: string | null;
+  currencyId: string | null;
+  lastModifiedById: string | null;
+
+  // Tax Setup
+  calculateTax2OnTax1: boolean;
+  tax1: string;
+  tax1Name: string | null;
+  tax1OnShipping: boolean;
+  tax1Rate: string;
+  tax2: string;
+  tax2Name: string | null;
+  tax2OnShipping: boolean;
+  tax2Rate: string;
+
+  // Nested Arrays (from full response document)
+  customer?: Partial<InflowCustomer>;
+  lines: InflowSalesOrderLine[];
+  packLines?: InflowPackLine[];
+  paymentLines?: InflowPaymentLine[];
+  pickLines?: InflowPickLine[];
+  shipLines?: InflowShipLine[];
+  location?: Partial<InflowLocation>;
+
+  currency: InflowCurrency;
+  lastModifiedBy: InflowTeamMember;
+}
+
+
+// ==========================================
+// Reusable Sub-structures
+// ==========================================
+
+
+export interface InflowPurchaseValueItem {
+  value: string; // e.g., "0.00000"
+  isPercent: boolean;
+}
+
+export interface InflowPurchaseQuantity {
+  standardQuantity: string;
+  uomQuantity: string;
+  uom: string;
+  serialNumbers: string[];
+}
+
+export interface InflowPurchaseUOMDetails {
+  name: string;
+  conversionRatio: {
+    standardQuantity: string;
+    uomQuantity: string;
+  };
+}
+
+
+
+// ==========================================
+// Lines array items
+// ==========================================
+
+export interface InflowPurchaseOrderLine {
+  purchaseOrderLineId: string;
+  description: string | null;
+  discount: InflowPurchaseValueItem;
+  productHeight: string | null;
+  productId: string;
+  productLength: string | null;
+  productWeight: string | null;
+  productWidth: string | null;
+  quantity: InflowPurchaseQuantity;
+  returnDate: string | null;
+  serviceCompleted: boolean | null;
+  subTotal: string;
+  tax1Rate: string;
+  tax2Rate: string;
+  taxCodeId: string | null;
+  timestamp: string;
+  unitPrice: string;
+  vendorItemCode: string | null;
+  product?: InflowProduct;
+  taxCode?: Record<string, any> | null;
+}
+
+export interface InflowPurchaseReceiveLine {
+  purchaseOrderReceiveLineId: string;
+  description: string | null;
+  locationId: string | null;
+  lotId: string | null;
+  productHeight: string | null;
+  productId: string;
+  productLength: string | null;
+  productWeight: string | null;
+  productWidth: string | null;
+  quantity: InflowPurchaseQuantity;
+  receiveDate: string | null;
+  sublocation: string | null; // e.g., "A-01"
+  timestamp: string;
+  vendorItemCode: string | null;
+  location?: Record<string, any> | null;
+  product?: Record<string, any> | null;
+}
+
+
+// ==========================================
+// Root Inflow Purchase Order Payload
+// ==========================================
+
+export interface InflowPurchaseOrder {
+  purchaseOrderId: string;
+  amountPaid: string;
+  approverTeamMemberId: string | null;
+  assignedToTeamMemberId: string | null;
+  balance: string;
+  calculateTax2OnTax1: boolean;
+  carrier: string;
+  contactName: string;
+  currencyId: string;
+  customFields: InflowCustomFields;
+  dueDate: string | null;
+  email: string;
+  exchangeRate: string;
+  exchangeRateAutoPulled: string | null;
+  freight: string;
+  inventoryStatus: 'fulfilled' | 'unfulfilled' | string;
+  isCancelled: boolean;
+  isCompleted: boolean;
+  isQuote: boolean;
+  isTaxInclusive: boolean;
+  lastModifiedById: string;
+  locationId: string;
+  nonVendorCosts: InflowPurchaseValueItem;
+  orderDate: string | null;
+  orderNumber: string;
+  orderRemarks: string;
+  paidDate: string | null;
+  paymentStatus: 'unpaid' | 'paid' | 'partial' | string;
+  paymentTermsId: string;
+  phone: string;
+  receiveRemarks: string;
+  requestShipDate: string | null;
+  returnExtra: string;
+  returnFee: string;
+  returnRemarks: string;
+  shipToAddress: InflowAddress;
+  shipToCompanyName: string;
+  showShipping: boolean;
+  subTotal: string;
+  tax1: string;
+  tax1Name: string;
+  tax1OnShipping: boolean;
+  tax1Rate: string;
+  tax2: string;
+  tax2Name: string;
+  tax2OnShipping: boolean;
+  tax2Rate: string;
+  taxingSchemeId: string;
+  timestamp: string;
+  total: string;
+  unstockRemarks: string;
+  vendorAddress: InflowAddress;
+  vendorId: string;
+  vendorOrderNumber: string;
+
+  // Relationship blocks from data layout
+  approverTeamMember: Record<string, any> | null;
+  assignedToTeamMember: Record<string, any> | null;
+  attachments: any[];
+  currency: InflowCurrency;
+  lastModifiedBy: InflowTeamMember;
+  lines: InflowPurchaseOrderLine[];
+  location: InflowLocation;
+  paymentLines: any[];
+  paymentTerms: InflowPaymentTerms;
+  receiveLines: InflowPurchaseReceiveLine[];
+  taxingScheme: Record<string, any>;
+  unstockLines: any[];
+  vendor: Record<string, any>;
+}
+
+
 // Shared Attachment
 
 

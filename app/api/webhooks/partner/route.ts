@@ -34,11 +34,11 @@ export async function POST(request: NextRequest) {
     switch (eventType) {
 
       case "SalesOrderCreated": {
-        const inflowId = payload.batch_id;
+        const batchID = payload.batch_id;
         
-        if (inflowId) {
+        if (batchID) {
           // Pass the target item ID along with the audit log entry reference
-          // await InflowProductWebhookService.handleProductCreate(inflowId, loggedEvent.id);
+          // await InflowProductWebhookService.handleProductCreate(batchID, loggedEvent.id);
 
           partnerApi.post("/transactions/sales/cloud-ack", {
             "batch_id": payload.batch_id,
@@ -51,11 +51,10 @@ export async function POST(request: NextRequest) {
       }
 
       case "SalesOrderUpdated": {
-        const inflowId = payload.batch_id;
+        const batchID = payload.batch_id;
         
-        if (inflowId) {
+        if (batchID) {
         //   await InflowProductWebhookService.handleProductUpdate(inflowId, loggedEvent.id);
-
           partnerApi.post("/transactions/sales/cloud-ack", {
             "batch_id": payload.batch_id,
             "outbound_audit_id": payload.outboundAuditId,

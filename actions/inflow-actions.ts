@@ -7,7 +7,7 @@ import {
   deleteWebhook, 
   INFLOW_EVENTS,
   InflowEvent
-} from "@/lib/inflow/services/webhook.service";
+} from "@/lib/inflow/webhooks/webhook.service";
 import { revalidatePath } from "next/cache";
 
 export async function getWebhookStatus() {

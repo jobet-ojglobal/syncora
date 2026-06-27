@@ -207,6 +207,8 @@ const InflowWorkspace = () => {
                 <SyncButtonOptions source="customers" title="Customers" />
                 <SyncButtonOptions source="vendors" title="Vendors" />
                 <SyncButtonOptions source="inventory" title="Inventory Levels" />
+                <SyncButtonOptions source="sales_orders" title="Sales Orders" />
+                <SyncButtonOptions source="purchase_orders" title="Purchase Orders" />
               </CardContent>
             </Card>
 

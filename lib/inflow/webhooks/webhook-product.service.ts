@@ -1,10 +1,10 @@
 // lib/inflow/services/webhook-product.service.ts
 import { prisma } from "@/lib/prisma";
 import { getProduct } from "../data/products";
-import { syncCategory } from "./category-sync";
-import { syncProductGroup } from "./product-group-sync";
-import { syncProduct } from "./product.sync";
-import { syncVariant } from "./variant.sync";
+import { syncCategory } from "../services/category-sync";
+import { syncProductGroup } from "../services/product-group-sync";
+import { syncProduct } from "../services/product.sync";
+import { syncVariant } from "../services/variant.sync";
 
 export class InflowProductWebhookService {
   /**
@@ -92,7 +92,11 @@ export class InflowProductWebhookService {
 
     return { success: true };
   }
-  
+}
+
+
+
+
   // private static async syncProductPayload(inflowId: string) {
   //   if (!inflowId) {
   //     throw new Error("Cannot process product webhook without a valid inFlow productId.");
@@ -184,4 +188,3 @@ export class InflowProductWebhookService {
   //   console.log(`[Webhook Service] Successfully matched and updated local product models for ID: ${inflowId}`);
   //   return { success: true };
   // }
-}

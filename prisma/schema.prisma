@@ -206,6 +206,18 @@ model Product {
   bomComponents     ProductBom[]      @relation("ParentProduct")
   bomUsedIn         ProductBom[]      @relation("ChildProduct")
 
+  orderLineItems         SalesOrderLine[]
+  packLines              SalesOrderPackLine[]
+  pickLines              SalesOrderPickLine[]
+  restockLines           SalesOrderRestockLine[]
+  pickAllocationLines    SalesOrderPickAllocationLine[]
+  pickAllocationFailures SalesOrderPickAllocationFailure[]
+
+
+  purchaseLines PurchaseOrderLine[]
+  receiveLines  PurchaseOrderReceiveLine[]
+  unstockLines  PurchaseOrderUnstockLine[]
+
   createdAt             DateTime @default(now())
   updatedAt             DateTime @updatedAt
   deletedAt   DateTime?
@@ -704,13 +716,15 @@ model Location {
   isActive        Boolean  @default(true)
   isDefault       Boolean  @default(false)
 
-  address         LocationAddress?
-  inventories     Inventory[]
-  sublocations    Sublocation[]
+  address             LocationAddress?
+  inventories         Inventory[]
+  sublocations        Sublocation[]
   adjustmentLines     InventoryAdjustmentLine[]
   inventoryLedger     InventoryLedger[]
-  teamLocations      TeamMemberLocation[]
+  teamLocations       TeamMemberLocation[]
   customers           Customer[]
+  salesOrders         SalesOrder[]
+  purchaseOrders      PurchaseOrder[]
   
   outgoingTransfers TransferOrder[] @relation("TransferSourceLocation")
   incomingTransfers TransferOrder[]  @relation("TransferTargetLocation")
@@ -975,6 +989,13 @@ model TeamMember {
   productAttachments ProductAttachment[]
   products           Product[]
 
+  assignedOrders     SalesOrder[] @relation("AssignedOrders")
+  confirmedOrders    SalesOrder[] @relation("ConfirmedOrders")
+  salesRepOrders     SalesOrder[] @relation("SalesRepOrders")
+
+  poAssignedOrders PurchaseOrder[] @relation("POAssignedOrders")
+  poApprovedOrders PurchaseOrder[] @relation("POApprovedOrders")
+
   user                User?
 
   createdAt           DateTime @default(now())
@@ -1164,6 +1185,8 @@ model Customer {
   balances   CustomerBalance[]
   credits    CustomerCredit[]
 
+  salesOrders            SalesOrder[]
+
   user       User?
 
   createdAt  DateTime @default(now())
@@ -1276,6 +1299,7 @@ model Vendor {
   attachments     VendorAttachment[]
   vendorItems     VendorItem[]
   reorderSettings reorderSetting[]
+  purchaseOrders        PurchaseOrder[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -1530,6 +1554,7 @@ model PaymentTerms {
 
   customers Customer[]
   vendors   Vendor[]
+  salesOrders    SalesOrder[]
 
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
@@ -1619,6 +1644,545 @@ model PartnerWebhookEvent {
   @@map("partner_webhook_event")
 }
 
+
+// ==========================================
+// Sales Order Models
+// ==========================================
+
+model SalesOrder {
+  id                     String    @id @default(cuid())
+  inflowId               String    @unique
+  orderNumber            String    @unique
+  poNumber               String?
+  externalId             String?
+  source                 String?
+  
+  // Financials
+  subTotal               Decimal   @db.Decimal(18, 5)
+  total                  Decimal   @db.Decimal(18, 5)
+  amountPaid             Decimal   @db.Decimal(18, 5)
+  balance                Decimal   @db.Decimal(18, 5)
+  orderFreight           Decimal   @db.Decimal(18, 5)
+  returnFee              Decimal   @db.Decimal(18, 5)
+  returnFreight          Decimal   @db.Decimal(18, 5)
+  exchangeRate           Float     @default(1.0)
+  exchangeRateAutoPulled DateTime?
+  
+  // Statuses & Flags
+  paymentStatus          String
+  inventoryStatus        String
+  isCancelled            Boolean   @default(false)
+  isCompleted            Boolean   @default(false)
+  isFullyPicked          Boolean   @default(false)
+  isInvoiced             Boolean   @default(false)
+  isPicking              Boolean   @default(false)
+  isPrioritized          Boolean   @default(false)
+  isQuote                Boolean   @default(false)
+  isTaxInclusive         Boolean   @default(false)
+  needsConfirmation      Boolean   @default(false)
+  
+  // Dates
+  orderDate              DateTime?
+  dueDate                DateTime?
+  invoicedDate           DateTime?
+  paidDate               DateTime?
+  requestedShipDate      DateTime?
+  shippedDate            DateTime?
+  
+  // Contact & Remarks
+  contactName            String?
+  email                  String?
+  phone                  String?
+  orderRemarks           String?   @db.Text
+  packRemarks            String?   @db.Text
+  pickRemarks            String?   @db.Text
+  restockRemarks         String?   @db.Text
+  returnRemarks          String?   @db.Text
+  shipRemarks            String?   @db.Text
+  shipToCompanyName      String?
+  showShipping           Boolean   @default(true)
+  timestamp              String
+  
+  // Embedded / JSON Objects
+  billingAddress         Json?     // Stores address1, address2, city, state, country, etc.
+  shippingAddress        Json?     // Stores address1, address2, city, state, country, etc.
+  customFields           Json?     // Stores custom1 through custom10
+  nonCustomerCost        Json?     // Stores { value: "19.99", isPercent: true }
+  sameBillingAndShipping Boolean   @default(false)
+
+  // Relations
+  customerId             String
+  customer               Customer  @relation(fields: [customerId], references: [inflowId])
+  
+  locationId             String?
+  location               Location? @relation(fields: [locationId], references: [inflowId])
+  
+  assignedToTeamMemberId String?
+  assignedToTeamMember   TeamMember? @relation("AssignedOrders", fields: [assignedToTeamMemberId], references: [inflowId])
+  
+  confirmerTeamMemberId  String?
+  confirmerTeamMember    TeamMember? @relation("ConfirmedOrders", fields: [confirmerTeamMemberId], references: [inflowId])
+  
+  salesRepTeamMemberId   String?
+  salesRepTeamMember     TeamMember? @relation("SalesRepOrders", fields: [salesRepTeamMemberId], references: [inflowId])
+  salesRep               String?
+
+  paymentTermsId         String?
+  paymentTerms           PaymentTerms? @relation(fields: [paymentTermsId], references: [inflowId])
+  
+  pricingSchemeId        String?
+  taxingSchemeId         String?
+  currencyId             String?
+  lastModifiedById       String?
+
+  // Tax Details
+  calculateTax2OnTax1    Boolean   @default(false)
+  tax1                   Decimal   @db.Decimal(18, 5)
+  tax1Name               String?
+  tax1OnShipping         Boolean   @default(false)
+  tax1Rate               Decimal   @db.Decimal(18, 5)
+  tax2                   Decimal   @db.Decimal(18, 5)
+  tax2Name               String?
+  tax2OnShipping         Boolean   @default(false)
+  tax2Rate               Decimal   @db.Decimal(18, 5)
+
+  // Has-Many Relations
+  lines                  SalesOrderLine[]
+  packLines              SalesOrderPackLine[]
+  paymentLines           SalesOrderPaymentLine[]
+  pickLines              SalesOrderPickLine[]
+  restockLines           SalesOrderRestockLine[]
+  pickAllocationLines    SalesOrderPickAllocationLine[]
+  pickAllocationFailures SalesOrderPickAllocationFailure[]
+  shipLines              SalesOrderShipLine[]
+  costOfGoodsSold        CostOfGoodsSold?
+  attachments            SalesOrderAttachment[]
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  @@index([inflowId])
+  @@index([orderNumber])
+  @@index([customerId])
+  @@index([locationId])
+  @@index([paymentStatus])
+  @@index([orderDate])
+
+  @@map("sales_order")
+}
+
+model SalesOrderLine {
+  salesOrderLineId String     @id @default(uuid())
+  salesOrderId     String     
+  salesOrder       SalesOrder @relation(fields: [salesOrderId], references: [inflowId], onDelete: Cascade)
+  
+  productId        String
+  product          Product    @relation(fields: [productId], references: [inflowId])
+  
+  description      String?    @db.Text
+  unitPrice        Decimal    @db.Decimal(18, 5)
+  subTotal         Decimal    @db.Decimal(18, 5)
+  discount         Json?      // Stores { value: "0.00", isPercent: true }
+  isDiscarded      Boolean    @default(false)
+  serviceCompleted Boolean?
+  returnDate       DateTime?
+  
+  quantity         Json       // Stores standardQuantity, uomQuantity, uom, and serialNumbers array
+  tax1Rate         Decimal    @db.Decimal(18, 5)
+  tax2Rate         Decimal    @db.Decimal(18, 5)
+  taxCodeId        String?
+  timestamp        String
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([salesOrderId])
+  @@index([productId])
+
+  @@map("sales_order_line")
+}
+
+model SalesOrderPackLine {
+  salesOrderPackLineId String     @id @default(uuid())
+  salesOrderId         String
+  salesOrder           SalesOrder @relation(fields: [salesOrderId], references: [inflowId], onDelete: Cascade)
+  
+  productId            String
+  product              Product    @relation(fields: [productId], references: [inflowId])
+  
+  containerNumber      String?
+  description          String?
+  quantity             Json       // Holds quantity object variants
+  timestamp            String
+
+  @@index([salesOrderId])
+  @@index([productId])
+
+  @@map("sales_order_pack_line")
+}
+
+model SalesOrderPickLine {
+  salesOrderPickLineId String     @id @default(uuid())
+  salesOrderId         String
+  salesOrder           SalesOrder @relation(fields: [salesOrderId], references: [inflowId], onDelete: Cascade)
+  
+  productId            String
+  product              Product    @relation(fields: [productId], references: [inflowId])
+  
+  lineNum              String?
+  locationId           String?
+  sublocation          String?
+  pickDate             DateTime?
+  description          String?
+  quantity             Json
+  timestamp            String
+
+  @@index([salesOrderId])
+  @@index([productId])
+
+  @@map("sales_order_pick_line")
+}
+
+model SalesOrderPickAllocationLine {
+  salesOrderPickAllocationLineId String     @id @default(uuid())
+  salesOrderId                   String
+  salesOrder                     SalesOrder @relation(fields: [salesOrderId], references: [inflowId], onDelete: Cascade)
+  
+  productId                      String
+  product                        Product    @relation(fields: [productId], references: [inflowId])
+  
+  lineNum                        String?
+  locationId                     String?
+  sublocation                    String?
+  quantity                       Json
+  timestamp                      String
+
+  @@index([salesOrderId])
+  @@index([productId])
+
+  @@map("sales_order_pick_allocation_line")
+}
+
+model SalesOrderPickAllocationFailure {
+  salesOrderPickAllocationFailureId String     @id @default(uuid())
+  salesOrderId                      String
+  salesOrder                        SalesOrder @relation(fields: [salesOrderId], references: [inflowId], onDelete: Cascade)
+  
+  productId                         String
+  product                           Product    @relation(fields: [productId], references: [inflowId])
+  
+  lineNum                           String?
+  hasExpiredLotsInStock             Boolean    @default(false)
+  quantity                          Json
+  timestamp                         String
+
+  @@index([salesOrderId])
+  @@index([productId])
+
+  @@map("sales_order_pick_allocation_failure")
+}
+
+model SalesOrderRestockLine {
+  salesOrderRestockLineId String     @id @default(uuid())
+  salesOrderId            String
+  salesOrder              SalesOrder @relation(fields: [salesOrderId], references: [inflowId], onDelete: Cascade)
+  
+  productId               String
+  product                 Product    @relation(fields: [productId], references: [inflowId])
+  
+  description             String?
+  locationId              String?
+  sublocation             String?
+  restockDate             DateTime?
+  quantity                Json
+  timestamp               String
+
+  @@index([salesOrderId])
+  @@index([productId])
+
+  @@map("sales_order_restock_line")
+}
+
+model SalesOrderShipLine {
+  salesOrderShipLineId String     @id @default(uuid())
+  salesOrderId         String
+  salesOrder           SalesOrder @relation(fields: [salesOrderId], references: [inflowId], onDelete: Cascade)
+  
+  carrier              String?
+  trackingNumber       String?
+  shippedDate          DateTime?
+  easyPostShipmentId   String?
+  easyPostShipmentStatus String?
+  easyPostConfirmationEmailAddress String?
+  containers           Json?      // To support nested structured array layouts if present
+  timestamp            String
+
+  @@index([salesOrderId])
+
+  @@map("sales_order_ship_line")
+}
+
+model SalesOrderPaymentLine {
+  salesOrderPaymentHistoryLineId String     @id @default(uuid())
+  salesOrderId                   String
+  salesOrder                     SalesOrder @relation(fields: [salesOrderId], references: [inflowId], onDelete: Cascade)
+  
+  lineNum                        Int
+  amount                         Decimal    @db.Decimal(18, 5)
+  datePaid                       DateTime?
+  paymentMethod                  String?
+  paymentType                    String?
+  referenceNumber                String?
+  remarks                        String?    @db.Text
+  timestamp                      String
+
+  @@index([salesOrderId])
+
+  @@map("sales_order_payment_line")
+}
+
+model CostOfGoodsSold {
+  salesOrderCostOfGoodsSoldId String     @id @default(uuid())
+  salesOrderId                String     @unique
+  salesOrder                  SalesOrder @relation(fields: [salesOrderId], references: [inflowId], onDelete: Cascade)
+  costOfGoodsSold             Decimal    @db.Decimal(18, 5)
+
+  @@map("cost_of_goods_sold")
+}
+
+model SalesOrderAttachment {
+  attachmentId     String     @id @default(uuid())
+  salesOrderId     String
+  salesOrder       SalesOrder @relation(fields: [salesOrderId], references: [inflowId], onDelete: Cascade)
+  attachmentUrl    String
+  fileName         String
+  fileSize         Json?      // Empty or structured size metadata
+  lastModDttm      DateTime?
+  lastModifiedById String?
+
+  @@index([salesOrderId])
+
+  @@map("sales_order_attachment")
+}
+
+
+// ==========================================
+// Purchase Order Models
+// ==========================================
+
+model PurchaseOrder {
+  id                     String    @id @default(cuid())
+  inflowId               String    @unique
+  orderNumber            String    @unique // e.g., "PO-000123"
+  vendorOrderNumber      String?
+  
+  // Financials
+  subTotal               Decimal   @db.Decimal(18, 5)
+  total                  Decimal   @db.Decimal(18, 5)
+  amountPaid             Decimal   @db.Decimal(18, 5)
+  balance                Decimal   @db.Decimal(18, 5)
+  freight                Decimal   @db.Decimal(18, 5)
+  returnFee              Decimal   @db.Decimal(18, 5)
+  returnExtra            Decimal   @db.Decimal(18, 5)
+  exchangeRate           Float     @default(1.0)
+  exchangeRateAutoPulled DateTime?
+
+  // Statuses & Flags
+  paymentStatus          String    // e.g., "Quote"
+  inventoryStatus        String    // e.g., "Quote"
+  isCancelled            Boolean   @default(false)
+  isCompleted            Boolean   @default(false)
+  isQuote                Boolean   @default(false)
+  isTaxInclusive         Boolean   @default(false)
+  showShipping           Boolean   @default(true)
+  carrier                String?
+
+  // Dates
+  orderDate              DateTime?
+  dueDate                DateTime?
+  requestShipDate        DateTime?
+
+  // Contact & Remarks
+  contactName            String?
+  email                  String?
+  phone                  String?
+  orderRemarks           String?   @db.Text
+  receiveRemarks         String?   @db.Text
+  returnRemarks          String?   @db.Text
+  unstockRemarks         String?   @db.Text
+  shipToCompanyName      String?
+  timestamp              String
+
+  // Embedded Structured JSON Data
+  shipToAddress          Json?     // Stores complete address sub-object
+  vendorAddress          Json?     // Stores complete address sub-object
+  customFields           Json?     // Stores custom1 through custom10
+  nonVendorCosts         Json?     // Stores { value: "19.99", isPercent: true }
+
+  // Relations
+  vendorId               String
+  vendor                 Vendor    @relation(fields: [vendorId], references: [inflowId])
+
+  locationId             String?
+  location               Location? @relation(fields: [locationId], references: [inflowId])
+
+  assignedToTeamMemberId String?
+  assignedToTeamMember   TeamMember? @relation("POAssignedOrders", fields: [assignedToTeamMemberId], references: [inflowId])
+  
+  approverTeamMemberId   String?
+  approverTeamMember     TeamMember? @relation("POApprovedOrders", fields: [approverTeamMemberId], references: [inflowId])
+
+  lastModifiedById       String?
+  currencyId             String?
+  paymentTermsId         String?
+  taxingSchemeId         String?
+
+  // Tax Subfields
+  calculateTax2OnTax1    Boolean   @default(false)
+  tax1                   Decimal   @db.Decimal(18, 5)
+  tax1Name               String?
+  tax1OnShipping         Boolean   @default(false)
+  tax1Rate               Decimal   @db.Decimal(18, 5)
+  tax2                   Decimal   @db.Decimal(18, 5)
+  tax2Name               String?
+  tax2OnShipping         Boolean   @default(false)
+  tax2Rate               Decimal   @db.Decimal(18, 5)
+
+  // Dependents / Line Array Relations
+  lines                  PurchaseOrderLine[]
+  paymentLines           PurchaseOrderPaymentLine[]
+  receiveLines           PurchaseOrderReceiveLine[]
+  unstockLines           PurchaseOrderUnstockLine[]
+  attachments            PurchaseOrderAttachment[]
+
+  @@index([inflowId])
+  @@index([orderNumber])
+  @@index([vendorId])
+  @@index([locationId])
+  @@index([paymentStatus])
+  @@index([orderDate])
+
+  @@map("purchase_order")
+}
+
+model PurchaseOrderLine {
+  purchaseOrderLineId String        @id @default(uuid())
+  purchaseOrderId     String
+  purchaseOrder       PurchaseOrder @relation(fields: [purchaseOrderId], references: [inflowId], onDelete: Cascade)
+
+  productId           String
+  product             Product       @relation(fields: [productId], references: [inflowId])
+  
+  vendorItemCode      String?
+  description         String?       @db.Text
+  unitPrice           Decimal       @db.Decimal(18, 5)
+  subTotal            Decimal       @db.Decimal(18, 5)
+  discount            Json?         // Holds { value: "19.99", isPercent: true }
+  serviceCompleted    Boolean       @default(false)
+  returnDate          DateTime?
+  quantity            Json          // Holds standardQuantity, uomQuantity, uom, and serials
+
+  // Product structural fallback fields tracking specs at PO generation
+  productHeight       Decimal?      @db.Decimal(10, 4)
+  productLength       Decimal?      @db.Decimal(10, 4)
+  productWidth        Decimal?      @db.Decimal(10, 4)
+  productWeight       Decimal?      @db.Decimal(10, 4)
+
+  tax1Rate            Decimal       @db.Decimal(18, 5)
+  tax2Rate            Decimal       @db.Decimal(18, 5)
+  taxCodeId           String?
+  timestamp           String
+
+  @@index([purchaseOrderId])
+  @@index([productId])
+
+  @@map("purchase_order_line")
+}
+
+model PurchaseOrderReceiveLine {
+  purchaseOrderReceiveLineId String        @id @default(uuid())
+  purchaseOrderId            String
+  purchaseOrder              PurchaseOrder @relation(fields: [purchaseOrderId], references: [inflowId], onDelete: Cascade)
+
+  productId                  String
+  product                    Product       @relation(fields: [productId], references: [inflowId])
+
+  locationId                 String?
+  sublocation                String?       // e.g., "C-19"
+  receiveDate                DateTime?
+  description                String?
+  vendorItemCode             String?
+  quantity                   Json          // Quantity structural wrapper object
+  timestamp                  String
+
+  productHeight              Decimal?      @db.Decimal(10, 4)
+  productLength              Decimal?      @db.Decimal(10, 4)
+  productWidth               Decimal?      @db.Decimal(10, 4)
+  productWeight              Decimal?      @db.Decimal(10, 4)
+
+  @@index([purchaseOrderId])
+  @@index([productId])
+  @@index([locationId])
+
+  @@map("purchase_order_receive_line")
+}
+
+model PurchaseOrderUnstockLine {
+  purchaseOrderUnstockLineId String        @id @default(uuid())
+  purchaseOrderId            String
+  purchaseOrder              PurchaseOrder @relation(fields: [purchaseOrderId], references: [inflowId], onDelete: Cascade)
+
+  productId                  String
+  product                    Product       @relation(fields: [productId], references: [inflowId])
+
+  locationId                 String?
+  sublocation                String?
+  unstockDate                DateTime?
+  description                String?
+  vendorItemCode             String?
+  quantity                   Json
+  timestamp                  String
+
+  @@index([purchaseOrderId])
+  @@index([productId])
+  @@index([locationId])
+
+  @@map("purchase_order_unstock_line")
+}
+
+model PurchaseOrderPaymentLine {
+  purchaseOrderPaymentHistoryLineId String        @id @default(uuid())
+  purchaseOrderId                   String
+  purchaseOrder                     PurchaseOrder @relation(fields: [purchaseOrderId], references: [inflowId], onDelete: Cascade)
+
+  amount                            Decimal       @db.Decimal(18, 5)
+  datePaid                          DateTime?
+  paymentMethod                     String?
+  paymentType                       String?       // e.g., "Payment"
+  referenceNumber                   String?
+  remarks                           String?       @db.Text
+  timestamp                         String
+
+  @@index([purchaseOrderId])
+
+  @@map("purchase_order_payment_line")
+}
+
+model PurchaseOrderAttachment {
+  attachmentId     String        @id @default(uuid())
+  purchaseOrderId  String
+  purchaseOrder    PurchaseOrder @relation(fields: [purchaseOrderId], references: [inflowId], onDelete: Cascade)
+  attachmentUrl    String
+  fileName         String
+  fileSize         Json?         // Empty or structured size metadata
+  lastModDttm      DateTime?
+  lastModifiedById String?
+
+  @@index([purchaseOrderId])
+
+  @@map("purchase_order_attachment")
+}
 
 // Customer Model
 // model Customer {

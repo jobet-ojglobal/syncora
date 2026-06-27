@@ -1,6 +1,6 @@
 // app/api/webhooks/inflow/route.ts
-import { listWebhooks } from "@/lib/inflow/services/webhook.service";
-import { InflowProductWebhookService } from "@/lib/inflow/services/webhook-product.service";
+import { listWebhooks } from "@/lib/inflow/webhooks/webhook.service";
+import { InflowProductWebhookService } from "@/lib/inflow/webhooks/webhook-product.service";
 import { prisma } from "@/lib/prisma";
 import { NextRequest, NextResponse } from "next/server";
 

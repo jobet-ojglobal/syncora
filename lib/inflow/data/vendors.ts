@@ -21,7 +21,7 @@ export async function getVendors(
 
 export async function getVendor(vendorId: string) {
   return await inflow.get<InflowVendor>(
-    `/vendors/${vendorId}`
+    `/vendors/${vendorId}?include=addresses,attachments,balances,credits,currency,dues,lastModifiedBy,taxingScheme,vendorItems`
   );
 }
 

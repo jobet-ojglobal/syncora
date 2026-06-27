@@ -21,7 +21,7 @@ export async function getCustomers(
 
 export async function getCustomer(customerId: string) {
   return await inflow.get<InflowCustomer>(
-    `/customers/${customerId}`
+    `/customers/${customerId}?include=addresses,attachments,balances,credits,defaultBillingAddress,defaultLocation,defaultPaymentTerms,defaultSalesRepTeamMember,defaultShippingAddress,dues,lastModifiedBy,pricingScheme,taxingScheme,orderHistory`
   );
 }
 

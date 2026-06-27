@@ -29,6 +29,8 @@ import { ProductAttachmentSyncService } from "../inflow/services/product-attachm
 import { ProductGroupSyncService } from "../inflow/services/product-group-sync.service";
 import { ProductVariantSyncService } from "../inflow/services/product-variant-sync.service";
 import { ProductGroupImageSyncService } from "../inflow/services/product-group-image-sync.service";
+import { SalesOrderSyncService } from "../inflow/services/sales-order-sync.service";
+import { PurchaseOrderSyncService } from "../inflow/services/purchase-order-sync.service";
 
 const testService = new TestSyncService();
 const categoryService = new CategorySyncService();
@@ -58,6 +60,9 @@ const adjustmentReasonService = new AdjustmentReasonSyncService();
 const pricingSchemeService = new PricingSchemeSyncService();
 const productCostAdjustmentService = new ProductCostAdjustmentSyncService();
 const paymentTermService = new PaymentTermSyncService();
+
+const salesOrderService = new SalesOrderSyncService();
+const purchaseOrderService = new PurchaseOrderSyncService();
 
 
 type SyncOptions = {
@@ -169,6 +174,12 @@ const worker = new Worker(
           break;
         case "product_cost_adjustments":
           result = await productCostAdjustmentService.sync(syncOptions);
+          break;
+        case "sales_orders":
+          result = await salesOrderService.sync(syncOptions);
+          break;
+        case "purchase_orders":
+          result = await purchaseOrderService.sync(syncOptions);
           break;
         case "test":
           result = await testService.sync(source, syncOptions);

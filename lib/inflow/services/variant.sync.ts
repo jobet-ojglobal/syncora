@@ -25,13 +25,11 @@ export async function syncVariant(
       productGroupId,
       productId: variant.productId,
       defaultPrice: Number(variant.defaultPrice) || 0.00,
-      sku: variant.sku ?? null,
       signature,
       variantCount,
     },
     update: {
       defaultPrice: Number(variant.defaultPrice) || 0.00,
-      sku: variant.sku ?? null,
       signature,
       variantCount,
     },
