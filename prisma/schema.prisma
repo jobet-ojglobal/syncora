@@ -1101,6 +1101,8 @@ enum AccessRight {
   Reports
 }
 
+// Business Partner Model
+
 model BusinessPartner {
   id              String   @id @default(cuid())
   name            String

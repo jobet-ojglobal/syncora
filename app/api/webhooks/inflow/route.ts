@@ -64,6 +64,34 @@ export async function POST(request: NextRequest) {
         break;
       }
 
+      case "SalesOrderCreatedV1":
+      case "SalesOrderUpdatedV1":
+      case "SalesOrderUpdatedV2": {
+        const orderId =  payload.id || payload.salesOrderId;
+
+        if (orderId) {
+          // Offload the sync processing to the dedicated background worker queue
+          console.log(`api partner_sync_job ${eventType}`)
+          await syncPartnerQueue.add(
+            "partner_sync_job",
+            {
+              source: "inflow_sales_order",
+              action: eventType === "SalesOrderCreatedV1" ? "create" : "update",
+              dataId: orderId,
+              loggedEventId: loggedEvent.id,
+            },
+            {
+              attempts: 3,
+              backoff: {
+                type: "exponential",
+                delay: 2000, // Wait 2s, then 4s, then 8s on failure
+              },
+            }
+          );
+        }
+        break;
+      }
+
       default:
         console.log(`[Webhook Router] Unhandled webhook event classification: ${eventType}`);
         break;

@@ -1,8 +1,8 @@
-// lib/partner/services/webhook-sales-order.service.ts
+// lib/partner/services/webhook-purchase-order.service.ts
 
 import { prisma } from "@/lib/prisma";
-import { getSalesOrder } from "../data/sales-order";
-import { syncSalesOrder } from "@/lib/inflow/services/sales-order.sync";
+import { getPurchaseOrder } from "../data/purchase-order";
+import { syncPurchaseOrder } from "@/lib/inflow/services/purchase-order.sync";
 
 interface SyncResult {
   success: boolean;
@@ -10,21 +10,21 @@ interface SyncResult {
   // ... other properties if any
 }
 
-export class InflowSalesOrderWebhookService {
+export class InflowPurchaseOrderWebhookService {
   /**
-   * Handles the 'SalesOrderCreatedV1' webhook event.
+   * Handles the 'PurchaseOrderCreatedV1' webhook event.
    */
-  static async handleSalesOrderCreate(inflowId: string, eventId?: string) {
-    console.log(`[Webhook Service] Processing real-time creation for sales order ID: ${inflowId}`);
+  static async handlePurchaseOrderCreate(inflowId: string, eventId?: string) {
+    console.log(`[Webhook Service] Processing real-time creation for purchase order ID: ${inflowId}`);
     
     // Process the sync using our shared core logic
-    const result = await this.syncSalesOrderPayload(inflowId);
+    const result = await this.syncPurchaseOrderPayload(inflowId);
 
     // If successful and an audit log event ID was provided, mark it as processed
     if (result.success && eventId) {
       await prisma.partnerWebhookEvent.update({ // <-- changed from inflowWebhookEvent
-          where: { id: eventId },
-          data: { processed: true }
+        where: { id: eventId },
+        data: { processed: true }
       });
     }
 
@@ -32,12 +32,12 @@ export class InflowSalesOrderWebhookService {
   }
 
   /**
-   * Handles the 'SalesOrderUpdatedV2' webhook event.
+   * Handles the 'PurchaseOrderUpdatedV2' webhook event.
    */
-  static async handleSalesOrderUpdate(inflowId: string, eventId?: string) {
-    console.log(`[Webhook Service] Processing real-time update for sales order ID: ${inflowId}`);
+  static async handlePurchaseOrderUpdate(inflowId: string, eventId?: string) {
+    console.log(`[Webhook Service] Processing real-time update for purchase order ID: ${inflowId}`);
     
-    const result = await this.syncSalesOrderPayload(inflowId);
+    const result = await this.syncPurchaseOrderPayload(inflowId);
 
     if (result.success && eventId) {
       await prisma.inflowWebhookEvent.update({
@@ -53,19 +53,16 @@ export class InflowSalesOrderWebhookService {
    * Private Helper: Shared core logic for both creates and updates.
    * Fetches full tree structure from inFlow API and executes atomic DB operations.
    */
-  private static async syncSalesOrderPayload(batchId: string): Promise<SyncResult> {
+  private static async syncPurchaseOrderPayload(batchId: string): Promise<SyncResult> {
     if (!batchId) {
-      throw new Error("Cannot process sales order webhook without a valid inFlow salesOrderId.");
+      throw new Error("Cannot process Purchase order webhook without a valid inFlow PurchaseOrderId.");
     }
 
-    const fullOrderData = await getSalesOrder(batchId);
-    
+    const fullOrderData = await getPurchaseOrder(batchId);
     
     if (!fullOrderData) {
-      throw new Error(`Sales Order data for ID ${batchId} could not be retrieved from the API.`);
+      throw new Error(`Purchase Order data for ID ${batchId} could not be retrieved from the API.`);
     }
-
-    console.log(fullOrderData)
 
     // Collect individual references from this single record to build validation parameters
     const locationIds = new Set<string>();
@@ -76,18 +73,11 @@ export class InflowSalesOrderWebhookService {
     if (fullOrderData.locationId) locationIds.add(fullOrderData.locationId);
     if (fullOrderData.paymentTermsId) paymentTermsIds.add(fullOrderData.paymentTermsId);
     if (fullOrderData.assignedToTeamMemberId) teamMemberIds.add(fullOrderData.assignedToTeamMemberId);
-    if (fullOrderData.confirmerTeamMemberId) teamMemberIds.add(fullOrderData.confirmerTeamMemberId);
-    if (fullOrderData.salesRepTeamMemberId) teamMemberIds.add(fullOrderData.salesRepTeamMemberId);
 
     fullOrderData.lines?.forEach((l: any) => l.productId && productIds.add(l.productId));
-    fullOrderData.packLines?.forEach((l: any) => l.productId && productIds.add(l.productId));
-    fullOrderData.pickLines?.forEach((l: any) => l.productId && productIds.add(l.productId));
-    fullOrderData.pickAllocationLines?.forEach((l: any) => l.productId && productIds.add(l.productId));
-    fullOrderData.pickAllocationFailures?.forEach((l: any) => l.productId && productIds.add(l.productId));
-    fullOrderData.restockLines?.forEach((l: any) => l.productId && productIds.add(l.productId));
 
     // Resolve structural validation sets in parallel block
-    // (Customer identification is ignored here to take advantage of syncSalesOrder's built-in self-healing JIT recovery)
+    // (Customer identification is ignored here to take advantage of syncPurchaseOrder's built-in self-healing JIT recovery)
     const [dbLocations, dbTerms, dbTeam, dbProducts] = await Promise.all([
       prisma.location.findMany({ where: { inflowId: { in: Array.from(locationIds) } }, select: { inflowId: true } }),
       prisma.paymentTerms.findMany({ where: { inflowId: { in: Array.from(paymentTermsIds) } }, select: { inflowId: true } }),
@@ -104,8 +94,8 @@ export class InflowSalesOrderWebhookService {
 
     // Atomic database execution block
     await prisma.$transaction(async (tx) => {
-      await syncSalesOrder(tx, fullOrderData, validationSets);
-    }, { timeout: 30000 }); // Single order sync will safely finalize within 30 seconds
+      await syncPurchaseOrder(tx, fullOrderData, validationSets);
+    }, { timeout: 30000 }); 
 
     return { success: true };
   }

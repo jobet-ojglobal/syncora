@@ -3,6 +3,9 @@ import { prisma } from "@/lib/prisma";
 import { syncPartnerQueue } from "@/lib/queues/sync.queue";
 import { listWebhooks } from "@/lib/partner/services/webhook.service";
 import { NextRequest, NextResponse } from "next/server";
+import { partnerApi } from "@/lib/partner/partner.client";
+import { upsertSalesOrder } from "@/lib/inflow/data/sales-orders";
+import { getSalesOrder } from "@/lib/partner/data/sales-order";
 
 /**
  * GET Handler: Verification endpoint used to prove connectivity 
@@ -44,6 +47,19 @@ export async function POST(request: NextRequest) {
         const batchID = payload.batch_id;
 
         if (batchID) {
+          // const sales = await getSalesOrder(batchID);
+          // const up = await upsertSalesOrder(sales);
+
+          // await partnerApi.post("/transactions/sales/cloud-ack", {
+          //   batch_id: batchID,
+          //   outbound_audit_id: payload.outboundAuditId,
+          //   cloud_status: "SUCCESS",
+          //   message: "Processed successfully via dedicated partner worker queue",
+          // });
+
+          // return NextResponse.json({ received: true, data: up }, { status: 200 });
+
+          // 
           // Offload the sync processing to the dedicated background worker queue
           await syncPartnerQueue.add(
             "partner_sync_job",

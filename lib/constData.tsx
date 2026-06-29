@@ -390,9 +390,38 @@ export const data = {
       ],
     },
 
+    {
+      title: "Taxing Scheme",
+      url: "/dashboard/taxing-scheme",
+      icon: Truck,
+      items: [
+        {
+          title: "All Scheme",
+          url: "/dashboard/taxing-scheme",
+        },
+        {
+          title: "Create Transfer",
+          url: "/dashboard/taxing-scheme/create",
+        },
+      ],
+    },
+
+
     /* -------------------------------------------------------------------------- */
     /*                               CUSTOMER ORDERS                              */
     /* -------------------------------------------------------------------------- */
+
+    {
+      title: "Team Members",
+      url: "/dashboard/team-members",
+      icon: Users,
+      items: [
+        {
+          title: "All Members",
+          url: "/dashboard/team-members",
+        },
+      ],
+    },
 
     // {
     //   title: "Customer Orders",

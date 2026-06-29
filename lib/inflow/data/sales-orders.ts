@@ -30,8 +30,12 @@ export async function getSalesOrder(
 export async function upsertSalesOrder(
   data: any
 ) {
-  return inflow.post(
-    "/sales-orders",
-    data
-  );
+  try {
+    return await inflow.put(
+      "/sales-orders",
+      data
+    );
+  } catch (e: any) {
+    console.log(e)
+  }
 }
