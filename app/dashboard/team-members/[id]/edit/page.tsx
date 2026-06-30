@@ -3,7 +3,7 @@
 
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
-import { TeamMemberForm } from "@/components/team-members/team-member-form";
+import { TeamMemberForm } from "@/components/team-member/team-member-form";
 import { Loader2, ShieldCheck } from "lucide-react";
 
 export default function EditTeamMemberPage() {

@@ -25,7 +25,7 @@ export async function POST(request: Request) {
     const { action, subscriptionId, events } = body;
 
     if (action === "connect") {
-      const defaultEvents: InflowEvent[] = ["salesOrder.updated", "customer.updated"];
+      const defaultEvents: InflowEvent[] = ["customer.created"]; // "salesOrder.updated", 
       const webhook = await createOrUpdatePartnerWebhook(defaultEvents);
       return NextResponse.json({ success: true, webhook });
     }

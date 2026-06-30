@@ -61,23 +61,23 @@ export async function POST(request: NextRequest) {
 
           // 
           // Offload the sync processing to the dedicated background worker queue
-          await syncPartnerQueue.add(
-            "partner_sync_job",
-            {
-              source: "inflow_sales_order",
-              action: eventType === "SalesOrderCreated" ? "create" : "update",
-              dataId: batchID,
-              loggedEventId: loggedEvent.id,
-              outboundAuditId: payload.outboundAuditId,
-            },
-            {
-              attempts: 3,
-              backoff: {
-                type: "exponential",
-                delay: 2000, // Wait 2s, then 4s, then 8s on failure
-              },
-            }
-          );
+          // await syncPartnerQueue.add(
+          //   "partner_sync_job",
+          //   {
+          //     source: "inflow_sales_order",
+          //     action: eventType === "SalesOrderCreated" ? "create" : "update",
+          //     dataId: batchID,
+          //     loggedEventId: loggedEvent.id,
+          //     outboundAuditId: payload.outboundAuditId,
+          //   },
+          //   {
+          //     attempts: 3,
+          //     backoff: {
+          //       type: "exponential",
+          //       delay: 2000, // Wait 2s, then 4s, then 8s on failure
+          //     },
+          //   }
+          // );
         }
         break;
       }

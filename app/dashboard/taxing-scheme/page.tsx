@@ -3,12 +3,13 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Plus, Search, Receipt, Percent, Edit3, Trash2, CheckCircle2, XCircle, ShieldCheck, HelpCircle } from "lucide-react";
+import { Plus, Search, Receipt, Edit3, CheckCircle2, XCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { DeleteButton } from "@/components/shared/delete-button";
 
 interface TaxCodeNode {
   inflowId: string;
@@ -57,31 +58,6 @@ export default function TaxingSchemesListPage() {
   useEffect(() => {
     fetchSchemes();
   }, []);
-
-  const handlePruneScheme = async (id: string, inflowId: string, name: string, dependencies: number) => {
-    if (dependencies > 0) {
-      toast.error("Relational Lockout", {
-        description: `Cannot delete "${name}". It is actively bound to ${dependencies} business accounts, profiles, or product rules.`,
-      });
-      return;
-    }
-
-    if (!confirm(`Are you certain you want to soft-delete the tax group "${name}"? This removes all nested child tax codes.`)) return;
-
-    try {
-      const res = await fetch("/api/admin/taxing-scheme", {
-        method: "DELETE",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ inflowId }),
-      });
-
-      if (!res.ok) throw new Error();
-      toast.success("Fiscal scheme dropped safely");
-      setSchemes((prev) => prev.filter((s) => s.inflowId !== inflowId));
-    } catch (err) {
-      toast.error("Transaction Aborted", { description: "Database schema rules rejected operation parameters." });
-    }
-  };
 
   const filteredSchemes = schemes.filter((s) => {
     const term = searchQuery.toLowerCase().trim();
@@ -249,20 +225,15 @@ export default function TaxingSchemesListPage() {
                             <Edit3 className="w-3.5 h-3.5" />
                           </Link>
                         </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => handlePruneScheme(scheme.id, scheme.inflowId, scheme.name, scheme.dependencyCount)}
-                          disabled={scheme.dependencyCount > 0}
-                          className={`h-8 w-8 ${
-                            scheme.dependencyCount > 0
-                              ? "text-muted-foreground/30 cursor-not-allowed opacity-40"
-                              : "text-muted-foreground hover:text-destructive hover:bg-destructive/5"
-                          }`}
-                          title={scheme.dependencyCount > 0 ? `Locked: Linked to ${scheme.dependencyCount} external ledger rows.` : "Prune taxation scheme profile configuration."}
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </Button>
+                        <DeleteButton
+                          itemId={scheme.id} 
+                          itemName={scheme.name} 
+                          endpointUrl={`/api/admin/taxing-scheme/${scheme.id}`}
+                          onSuccess={(id) => {
+                            setSchemes((prev) => prev.filter((s) => s.id !== id));
+                          }} 
+                          variant="icon"
+                        />
                       </div>
                     </td>
 

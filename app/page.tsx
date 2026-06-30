@@ -2,7 +2,7 @@
 // import { SyncButton } from "@/components/shared/sync-button";
 // import WebhookTestButton from "./_components/TestWebhook";
 // import InflowCloudHealth from "./_components/InflowCloud";
-import InflowWorkspace from "@/components/settings/inflow-workspace";
+import InflowWorkspace from "@/components/setting/inflow-workspace";
 
 export default function Home() {
   return (

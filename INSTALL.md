@@ -9,3 +9,4 @@ inflow Cloud schema to prisma models: https://chatgpt.com/c/6a39052c-0860-83ec-a
 # GEMINI Links
 crafts forms, pages, apis, dashboard ui, shadcn: https://gemini.google.com/app/b94acd92dc8f787e
 building webhooks api: https://gemini.google.com/app/98385b50a9a310f7 
+Inflow Sync Service Refactor: https://gemini.google.com/app/2a790ede8dc6c00b

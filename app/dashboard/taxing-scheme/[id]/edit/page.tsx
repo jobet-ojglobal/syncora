@@ -1,5 +1,8 @@
+import PageHeader from '@/components/layout/dashboard/PageHeader';
 import { TaxingSchemeForm } from '@/components/taxing-scheme/taxing-scheme-form';
+import { ArrowLeft } from 'lucide-react';
 import { Metadata } from 'next';
+import Link from 'next/link';
 import { notFound } from 'next/navigation';
 
 // Replace this with your actual DB/API fetching logic
@@ -17,16 +20,18 @@ async function getTaxingScheme(id: string) {
   }
 }
 
-interface EditProps {
-  params: Promise<{ id: string }>;
+interface Props {
+  params: Promise<{
+    id: string;
+  }>;
 }
 
-export async function generateMetadata({ params }: EditProps): Promise<Metadata> {
+export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { id } = await params;
   return { title: `Edit Taxing Scheme ${id} | Dashboard` };
 }
 
-export default async function EditTaxingSchemePage({ params }: EditProps) {
+export default async function EditTaxingSchemePage({ params }: Props) {
   const { id } = await params;
   const taxingScheme = await getTaxingScheme(id);
 
@@ -35,18 +40,22 @@ export default async function EditTaxingSchemePage({ params }: EditProps) {
   }
 
   return (
-    <div className="max-w-4xl mx-auto px-4 py-8">
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold tracking-tight text-slate-900">
-          Edit Taxing Scheme
-        </h1>
-        <p className="mt-1 text-sm text-slate-500">
-          Modify rules, rates, or exemptions for this scheme.
-        </p>
-      </div>
+    <div className="w-full max-w-xl mx-auto p-6 space-y-6">
+        {/* HEADER */}
+        <Link
+          href="/dashboard/categories"
+          className="mb-4 inline-flex items-center gap-2 text-sm font-medium text-slate-600 hover:text-slate-900"
+        >
+          <ArrowLeft className="h-4 w-4" />
+          Back to Taxing Scheme
+        </Link>
+        <PageHeader
+          title="Edit Taxing Scheme" 
+          description="Modify rules, rates, or exemptions for this scheme." 
+        />
 
       <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6">
-        <TaxingSchemeForm initialData={taxingScheme} />
+        {/* <TaxingSchemeForm initialData={taxingScheme} /> */}
       </div>
     </div>
   );

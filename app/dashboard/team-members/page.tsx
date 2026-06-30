@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { DeleteButton } from "@/components/shared/delete-button";
 
 interface LocationNode {
   code: string;
@@ -230,7 +231,7 @@ export default function TeamMembersListPage() {
                             <Edit3 className="w-3.5 h-3.5" />
                           </Link>
                         </Button>
-                        <Button 
+                        {/* <Button 
                           variant="ghost" 
                           size="icon" 
                           onClick={() => handleArchiveMember(member.id, member.name, member.totalAssignedTasks)}
@@ -243,7 +244,16 @@ export default function TeamMembersListPage() {
                           title={member.totalAssignedTasks > 0 ? `Locked: Bound to ${member.totalAssignedTasks} operational records rows links.` : "Archive account profile records nodes."}
                         >
                           <Trash2 className="w-3.5 h-3.5" />
-                        </Button>
+                        </Button> */}
+                        <DeleteButton
+                          itemId={member.id} 
+                          itemName={member.name} 
+                          endpointUrl={`/api/admin/team-member/${member.id}`}
+                          onSuccess={(id) => {
+                            setRoster(prev => prev.filter(m => m.id !== id));
+                          }} 
+                          variant="icon"
+                        />
                       </div>
                     </td>
 

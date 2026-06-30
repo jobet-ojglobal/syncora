@@ -5,16 +5,19 @@ import { prisma } from "@/lib/prisma";
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { name, isActive, isDefault, calculateTax2OnTax1, tax1Name, tax1OnShipping, tax2Name, tax2OnShipping, taxCodes } = body;
+    const { 
+      name, isActive, isDefault, calculateTax2OnTax1, 
+      tax1Name, tax1OnShipping, tax2Name, tax2OnShipping, taxCodes 
+    } = body;
 
     if (!name?.trim()) {
-      return NextResponse.json({ error: "Missing required taxing scheme display group name designation." }, { status: 400 });
+      return NextResponse.json({ error: "Missing required taxing scheme name." }, { status: 400 });
     }
 
-    const inflowId = crypto.randomUUID().toLowerCase();
+    const schemeInflowId = crypto.randomUUID().toLowerCase();
 
     const compiledScheme = await prisma.$transaction(async (tx) => {
-      // 1. If this new entry is flag-marked as system default, auto-disable previous entries defaults status to preserve system configuration balance rules
+      // 1. Enforce single global default rule
       if (isDefault) {
         await tx.taxingScheme.updateMany({
           where: { isDefault: true },
@@ -22,81 +25,113 @@ export async function POST(request: NextRequest) {
         });
       }
 
-      // 2. Build foundational parent schema configuration data row sheet node
+      // 2. Build foundational taxing scheme
       const scheme = await tx.taxingScheme.create({
         data: {
-          inflowId,
+          inflowId: schemeInflowId,
           name: name.trim(),
-          isActive,
-          isDefault,
-          calculateTax2OnTax1: tax2Name ? calculateTax2OnTax1 : false,
+          isActive: isActive ?? true,
+          isDefault: isDefault ?? false,
+          calculateTax2OnTax1: tax2Name ? (calculateTax2OnTax1 ?? false) : false,
           tax1Name: tax1Name?.trim() || null,
-          tax1OnShipping,
+          tax1OnShipping: tax1OnShipping ?? false,
           tax2Name: tax2Name?.trim() || null,
-          tax2OnShipping,
-        }
+          tax2OnShipping: tax2OnShipping ?? false,
+        },
       });
 
-      // 3. Hydrate dynamic structural child zones rates records mapping objects paths loop arrays
-      if (taxCodes && taxCodes.length > 0) {
+      // 3. Batch insert child tax codes if they exist
+      if (taxCodes && Array.isArray(taxCodes) && taxCodes.length > 0) {
+        // Map payloads out with pre-generated IDs to avoid loop DB roundtrips
+        const taxCodesData = taxCodes.map((tc) => ({
+          inflowId: crypto.randomUUID().toLowerCase(),
+          taxingSchemeId: schemeInflowId,
+          name: tc.name.trim().toUpperCase(),
+          isActive: tc.isActive ?? true,
+          tax1Rate: tc.tax1Rate || 0,
+          tax2Rate: tax2Name ? (tc.tax2Rate || 0) : 0,
+        }));
+
         await tx.taxCode.createMany({
-          data: taxCodes.map((tc: any) => {
-            const taxInflowId = crypto.randomUUID().toLowerCase();
-            return ({
-              inflowId: taxInflowId,
-              taxingSchemeId: scheme.inflowId,
-              name: tc.name.trim().toUpperCase(),
-              isActive: tc.isActive,
-              tax1Rate: tc.tax1Rate || 0,
-              tax2Rate: tax2Name ? (tc.tax2Rate || 0) : 0,
-            })
-          })
+          data: taxCodesData,
         });
 
-        // Set fallback first entry element as baseline default code parameters for scheme profile card context
-        const firstInsertedCode = taxCodes[0];
+        // Set the first item as the default tax code identifier
         await tx.taxingScheme.update({
           where: { id: scheme.id },
-          data: { defaultTaxCodeId: firstInsertedCode.inflowId }
+          data: { defaultTaxCodeId: taxCodesData[0].inflowId },
         });
       }
 
-      return scheme;
+      return await tx.taxingScheme.findUnique({
+        where: { id: scheme.id },
+        include: { taxCodes: true },
+      });
     });
 
     return NextResponse.json(compiledScheme, { status: 201 });
-  } catch (error: any) {
-    console.error("Critical server transaction failed deploying taxation metrics profile:", error);
-    return NextResponse.json({ error: "Internal Database structure transaction abort exception." }, { status: 500 });
+  } catch (error) {
+    console.error("Failed to create taxing scheme:", error);
+    return NextResponse.json({ error: "Internal server database transaction failure." }, { status: 500 });
   }
 }
 
 export async function PATCH(request: NextRequest) {
   try {
     const body = await request.json();
-    const { inflowId, name, isActive, isDefault, calculateTax2OnTax1, tax1Name, tax1OnShipping, tax2Name, tax2OnShipping, taxCodes } = body;
+    const { 
+      id, name, isActive, isDefault, calculateTax2OnTax1, 
+      tax1Name, tax1OnShipping, tax2Name, tax2OnShipping, taxCodes 
+    } = body;
 
-    if (!inflowId) {
-      return NextResponse.json({ error: "Identity token verification query pointer target missing." }, { status: 400 });
+    if (!id) {
+      return NextResponse.json({ error: "Target taxing scheme identifier is missing." }, { status: 400 });
     }
 
     const modifiedScheme = await prisma.$transaction(async (tx) => {
-      // Balance systems-wide standard global rules checkboxes
       if (isDefault) {
         await tx.taxingScheme.updateMany({
-          where: { NOT: { inflowId }, isDefault: true },
+          where: { NOT: { id }, isDefault: true },
           data: { isDefault: false }
         });
       }
 
-      // Drop historic children rates calculations elements entries lines cascade nodes explicitly to maintain atomic balance paths configurations trees parameters safety
-      await tx.taxCode.deleteMany({ where: { taxingSchemeId: inflowId } });
+      const scheme = await tx.taxingScheme.findUnique({
+        where: { id },
+        select: { inflowId: true }
+      });
 
-      // Build updated data tracking values map objects arrays onto parent table card matrix
-      const scheme = await tx.taxingScheme.update({
-        where: { inflowId },
+      if (!scheme) {
+        throw new Error("Taxing Scheme not found.");
+      }
+
+      // Drop historic children elements safely 
+      // NOTE: Consider switching to an upside upsert/update strategy if inflowId is leveraged as a foreign key downstream!
+      await tx.taxCode.deleteMany({ where: { taxingSchemeId: scheme.inflowId } });
+
+      let defaultTaxCodeId: string | null = null;
+
+      if (taxCodes && Array.isArray(taxCodes) && taxCodes.length > 0) {
+        const taxCodesData = taxCodes.map((tc) => ({
+          inflowId: crypto.randomUUID().toLowerCase(),
+          taxingSchemeId: scheme.inflowId,
+          name: tc.name.trim().toUpperCase(),
+          isActive: tc.isActive ?? true,
+          tax1Rate: tc.tax1Rate || 0,
+          tax2Rate: tax2Name ? (tc.tax2Rate || 0) : 0,
+        }));
+
+        await tx.taxCode.createMany({
+          data: taxCodesData,
+        });
+
+        defaultTaxCodeId = taxCodesData[0].inflowId;
+      }
+
+      return await tx.taxingScheme.update({
+        where: { id },
         data: {
-          name: name.trim(),
+          name: name?.trim(),
           isActive,
           isDefault,
           calculateTax2OnTax1: tax2Name ? calculateTax2OnTax1 : false,
@@ -104,30 +139,15 @@ export async function PATCH(request: NextRequest) {
           tax1OnShipping,
           tax2Name: tax2Name?.trim() || null,
           tax2OnShipping,
-          defaultTaxCodeId: taxCodes && taxCodes.length > 0 ? taxCodes[0].inflowId : null
-        }
+          defaultTaxCodeId,
+        },
+        include: { taxCodes: true }
       });
-
-      // Write freshly modified clean dataset collection codes structures loops
-      if (taxCodes && taxCodes.length > 0) {
-        await tx.taxCode.createMany({
-          data: taxCodes.map((tc: any) => ({
-            inflowId: tc.inflowId,
-            taxingSchemeId: inflowId,
-            name: tc.name.trim().toUpperCase(),
-            isActive: tc.isActive,
-            tax1Rate: tc.tax1Rate || 0,
-            tax2Rate: tax2Name ? (tc.tax2Rate || 0) : 0,
-          }))
-        });
-      }
-
-      return scheme;
     });
 
     return NextResponse.json(modifiedScheme, { status: 200 });
   } catch (error) {
-    console.error("Failed adjusting corporate taxation tracking boundaries parameters configuration structures:", error);
-    return NextResponse.json({ error: "Internal Database modification pipeline write transaction execution crash." }, { status: 500 });
+    console.error("Failed to update taxing scheme:", error);
+    return NextResponse.json({ error: "Internal server database write transaction failure." }, { status: 500 });
   }
 }

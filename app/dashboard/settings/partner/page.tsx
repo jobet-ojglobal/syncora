@@ -1,5 +1,5 @@
 // partner-app/app/settings/webhooks/page.tsx
-import WebhookSettings from "@/components/settings/webhook-settings";
+import WebhookSettings from "@/components/setting/webhook-settings";
 
 export default function WebhookSettingsPage() {
   return (

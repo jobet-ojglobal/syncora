@@ -7,7 +7,7 @@ export async function getCustomers(
 ) {
   const params = new URLSearchParams({
     count: String(count),
-    include: "addresses,attachments,balances,credits,defaultBillingAddress,defaultLocation,defaultPaymentTerms,defaultSalesRepTeamMember,defaultShippingAddress,dues,lastModifiedBy,pricingScheme,taxingScheme,orderHistory",
+    include: "addresses,attachments,balances,credits,defaultBillingAddress,defaultLocation,defaultPaymentTerms,defaultSalesRepTeamMember,defaultShippingAddress,dues,lastModifiedBy,pricingScheme,taxingScheme.taxCodes,orderHistory",
   });
 
   if (after) {
@@ -21,16 +21,15 @@ export async function getCustomers(
 
 export async function getCustomer(customerId: string) {
   return await inflow.get<InflowCustomer>(
-    `/customers/${customerId}?include=addresses,attachments,balances,credits,defaultBillingAddress,defaultLocation,defaultPaymentTerms,defaultSalesRepTeamMember,defaultShippingAddress,dues,lastModifiedBy,pricingScheme,taxingScheme,orderHistory`
+    `/customers/${customerId}?include=addresses,attachments,balances,credits,defaultBillingAddress,defaultLocation,defaultPaymentTerms,defaultSalesRepTeamMember,defaultShippingAddress,dues,lastModifiedBy,pricingScheme,taxingScheme.taxCodes,orderHistory`
   );
 }
 
 export async function upsertCustomer(
-  customerId: string,
-  data: any
+  data: InflowCustomer
 ) {
   return await inflow.put<InflowCustomer>(
-    `/customers/${customerId}`,
+    `/customers?include=addresses,attachments,balances,credits,defaultBillingAddress,defaultLocation,defaultPaymentTerms,defaultSalesRepTeamMember,defaultShippingAddress,dues,lastModifiedBy,pricingScheme,taxingScheme.taxCodes,orderHistory`,
     data
   );
 }

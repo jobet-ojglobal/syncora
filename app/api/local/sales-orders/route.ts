@@ -9,7 +9,7 @@ export async function GET() {
 
     return NextResponse.json({
       success: true,
-      message: "Connected to inFlow Local",
+      message: "Connected to Partner Local",
     //   data,
     });
  

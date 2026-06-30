@@ -11,5 +11,5 @@ export async function getTaxCodes() {
 }
 
 export async function getTaxCode(taxID: string) {
-  return inflow.get<InflowTaxCode>(`/tax-codes/${taxID}`);
+  return await inflow.get<InflowTaxCode>(`/tax-codes/${taxID}`);
 }

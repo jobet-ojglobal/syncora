@@ -21,7 +21,7 @@ interface DeleteButtonProps {
   itemId: string;
   itemName: string;
   endpointUrl: string; // The backend API target route (e.g., "/api/admin/categories")
-  onSuccess?: () => void; // Callback to refresh lists or redirect pages after success
+  onSuccess?: (id: string) => void; // Callback to refresh lists or redirect pages after success
   variant?: "icon" | "full"; // Customize style display options
 }
 
@@ -58,7 +58,7 @@ export function DeleteButton({
       });
 
       setIsOpen(false);
-      if (onSuccess) onSuccess();
+      if (onSuccess) onSuccess(itemId);
     } catch (err: any) {
       console.error("Deletion error occurred:", err);
       toast.error("Deletion Failed", {

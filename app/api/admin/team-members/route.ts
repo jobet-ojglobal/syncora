@@ -5,10 +5,9 @@ import { prisma } from "@/lib/prisma";
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { inflowId, name, email, isActive, canBeSalesRep, accessAllLocations, accessRights, locationInflowIds } = body;
+    const { name, email, isActive, canBeSalesRep, accessAllLocations, accessRights, locationInflowIds } = body;
 
-
-    if (!inflowId || !name || !email) {
+    if (!name || !email) {
       return NextResponse.json({ error: "Missing core directory criteria properties parameters fields." }, { status: 400 });
     }
 

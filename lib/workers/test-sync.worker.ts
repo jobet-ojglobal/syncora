@@ -91,7 +91,7 @@ worker.on("error", (error) => {
   console.error("Worker error:", error);
 });
 
-console.log("Test Worker started. Listening for sync jobs...");
+console.log("🚀 Test Worker started. Listening for 'test-sync' jobs...");
 
 // Graceful shutdown
 process.on("SIGTERM", async () => {

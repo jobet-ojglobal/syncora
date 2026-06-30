@@ -3,6 +3,10 @@
 import { Prisma } from "@/generated/prisma/client";
 import { ensureLocationShell, ensurePaymentTermsShell } from "./helpers";
 import { InflowCustomer } from "../types";
+import { getTaxingScheme } from "../data/taxing-schemes";
+import { syncTaxingScheme } from "./taxing-scheme.sync";
+import { getPricingScheme } from "../data/pricing-schemes";
+import { syncPricingScheme } from "./pricing-scheme.sync";
 
 /**
  * Syncs a single customer payload into the local database using an ongoing Prisma transaction.
@@ -69,6 +73,68 @@ export async function syncCustomer(
       console.warn(
         `[Sync Notification] Sales Rep member with inflowId "${customer.lastModifiedById}" not synced yet. Setting customer.lastModifiedById to null to avoid constraint errors.`
       );
+    }
+  }
+
+  // JIT Self-Healing Layer for missing pricing scheme
+  let validPricingSchemeId: string | null = null;
+
+  if (customer.pricingSchemeId) {
+    const localPricingScheme = await tx.pricingScheme.findUnique({
+      where: { inflowId: customer.pricingSchemeId },
+      select: { inflowId: true }
+    });
+    
+    if (!localPricingScheme) {
+      try {
+        console.log(`[JIT Sync] PricingScheme "${customer.pricingSchemeId}" missing locally. Fetching from cloud...`);
+        const pricingScheme = await getPricingScheme(customer.pricingSchemeId);
+        
+        if (pricingScheme) {
+          // Execute the decoupled sync function we extracted earlier
+          await syncPricingScheme(tx, pricingScheme);
+          // Use the ID directly from the cloud payload since it was just inserted
+          validPricingSchemeId = customer.pricingSchemeId;
+        }
+      } catch (err) {
+        console.error(`[JIT Sync Error] Could not recover Pricing Scheme "${customer.pricingSchemeId}":`, err);
+        // Fallback safely to null to preserve primary customer sync process stability
+        validPricingSchemeId = null;
+      }
+    } else {
+      // Record exists locally! Map it safely.
+      validPricingSchemeId = localPricingScheme.inflowId;
+    }
+  }
+
+  // JIT Self-Healing Layer for missing taxing scheme
+  let validTaxingSchemeId: string | null = null;
+
+  if (customer.taxingSchemeId) {
+    const localTaxingScheme = await tx.taxingScheme.findUnique({
+      where: { inflowId: customer.taxingSchemeId },
+      select: { inflowId: true }
+    });
+    
+    if (!localTaxingScheme) {
+      try {
+        console.log(`[JIT Sync] TaxingScheme "${customer.taxingSchemeId}" missing locally. Fetching from cloud...`);
+        const taxingScheme = await getTaxingScheme(customer.taxingSchemeId);
+        
+        if (taxingScheme) {
+          // Execute the decoupled sync function we extracted earlier
+          await syncTaxingScheme(tx, taxingScheme);
+          // Use the ID directly from the cloud payload since it was just inserted
+          validTaxingSchemeId = customer.taxingSchemeId;
+        }
+      } catch (err) {
+        console.error(`[JIT Sync Error] Could not recover Taxing Scheme "${customer.taxingSchemeId}":`, err);
+        // Fallback safely to null to preserve primary customer sync process stability
+        validTaxingSchemeId = null;
+      }
+    } else {
+      // Record exists locally! Map it safely.
+      validTaxingSchemeId = localTaxingScheme.inflowId;
     }
   }
   

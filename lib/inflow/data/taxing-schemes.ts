@@ -11,9 +11,9 @@ export async function getTaxingSchemes() {
 }
 
 export async function getTaxingScheme(taxSchemeId: string) {
-  return inflow.get<InflowTaxingScheme>(`/taxing-schemes/${taxSchemeId}`);
+  return await inflow.get<InflowTaxingScheme>(`/taxing-schemes/${taxSchemeId}?include=taxCodes`);
 }
 
 export async function upsertTaxingScheme(payload: any) {
-  return inflow.put<InflowTaxingScheme>(`/taxing-schemes`, payload);
+  return await inflow.put<InflowTaxingScheme>(`/taxing-schemes`, payload);
 }

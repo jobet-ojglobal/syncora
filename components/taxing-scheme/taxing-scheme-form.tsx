@@ -48,7 +48,7 @@ export function TaxingSchemeForm({ initialData }: TaxingSchemeFormProps) {
 
   const onSubmit = async (values: TaxingSchemeInput) => {
     try {
-      const response = await fetch("/api/admin/taxing-schemes", {
+      const response = await fetch("/api/admin/taxing-scheme", {
         method: isEditMode ? "PATCH" : "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(values),
@@ -60,7 +60,7 @@ export function TaxingSchemeForm({ initialData }: TaxingSchemeFormProps) {
       }
 
       toast.success(isEditMode ? "Taxing schema profile rules saved" : "New fiscal taxation scheme registered");
-      router.push("/admin/taxing-schemes");
+      router.push("/dashboard/taxing-scheme");
       router.refresh();
     } catch (err: any) {
       toast.error("Pipeline Sync Interrupted", { description: err.message });
@@ -234,7 +234,7 @@ export function TaxingSchemeForm({ initialData }: TaxingSchemeFormProps) {
               type="button"
               variant="outline"
               size="sm"
-              onClick={() => appendTaxCode({ inflowId: `TXC-${Math.floor(100000 + Math.random() * 900000)}`, name: "", isActive: true, tax1Rate: 0, tax2Rate: 0 })}
+              onClick={() => appendTaxCode({ name: "", isActive: true, tax1Rate: 0, tax2Rate: 0 })}
               className="h-8 text-xs gap-1.5 shadow-2xs hover:bg-muted font-medium"
             >
               <Plus className="w-3.5 h-3.5" /> Append Jurisdiction Rate Row

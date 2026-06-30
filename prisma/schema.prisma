@@ -1137,7 +1137,7 @@ model BusinessPartnerAddress {
   country         String?
   postalCode      String?
   remarks         String?
-  addressType     String?
+  addressType     AddressType?
 
   businessPartner BusinessPartner @relation(fields: [businessPartnerId], references: [id], onDelete: Cascade)
 
@@ -1152,6 +1152,11 @@ model BusinessPartnerAddress {
   @@index([businessPartnerId])
 
   @@map("business_partner_address")
+}
+
+enum AddressType {
+  Commercial
+  Residential
 }
 
 model Customer {
@@ -1535,7 +1540,7 @@ model PricingScheme {
 
   currency          Currency  @relation(fields: [currencyId], references: [inflowId], onDelete: Restrict)
   productPrices     ProductPrice[]
-  customers Customer[]
+  customers         Customer[]
 
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
@@ -1554,9 +1559,9 @@ model PaymentTerms {
   daysDue         Int?
   isActive        Boolean  @default(true)
 
-  customers Customer[]
-  vendors   Vendor[]
-  salesOrders    SalesOrder[]
+  customers       Customer[]
+  vendors         Vendor[]
+  salesOrders     SalesOrder[]
 
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt

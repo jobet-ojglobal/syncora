@@ -1,6 +1,6 @@
 
-import { getCustomers } from '@/lib/inflow/data/customers';
-import { NextResponse } from 'next/server';
+import { getCustomers, upsertCustomer } from '@/lib/inflow/data/customers';
+import { NextRequest, NextResponse } from 'next/server';
 
 export async function GET() {
   try {
@@ -24,5 +24,18 @@ export async function GET() {
       },
       { status: 500 }
     );
+  }
+}
+
+export async function PUT(request: NextRequest) {
+  try {
+    const body = await request.json();
+
+    const customer = await upsertCustomer(body)
+
+    return NextResponse.json(customer, { status: 201 });
+  } catch (error) {
+    console.error("Customer creation error runtime failure:", error);
+    return NextResponse.json({ error: "Internal Database insertion engine breakdown error.", message: error }, { status: 500 });
   }
 }

@@ -13,7 +13,7 @@ import { TeamMemberSyncService } from "../inflow/services/team-members-sync.serv
 import { TaxingSchemeSyncService } from "../inflow/services/taxing-scheme-sync.service";
 import { CurrencySyncService } from "../inflow/services/currency-sync.service";
 import { AdjustmentReasonSyncService } from "../inflow/services/adjustment-sync.service";
-import { PricingSchemeSyncService } from "../inflow/services/pricing-scheme-syn.service";
+import { PricingSchemeSyncService } from "../inflow/services/pricing-scheme-sync.service";
 import { ProductCostAdjustmentSyncService } from "../inflow/services/product-cost-adjustment-sync.service";
 import { PaymentTermSyncService } from "../inflow/services/payment-term-sync.service";
 import { VendorSyncService } from "../inflow/services/vendor-sync.service";
@@ -231,7 +231,7 @@ worker.on("error", (error) => {
   console.error("Worker error:", error);
 });
 
-console.log("Sync Worker started. Listening for sync jobs...");
+console.log("🚀 Manual Sync Worker started. Listening for 'sync' jobs...");
 
 // Graceful shutdown
 process.on("SIGTERM", async () => {

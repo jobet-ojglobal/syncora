@@ -58,7 +58,6 @@ export function TeamMemberForm({ locationLookup, initialData }: TeamMemberFormPr
   const form = useForm<TeamMemberInput>({
     resolver: zodResolver(teamMemberSchema),
     defaultValues: initialData || {
-      inflowId: `TM-${Math.random().toString(36).substr(2, 7).toUpperCase()}`,
       name: "",
       email: "",
       isActive: true,
@@ -125,18 +124,13 @@ export function TeamMemberForm({ locationLookup, initialData }: TeamMemberFormPr
             <Users className="w-4 h-4 text-primary" /> Directory Identity Metadata Profile
           </FieldLegend>
 
-          <Field className="md:col-span-3">
-            <FieldLabel>Inflow System ID *</FieldLabel>
-            <Input {...register("inflowId")} disabled={isEditMode} className="font-mono bg-muted/20 uppercase" />
-          </Field>
-
-          <Field className="md:col-span-5">
+          <Field className="md:col-span-6">
             <FieldLabel>Full User Name *</FieldLabel>
             <Input placeholder="e.g., Sarah Jenkins" {...register("name")} />
             {errors.name && <span className="text-xs text-destructive">{errors.name.message}</span>}
           </Field>
 
-          <Field className="md:col-span-4">
+          <Field className="md:col-span-6">
             <FieldLabel>Corporate Email Address *</FieldLabel>
             <Input type="email" placeholder="s.jenkins@enterprise.com" {...register("email")} />
             {errors.email && <span className="text-xs text-destructive">{errors.email.message}</span>}

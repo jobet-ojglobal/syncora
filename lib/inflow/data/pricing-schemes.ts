@@ -20,5 +20,5 @@ export async function getPricingSchemes(
 }
 
 export async function getPricingScheme(pricingID: string) {
-  return inflow.get<InflowPricingScheme>(`/pricing-schemes/${pricingID}`);
+  return await inflow.get<InflowPricingScheme>(`/pricing-schemes/${pricingID}`);
 }

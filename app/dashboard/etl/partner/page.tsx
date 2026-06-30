@@ -1,6 +1,6 @@
 // partner-app/app/settings/webhooks/page.tsx
 
-import PartnerWorkspace from "@/components/settings/partner-workspace";
+import PartnerWorkspace from "@/components/setting/partner-workspace";
 
 export default function WebhookSettingsPage() {
   return (

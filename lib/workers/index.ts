@@ -1,4 +1,4 @@
-import "./test-sync.worker";
+// import "./test-sync.worker";
 import "./sync.worker";
 import "./partner.worker"
 

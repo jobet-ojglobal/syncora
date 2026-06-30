@@ -3,7 +3,7 @@
 
 import { useEffect, useState } from "react";
 import { Loader2, UserPlus } from "lucide-react";
-import { TeamMemberForm } from "@/components/team-members/team-member-form";
+import { TeamMemberForm } from "@/components/team-member/team-member-form";
 
 export default function CreateTeamMemberPage() {
   const [hydrationData, setHydrationData] = useState<{ locationLookup: any[] } | null>(null);

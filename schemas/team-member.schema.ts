@@ -3,7 +3,6 @@ import { z } from "zod";
 
 export const teamMemberSchema = z.object({
   id: z.string().optional(),
-  inflowId: z.string().min(1, "Inflow tracker synchronization ID is required"),
   name: z.string().min(1, "Team member display identity name is required"),
   email: z.string().email("A valid internal corporate email address is required"),
   isActive: z.boolean(),

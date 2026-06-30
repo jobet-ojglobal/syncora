@@ -18,6 +18,7 @@
   Receipt,
   Tablet,
   MonitorCheck,
+  DollarSign,
 } from "lucide-react";
 
     // admin: [
@@ -396,12 +397,42 @@ export const data = {
       icon: Truck,
       items: [
         {
-          title: "All Scheme",
+          title: "All Taxing Scheme",
           url: "/dashboard/taxing-scheme",
         },
         {
-          title: "Create Transfer",
+          title: "Create Taxing Scheme",
           url: "/dashboard/taxing-scheme/create",
+        },
+      ],
+    },
+    {
+      title: "Currency",
+      url: "/dashboard/currencies",
+      icon: DollarSign,
+      items: [
+        {
+          title: "All Currency",
+          url: "/dashboard/currencies",
+        },
+        {
+          title: "Create Currency",
+          url: "/dashboard/currencies/create",
+        },
+      ],
+    },
+    {
+      title: "Pricing Scheme",
+      url: "/dashboard/pricing-scheme",
+      icon: Truck,
+      items: [
+        {
+          title: "All Pricing Scheme",
+          url: "/dashboard/pricing-scheme",
+        },
+        {
+          title: "Create Pricing Scheme",
+          url: "/dashboard/pricing-scheme/create",
         },
       ],
     },
@@ -422,6 +453,8 @@ export const data = {
         },
       ],
     },
+
+    
 
     // {
     //   title: "Customer Orders",
