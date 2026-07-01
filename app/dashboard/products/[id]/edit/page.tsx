@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { ArrowLeft, Loader2 } from "lucide-react";
 import PageHeader from "@/components/layout/dashboard/PageHeader";
-import { ProductForm } from "@/components/products/product-form";
+import { ProductForm } from "@/components/product/product-form";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 

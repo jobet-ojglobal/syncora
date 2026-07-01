@@ -436,12 +436,41 @@ export const data = {
         },
       ],
     },
+    {
+      title: "Payment Terms",
+      url: "/dashboard/payment-terms",
+      icon: Truck,
+      items: [
+        {
+          title: "All Payment Terms",
+          url: "/dashboard/payment-terms",
+        },
+        {
+          title: "Create Payment Terms",
+          url: "/dashboard/payment-terms/create",
+        },
+      ],
+    },
 
 
     /* -------------------------------------------------------------------------- */
     /*                               CUSTOMER ORDERS                              */
     /* -------------------------------------------------------------------------- */
-
+    {
+      title: "Customer",
+      url: "/dashboard/customers",
+      icon: Users,
+      items: [
+        {
+          title: "All Customers",
+          url: "/dashboard/customers",
+        },
+         {
+          title: "Create Customer",
+          url: "/dashboard/customers/create",
+        },
+      ],
+    },
     {
       title: "Team Members",
       url: "/dashboard/team-members",
@@ -453,6 +482,7 @@ export const data = {
         },
       ],
     },
+    
 
     
 

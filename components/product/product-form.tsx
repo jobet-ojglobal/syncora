@@ -275,6 +275,9 @@ export function ProductForm({  brands, uoms, initialData, groups: productGroups 
   }, [watchedName, watchedBrandId, brandMap, isEditMode, setValue]);
 
   const onSubmit = async (values: ProductInput) => {
+
+    console.log("Submitting values:", values);
+    
     try {
       const endpoint = "/api/admin/products";
       const method = isEditMode ? "PATCH" : "POST";
@@ -301,11 +304,7 @@ export function ProductForm({  brands, uoms, initialData, groups: productGroups 
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="w-full max-w-5xl mx-auto p-6 bg-card border rounded-xl shadow-xs space-y-6">
       
-      
-      
       <FieldGroup className="gap-6">
-
-        
 
         {/* Core Properties Row */}
         <FieldSet className="grid grid-cols-1 md:grid-cols-3 gap-4">

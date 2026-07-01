@@ -40,7 +40,6 @@ export const PurchaseOrderMapper = {
       tax1Rate: new Prisma.Decimal(l.tax1Rate || 0),
       tax2Rate: new Prisma.Decimal(l.tax2Rate || 0),
       taxCodeId: l.taxCodeId || null,
-      timestamp: l.timestamp,
     }));
   },
 
@@ -55,7 +54,6 @@ export const PurchaseOrderMapper = {
       description: l.description || null,
       vendorItemCode: l.vendorItemCode || null,
       quantity: l.quantity || Prisma.DbNull,
-      timestamp: l.timestamp,
       productHeight: l.productHeight ? new Prisma.Decimal(l.productHeight) : null,
       productLength: l.productLength ? new Prisma.Decimal(l.productLength) : null,
       productWidth: l.productWidth ? new Prisma.Decimal(l.productWidth) : null,
@@ -74,7 +72,6 @@ export const PurchaseOrderMapper = {
       description: l.description || null,
       vendorItemCode: l.vendorItemCode || null,
       quantity: l.quantity || Prisma.DbNull,
-      timestamp: l.timestamp,
     }));
   },
 
@@ -88,7 +85,6 @@ export const PurchaseOrderMapper = {
       paymentType: l.paymentType || null,
       referenceNumber: l.referenceNumber || null,
       remarks: l.remarks || null,
-      timestamp: l.timestamp || "",
     }));
   },
 

@@ -56,7 +56,6 @@ export class ProductTaxCodeSyncService {
                     productId: product.productId,
                     taxCodeId: tc.taxCodeId,
                     taxingSchemeId: tc.taxingSchemeId,
-                    timestamp: tc.timestamp,
                   })),
                   skipDuplicates: true,
                 });

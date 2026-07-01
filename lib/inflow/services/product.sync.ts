@@ -197,7 +197,6 @@ export async function syncProduct(
           productId: product.productId,
           taxCodeId: tc.taxCodeId,
           taxingSchemeId: tc.taxingSchemeId,
-          timestamp: tc.timestamp,
         })),
         skipDuplicates: true,
       });
@@ -222,7 +221,6 @@ export async function syncProduct(
           reorderMethod: rs.reorderMethod || "PurchaseOrder",
           reorderPoint: new Prisma.Decimal(rs.reorderPoint || 0),
           reorderQuantity: new Prisma.Decimal(rs.reorderQuantity || 0),
-          timestamp: rs.timestamp,
         })),
         skipDuplicates: true,
       });
@@ -246,7 +244,6 @@ export async function syncProduct(
           estimatedSeconds: new Prisma.Decimal(po.estimatedSeconds || 0),
           instructions: po.instructions,
           trackTime: po.trackTime ?? false,
-          timestamp: po.timestamp,
         })),
         skipDuplicates: true,
       });
@@ -319,7 +316,6 @@ export async function syncProduct(
             productId: product.productId,
             childProductId: bom.childProductId,
             quantity: new Prisma.Decimal(rawQuantity || "0"),
-            timestamp: bom.timestamp,
           };
         }),
         skipDuplicates: true,

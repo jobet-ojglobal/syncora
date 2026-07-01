@@ -3,8 +3,8 @@ import {
   ArrowLeft,
 } from "lucide-react";
 import PageHeader from "@/components/layout/dashboard/PageHeader";
-import { ProductGroupForm } from "@/components/products/group-form";
 import { notFound } from "next/navigation";
+import { ProductGroupForm } from "@/components/product/group-form";
 
 async function getBrands() {
   try {

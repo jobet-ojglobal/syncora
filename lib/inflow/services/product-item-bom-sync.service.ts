@@ -61,7 +61,6 @@ export class ProductItemBomSyncService {
                       productId: product.productId, // Parent Assembly item ID
                       childProductId: bom.childProductId, // Component item ID
                       quantity: new Prisma.Decimal(rawQuantity || "0"),
-                      timestamp: bom.timestamp,
                     };
                   }),
                   skipDuplicates: true,

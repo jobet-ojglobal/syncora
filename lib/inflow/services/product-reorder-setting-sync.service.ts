@@ -62,7 +62,6 @@ export class ProductReorderSettingSyncService {
                     // Safely parse numbers to Decimal mappings matching your schema (db.Decimal(12,4))
                     reorderPoint: new Prisma.Decimal(rs.reorderPoint || 0),
                     reorderQuantity: new Prisma.Decimal(rs.reorderQuantity || 0),
-                    timestamp: rs.timestamp,
                   })),
                   skipDuplicates: true,
                 });

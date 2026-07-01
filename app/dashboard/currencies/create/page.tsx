@@ -26,9 +26,7 @@ export default function NewCurrencyPage() {
         title="Initialize International Trading Handle" 
         description="Establish cryptographic standard ISO tracking values, configure typographic print layout separators properties, and attach base conversion rate factor coefficients."
         icon={Globe2}
-        >
-        <Button size="sm">Add Rule Mapping</Button>
-      </PageHeader>
+        />
 
       {/* Initialize unified multi-variant configuration client form block layout */}
       <CurrencyForm initialData={null} />

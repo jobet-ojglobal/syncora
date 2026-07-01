@@ -231,20 +231,6 @@ export default function TeamMembersListPage() {
                             <Edit3 className="w-3.5 h-3.5" />
                           </Link>
                         </Button>
-                        {/* <Button 
-                          variant="ghost" 
-                          size="icon" 
-                          onClick={() => handleArchiveMember(member.id, member.name, member.totalAssignedTasks)}
-                          disabled={member.totalAssignedTasks > 0}
-                          className={`h-8 w-8 ${
-                            member.totalAssignedTasks > 0 
-                              ? "text-muted-foreground/30 cursor-not-allowed opacity-40" 
-                              : "text-muted-foreground hover:text-destructive hover:bg-destructive/5"
-                          }`}
-                          title={member.totalAssignedTasks > 0 ? `Locked: Bound to ${member.totalAssignedTasks} operational records rows links.` : "Archive account profile records nodes."}
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </Button> */}
                         <DeleteButton
                           itemId={member.id} 
                           itemName={member.name} 

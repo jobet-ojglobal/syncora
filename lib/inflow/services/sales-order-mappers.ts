@@ -37,7 +37,6 @@ export const SalesOrderMapper = {
         tax1Rate: new Prisma.Decimal(l.tax1Rate || 0),
         tax2Rate: new Prisma.Decimal(l.tax2Rate || 0),
         taxCodeId: l.taxCodeId || null,
-        timestamp: l.timestamp,
       }));
   },
 
@@ -49,7 +48,6 @@ export const SalesOrderMapper = {
       containerNumber: l.containerNumber || null,
       description: l.description || null,
       quantity: l.quantity || Prisma.DbNull,
-      timestamp: l.timestamp,
     }));
   },
 
@@ -64,7 +62,6 @@ export const SalesOrderMapper = {
       pickDate: l.pickDate ? new Date(l.pickDate) : null,
       description: l.description || null,
       quantity: l.quantity || Prisma.DbNull,
-      timestamp: l.timestamp,
     }));
   },
 
@@ -77,7 +74,6 @@ export const SalesOrderMapper = {
       locationId: l.locationId || null,
       sublocation: l.sublocation || null,
       quantity: l.quantity || Prisma.DbNull,
-      timestamp: l.timestamp,
     }));
   },
 
@@ -89,7 +85,6 @@ export const SalesOrderMapper = {
       lineNum: l.lineNum !== undefined ? String(l.lineNum) : null,
       hasExpiredLotsInStock: l.hasExpiredLotsInStock ?? false,
       quantity: l.quantity || Prisma.DbNull,
-      timestamp: l.timestamp,
     }));
   },
 
@@ -103,7 +98,6 @@ export const SalesOrderMapper = {
       sublocation: l.sublocation || null,
       restockDate: l.restockDate ? new Date(l.restockDate) : null,
       quantity: l.quantity || Prisma.DbNull,
-      timestamp: l.timestamp,
     }));
   },
 
@@ -118,7 +112,6 @@ export const SalesOrderMapper = {
       easyPostShipmentStatus: l.easyPostShipmentStatus || null,
       easyPostConfirmationEmailAddress: l.easyPostConfirmationEmailAddress || null,
       containers: l.containers ? l.containers : Prisma.DbNull,
-      timestamp: l.timestamp,
     }));
   },
 
@@ -133,7 +126,6 @@ export const SalesOrderMapper = {
       paymentType: l.paymentType || null,
       referenceNumber: l.referenceNumber || null,
       remarks: l.remarks || null,
-      timestamp: l.timestamp,
     }));
   },
 };

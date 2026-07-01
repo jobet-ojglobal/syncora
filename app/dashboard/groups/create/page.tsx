@@ -4,7 +4,7 @@ import {
 } from "lucide-react";
 import PageHeader from "@/components/layout/dashboard/PageHeader";
 import { prisma } from "@/lib/prisma";
-import { ProductGroupForm } from "@/components/products/group-form";
+import { ProductGroupForm } from "@/components/product/group-form";
 
 
 async function getAttributes() {
@@ -26,7 +26,7 @@ async function getAttributes() {
 
 export default async function CreateProductGroupPage() {
   
-  const [brands, categories, attributes, productsLookup] = await Promise.all([
+  const [brands, categories, attributes] = await Promise.all([
     prisma.brand.findMany({
       select: {
         id: true,
@@ -71,7 +71,7 @@ export default async function CreateProductGroupPage() {
         title="Create Group Product"
         description=" Add a new group product." 
       />
-      <ProductGroupForm 
+      <ProductGroupForm
         brands={brands} 
         categories={categories} 
         attributes={attributes}

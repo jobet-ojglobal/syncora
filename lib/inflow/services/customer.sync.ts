@@ -199,7 +199,8 @@ export async function syncCustomer(
         country: addr.address?.country,
         postalCode: addr.address?.postalCode,
         remarks: addr.address?.remarks,
-        addressType: addr.address?.addressType,
+        // to uppercase the first letter of the address type for consistency with the enum
+        addressType: addr.address?.addressType && addr.address?.addressType !== null ? addr.address?.addressType?.charAt(0).toUpperCase() + addr.address?.addressType?.slice(1) : null,
       },
       update: {
         name: addr.name,
@@ -210,7 +211,8 @@ export async function syncCustomer(
         country: addr.address?.country,
         postalCode: addr.address?.postalCode,
         remarks: addr.address?.remarks,
-        addressType: addr.address?.addressType,
+        // to uppercase the first letter of the address type for consistency with the enum
+        addressType: addr.address?.addressType && addr.address?.addressType !== null ? addr.address?.addressType?.charAt(0).toUpperCase() + addr.address?.addressType?.slice(1) : null,
       },
     });
   }

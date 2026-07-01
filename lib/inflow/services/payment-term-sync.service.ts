@@ -15,7 +15,7 @@ export class PaymentTermSyncService {
     for (let i = 0; i < total; i++) {
       const term = terms[i];
       await prisma.$transaction(async (tx) => {
-        await tx.paymentTerms.upsert({
+        await tx.paymentTerm.upsert({
           where: {
               inflowId: term.paymentTermsId,
           },

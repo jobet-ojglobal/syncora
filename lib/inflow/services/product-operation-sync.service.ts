@@ -62,7 +62,6 @@ export class ProductOperationSyncService {
                     estimatedSeconds: new Prisma.Decimal(po.estimatedSeconds || 0),
                     instructions: po.instructions,
                     trackTime: po.trackTime ?? false,
-                    timestamp: po.timestamp,
                   })),
                   skipDuplicates: true,
                 });

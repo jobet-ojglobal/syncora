@@ -122,7 +122,7 @@ export async function ensurePaymentTermsShell(
     name: string;
   }
 ) {
-  await tx.paymentTerms.upsert({
+  await tx.paymentTerm.upsert({
     where: { inflowId: payload.inflowId },
     create: {
       inflowId: payload.inflowId,
