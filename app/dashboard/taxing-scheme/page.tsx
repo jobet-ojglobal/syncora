@@ -132,9 +132,6 @@ export default function TaxingSchemesListPage() {
                           </Badge>
                         )}
                       </div>
-                      <div className="font-mono text-[9px] text-muted-foreground mt-1 uppercase tracking-tight">
-                        {scheme.inflowId}
-                      </div>
                     </td>
 
                     {/* Tier Calculations Breakdown */}

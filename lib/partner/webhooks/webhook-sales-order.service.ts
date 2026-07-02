@@ -7,6 +7,7 @@ import { syncSalesOrder } from "@/lib/inflow/services/sales-order.sync";
 interface SyncResult {
   success: boolean;
   message?: string; // <-- Add this optional property
+  inflowPayload?: any;
   // ... other properties if any
 }
 
@@ -90,7 +91,7 @@ export class InflowSalesOrderWebhookService {
     // (Customer identification is ignored here to take advantage of syncSalesOrder's built-in self-healing JIT recovery)
     const [dbLocations, dbTerms, dbTeam, dbProducts] = await Promise.all([
       prisma.location.findMany({ where: { inflowId: { in: Array.from(locationIds) } }, select: { inflowId: true } }),
-      prisma.paymentTerms.findMany({ where: { inflowId: { in: Array.from(paymentTermsIds) } }, select: { inflowId: true } }),
+      prisma.paymentTerm.findMany({ where: { inflowId: { in: Array.from(paymentTermsIds) } }, select: { inflowId: true } }),
       prisma.teamMember.findMany({ where: { inflowId: { in: Array.from(teamMemberIds) } }, select: { inflowId: true } }),
       prisma.product.findMany({ where: { inflowId: { in: Array.from(productIds) } }, select: { inflowId: true } }),
     ]);
@@ -103,10 +104,10 @@ export class InflowSalesOrderWebhookService {
     };
 
     // Atomic database execution block
-    await prisma.$transaction(async (tx) => {
+    const builtPayload = await prisma.$transaction(async (tx) => {
       await syncSalesOrder(tx, fullOrderData, validationSets);
     }, { timeout: 30000 }); // Single order sync will safely finalize within 30 seconds
 
-    return { success: true };
+    return { success: true, inflowPayload: builtPayload };
   }
 }

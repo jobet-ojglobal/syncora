@@ -132,8 +132,8 @@ export default function UnifiedCustomerForm({ initialData, catalogs }: UnifiedCu
     return errors.addresses?.[index]?.[fieldName]?.message;
   };
 
-  return (
-    <form onSubmit={handleSubmit(onSubmit)} className="space-y-6 text-xs">
+  return ( 
+    <form onSubmit={handleSubmit(onSubmit)} className="space-y-6 ">
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         
         {/* Left Column */}
@@ -480,38 +480,39 @@ export default function UnifiedCustomerForm({ initialData, catalogs }: UnifiedCu
                   Remove
                 </button>
 
-                <Controller 
-                  control={control} 
-                  name={`addresses.${index}.name`} 
-                  render={({ field }) => (
-                    <Field>
-                      <FieldLabel>Label (e.g. Warehouse A)</FieldLabel>
-                      <FieldContent><Input {...field} className="h-8 text-xs" /></FieldContent>
-                      {getAddressError(index, "name") && <FieldError>{getAddressError(index, "name")}</FieldError>}
-                    </Field>
-                  )}
-                />
-
-                <Controller 
-                  control={control} 
-                  name={`addresses.${index}.address1`} 
-                  render={({ field }) => (
-                    <Field>
-                      <FieldLabel>Street Address</FieldLabel>
-                      <FieldContent><Input {...field} className="h-8 text-xs" /></FieldContent>
-                      {getAddressError(index, "address1") && <FieldError>{getAddressError(index, "address1")}</FieldError>}
-                    </Field>
-                  )}
-                />
-
-                <div className="grid grid-cols-3 gap-2">
+                
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <Controller 
+                    control={control} 
+                    name={`addresses.${index}.name`} 
+                    render={({ field }) => (
+                      <Field>
+                        <FieldLabel>Label (e.g. Home A)</FieldLabel>
+                        <FieldContent><Input {...field} className="h-8 text-xs w-full" /></FieldContent>
+                        {getAddressError(index, "name") && <FieldError>{getAddressError(index, "name")}</FieldError>}
+                      </Field>
+                    )}
+                  />
+                  <Controller 
+                    control={control} 
+                    name={`addresses.${index}.address1`} 
+                    render={({ field }) => (
+                      <Field>
+                        <FieldLabel>Street Address</FieldLabel>
+                        <FieldContent><Input {...field} className="h-8 text-xs w-full" /></FieldContent>
+                        {getAddressError(index, "address1") && <FieldError>{getAddressError(index, "address1")}</FieldError>}
+                      </Field>
+                    )}
+                  />
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <Controller 
                     control={control} 
                     name={`addresses.${index}.city`} 
                     render={({ field }) => (
                       <Field>
                         <FieldLabel>City</FieldLabel>
-                        <FieldContent><Input {...field} className="h-8 text-xs" /></FieldContent>
+                        <FieldContent><Input {...field} className="h-8 text-xs w-full" /></FieldContent>
                         {getAddressError(index, "city") && <FieldError>{getAddressError(index, "city")}</FieldError>}
                       </Field>
                     )}
@@ -522,25 +523,25 @@ export default function UnifiedCustomerForm({ initialData, catalogs }: UnifiedCu
                     render={({ field }) => (
                       <Field>
                         <FieldLabel>State</FieldLabel>
-                        <FieldContent><Input {...field} className="h-8 text-xs" /></FieldContent>
+                        <FieldContent><Input {...field} className="h-8 text-xs w-full" /></FieldContent>
                         {getAddressError(index, "state") && <FieldError>{getAddressError(index, "state")}</FieldError>}
                       </Field>
                     )}
                   />
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
                   <Controller 
                     control={control} 
                     name={`addresses.${index}.postalCode`} 
                     render={({ field }) => (
                       <Field>
                         <FieldLabel>Zip</FieldLabel>
-                        <FieldContent><Input {...field} className="h-8 text-xs" /></FieldContent>
+                        <FieldContent><Input {...field} className="h-8 text-xs w-full" /></FieldContent>
                         {getAddressError(index, "postalCode") && <FieldError>{getAddressError(index, "postalCode")}</FieldError>}
                       </Field>
                     )}
                   />
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
                   <Controller 
                     control={control} 
                     name={`addresses.${index}.addressType`} 
@@ -552,7 +553,7 @@ export default function UnifiedCustomerForm({ initialData, catalogs }: UnifiedCu
                             onValueChange={(val) => field.onChange(val === "null" ? null : val)} 
                             value={field.value ?? "null"}
                           >
-                            <SelectTrigger className="h-9 text-xs">
+                            <SelectTrigger className="h-9 text-xs w-full">
                               <SelectValue placeholder="Select type (optional)" />
                             </SelectTrigger>
                             <SelectContent>
@@ -573,7 +574,7 @@ export default function UnifiedCustomerForm({ initialData, catalogs }: UnifiedCu
                       <Field>
                         <FieldLabel>Suite / Floor / Unit</FieldLabel>
                         <FieldContent>
-                          <Input {...field} placeholder="Optional" className="h-9 text-xs" />
+                          <Input {...field} placeholder="Optional" className="h-9 text-xs w-full" />
                         </FieldContent>
                         {getAddressError(index, "address2") && <FieldError>{getAddressError(index, "address2")}</FieldError>}
                       </Field>

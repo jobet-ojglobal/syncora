@@ -2,18 +2,19 @@
 import { Worker, Job } from "bullmq";
 import { prisma } from "@/lib/prisma";
 import { connection } from "@/lib/redis";
-import { upsertCustomer } from "../inflow/data/customers";
+import { upsertCustomer as upsertCloudCustomer } from "../inflow/data/customers";
+import { upsertCustomer as upsertPartnerCustomer } from "../partner/data/customers";
 
-interface PartnerWebhookJobData {
+interface MidWebhookJobData {
   source: string;
   model: string;
   payload: any;
   timestamp: string;
 }
 
-const midWorker = new Worker<PartnerWebhookJobData>(
+const midWorker = new Worker<MidWebhookJobData>(
   "mid_sync", // Ties this worker explicitly to the mid_sync queue
-  async (job: Job<PartnerWebhookJobData>) => {
+  async (job: Job<MidWebhookJobData>) => {
     const { source, model, payload, timestamp } = job.data;
 
     console.log(`[Mid Worker] Processing job ${job.id} for source: ${source} (model: ${model}) at ${timestamp}`);
@@ -21,9 +22,16 @@ const midWorker = new Worker<PartnerWebhookJobData>(
     try {
       switch (source) {
         case "CUSTOMER_SYNC_API":
-          await upsertCustomer(payload);
-          // await upsertPartnerCustomer(payload);  // to partner
+          await upsertCloudCustomer(payload);
+          // await upsertPartnerCustomer(payload); 
           break;
+        case "UPSERT_CLOUD_CUSTOMER":
+          await upsertCloudCustomer(payload);
+          break;
+        case "UPSERT_PARTNER_CUSTOMER":
+          await upsertPartnerCustomer(payload);
+          break;
+
         default:
           throw new Error(`Unsupported mid sync source: ${source}`);
       }

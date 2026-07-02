@@ -2,8 +2,8 @@
 "use client"
 
 import * as React from "react"
-import { columns, ParsedProduct } from "@/components/products/data-table/columns"
-import { ProductDataTable } from "@/components/products/data-table/table"
+import { columns, ParsedProduct } from "@/components/product/data-table/columns"
+import { ProductDataTable } from "@/components/product/data-table/table"
 
 export default function AdminProductsPage() {
   const [products, setProducts] = React.useState<ParsedProduct[]>([])

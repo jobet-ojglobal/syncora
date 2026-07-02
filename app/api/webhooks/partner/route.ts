@@ -1,6 +1,6 @@
 // app/api/webhooks/partner/route.ts
 import { prisma } from "@/lib/prisma";
-import { syncPartnerQueue } from "@/lib/queues/sync.queue";
+import { partnerSyncQueue } from "@/lib/queues/sync.queue";
 import { listWebhooks } from "@/lib/partner/services/webhook.service";
 import { NextRequest, NextResponse } from "next/server";
 import { partnerApi } from "@/lib/partner/partner.client";
@@ -61,8 +61,8 @@ export async function POST(request: NextRequest) {
 
           // 
           // Offload the sync processing to the dedicated background worker queue
-          // await syncPartnerQueue.add(
-          //   "partner_sync_job",
+          // await partnerSyncQueue.add(
+          //   "sales_sync_job",
           //   {
           //     source: "inflow_sales_order",
           //     action: eventType === "SalesOrderCreated" ? "create" : "update",
@@ -78,6 +78,34 @@ export async function POST(request: NextRequest) {
           //     },
           //   }
           // );
+        }
+        break;
+      }
+
+      case "CustomerCreated":
+      case "CustomerUpdated": {
+        const batchID = payload.batch_id;
+
+        if (batchID) {
+          // Offload the sync processing to the dedicated background worker queue
+          await partnerSyncQueue.add(
+            "customer_sync_job",
+            {
+              source: "inflow_customer",
+              action: eventType === "CustomerCreated" ? "create" : "update",
+              dataId: batchID,
+              loggedEventId: loggedEvent.id,
+              outboundAuditId: payload.outboundAuditId,
+              eventType,
+            },
+            {
+              attempts: 3,
+              backoff: {
+                type: "exponential",
+                delay: 2000, // Wait 2s, then 4s, then 8s on failure
+              },
+            }
+          );
         }
         break;
       }

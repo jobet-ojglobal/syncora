@@ -2,13 +2,13 @@
 "use client"
 
 import * as React from "react"
-import { columns, ParsedProduct } from "@/components/products/data-table/columns"
-import { ProductDataTable } from "@/components/products/data-table/server-side-table"
+import { columns, ParsedProduct } from "@/components/product/data-table/columns"
+import { ProductDataTable } from "@/components/product/data-table/server-side-table"
 import { ColumnFiltersState, SortingState } from "@tanstack/react-table"
 import PageHeader from "@/components/layout/dashboard/PageHeader"
 import { Button } from "@/components/ui/button"
 import Link from "next/link"
-import { Plus } from "lucide-react"
+import { Layers, Plus } from "lucide-react"
 import { toast } from "sonner"
 
 interface HydrationPayload {
@@ -159,7 +159,8 @@ export default function AdminServerSideProductsPage() {
   return (
     <div className="w-full max-w-7xl mx-auto  p-6  space-y-6">
       <PageHeader 
-        className=" border-b pb-5" 
+        className="border-b pb-5" 
+        icon={Layers}
         title="Master Product Catalog" 
         description="Manage global trade line SKUs, nested barcode structures, multi-tier transactional UOM variables, and active tracking variables." 
         >

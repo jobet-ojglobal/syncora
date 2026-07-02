@@ -100,7 +100,7 @@ export function LocationForm({ initialData }: LocationFormProps) {
   };
 
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className="w-full max-w-3xl mx-auto p-6 bg-card border rounded-xl shadow-sm space-y-6">
+    <form onSubmit={handleSubmit(onSubmit)} className="w-full mx-auto p-6 bg-card border rounded-xl shadow-sm space-y-6 text-xs">
       
       {/* SECTION 1: Top Core Identity Options */}
       <FieldGroup className="gap-5">

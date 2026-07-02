@@ -138,9 +138,6 @@ export default function PaymentTermsListPage() {
                     {/* Public Designation Title Identity Cell Block */}
                     <td className="p-4 pl-5">
                       <div className="font-semibold text-foreground text-[13px] leading-snug">{term.name}</div>
-                      <div className="font-mono text-[9px] text-muted-foreground/60 mt-1 uppercase tracking-widest">
-                        <span className="bg-muted border px-1.5 py-0.5 rounded shadow-3xs font-semibold">{term.inflowId}</span>
-                      </div>
                     </td>
 
                     {/* Window Day Delay Limit Measurement Parameter Data Field */}

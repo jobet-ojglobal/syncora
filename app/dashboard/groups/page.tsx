@@ -10,6 +10,7 @@ import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { DeleteButton } from "@/components/shared/delete-button";
+import PageHeader from "@/components/layout/dashboard/PageHeader";
 
 interface LinkedSkuItem {
   variantId: string;
@@ -89,23 +90,18 @@ export default function ProductGroupsListPage() {
 
   return (
     <div className="w-full max-w-7xl mx-auto p-6 space-y-6">
-      
-      {/* Upper Navigation Block */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b pb-5">
-        <div>
-          <h1 className="text-xl font-bold tracking-tight text-foreground flex items-center gap-2">
-            <Layers className="w-5 h-5 text-primary" /> Matrix Product Groupings
-          </h1>
-          <p className="text-xs text-muted-foreground mt-0.5">
-            Organize loose warehouse inventory stock keeping units into dynamic variable customer arrays.
-          </p>
-        </div>
+      <PageHeader 
+        className="border-b pb-5"
+        title="Matrix Product Groupings" 
+        description="Organize loose warehouse inventory stock keeping units into dynamic variable customer arrays."
+        icon={Layers}
+        >
         <Button asChild size="sm" className="gap-1.5 shrink-0 text-xs">
           <Link href="/dashboard/groups/create">
             <Plus className="w-4 h-4" /> Assemble Group Matrix
           </Link>
         </Button>
-      </div>
+      </PageHeader>
 
       {/* Toolbar Strip */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">

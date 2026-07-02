@@ -149,9 +149,6 @@ export default function TeamMembersListPage() {
                     {/* Identification tracking handles column cell */}
                     <td className="p-4 pl-5 font-medium">
                       <div className="font-semibold text-foreground text-[13px]">{member.name}</div>
-                      <div className="font-mono text-[9px] text-muted-foreground mt-0.5 tracking-tight uppercase">
-                        {member.inflowId}
-                      </div>
                     </td>
 
                     {/* Email anchor endpoint layout box cell */}

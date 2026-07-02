@@ -166,7 +166,6 @@ export default function CurrenciesListPage() {
                     {/* Descriptive full catalog name text label */}
                     <td className="p-4 text-foreground text-[13px]">
                       <div>{currency.name}</div>
-                      <div className="text-[9px] font-mono font-bold text-muted-foreground/60 tracking-tight mt-0.5 uppercase">{currency.inflowId}</div>
                     </td>
 
                     {/* Localized typographical rule display validation preview strings */}

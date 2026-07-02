@@ -122,9 +122,9 @@ export default function PricingSchemesListPage() {
                           </Badge>
                         )}
                       </div>
-                      <div className="font-mono text-[9px] text-muted-foreground/60 mt-1 uppercase tracking-wider">
+                      {/* <div className="font-mono text-[9px] text-muted-foreground/60 mt-1 uppercase tracking-wider">
                         {scheme.inflowId}
-                      </div>
+                      </div> */}
                     </td>
 
                     {/* Operational settlement trading currency link lookup fields */}

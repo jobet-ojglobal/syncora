@@ -5,6 +5,6 @@ export async function getSalesOrder(
   batchId: string
 ) {
   return partnerApi.get<InflowSalesOrder>(
-    `/transactions/open/sales/${batchId}`,
+    `/sales/${batchId}`,
   );
 }

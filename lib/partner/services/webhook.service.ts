@@ -81,29 +81,6 @@ export async function createOrUpdatePartnerWebhook(events: InflowEvent[]) {
       },
   });
 
-  // 1. Mutate state on the partner's server
-//   const updated = await partnerApi.put<PartnerWebhook>("/webhooks", {
-//     subscriptionId: webHookSubscriptionId,
-//     partnerName: "Mid Central App",
-//     url: existing?.url ?? PARTNER_WEBHOOK_URL,
-//     events,
-//   });
-
-//   // 2. Sync state down to your local Postgres database
-//   await prisma.partnerWebhook.upsert({
-//     where: { url: updated.url },
-//     create: {
-//       id: updated.webHookSubscriptionId,
-//       url: updated.url,
-//       events: updated.events,
-//       secret: updated.secret ?? null,
-//     },
-//     update: {
-//       id: updated.webHookSubscriptionId,
-//       events: updated.events,
-//     },
-//   });
-
   return updatedWebhook;
 }
 

@@ -10,6 +10,10 @@ export const midSyncQueue = new Queue("mid_sync", {
   connection: connection,
 });
 
-export const syncPartnerQueue = new Queue("partner_sync", {
+export const cloudSyncQueue = new Queue("cloud_sync", {
+  connection: connection,
+});
+
+export const partnerSyncQueue = new Queue("partner_sync", {
   connection: connection,
 });

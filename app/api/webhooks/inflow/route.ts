@@ -1,7 +1,7 @@
 // app/api/webhooks/inflow/route.ts
 import { prisma } from "@/lib/prisma";
-import { syncPartnerQueue } from "@/lib/queues/sync.queue";
-import { listWebhooks } from "@/lib/inflow/webhooks/webhook.service";
+import { cloudSyncQueue } from "@/lib/queues/sync.queue";
+import { listWebhooks } from "@/lib/inflow/webhooks/webhook-setting.service";
 import { NextRequest, NextResponse } from "next/server";
 
 /**
@@ -11,7 +11,7 @@ import { NextRequest, NextResponse } from "next/server";
 export async function GET() {
   try {
     const data = await listWebhooks();
-    return NextResponse.json({ success: true, message: "Connected to inflow App", data });
+    return NextResponse.json({ success: true, message: "Connected to inflow Cloud", data });
   } catch (error) {
     return NextResponse.json(
       { success: false, error: error instanceof Error ? error.message : "Unknown error" },
@@ -44,11 +44,61 @@ export async function POST(request: NextRequest) {
         const inflowId = payload.id || payload.productId;
 
         if (inflowId) {
-          await syncPartnerQueue.add(
+          await cloudSyncQueue.add(
             "cloud_sync_job",
             {
               source: "inflow_product",
               action: eventType === "ProductCreatedV1" ? "create" : "update",
+              dataId: inflowId,
+              loggedEventId: loggedEvent.id
+            },
+            {
+              attempts: 3,
+              backoff: {
+                type: "exponential",
+                delay: 2000, // Wait 2s, then 4s, then 8s on failure
+              },
+            }
+          );
+        }
+        break;
+      }
+
+      case "CustomerCreatedV1":
+      case "CustomerUpdatedV1": {
+        const inflowId = payload.id || payload.customerId;
+
+        if (inflowId) {
+          await cloudSyncQueue.add(
+            "cloud_sync_job",
+            {
+              source: "inflow_customer",
+              action: eventType === "CustomerCreatedV1" ? "create" : "update",
+              dataId: inflowId,
+              loggedEventId: loggedEvent.id
+            },
+            {
+              attempts: 3,
+              backoff: {
+                type: "exponential",
+                delay: 2000, // Wait 2s, then 4s, then 8s on failure
+              },
+            }
+          );
+        }
+        break;
+      }
+
+      case "VendorCreatedV1":
+      case "VendorUpdatedV2": {
+        const inflowId = payload.id || payload.vendorId;
+
+        if (inflowId) {
+          await cloudSyncQueue.add(
+            "cloud_sync_job",
+            {
+              source: "inflow_vendor",
+              action: eventType === "VendorCreatedV1" ? "create" : "update",
               dataId: inflowId,
               loggedEventId: loggedEvent.id
             },
@@ -72,7 +122,7 @@ export async function POST(request: NextRequest) {
         if (orderId) {
           // Offload the sync processing to the dedicated background worker queue
           console.log(`api partner_sync_job ${eventType}`)
-          await syncPartnerQueue.add(
+          await cloudSyncQueue.add(
             "partner_sync_job",
             {
               source: "inflow_sales_order",

@@ -174,6 +174,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(result.customer, { status: 201 });
   } catch (error) {
     console.error("[CUSTOMER_POST_ERROR]:", error);
+    
     return NextResponse.json({ error: "Failed to process customer creation pipeline." }, { status: 500 });
   }
 }
@@ -216,6 +217,24 @@ export async function PATCH(request: NextRequest) {
           isActive: isActive !== undefined ? isActive : undefined
         }
       });
+
+      const existingAddresses = await tx.businessPartnerAddress.findMany({
+        where: { businessPartnerId: currentCustomer.businessPartnerId },
+        select: { id: true }
+      });
+
+      const incomingIds = addresses
+        .filter((a: any) => a.id) // Only get addresses that have an ID
+        .map((a: any) => a.id);
+
+      // 2. Identify addresses to delete (exist in DB, but not in current payload)
+      const toDelete = existingAddresses.filter(addr => !incomingIds.includes(addr.id));
+
+      if (toDelete.length > 0) {
+        await tx.businessPartnerAddress.deleteMany({
+          where: { id: { in: toDelete.map(a => a.id) } }
+        });
+      }
 
       // 3. Smart Address Alignment Strategy (Upserts matching structural states)
       const syncedAddresses = await Promise.all(
@@ -282,6 +301,7 @@ export async function PATCH(request: NextRequest) {
        * STEP 5: Construct Outbound inFlow-Compliant Upsert Representation
        */
       const inflowPayload = {
+        id: updatedCustomer.id,
         customerId: currentCustomer.inflowId, // Matches immutable external inFlow GUID
         name: businessPartner.name,
         contactName: businessPartner.contactName,

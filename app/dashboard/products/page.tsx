@@ -1,4 +1,4 @@
-import AdminServerSideProductsPage from "@/components/products/data-table/ServerSideRender";
+import AdminServerSideProductsPage from "@/components/product/data-table/ServerSideRender";
 
 
 const Page = () => {

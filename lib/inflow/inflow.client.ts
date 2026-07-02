@@ -22,16 +22,24 @@ export class InflowClient {
       }
     );
 
-    if (!response.ok) {
-      const text =
-        await response.text();
+    // if (!response.ok) {
+    //   const text =
+    //     await response.text();
 
+    //   throw new Error(
+    //     `InFlow API Error ${response.status}: ${text}`
+    //   );
+    // }
+
+    const text = await response.text();
+
+    if (!response.ok) {
       throw new Error(
         `InFlow API Error ${response.status}: ${text}`
       );
     }
 
-    return response.json();
+    return text ? JSON.parse(text) : ({} as T);
   }
 
   get<T>(
@@ -85,7 +93,7 @@ export class InflowClient {
     );
   }
 
-  delete<T>(
+   delete<T>(
     endpoint: string
   ): Promise<T> {
     return this.request<T>(

@@ -5,7 +5,7 @@ import {
   createOrUpdatePartnerWebhook, 
   deletePartnerWebhook,
 } from "@/lib/partner/services/webhook.service";
-import { InflowEvent, PartnerWebhook } from "@/lib/partner/types/webhook";
+import { InflowEvent } from "@/lib/partner/types/webhook";
 
 export async function GET() {
   try {
@@ -22,7 +22,7 @@ export async function GET() {
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { action, subscriptionId, events } = body;
+    const { action, webhookId, events } = body;
 
     if (action === "connect") {
       const defaultEvents: InflowEvent[] = ["customer.created"]; // "salesOrder.updated", 
@@ -31,11 +31,11 @@ export async function POST(request: Request) {
     }
 
     if (action === "disconnect") {
-      if (!subscriptionId) {
+      if (!webhookId) {
         const current = await findPartnerWebhook();
         if (current) await deletePartnerWebhook(current.webHookSubscriptionId);
       } else {
-        await deletePartnerWebhook(subscriptionId);
+        await deletePartnerWebhook(webhookId);
       }
       return NextResponse.json({ success: true });
     }

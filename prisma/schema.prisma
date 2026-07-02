@@ -1204,7 +1204,6 @@ model Customer {
   @@map("customer")
 }
 
-
 model CustomerDue {
   id                String   @id @default(cuid())
   inflowId          String   @unique
