@@ -26,11 +26,10 @@ export async function getVendor(vendorId: string) {
 }
 
 export async function upsertVendor(
-  vendorId: string,
   data: any
 ) {
   return await inflow.put<InflowVendor>(
-    `/vendors/${vendorId}`,
+    `/vendors?include=addresses,attachments,balances,credits,currency,dues,lastModifiedBy,taxingScheme,vendorItems`,
     data
   );
 }

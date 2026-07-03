@@ -3,7 +3,10 @@ import { Worker, Job } from "bullmq";
 import { prisma } from "@/lib/prisma";
 import { connection } from "@/lib/redis";
 import { upsertCustomer as upsertCloudCustomer } from "../inflow/data/customers";
+import { upsertVendor as upsertCloudVendor } from "../inflow/data/vendors";
 import { upsertCustomer as upsertPartnerCustomer } from "../partner/data/customers";
+import { upsertTestCustomer as upsertPartnerTestCustomer } from "../partner/data/customers";
+
 
 interface MidWebhookJobData {
   source: string;
@@ -21,15 +24,35 @@ const midWorker = new Worker<MidWebhookJobData>(
 
     try {
       switch (source) {
+        // ========= CUSTOMER ============
         case "CUSTOMER_SYNC_API":
           await upsertCloudCustomer(payload);
           // await upsertPartnerCustomer(payload); 
+          break;
+        case "CUSTOMER_SYNC_BULK":
+          // await upsertCloudCustomer(payload);
+          await upsertPartnerCustomer(payload); 
           break;
         case "UPSERT_CLOUD_CUSTOMER":
           await upsertCloudCustomer(payload);
           break;
         case "UPSERT_PARTNER_CUSTOMER":
-          await upsertPartnerCustomer(payload);
+          await upsertPartnerTestCustomer(payload);
+          break;
+        // ========= VENDOR ============
+        case "VENDOR_SYNC_API":
+          await upsertCloudVendor(payload);
+          // await upsertPartnerCustomer(payload); 
+          break;
+        case "VENDOR_SYNC_BULK":
+          await upsertCloudVendor(payload);
+          // await upsertPartnerCustomer(payload); 
+          break;
+        case "UPSERT_CLOUD_VENDOR":
+          await upsertCloudVendor(payload);
+          break;
+        case "UPSERT_PARTNER_VENDOR":
+          // await upsertPartnerVendor(payload);
           break;
 
         default:

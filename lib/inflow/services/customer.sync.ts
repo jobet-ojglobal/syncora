@@ -348,16 +348,16 @@ export async function syncCustomer(
     })),
     // Fixed: Read custom fields directly from the incoming webhook object since they aren't stored via database models
     customFields: {
-      custom1: customer.customFields?.custom1 || null,
-      custom2: customer.customFields?.custom2 || null,
-      custom3: customer.customFields?.custom3 || null,
-      custom4: customer.customFields?.custom4 || null,
-      custom5: customer.customFields?.custom5 || null,
-      custom6: customer.customFields?.custom6 || null,
-      custom7: customer.customFields?.custom7 || null,
-      custom8: customer.customFields?.custom8 || null,
-      custom9: customer.customFields?.custom9 || null,
-      custom10: customer.customFields?.custom10 || null,
+      custom1: customer.customFields?.custom1 || "",
+      custom2: customer.customFields?.custom2 || "",
+      custom3: customer.customFields?.custom3 || "",
+      custom4: customer.customFields?.custom4 || "",
+      custom5: customer.customFields?.custom5 || "",
+      custom6: customer.customFields?.custom6 || "",
+      custom7: customer.customFields?.custom7 || "",
+      custom8: customer.customFields?.custom8 || "",
+      custom9: customer.customFields?.custom9 || "",
+      custom10: customer.customFields?.custom10 || "",
     }
   };
 

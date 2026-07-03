@@ -66,7 +66,7 @@ export async function GET(
     // 3. Normalize the final payload to strictly align with CustomerMasterInput
     const initialFormData = {
       id: customerFields.id,
-      legalName: businessPartner.name,
+      name: businessPartner.name,
       contactName: businessPartner.contactName ?? "",
       email: businessPartner.email ?? "",
       phone: businessPartner.phone ?? "",

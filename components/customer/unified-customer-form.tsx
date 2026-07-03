@@ -5,7 +5,8 @@ import { useForm, Controller, type SubmitHandler, useFieldArray } from "react-ho
 import { zodResolver } from "@hookform/resolvers/zod";
 import { 
   Building2, User, Mail, Phone, MapPin, Landmark, 
-  Save, ArrowLeft, Loader2, Globe, Briefcase, Percent, Edit3
+  Save, ArrowLeft, Loader2, Globe, Briefcase, Percent, Edit3,
+  AlertCircle
 } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
@@ -17,12 +18,12 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Field, FieldLabel, FieldError, FieldContent } from "@/components/ui/field";
 
-import { customerMasterSchema, CustomerMasterInput } from "@/schemas/customer.schema";
+import { customerFormSchema, CustomerFormData } from "@/schemas/customer.schema";
 import { addressFormSchema } from "@/schemas/address.schema";
 import z from "zod";
 
 interface UnifiedCustomerFormProps {
-  initialData?: any; 
+  initialData?: Partial<CustomerFormData>;
   catalogs: {
     pricing: { id: string; name: string }[];
     taxing: { id: string; name: string }[];
@@ -43,11 +44,11 @@ export default function UnifiedCustomerForm({ initialData, catalogs }: UnifiedCu
     watch, 
     setValue, 
     formState: { errors, isSubmitting } 
-  } = useForm<CustomerMasterInput>({
-    resolver: zodResolver(customerMasterSchema),
+  } = useForm<CustomerFormData>({
+    resolver: zodResolver(customerFormSchema) as any,
     defaultValues: {
       id: initialData?.id || "",
-      name: initialData?.legalName || "",
+      name: initialData?.name || "",
       contactName: initialData?.contactName || "",
       email: initialData?.email || "",
       phone: initialData?.phone || "",
@@ -85,7 +86,7 @@ export default function UnifiedCustomerForm({ initialData, catalogs }: UnifiedCu
     name: "addresses"
   });
 
-  const onSubmit: SubmitHandler<CustomerMasterInput> = async (values) => {
+  const onSubmit = async (values: CustomerFormData) => {
     try {
       const res = await fetch("/api/admin/customers", {
         method: isEditMode ? "PATCH" : "POST",
@@ -452,22 +453,36 @@ export default function UnifiedCustomerForm({ initialData, catalogs }: UnifiedCu
 
           {/* Managed Addresses */}
           <div className="bg-card border rounded-xl p-5 space-y-4 shadow-xs">
-            <div className="flex items-center justify-between">
-              <h2 className="text-sm font-bold text-foreground flex items-center gap-1.5">
-                <MapPin className="w-4 h-4 text-primary" /> Managed Addresses
-              </h2>
-              <Button 
-                type="button" 
-                variant="outline" 
-                size="xs" 
-                onClick={() => append({ 
-                  name: "", address1: "", address2: "", city: "", state: "", 
-                  country: "USA", postalCode: "", addressType: "Commercial", 
-                  isDefaultBilling: false, isDefaultShipping: false, remarks: ""
-                })}
-              >
-                + Add Location
-              </Button>
+            <div className="flex flex-col space-y-2">
+              <div className="flex items-center justify-between">
+                <h2 className="text-sm font-bold text-foreground flex items-center gap-1.5">
+                  <MapPin className="w-4 h-4 text-primary" /> Managed Addresses
+                </h2>
+                <Button 
+                  type="button" 
+                  variant="outline" 
+                  size="sm" 
+                  className="h-8 text-xs"
+                  onClick={() => append({ 
+                    name: "", address1: "", address2: "", city: "", state: "", 
+                    country: "USA", postalCode: "", addressType: "Commercial", 
+                    isDefaultBilling: false, isDefaultShipping: false, remarks: ""
+                  })}
+                >
+                  + Add Location
+                </Button>
+              </div>
+
+              {/* CUSTOM ERROR ALERT FOR ADDRESSES ARRAY */}
+              {errors.addresses?.message && !Array.isArray(errors.addresses) && (
+                <div className="flex items-start gap-2 bg-destructive/10 text-destructive text-sm p-3 rounded-md border border-destructive/20 shadow-sm animate-in fade-in zoom-in-95 duration-200">
+                  <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
+                  <div className="flex flex-col">
+                    <p className="font-semibold">Missing Information</p>
+                    <p className="text-destructive/80 text-xs">{errors.addresses.message}</p>
+                  </div>
+                </div>
+              )}
             </div>
 
             {fields.map((field, index) => (

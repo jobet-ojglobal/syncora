@@ -11,7 +11,7 @@ export default async function OnboardNewCustomerAccountPage() {
     fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/admin/currencies/basic`).then(r => r.json()),
   ]);
   return (
-    <div className="w-full max-w-5xl mx-auto p-6 space-y-4 ">
+    <div className="w-full mx-auto px-6 space-y-4 py-12 ">
       {/* HEADER */}
       <Link
         href="/dashboard/vendors"

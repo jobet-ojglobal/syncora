@@ -18,7 +18,7 @@ export default async function OnboardNewCustomerAccountPage() {
     fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/admin/team-members/sales`).then(r => r.json()),
   ]);
   return (
-    <div className="w-full max-w-5xl mx-auto p-6 space-y-4 ">
+    <div className="w-full max-w-5xl mx-auto px-6 py-12 space-y-4 ">
       {/* HEADER */}
       <Link
         href="/dashboard/customers"

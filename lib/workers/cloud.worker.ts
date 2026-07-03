@@ -3,8 +3,9 @@ import { Worker, Job } from "bullmq";
 import { prisma } from "@/lib/prisma";
 import { connection } from "@/lib/redis";
 import { InflowSalesOrderWebhookService } from "@/lib/inflow/webhooks/webhook-sales-order.service";
-import { InflowCustomerWebhookService } from "@/lib/inflow/webhooks/webhook-customer.service";
+import { InflowCustomerWebhookService, CustomerSyncResult } from "@/lib/inflow/webhooks/webhook-customer.service";
 import { InflowProductWebhookService } from "@/lib/inflow/webhooks/webhook-product.service";
+import { midSyncQueue } from "../queues/sync.queue";
 
 
 interface CloudWebhookJobData {
@@ -61,27 +62,27 @@ const cloudWorker = new Worker<CloudWebhookJobData>(
 
       if (result?.success) {
         // upsert to parter app
-        // if (source === "inflow_customer") {
-        //   const customerResult = result as CustomerSyncResult;
+        if (source === "inflow_customer") {
+          const customerResult = result as CustomerSyncResult;
           
-        //   if (customerResult.inflowPayload) {
-        //     console.log(`[Partner Worker] Dispatching customer downstream job to midSyncQueue for ID: ${dataId}`);
-        //     await partnerSyncQueue.add(
-        //       "customer_sync_job",
-        //       {
-        //         source: "CUSTOMER_SYNC_API",
-        //         model: "CUSTOMER",
-        //         payload: customerResult.inflowPayload, // 3. TypeScript is happy now!
-        //         timestamp: new Date().toISOString()
-        //       },
-        //       { 
-        //         attempts: 3, 
-        //         backoff: { type: "exponential", delay: 2000 },
-        //         removeOnComplete: true
-        //       }
-        //     );
-        //   }
-        // }
+          if (customerResult.inflowPayload) {
+            console.log(`[Partner Worker] Dispatching customer downstream job to midSyncQueue for ID: ${dataId}`);
+            await midSyncQueue.add(
+              "customer_sync_job",
+              {
+                source: "UPSERT_PARTNER_CUSTOMER",
+                model: "CUSTOMER",
+                payload: customerResult.inflowPayload, // 3. TypeScript is happy now!
+                timestamp: new Date().toISOString()
+              },
+              { 
+                attempts: 3, 
+                backoff: { type: "exponential", delay: 2000 },
+                removeOnComplete: true
+              }
+            );
+          }
+        }
       }
 
     } catch (error) {

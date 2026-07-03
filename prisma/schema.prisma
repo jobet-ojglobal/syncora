@@ -1275,14 +1275,14 @@ model Vendor {
   id                        String @id @default(cuid())
   businessPartnerId         String @unique
   inflowId                  String @unique
-  currencyId                String?
-  defaultAddressId          String?
   defaultCarrier            String?
   defaultPaymentMethod      String?
-  defaultPaymentTermsId     String?
   discount                  Decimal? @db.Decimal(10,2)
   isTaxInclusivePricing     Boolean @default(false)
   leadTimeDays              Int?
+  currencyId                String?
+  defaultAddressId          String?
+  defaultPaymentTermsId     String?
   taxingSchemeId            String?
   lastModifiedById          String?
   lastModifiedDttm          DateTime?

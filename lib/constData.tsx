@@ -471,6 +471,21 @@ export const data = {
         },
       ],
     },
+     {
+      title: "Vendors",
+      url: "/dashboard/vendors",
+      icon: Users,
+      items: [
+        {
+          title: "All Vendors",
+          url: "/dashboard/vendors",
+        },
+         {
+          title: "Create Vendor",
+          url: "/dashboard/vendors/create",
+        },
+      ],
+    },
     {
       title: "Team Members",
       url: "/dashboard/team-members",
