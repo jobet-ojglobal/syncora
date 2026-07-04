@@ -10,7 +10,7 @@ import { notFound } from "next/navigation";
 async function getBrand(id: string) {
   try {
     const response = await fetch(
-      `${process.env.NEXT_PUBLIC_APP_URL}/api/admin/brands/${id}/basic`,
+      `${process.env.NEXT_PUBLIC_SITE_URL}/api/admin/brands/${id}/basic`,
       {
         cache: "no-store",
       }

@@ -13,7 +13,7 @@ import { getCurrentUser } from "@/lib/user";
 async function getInventory(id: string) {
   try {
     const response = await fetch(
-      `${process.env.NEXT_PUBLIC_APP_URL}/api/admin/inventory/${id}/basic`,
+      `${process.env.NEXT_PUBLIC_SITE_URL}/api/admin/inventory/${id}/basic`,
       {
         cache: "no-store",
       }

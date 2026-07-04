@@ -7,7 +7,6 @@ import { upsertVendor as upsertCloudVendor } from "../inflow/data/vendors";
 import { upsertCustomer as upsertPartnerCustomer } from "../partner/data/customers";
 import { upsertTestCustomer as upsertPartnerTestCustomer } from "../partner/data/customers";
 
-
 interface MidWebhookJobData {
   source: string;
   model: string;

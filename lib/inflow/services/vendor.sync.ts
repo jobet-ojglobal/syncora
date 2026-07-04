@@ -1,5 +1,5 @@
 // services/sync/products/vendor.sync.ts
-import { Prisma } from "@/generated/prisma/client";
+import { AddressType, Prisma } from "@/generated/prisma/client";
 import { ensurePaymentTermsShell } from "./helpers";
 import { InflowVendor } from "../types";
 
@@ -97,7 +97,7 @@ export async function syncVendor(
           country: addr.address?.country,
           postalCode: addr.address?.postalCode,
           remarks: addr.address?.remarks,
-          addressType: addr.address?.addressType,
+          addressType: addr.address?.addressType as AddressType | null,
         })),
         skipDuplicates: true,
       });

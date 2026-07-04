@@ -2,12 +2,19 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 
+interface Props {
+  params: Promise<{
+    id: string;
+    locationId: string;
+  }>;
+}
+
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string, locationId: string } }
+  { params }: Props
 ) {
   try {
-    const { id, locationId } = params;
+    const { id, locationId } = await params;
 
     if (!id) {
       return NextResponse.json(

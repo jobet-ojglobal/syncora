@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { DeleteButton } from "@/components/shared/delete-button";
 import PageHeader from "@/components/layout/dashboard/PageHeader";
+import Image from "next/image";
 
 interface BrandListItem {
   id: string;
@@ -105,7 +106,7 @@ export default function BrandsListPage() {
                   <div className="flex items-center gap-3 min-w-0">
                     <div className="w-10 h-10 rounded-lg border bg-muted flex items-center justify-center overflow-hidden shrink-0">
                       {brand.logoUrl ? (
-                        <img src={brand.logoUrl} alt={`${brand.name} logo`} className="w-full h-full object-contain p-1" />
+                        <Image src={brand.logoUrl} alt={`${brand.name} logo`} className="w-full h-full object-contain p-1" />
                       ) : (
                         <FolderHeart className="w-5 h-5 text-muted-foreground/60" />
                       )}

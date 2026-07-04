@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma"; // Replace with your exact Prisma client path
-import { AdjustmentReason, InventoryTransactionType } from "@/generated/prisma/enums";
+import { InventoryAdjustmentReason, InventoryTransactionType } from "@/generated/prisma/enums";
 
 // Helper function to generate a unique tracking code (e.g., ADJ-20260616-XYZW)
 function generateAdjustmentNumber(): string {
@@ -50,7 +50,7 @@ export async function POST(request: NextRequest) {
       const adjustmentHeader = await tx.inventoryAdjustment.create({
         data: {
           adjustmentNumber: generateAdjustmentNumber(),
-          reason: (reason as AdjustmentReason) || "MANUAL",
+          reason: (reason as InventoryAdjustmentReason) || "MANUAL",
           notes: notes || "Initial baseline inventory ledger registration",
           performedById: performedById,
         }
@@ -194,7 +194,7 @@ export async function PATCH(request: NextRequest) {
       const adjustmentHeader = await tx.inventoryAdjustment.create({
         data: {
           adjustmentNumber: generateAdjustmentNumber(),
-          reason: (reason as AdjustmentReason) || "CORRECTION",
+          reason: (reason as InventoryAdjustmentReason) || "CORRECTION",
           notes: notes || "Administrative inventory correction adjustment execution",
           performedById: performedById,
         }

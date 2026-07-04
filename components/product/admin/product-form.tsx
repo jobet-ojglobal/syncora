@@ -1,3 +1,9 @@
+const Sample = () => {
+    return ( <></>  );
+}
+ 
+export default Sample;
+
 // "use client";
 
 // import { useForm, Controller } from "react-hook-form";

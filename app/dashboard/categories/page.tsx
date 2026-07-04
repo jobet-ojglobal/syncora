@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { DeleteButton } from "@/components/shared/delete-button";
 import PageHeader from "@/components/layout/dashboard/PageHeader";
+import Image from "next/image";
 
 // 📝 Updated TypeScript shape to track count parameters
 interface CategoryTreeItem {
@@ -47,7 +48,7 @@ export default function CategoriesListPage() {
 
   useEffect(() => {
     fetchCategories();
-  }, []);
+  }, [fetchCategories]);
 
   const buildHierarchicalTree = (flatList: CategoryTreeItem[]): CategoryTreeItem[] => {
     const map: Record<string, CategoryTreeItem> = {};
@@ -143,7 +144,7 @@ export default function CategoriesListPage() {
             {/* Thumbnail Display Box */}
             <div className="w-8 h-8 rounded-lg border bg-muted flex items-center justify-center overflow-hidden shrink-0">
               {node.imageUrl ? (
-                <img src={node.imageUrl} alt={node.name} className="w-full h-full object-cover" />
+                <Image src={node.imageUrl} alt={node.name} className="w-full h-full object-cover" />
               ) : (
                 <ImageIcon className="w-3.5 h-3.5 text-muted-foreground/60" />
               )}

@@ -9,7 +9,7 @@ import { ProductGroupForm } from "@/components/product/group-form";
 async function getBrands() {
   try {
     const response = await fetch(
-      `${process.env.NEXT_PUBLIC_APP_URL}/api/admin/brands/basic`,
+      `${process.env.NEXT_PUBLIC_SITE_URL}/api/admin/brands/basic`,
       {
         cache: "no-store",
       }
@@ -26,7 +26,7 @@ async function getBrands() {
 async function getCategories() {
   try {
     const response = await fetch(
-      `${process.env.NEXT_PUBLIC_APP_URL}/api/admin/categories/basic`,
+      `${process.env.NEXT_PUBLIC_SITE_URL}/api/admin/categories/basic`,
       {
         cache: "no-store",
       }
@@ -43,7 +43,7 @@ async function getCategories() {
 async function getAttributes() {
   try {
      const response = await fetch(
-      `${process.env.NEXT_PUBLIC_APP_URL}/api/admin/attributes/basic`,
+      `${process.env.NEXT_PUBLIC_SITE_URL}/api/admin/attributes/basic`,
       {
         cache: "no-store",
       }
@@ -61,7 +61,7 @@ async function getAttributes() {
 async function getGroup(id: string) {
   try {
      const response = await fetch(
-      `${process.env.NEXT_PUBLIC_APP_URL}/api/admin/groups/${id}/basic`,
+      `${process.env.NEXT_PUBLIC_SITE_URL}/api/admin/groups/${id}/basic`,
       {
         cache: "no-store",
         next: { revalidate: 0 }

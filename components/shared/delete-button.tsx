@@ -104,7 +104,7 @@ export function DeleteButton({
             Are you absolutely sure?
           </AlertDialogTitle>
           <AlertDialogDescription className="text-left text-sm text-muted-foreground mt-1">
-            This will permanently remove <span className="font-semibold text-foreground">"{itemName}"</span> from your catalog indexing. This action cannot be undone.
+            This will permanently remove <span className="font-semibold text-foreground">&quot;{itemName}&quot;</span> from your catalog indexing. This action cannot be undone.
           </AlertDialogDescription>
         </AlertDialogHeader>
         

@@ -509,7 +509,7 @@ export default InflowWorkspace;
                 </p>
 
                 <code className="block break-all text-xs">
-                  {process.env.APP_URL}
+                  {process.env.SITE_URL}
                   /api/webhooks/inflow
                 </code>
               </div>

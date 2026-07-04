@@ -18,7 +18,7 @@ export const metadata = {
 async function fetchCustomer(id: string) {
   try {
     const response = await fetch(
-      `${process.env.NEXT_PUBLIC_APP_URL}/api/admin/customers/${id}`,
+      `${process.env.NEXT_PUBLIC_SITE_URL}/api/admin/customers/${id}`,
       {
         cache: "no-store",
       }
@@ -38,11 +38,11 @@ export default async function ModifyExistingCustomerProfileLedgerPage({ params }
 
   // Fetch all dependencies in parallel at the server level
   const [pricing, taxing, terms, locations, reps, customerData] = await Promise.all([
-    fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/admin/pricing-scheme/basic`).then(r => r.json()),
-    fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/admin/taxing-scheme/basic`).then(r => r.json()),
-    fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/admin/payment-terms/basic`).then(r => r.json()),
-    fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/admin/locations/basic`).then(r => r.json()),
-    fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/admin/team-members/sales`).then(r => r.json()),
+    fetch(`${process.env.NEXT_PUBLIC_SITE_URL}/api/admin/pricing-scheme/basic`).then(r => r.json()),
+    fetch(`${process.env.NEXT_PUBLIC_SITE_URL}/api/admin/taxing-scheme/basic`).then(r => r.json()),
+    fetch(`${process.env.NEXT_PUBLIC_SITE_URL}/api/admin/payment-terms/basic`).then(r => r.json()),
+    fetch(`${process.env.NEXT_PUBLIC_SITE_URL}/api/admin/locations/basic`).then(r => r.json()),
+    fetch(`${process.env.NEXT_PUBLIC_SITE_URL}/api/admin/team-members/sales`).then(r => r.json()),
     fetchCustomer(targetId), 
   ]);
 

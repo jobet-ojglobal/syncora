@@ -20,7 +20,7 @@ export const env = {
   INFLOW_COMPANY_ID: required(
     "INFLOW_COMPANY_ID"
   ),
-  APP_URL: required(
-    "APP_URL"
+  SITE_URL: required(
+    "SITE_URL"
   ),
 };

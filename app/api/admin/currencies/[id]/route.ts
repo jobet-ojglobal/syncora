@@ -25,9 +25,9 @@ export async function DELETE(
       include: {
         _count: {
           select: {
-          customerBalance: true,
+          customerBalances: true,
           vendors: true,
-          pricingScheme: true,
+          pricingSchemes: true,
           },
         },
       },
@@ -37,7 +37,7 @@ export async function DELETE(
       return NextResponse.json({ error: "Currency not found." }, { status: 404 });
     }
 
-    const dependencyCount = currency._count.customerBalance + currency._count.vendors + currency._count.pricingScheme;
+    const dependencyCount = currency._count.customerBalances + currency._count.vendors + currency._count.pricingSchemes;
 
     if (dependencyCount > 0) {
       return NextResponse.json(

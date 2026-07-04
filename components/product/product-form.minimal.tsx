@@ -15,6 +15,7 @@ import { Field, FieldGroup, FieldLabel, FieldLegend, FieldSet } from "@/componen
 import { generateSku2Variant2 } from "@/helpers/genSKU";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useEffect, useMemo } from "react";
+import { CategorySelect } from "../shared/category-select";
 
 interface BrandLookupOption {
   id: string;
@@ -45,6 +46,7 @@ export function ProductForm({ categories, brands, initialData }: ProductFormProp
       description: initialData?.description || "",
       itemType: initialData?.itemType || "Stock",
       brandId: initialData?.brandId || "",
+      categoryId: initialData?.categoryId || "",
       autoAssemble: initialData?.autoAssemble ?? false,
       isActive: initialData?.isActive ?? true,
       isManufacturable: initialData?.isManufacturable ?? false,
@@ -187,31 +189,14 @@ export function ProductForm({ categories, brands, initialData }: ProductFormProp
           </Field>
           
 
-          <Field>
-              <FieldLabel htmlFor="pg-category">Target Category *</FieldLabel>
-              <Controller
-                control={control}
-                name="categoryId"
-                render={({ field }) => (
-                  <Select 
-                    onValueChange={field.onChange} 
-                    value={field.value}
-                  >
-                    <SelectTrigger id="pg-category">
-                      <SelectValue placeholder={"Select a taxonomy bracket"} />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {categories.map((category) => (
-                        <SelectItem key={category.inflowId} value={category.inflowId}>
-                          {category.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                )}
-              />
-              {errors.categoryId && <span className="text-xs text-destructive">{errors.categoryId.message}</span>}
-            </Field>
+          <Field className="md:col-span-1">
+            <FieldLabel>Master Catalog Department Category</FieldLabel>
+            <Controller
+              name="categoryId"
+              control={control}
+              render={({ field }) => <CategorySelect value={field.value ?? undefined} onChange={field.onChange} />}
+            />
+          </Field>
 
           <Field>
             <FieldLabel>Manufacturer / Brand Assignment</FieldLabel>

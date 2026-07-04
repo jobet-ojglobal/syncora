@@ -50,7 +50,7 @@ export class SalesOrderSyncService {
       const [dbCustomers, dbLocations, dbTerms, dbTeam, dbProducts] = await Promise.all([
         prisma.customer.findMany({ where: { inflowId: { in: Array.from(customerIds) } }, select: { inflowId: true } }),
         prisma.location.findMany({ where: { inflowId: { in: Array.from(locationIds) } }, select: { inflowId: true } }),
-        prisma.paymentTerms.findMany({ where: { inflowId: { in: Array.from(paymentTermsIds) } }, select: { inflowId: true } }),
+        prisma.paymentTerm.findMany({ where: { inflowId: { in: Array.from(paymentTermsIds) } }, select: { inflowId: true } }),
         prisma.teamMember.findMany({ where: { inflowId: { in: Array.from(teamMemberIds) } }, select: { inflowId: true } }),
         prisma.product.findMany({ where: { inflowId: { in: Array.from(productIds) } }, select: { inflowId: true } }),
       ]);

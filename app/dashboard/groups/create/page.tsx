@@ -10,7 +10,7 @@ import { ProductGroupForm } from "@/components/product/group-form";
 async function getAttributes() {
   try {
     const response = await fetch(
-      `${process.env.NEXT_PUBLIC_APP_URL}/api/admin/attributes/basic`,
+      `${process.env.NEXT_PUBLIC_SITE_URL}/api/admin/attributes/basic`,
       {
         cache: "no-store",
       }

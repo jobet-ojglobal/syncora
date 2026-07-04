@@ -9,7 +9,7 @@ import { prisma } from "@/lib/prisma";
 async function getTransfer(id: string) {
   try {
     const response = await fetch(
-      `${process.env.NEXT_PUBLIC_APP_URL}/api/admin/transfers/${id}/basic`,
+      `${process.env.NEXT_PUBLIC_SITE_URL}/api/admin/transfers/${id}/basic`,
       {
         cache: "no-store",
         next: { revalidate: 0 }

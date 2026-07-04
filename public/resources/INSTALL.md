@@ -12,3 +12,15 @@ building webhooks api: https://gemini.google.com/app/98385b50a9a310f7
 Inflow Sync Service Refactor: https://gemini.google.com/app/2a790ede8dc6c00b
 
 ## OJ JOBET
+
+
+
+## VSCODE Extensions
+Error Lens
+ESLint
+Thunder Client
+Container Tools
+Prisma
+Simple React Snippets
+npm intellisense
+Next JS/TS Snippets

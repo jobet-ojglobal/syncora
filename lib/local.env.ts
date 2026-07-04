@@ -17,7 +17,7 @@ export const env = {
   PARTNER_API_KEY: required(
     "PARTNER_API_KEY"
   ),
-  APP_URL: required(
-    "APP_URL"
+  SITE_URL: required(
+    "SITE_URL"
   ),
 };

@@ -1,6 +1,6 @@
 export class APIClient {
   private baseUrl =
-  `${process.env.NEXT_PUBLIC_APP_URL}`;
+  `${process.env.NEXT_PUBLIC_SITE_URL}`;
 
   private async request<T>(
     endpoint: string,

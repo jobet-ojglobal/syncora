@@ -39,7 +39,7 @@ export function TransferOrderForm({ locations, products, sublocations, initialDa
     resolver: zodResolver(transferOrderSchema),
     defaultValues: {
       id: initialData?.id,
-      transferNumber: initialData?.transferNumber || `TO-${Math.floor(100000 + Math.random() * 900000)}`,
+      transferNumber: initialData?.transferNumber || `TO-UUID`,
       sourceLocationId: initialData?.sourceLocationId || "",
       targetLocationId: initialData?.targetLocationId || "",
       status: initialData?.status || "DRAFT",

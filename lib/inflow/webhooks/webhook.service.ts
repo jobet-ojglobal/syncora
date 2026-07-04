@@ -4,7 +4,7 @@
 // import { prisma } from "@/lib/prisma";
 // import { InflowWebhook } from "../types/inflow";
 
-// const WEBHOOK_URL = `${process.env.APP_URL}/api/webhooks/inflow`;
+// const WEBHOOK_URL = `${process.env.SITE_URL}/api/webhooks/inflow`;
 
 // export type InflowEvent =
 //   | "customer.created" | "customer.updated"
@@ -27,7 +27,7 @@
 
 // /**
 //  * Finds the webhook registration. Falls back to finding ANY webhook 
-//  * ending in our path if APP_URL (like localhost vs ngrok) mismatch.
+//  * ending in our path if SITE_URL (like localhost vs ngrok) mismatch.
 //  */
 // export async function findWebhook() {
 //   const webhooks = await listWebhooks();

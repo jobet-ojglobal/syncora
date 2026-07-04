@@ -1,5 +1,9 @@
-// "use server";
+"use server";
 
+export const fetch = () => {
+    return ""
+}
+ 
 // import { inflow } from "@/lib/inflow/inflow.client";
 // import { findWebhook, subscribeWebhook } from "@/lib/inflow/webhooks/webhook.service";
 // import { prisma } from "@/lib/prisma";

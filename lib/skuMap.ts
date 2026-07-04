@@ -1,6 +1,6 @@
 
 
-const SKU_MAP: Record<string, string> = {
+export const SKU_MAP: Record<string, string> = {
   BAREBONE: "BB",
   BAREBONES: "BB",
   GREY: "GRY",

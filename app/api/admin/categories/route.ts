@@ -19,7 +19,7 @@ export async function GET() {
       description: cat.description,
       imageUrl: cat.imageUrl,
       parentId: cat.parentId,
-      productsCount: cat._count.productGroups,
+      productsCount: cat._count.products,
       subcategoriesCount: cat._count.children,
     }));
 

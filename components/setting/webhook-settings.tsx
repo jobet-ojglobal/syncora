@@ -24,11 +24,6 @@ export default function WebhookSettings() {
   const [selectedEvents, setSelectedEvents] = useState<string[]>([]);
   const [copied, setCopied] = useState(false);
 
-  // 1. Fetch current registration status on mount
-  useEffect(() => {
-    fetchWebhookStatus();
-  }, []);
-
   const fetchWebhookStatus = async () => {
     try {
       const res = await fetch("/api/webhooks");
@@ -46,6 +41,11 @@ export default function WebhookSettings() {
       console.error("Failed to fetch subscription status", err);
     }
   };
+
+    // 1. Fetch current registration status on mount
+  useEffect(() => {
+    fetchWebhookStatus();
+  }, []);
 
   // 2. Toggle available system events
   const handleEventToggle = (eventId: string) => {

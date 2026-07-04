@@ -1,5 +1,9 @@
-// // actions/inflow-actions.ts
-// "use server";
+"use server";
+
+export const fetch = () => {
+    return ""
+}
+ 
 
 // import { 
 //   findWebhook, 

@@ -4,7 +4,7 @@ import { randomUUID } from "crypto";
 import { prisma } from "@/lib/prisma";
 import { InflowEvent, PartnerWebhook } from "../types/webhook";
 
-const PARTNER_WEBHOOK_URL = `${process.env.APP_URL}/api/webhooks/partner`;
+const PARTNER_WEBHOOK_URL = `${process.env.SITE_URL}/api/webhooks/partner`;
 
 // export type PartnerEvent = "order.created" | "order.shipped" | "inventory.updated";
 
@@ -21,7 +21,7 @@ export async function listWebhooks() {
 
 /**
  * Finds the webhook registration. Falls back to finding ANY webhook 
- * ending in our path if APP_URL (like localhost vs ngrok) mismatch.
+ * ending in our path if SITE_URL (like localhost vs ngrok) mismatch.
  */
 export async function findWebhook() {
   const webhooks = await listWebhooks();

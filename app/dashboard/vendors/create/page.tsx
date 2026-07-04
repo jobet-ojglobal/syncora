@@ -6,9 +6,9 @@ import { VendorForm } from "@/components/vendor/vendor-form";
 
 export default async function OnboardNewCustomerAccountPage() {
   const [taxing, terms, currencies] = await Promise.all([
-    fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/admin/taxing-scheme/basic`).then(r => r.json()),
-    fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/admin/payment-terms/basic`).then(r => r.json()),
-    fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/admin/currencies/basic`).then(r => r.json()),
+    fetch(`${process.env.NEXT_PUBLIC_SITE_URL}/api/admin/taxing-scheme/basic`).then(r => r.json()),
+    fetch(`${process.env.NEXT_PUBLIC_SITE_URL}/api/admin/payment-terms/basic`).then(r => r.json()),
+    fetch(`${process.env.NEXT_PUBLIC_SITE_URL}/api/admin/currencies/basic`).then(r => r.json()),
   ]);
   return (
     <div className="w-full mx-auto px-6 space-y-4 py-12 ">

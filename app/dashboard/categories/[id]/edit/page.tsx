@@ -9,7 +9,7 @@ import { CategoryForm } from "@/components/category/category-form";
 async function getCategory(id: string) {
   try {
     const response = await fetch(
-      `${process.env.NEXT_PUBLIC_APP_URL}/api/admin/categories/${id}/basic`,
+      `${process.env.NEXT_PUBLIC_SITE_URL}/api/admin/categories/${id}/basic`,
       {
         cache: "no-store",
       }

@@ -1,216 +1,226 @@
-"use client";
 
-import { useState, useTransition } from "react";
 
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import { Separator } from "@/components/ui/separator";
-import { testConnection } from "@/actions/webhook-test";
 
-import type { ConnectionResult } from "@/actions/webhook-test";
 
-const InflowCloudHealth = () => {
-  const [pending, startTransition] =
-    useTransition();
-  const [error, setError] = useState<string | null>(
-    null
-  );
-  const [result, setResult] =
-  useState<Extract<ConnectionResult, { success: true }> | null>(
-    null
-  );
+const Sample = () => {
+  return ( <></> );
+}
+ 
+export default Sample;
 
-  const handleTestConnection = () => {
-    startTransition(async () => {
-      setError(null);
+// "use client";
 
-      try {
-        const response =
-          await testConnection();
+// import { useState, useTransition } from "react";
 
-        if (!response.success) {
-          setError(
-            response.error ??
-              "Connection failed"
-          );
-          return;
-        }
+// import { Badge } from "@/components/ui/badge";
+// import { Button } from "@/components/ui/button";
+// import {
+//   Card,
+//   CardContent,
+//   CardDescription,
+//   CardFooter,
+//   CardHeader,
+//   CardTitle,
+// } from "@/components/ui/card";
+// import { Separator } from "@/components/ui/separator";
+// import { testConnection } from "@/actions/webhook-test";
 
-        setResult(response);
-      } catch (err) {
-        setError(
-          err instanceof Error
-            ? err.message
-            : "Unknown error"
-        );
-      }
-    });
-  };
+// import type { ConnectionResult } from "@/actions/webhook-test";
 
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center justify-between">
-          InFlow Cloud
+// const InflowCloudHealth = () => {
+//   const [pending, startTransition] =
+//     useTransition();
+//   const [error, setError] = useState<string | null>(
+//     null
+//   );
+//   const [result, setResult] =
+//   useState<Extract<ConnectionResult, { success: true }> | null>(
+//     null
+//   );
 
-          {result?.connected &&
-            result?.subscribed &&
-            !result?.disabled && (
-              <Badge>
-                Healthy
-              </Badge>
-          )}
+//   const handleTestConnection = () => {
+//     startTransition(async () => {
+//       setError(null);
 
-          {result?.disabled && (
-            <Badge variant="destructive">
-              Attention Needed
-            </Badge>
-          )}
-        </CardTitle>
+//       try {
+//         const response =
+//           await testConnection();
 
-        <CardDescription>
-          Inventory sync and webhook integration
-        </CardDescription>
-      </CardHeader>
+//         if (!response.success) {
+//           setError(
+//             response.error ??
+//               "Connection failed"
+//           );
+//           return;
+//         }
 
-      <CardContent className="space-y-4">
-        <div className="flex items-center justify-between">
-          <span>Status</span>
-          <Badge
-            variant={
-              pending
-                ? "secondary"
-                : result?.connected
-                ? "default"
-                : "secondary"
-            }
-          >
-            {pending
-              ? "Testing..."
-              : result?.connected
-              ? "Connected"
-              : "Unknown"}
-          </Badge>
-        </div>
+//         setResult(response);
+//       } catch (err) {
+//         setError(
+//           err instanceof Error
+//             ? err.message
+//             : "Unknown error"
+//         );
+//       }
+//     });
+//   };
 
-        <div className="flex items-center justify-between">
-          <span>Webhook</span>
+//   return (
+//     <Card>
+//       <CardHeader>
+//         <CardTitle className="flex items-center justify-between">
+//           InFlow Cloud
 
-          <Badge
-            variant={
-              result?.subscribed
-                ? "default"
-                : "secondary"
-            }
-          >
-            {result?.subscribed
-              ? "Subscribed"
-              : "Not Subscribed"}
-          </Badge>
-        </div>
+//           {result?.connected &&
+//             result?.subscribed &&
+//             !result?.disabled && (
+//               <Badge>
+//                 Healthy
+//               </Badge>
+//           )}
 
-        {result && (
-          <>
-            <div className="flex items-center justify-between">
-              <span>Webhook Status</span>
+//           {result?.disabled && (
+//             <Badge variant="destructive">
+//               Attention Needed
+//             </Badge>
+//           )}
+//         </CardTitle>
 
-              <Badge
-                variant={
-                  result.disabled
-                    ? "destructive"
-                    : "default"
-                }
-              >
-                {result.disabled
-                  ? "Disabled"
-                  : "Active"}
-              </Badge>
-            </div>
+//         <CardDescription>
+//           Inventory sync and webhook integration
+//         </CardDescription>
+//       </CardHeader>
 
-            <div className="flex items-center justify-between">
-              <span>Delivery Failures</span>
+//       <CardContent className="space-y-4">
+//         <div className="flex items-center justify-between">
+//           <span>Status</span>
+//           <Badge
+//             variant={
+//               pending
+//                 ? "secondary"
+//                 : result?.connected
+//                 ? "default"
+//                 : "secondary"
+//             }
+//           >
+//             {pending
+//               ? "Testing..."
+//               : result?.connected
+//               ? "Connected"
+//               : "Unknown"}
+//           </Badge>
+//         </div>
 
-              <span>{result.failures}</span>
-            </div>
+//         <div className="flex items-center justify-between">
+//           <span>Webhook</span>
 
-            <div className="flex items-center justify-between">
-              <span>Webhook ID</span>
+//           <Badge
+//             variant={
+//               result?.subscribed
+//                 ? "default"
+//                 : "secondary"
+//             }
+//           >
+//             {result?.subscribed
+//               ? "Subscribed"
+//               : "Not Subscribed"}
+//           </Badge>
+//         </div>
 
-              <code className="text-xs">
-                {result.webhookId.slice(0, 8)}
-                ...
-                {result.webhookId.slice(-4)}
-              </code>
-            </div>
-          </>
-        )}
+//         {result && (
+//           <>
+//             <div className="flex items-center justify-between">
+//               <span>Webhook Status</span>
 
-        <Separator />
+//               <Badge
+//                 variant={
+//                   result.disabled
+//                     ? "destructive"
+//                     : "default"
+//                 }
+//               >
+//                 {result.disabled
+//                   ? "Disabled"
+//                   : "Active"}
+//               </Badge>
+//             </div>
 
-        <div className="space-y-1">
-          <p className="text-sm text-muted-foreground">
-            Webhook URL
-          </p>
+//             <div className="flex items-center justify-between">
+//               <span>Delivery Failures</span>
 
-          <code className="block break-all text-xs">
-            {process.env.APP_URL}
-            /api/webhooks/inflow
-          </code>
-        </div>
+//               <span>{result.failures}</span>
+//             </div>
 
-        {result?.success && (
-          <div className="rounded-md border bg-muted/50 p-3 text-sm space-y-1">
-            <p>✓ API Authentication Successful</p>
-            <p>✓ Webhook Registered</p>
+//             <div className="flex items-center justify-between">
+//               <span>Webhook ID</span>
 
-            <p>
-              {result.disabled
-                ? "⚠ Webhook Disabled"
-                : "✓ Webhook Active"}
-            </p>
+//               <code className="text-xs">
+//                 {result.webhookId.slice(0, 8)}
+//                 ...
+//                 {result.webhookId.slice(-4)}
+//               </code>
+//             </div>
+//           </>
+//         )}
 
-            <p>
-              Consecutive Failures:{" "}
-              {result.failures}
-            </p>
-          </div>
-        )}
+//         <Separator />
 
-        {error && (
-          <div className="rounded-md border border-destructive p-3 text-sm text-destructive">
-            {error}
-          </div>
-        )}
-      </CardContent>
+//         <div className="space-y-1">
+//           <p className="text-sm text-muted-foreground">
+//             Webhook URL
+//           </p>
 
-      <CardFooter className="gap-2">
-        <Button
-          onClick={handleTestConnection}
-          disabled={pending}
-        >
-          {pending
-            ? "Testing..."
-            : "Test Connection"}
-        </Button>
+//           <code className="block break-all text-xs">
+//             {process.env.SITE_URL}
+//             /api/webhooks/inflow
+//           </code>
+//         </div>
 
-        <Button
-          variant="outline"
-          onClick={handleTestConnection}
-          disabled={pending}
-        >
-          Refresh
-        </Button>
-      </CardFooter>
-    </Card>
-  );
-};
+//         {result?.success && (
+//           <div className="rounded-md border bg-muted/50 p-3 text-sm space-y-1">
+//             <p>✓ API Authentication Successful</p>
+//             <p>✓ Webhook Registered</p>
 
-export default InflowCloudHealth;
+//             <p>
+//               {result.disabled
+//                 ? "⚠ Webhook Disabled"
+//                 : "✓ Webhook Active"}
+//             </p>
+
+//             <p>
+//               Consecutive Failures:{" "}
+//               {result.failures}
+//             </p>
+//           </div>
+//         )}
+
+//         {error && (
+//           <div className="rounded-md border border-destructive p-3 text-sm text-destructive">
+//             {error}
+//           </div>
+//         )}
+//       </CardContent>
+
+//       <CardFooter className="gap-2">
+//         <Button
+//           onClick={handleTestConnection}
+//           disabled={pending}
+//         >
+//           {pending
+//             ? "Testing..."
+//             : "Test Connection"}
+//         </Button>
+
+//         <Button
+//           variant="outline"
+//           onClick={handleTestConnection}
+//           disabled={pending}
+//         >
+//           Refresh
+//         </Button>
+//       </CardFooter>
+//     </Card>
+//   );
+// };
+
+// export default InflowCloudHealth;

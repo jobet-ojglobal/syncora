@@ -11,11 +11,11 @@ export const metadata = {
 
 export default async function OnboardNewCustomerAccountPage() {
   const [pricing, taxing, terms, locations, reps] = await Promise.all([
-    fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/admin/pricing-scheme/basic`).then(r => r.json()),
-    fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/admin/taxing-scheme/basic`).then(r => r.json()),
-    fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/admin/payment-terms/basic`).then(r => r.json()),
-    fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/admin/locations/basic`).then(r => r.json()),
-    fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/admin/team-members/sales`).then(r => r.json()),
+    fetch(`${process.env.NEXT_PUBLIC_SITE_URL}/api/admin/pricing-scheme/basic`).then(r => r.json()),
+    fetch(`${process.env.NEXT_PUBLIC_SITE_URL}/api/admin/taxing-scheme/basic`).then(r => r.json()),
+    fetch(`${process.env.NEXT_PUBLIC_SITE_URL}/api/admin/payment-terms/basic`).then(r => r.json()),
+    fetch(`${process.env.NEXT_PUBLIC_SITE_URL}/api/admin/locations/basic`).then(r => r.json()),
+    fetch(`${process.env.NEXT_PUBLIC_SITE_URL}/api/admin/team-members/sales`).then(r => r.json()),
   ]);
   return (
     <div className="w-full max-w-5xl mx-auto px-6 py-12 space-y-4 ">

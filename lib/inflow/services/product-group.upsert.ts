@@ -4,6 +4,9 @@ import { syncProductGroup } from "./product-group-sync";
 import { getProductGroup, upsertProductGroup } from "../data/product-group";
 import { upsertProduct } from "../data/products";
 import { syncCategory } from "./category-sync";
+import { Prisma } from "@/generated/prisma/client";
+
+type Tx = Prisma.TransactionClient;
 
 // Helper function to generate clean, short SKU components from product text names
 function generateSkuSlug(text: string): string {
@@ -72,7 +75,7 @@ export async function createProductGroupToInflow(input: CreateProductGroupInput)
     brandString = brandRecord?.name || input.brandId;
   }
 
-  let computedVariants: any[] = [];
+  const computedVariants: any[] = [];
 
   if (input.generateVariants) {
     // Collect variant breakdown arrays
@@ -162,7 +165,7 @@ export async function createProductGroupToInflow(input: CreateProductGroupInput)
   const inflowProductGroup = await upsertProductGroup(inflowPayload);
 
   // 3. Sync data locally
-  const localDbRecord = await prisma.$transaction(async (tx) => {
+  const localDbRecord = await prisma.$transaction(async (tx: Tx) => {
     const targetProductGroup = await getProductGroup(inflowProductGroup.productGroupId);
     targetProductGroup.category ? await syncCategory(tx, targetProductGroup.category) : null;
     await syncProductGroup(tx, targetProductGroup, targetProductGroup.defaultProduct);

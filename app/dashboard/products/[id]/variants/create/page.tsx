@@ -5,9 +5,6 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 
-import {
-  ProductForm,
-} from "@/components/products/admin/product-form";
 
 export default function Page() {
   return (
@@ -20,7 +17,6 @@ export default function Page() {
         </CardHeader>
 
         <CardContent>
-          <ProductForm />
         </CardContent>
       </Card>
     </div>

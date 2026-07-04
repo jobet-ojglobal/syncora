@@ -18,7 +18,7 @@ export const metadata = {
 async function fetchVendor(id: string) {
   try {
     const response = await fetch(
-      `${process.env.NEXT_PUBLIC_APP_URL}/api/admin/vendors/${id}`,
+      `${process.env.NEXT_PUBLIC_SITE_URL}/api/admin/vendors/${id}`,
       {
         cache: "no-store",
       }
@@ -37,9 +37,9 @@ export default async function ModifyExistingVendorProfileLedgerPage({ params }: 
   const targetId = resolvedParameters.id;
 
   const [terms, taxing, currencies, vendorData] = await Promise.all([
-    fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/admin/payment-terms/basic`).then(r => r.json()),
-    fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/admin/taxing-scheme/basic`).then(r => r.json()),
-    fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/admin/currencies/basic`).then(r => r.json()),
+    fetch(`${process.env.NEXT_PUBLIC_SITE_URL}/api/admin/payment-terms/basic`).then(r => r.json()),
+    fetch(`${process.env.NEXT_PUBLIC_SITE_URL}/api/admin/taxing-scheme/basic`).then(r => r.json()),
+    fetch(`${process.env.NEXT_PUBLIC_SITE_URL}/api/admin/currencies/basic`).then(r => r.json()),
     fetchVendor(targetId), 
   ]);
 

@@ -26,7 +26,7 @@ export async function GET(
         },
 
         include: {
-          productGroup: {
+          groups: {
             include: {
               category: true,
             },

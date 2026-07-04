@@ -71,7 +71,7 @@ export function CurrencyForm({ initialData }: CurrencyFormProps) {
     for (let i = 0; i < watchedDecPlaces; i++) baseDigits += "5";
     if (watchedDecPlaces === 0) baseDigits = `1${watchedThousSep}235`;
 
-    let formatted = watchedIsFirst ? `${watchedSymbol} ${baseDigits}` : `${baseDigits} ${watchedSymbol}`;
+    const formatted = watchedIsFirst ? `${watchedSymbol} ${baseDigits}` : `${baseDigits} ${watchedSymbol}`;
 
     if (isNegative) {
       if (watchedNegativeType === "Leading") return `-${formatted}`;

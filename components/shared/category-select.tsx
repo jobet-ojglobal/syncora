@@ -139,7 +139,7 @@ export function CategorySelect({ value, onChange }: CategorySelectProps) {
                   onClick={() => setDialogOpen(true)}
                 >
                   <Plus className="h-3.5 w-3.5" />
-                  <span>Create category "{newCategoryName}"</span>
+                  <span>Create category &quot;{newCategoryName}&quot;</span>
                 </Button>
               </CommandEmpty>
               <CommandGroup>

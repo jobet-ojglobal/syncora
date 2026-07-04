@@ -10,7 +10,7 @@ import { notFound } from "next/navigation";
 async function getAttribute(id: string) {
   try {
     const response = await fetch(
-      `${process.env.NEXT_PUBLIC_APP_URL}/api/admin/attributes/${id}/basic`,
+      `${process.env.NEXT_PUBLIC_SITE_URL}/api/admin/attributes/${id}/basic`,
       {
         cache: "no-store",
       }

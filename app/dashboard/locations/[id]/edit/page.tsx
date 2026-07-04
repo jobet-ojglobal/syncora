@@ -9,7 +9,7 @@ import { LocationForm } from "@/components/location/location-form";
 async function getLocation(id: string) {
   try {
     const response = await fetch(
-      `${process.env.NEXT_PUBLIC_APP_URL}/api/admin/locations/${id}/basic`,
+      `${process.env.NEXT_PUBLIC_SITE_URL}/api/admin/locations/${id}/basic`,
       {
         cache: "no-store",
       }

@@ -141,7 +141,7 @@ export function BrandSelect({ value, onChange }: BrandSelectProps) {
                   onClick={() => setDialogOpen(true)}
                 >
                   <Plus className="h-3.5 w-3.5" />
-                  <span>Create brand "{newBrandName}"</span>
+                  <span>Create brand &quot;{newBrandName}&quot;</span>
                 </Button>
               </CommandEmpty>
               <CommandGroup>

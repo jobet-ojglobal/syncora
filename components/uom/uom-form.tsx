@@ -112,7 +112,7 @@ export function UomForm({ uomListLookup, initialData }: UomFormProps) {
             <FieldLabel>System Baseline Multiplication Factor ($baseFactor$) *</FieldLabel>
             <Input type="number" step="0.000001" placeholder="1.000000" {...register("baseFactor", { valueAsNumber: true })} />
             <p className="text-[10px] text-muted-foreground mt-1">
-              Relative value against your category's root scalar parameter (e.g. if 1g = 1.0, then 1kg = 1000.0).
+              Relative value against your category&apos;s root scalar parameter (e.g. if 1g = 1.0, then 1kg = 1000.0).
             </p>
             {errors.baseFactor && <span className="text-xs text-destructive">{errors.baseFactor.message}</span>}
           </Field>
