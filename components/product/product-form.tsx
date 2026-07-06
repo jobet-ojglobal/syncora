@@ -110,7 +110,7 @@ interface ProductFormProps {
   initialData?: any | null;
 }
 
-export function ProductForm({  brands, uoms, initialData, groups: productGroups }: ProductFormProps) {
+export function ProductForm({  brands, uoms, groups: productGroups, initialData }: ProductFormProps) {
   const router = useRouter();
   const isEditMode = !!initialData;
 

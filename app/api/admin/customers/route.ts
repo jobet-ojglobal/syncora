@@ -156,20 +156,20 @@ export async function POST(request: NextRequest) {
     });
 
     // 6. Push safely to background worker queue outside the active DB transaction scope
-    await midSyncQueue.add(
-      "customer_sync_job",
-      {
-        source: "CUSTOMER_SYNC_API",
-        model: "CUSTOMER",
-        payload: result.inflowPayload,
-        timestamp: new Date().toISOString()
-      },
-      { 
-        attempts: 3, 
-        backoff: { type: "exponential", delay: 2000 },
-        removeOnComplete: true
-      }
-    );
+    // await midSyncQueue.add(
+    //   "customer_sync_job",
+    //   {
+    //     source: "CUSTOMER_SYNC_API",
+    //     model: "CUSTOMER",
+    //     payload: result.inflowPayload,
+    //     timestamp: new Date().toISOString()
+    //   },
+    //   { 
+    //     attempts: 3, 
+    //     backoff: { type: "exponential", delay: 2000 },
+    //     removeOnComplete: true
+    //   }
+    // );
 
     return NextResponse.json(result.customer, { status: 201 });
   } catch (error) {

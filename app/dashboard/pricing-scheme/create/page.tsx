@@ -11,6 +11,8 @@ export const metadata: Metadata = {
   description: "Establish custom commercial pricing matrices and catalog segmentation thresholds rules templates.",
 };
 
+export const dynamic = "force-dynamic";
+
 export default async function NewPricingSchemePage() {
   // Query currency lookup vectors on the server layer to feed relational validation controls
   const activeCurrencies = await prisma.currency.findMany({

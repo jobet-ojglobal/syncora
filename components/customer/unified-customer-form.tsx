@@ -16,7 +16,7 @@ import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Field, FieldLabel, FieldError, FieldContent } from "@/components/ui/field";
+import { Field, FieldLabel, FieldError, FieldContent, FieldGroup } from "@/components/ui/field";
 
 import { customerFormSchema, CustomerFormData } from "@/schemas/customer.schema";
 import { addressFormSchema } from "@/schemas/address.schema";
@@ -313,6 +313,30 @@ export default function UnifiedCustomerForm({ initialData, catalogs }: UnifiedCu
               </Field>
             </div>
           </div>
+
+          {/* Additional Remarks */}
+          <div className="bg-card border rounded-xl p-5 space-y-4 shadow-xs hidden sm:block">
+            <h2 className="text-sm font-bold border-b pb-2 text-foreground flex items-center gap-1.5">
+              <Edit3 className="w-4 h-4 text-primary" /> Additional Remarks
+            </h2>
+            <Controller
+              name="remarks"
+              control={control}
+              render={({ field, fieldState }) => (
+                <Field data-invalid={fieldState.invalid}>
+                  <FieldLabel htmlFor="form-remarks">Notes / Comments</FieldLabel>
+                  <Textarea
+                    {...field}
+                    id="form-remarks"
+                    aria-invalid={fieldState.invalid}
+                    placeholder="Optional"
+                    className="min-h-[120px]"
+                  />
+                  {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
+                </Field>
+              )}
+            />
+          </div>
         </div>
 
         {/* Right Column */}
@@ -458,19 +482,6 @@ export default function UnifiedCustomerForm({ initialData, catalogs }: UnifiedCu
                 <h2 className="text-sm font-bold text-foreground flex items-center gap-1.5">
                   <MapPin className="w-4 h-4 text-primary" /> Managed Addresses
                 </h2>
-                <Button 
-                  type="button" 
-                  variant="outline" 
-                  size="sm" 
-                  className="h-8 text-xs"
-                  onClick={() => append({ 
-                    name: "", address1: "", address2: "", city: "", state: "", 
-                    country: "USA", postalCode: "", addressType: "Commercial", 
-                    isDefaultBilling: false, isDefaultShipping: false, remarks: ""
-                  })}
-                >
-                  + Add Location
-                </Button>
               </div>
 
               {/* CUSTOM ERROR ALERT FOR ADDRESSES ARRAY */}
@@ -486,6 +497,303 @@ export default function UnifiedCustomerForm({ initialData, catalogs }: UnifiedCu
             </div>
 
             {fields.map((field, index) => (
+              <div key={field.id} className="p-4 border rounded-lg space-y-3 bg-muted/20 relative pt-6">
+                {fields.length > 1 && (
+                <button 
+                  type="button" 
+                  onClick={() => remove(index)}
+                  className="absolute top-2 right-2 text-xs text-destructive hover:underline"
+                >
+                  Remove
+                </button>
+                )}
+
+                <Controller 
+                  control={control} 
+                  name={`addresses.${index}.name`} 
+                  render={({ field, fieldState }) => (
+                    <Field>
+                      <FieldLabel htmlFor={`form-address-name-${index}`}>Address Label <b className="text-red-500">*</b></FieldLabel>
+                      <FieldContent>
+                        <Input
+                          {...field}
+                          id={`form-address-name-${index}`}
+                          aria-invalid={fieldState.invalid}
+                          placeholder="e.g. Home A"
+                        />
+                        {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
+                      </FieldContent>
+                    </Field>
+                  )}
+                />
+
+                <FieldGroup className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  
+                  <Controller 
+                    control={control} 
+                    name={`addresses.${index}.address1`} 
+                    render={({ field, fieldState }) => (
+                      <Field>
+                        <FieldLabel htmlFor={`form-address-address1-${index}`}>Street Address <b className="text-red-500">*</b></FieldLabel>
+                        <FieldContent>
+                          <Input
+                            {...field}
+                            id={`form-address-address1-${index}`}
+                            aria-invalid={fieldState.invalid}
+                          />
+                          {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
+                        </FieldContent>
+                      </Field>
+                    )}
+                  />
+                  <Controller 
+                    control={control} 
+                    name={`addresses.${index}.address2`} 
+                    render={({ field, fieldState }) => (
+                      <Field>
+                        <FieldLabel htmlFor={`form-address-address2-${index}`}>Suite / Floor / Unit</FieldLabel>
+                        <FieldContent>
+                          <Input
+                            {...field}
+                            id={`form-address-address2-${index}`}
+                            aria-invalid={fieldState.invalid}
+                          />
+                          {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
+                        </FieldContent>
+                      </Field>
+                    )}
+                  />
+                </FieldGroup>
+                <FieldGroup className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <Controller 
+                    control={control} 
+                    name={`addresses.${index}.city`} 
+                    render={({ field, fieldState }) => (
+                      <Field>
+                        <FieldLabel htmlFor={`form-address-city-${index}`}>City <b className="text-red-500">*</b></FieldLabel>
+                        <FieldContent>
+                          <Input
+                            {...field}
+                            id={`form-address-city-${index}`}
+                            aria-invalid={fieldState.invalid}
+                          />
+                          {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
+                        </FieldContent>
+                      </Field>
+                    )}
+                  />
+                  <Controller 
+                    control={control} 
+                    name={`addresses.${index}.state`} 
+                    render={({ field, fieldState }) => (
+                      <Field>
+                        <FieldLabel htmlFor={`form-address-state-${index}`}>State <b className="text-red-500">*</b></FieldLabel>
+                        <FieldContent>
+                          <Input
+                            {...field}
+                            id={`form-address-state-${index}`}
+                            aria-invalid={fieldState.invalid}
+                          />
+                          {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
+                        </FieldContent>
+                      </Field>
+                    )}
+                  />
+                  <Controller 
+                    control={control} 
+                    name={`addresses.${index}.postalCode`} 
+                    render={({ field, fieldState }) => (
+                      <Field>
+                        <FieldLabel htmlFor={`form-address-postalCode-${index}`}>Zip <b className="text-red-500">*</b></FieldLabel>
+                        <FieldContent>
+                          <Input
+                            {...field}
+                            id={`form-address-postalCode-${index}`}
+                            aria-invalid={fieldState.invalid}
+                          />
+                          {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
+                        </FieldContent>
+                      </Field>
+                    )}
+                  />
+                
+                </FieldGroup>
+
+                <FieldGroup className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <Controller 
+                    control={control} 
+                    name={`addresses.${index}.country`} 
+                    render={({ field, fieldState }) => (
+                      <Field>
+                        <FieldLabel htmlFor={`form-addresses.${index}.country`}>Country <b className="text-red-500">*</b></FieldLabel>
+                        <FieldContent>
+                          <Input
+                            {...field}
+                            id={`form-addresses.${index}.country`} 
+                            placeholder="e.g., United States"
+                            aria-invalid={fieldState.invalid}
+                          />
+                          {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
+                        </FieldContent>
+                      </Field>
+                    )}
+                  />
+                  <Controller
+                    name={`addresses.${index}.addressType`} 
+                    control={control}
+                    render={({ field, fieldState }) => (
+                      <Field data-invalid={fieldState.invalid}>
+                        <FieldLabel htmlFor="form-addressType">
+                          Address Type <b className="text-red-500">*</b>
+                        </FieldLabel>
+                        <FieldContent className="relative">
+                          <Select
+                            name={field.name}
+                            onValueChange={(val) => field.onChange(val === "null" ? null : val)} 
+                            value={field.value ?? "null"}
+                          >
+                            <SelectTrigger
+                              id="form-addressType"
+                              aria-invalid={fieldState.invalid}
+                              className="w-full"
+                            >
+                              <SelectValue placeholder="Select" />
+                            </SelectTrigger>
+                            <SelectContent position="item-aligned">
+                              <SelectItem value="null">Not Specified</SelectItem>
+                              <SelectItem value="Commercial">Commercial</SelectItem>
+                              <SelectItem value="Residential">Residential</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </FieldContent>
+                        {fieldState.invalid && (
+                          <FieldError errors={[fieldState.error]} />
+                        )}
+                      </Field>
+                    )}
+                  />
+                  
+                </FieldGroup>
+
+                <Controller
+                  name={`addresses.${index}.remarks`} 
+                  control={control}
+                  render={({ field, fieldState }) => (
+                    <Field>
+                      <FieldLabel htmlFor={`form-address-remarks-${index}`}>Notes / Comments</FieldLabel>
+                      <Textarea
+                        {...field}
+                        id={`form-address-remarks-${index}`}
+                        aria-invalid={fieldState.invalid}
+                        placeholder="Optional"
+                        className="min-h-[120px]"
+                      />
+                      {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
+                    </Field>
+                  )}
+                />
+
+                <div className="flex gap-4 border-t pt-3">
+                  <Controller 
+                    control={control} 
+                    name={`addresses.${index}.isDefaultBilling`} 
+                    render={({ field }) => (
+                      <label className="flex items-center gap-2 cursor-pointer select-none">
+                        <input 
+                          type="checkbox" 
+                          checked={field.value} 
+                          onChange={(e) => {
+                            field.onChange(e.target.checked);
+                            handleDefaultChange(index, "isDefaultBilling", e.target.checked);
+                          }} 
+                        /> Default Billing
+                      </label>
+                    )}
+                  />
+
+                  <Controller 
+                    control={control} 
+                    name={`addresses.${index}.isDefaultShipping`} 
+                    render={({ field }) => (
+                      <label className="flex items-center gap-2 cursor-pointer select-none">
+                        <input 
+                          type="checkbox" 
+                          checked={field.value} 
+                          onChange={(e) => {
+                            field.onChange(e.target.checked);
+                            handleDefaultChange(index, "isDefaultShipping", e.target.checked);
+                          }} 
+                        /> Default Shipping
+                      </label>
+                    )}
+                  />
+                </div>
+              </div>
+            ))}
+            <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="w-full"
+                onClick={() => append({ 
+                    name: "", address1: "", address2: "", city: "", state: "", 
+                    country: "Philippines", postalCode: "", addressType: "Commercial", 
+                    isDefaultBilling: false, isDefaultShipping: false, remarks: ""
+                  })}
+                disabled={fields.length >= 5}
+              >
+                + Add Location
+              </Button>
+          </div>
+
+          {/* Additional Remarks */}
+          <div className="bg-card border rounded-xl p-5 space-y-4 shadow-xs sm:hidden">
+            <h2 className="text-sm font-bold border-b pb-2 text-foreground flex items-center gap-1.5">
+              <Edit3 className="w-4 h-4 text-primary" /> Additional Remarks
+            </h2>
+            <Controller
+              name="remarks"
+              control={control}
+              render={({ field, fieldState }) => (
+                <Field data-invalid={fieldState.invalid}>
+                  <FieldLabel htmlFor="form-remarks">Notes / Comments</FieldLabel>
+                  <Textarea
+                    {...field}
+                    id="form-remarks"
+                    aria-invalid={fieldState.invalid}
+                    placeholder="Optional"
+                    className="min-h-[120px]"
+                  />
+                  {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
+                </Field>
+              )}
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* Form Action Controls Bar */}
+      <div className="flex items-center justify-between border-t pt-5 mt-6">
+        <Button asChild variant="outline" size="sm" className="gap-1 text-xs">
+          <Link href="/dashboard/customers">
+            <ArrowLeft className="w-3.5 h-3.5" /> Return to Customer Index
+          </Link>
+        </Button>
+
+        <Button type="submit" size="sm" disabled={isSubmitting} className="gap-1.5 text-xs px-5">
+          {isSubmitting ? (
+            <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Saving Data...</>
+          ) : (
+            <><Save className="w-3.5 h-3.5" /> {isEditMode ? "Commit Modifications" : "Save Customer"}</>
+          )}
+        </Button>
+      </div>
+    </form>
+  );
+}
+
+
+            {/* {fields.map((field, index) => (
               <div key={field.id} className="p-4 border rounded-lg space-y-3 bg-muted/20 relative pt-6">
                 <button 
                   type="button" 
@@ -647,44 +955,4 @@ export default function UnifiedCustomerForm({ initialData, catalogs }: UnifiedCu
                   />
                 </div>
               </div>
-            ))}
-          </div>
-
-          {/* Additional Remarks */}
-          <div className="bg-card border rounded-xl p-5 space-y-4 shadow-xs">
-            <h2 className="text-sm font-bold border-b pb-2 text-foreground flex items-center gap-1.5">
-              <Edit3 className="w-4 h-4 text-primary" /> Additional Remarks
-            </h2>
-            <Controller 
-              control={control} 
-              name="remarks" 
-              render={({ field }) => (
-                <Field className="space-y-1.5">
-                  <FieldLabel>Notes / Comments</FieldLabel>
-                  <FieldContent><Textarea placeholder="Optional" className="text-xs" {...field} /></FieldContent>
-                </Field>
-              )}
-            />
-          </div>
-        </div>
-      </div>
-
-      {/* Form Action Controls Bar */}
-      <div className="flex items-center justify-between border-t pt-5 mt-6">
-        <Button asChild variant="outline" size="sm" className="gap-1 text-xs">
-          <Link href="/dashboard/customers">
-            <ArrowLeft className="w-3.5 h-3.5" /> Return to Customer Index
-          </Link>
-        </Button>
-
-        <Button type="submit" size="sm" disabled={isSubmitting} className="gap-1.5 text-xs px-5">
-          {isSubmitting ? (
-            <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Saving Data...</>
-          ) : (
-            <><Save className="w-3.5 h-3.5" /> {isEditMode ? "Commit Modifications" : "Save Customer"}</>
-          )}
-        </Button>
-      </div>
-    </form>
-  );
-}
+            ))} */}

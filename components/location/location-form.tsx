@@ -8,16 +8,20 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
-import { Trash2, Plus, MapPin, Layers, ArrowLeft } from "lucide-react";
+import { Trash2, Plus, MapPin, Layers, ArrowLeft, Globe, Warehouse } from "lucide-react";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 import {
   Field,
+  FieldContent,
+  FieldError,
   FieldGroup,
   FieldLabel,
   FieldLegend,
   FieldSet,
 } from "@/components/ui/field";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../ui/select";
+import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from "../ui/input-group";
 
 interface LocationFormProps {
   initialData?: {
@@ -25,6 +29,7 @@ interface LocationFormProps {
     name: string;
     isActive: boolean;
     isDefault: boolean;
+    url: string;
     address: {
       address1: string | null;
       address2: string | null;
@@ -50,6 +55,7 @@ export function LocationForm({ initialData }: LocationFormProps) {
       name: initialData?.name || "",
       isActive: initialData?.isActive ?? true,
       isDefault: initialData?.isDefault ?? false,
+      url: initialData?.url ?? "",
       address: {
         address1: initialData?.address?.address1 || "",
         address2: initialData?.address?.address2 || "",
@@ -64,7 +70,7 @@ export function LocationForm({ initialData }: LocationFormProps) {
     },
   });
 
-  const { register, control, handleSubmit, formState: { errors, isSubmitting } } = form;
+  const { register, control, handleSubmit, reset, formState: { errors, isSubmitting } } = form;
 
   // Manage the 1:Many sublocation fields array
   const { fields, append, remove } = useFieldArray({
@@ -100,164 +106,350 @@ export function LocationForm({ initialData }: LocationFormProps) {
   };
 
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className="w-full mx-auto p-6 bg-card border rounded-xl shadow-sm space-y-6 text-xs">
-      
-      {/* SECTION 1: Top Core Identity Options */}
-      <FieldGroup className="gap-5">
-        <FieldSet>
-          <FieldLegend className="flex items-center gap-2">
-            <MapPin className="w-4 h-4 text-muted-foreground" />
-            {isEditMode ? `Modify Logistics Hub: ${initialData?.name}` : "Establish New Logistics Facility"}
-          </FieldLegend>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
-            <Field className="md:col-span-2">
-              <FieldLabel htmlFor="loc-name">Facility Depot Name *</FieldLabel>
-              <Input id="loc-name" placeholder="e.g., Seattle Regional Fulfillment (WH-02)" {...register("name")} />
-              {errors.name && <span className="text-xs text-destructive">{errors.name.message}</span>}
-            </Field>
-
-            <Field className="flex items-center justify-between border p-3 rounded-xl bg-muted/20">
-              <div>
-                <FieldLabel className="text-xs font-semibold mb-0">Active Status</FieldLabel>
-                <p className="text-[11px] text-muted-foreground">Allows processing order fulfillment transfers</p>
-              </div>
-              <Controller
-                control={control}
-                name="isActive"
-                render={({ field }) => (
-                  <Switch checked={field.value} onCheckedChange={field.onChange} />
-                )}
-              />
-            </Field>
-
-            <Field className="flex items-center justify-between border p-3 rounded-xl bg-muted/20">
-              <div>
-                <FieldLabel className="text-xs font-semibold mb-0">Default System Site</FieldLabel>
-                <p className="text-[11px] text-muted-foreground">Auto-selected on incoming procurement lines</p>
-              </div>
-              <Controller
-                control={control}
-                name="isDefault"
-                render={({ field }) => (
-                  <Switch checked={field.value} onCheckedChange={field.onChange} />
-                )}
-              />
-            </Field>
-          </div>
-        </FieldSet>
-
-        {/* SECTION 2: 1:1 Physical Mailing Address parameters */}
-        <FieldSet className="border-t pt-5">
-          <FieldLegend className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Physical Site Coordinates & Address</FieldLegend>
-          
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-3">
-            <Field className="md:col-span-2">
-              <FieldLabel>Street Address line 1</FieldLabel>
-              <Input placeholder="e.g., 4200 Industry Highway" {...register("address.address1")} />
-              {errors.address?.address1 && <span className="text-xs text-destructive">{errors.address.address1.message}</span>}
-            </Field>
-
-            <Field>
-              <FieldLabel>Suite / Aisle Box</FieldLabel>
-              <Input placeholder="e.g., Dock 4, Bay B" {...register("address.address2")} />
-            </Field>
-
-            <Field>
-              <FieldLabel>City *</FieldLabel>
-              <Input placeholder="Seattle" {...register("address.city")} />
-              {errors.address?.city && <span className="text-xs text-destructive">{errors.address.city.message}</span>}
-            </Field>
-
-            <Field>
-              <FieldLabel>State / Province</FieldLabel>
-              <Input placeholder="WA" {...register("address.state")} />
-            </Field>
-
-            <Field>
-              <FieldLabel>Postal / Zip Code</FieldLabel>
-              <Input placeholder="98101" {...register("address.postalCode")} />
-            </Field>
-
-            <Field>
-              <FieldLabel>Country *</FieldLabel>
-              <Input placeholder="United States" {...register("address.country")} />
-              {errors.address?.country && <span className="text-xs text-destructive">{errors.address.country.message}</span>}
-            </Field>
-
-            <Field>
-              <FieldLabel>Site Use Designation</FieldLabel>
-              <Input placeholder="e.g., Warehouse, Storefront, Logistics Partner" {...register("address.addressType")} />
-            </Field>
-
-            <Field className="md:col-span-3">
-              <FieldLabel>Logistical Operational Access Remarks</FieldLabel>
-              <Textarea placeholder="Include delivery access pin numbers, gate constraints or carrier drop metrics rules..." rows={2} {...register("address.remarks")} />
-            </Field>
-          </div>
-        </FieldSet>
-
-        {/* SECTION 3: Dynamic Sublocation Array List Configurer */}
-        <FieldSet className="border-t pt-5">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Layers className="w-4 h-4 text-muted-foreground" />
-              <FieldLegend className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Internal Staging Sublocations</FieldLegend>
-            </div>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => append({ name: "" })}
-              className="h-8 text-xs gap-1"
-            >
-              <Plus className="w-3 h-3" /> Map Internal Sub-Zone
-            </Button>
-          </div>
-          <p className="text-[11px] text-muted-foreground mt-0.5">Define distinct sections inside this hub like Aisle A, Receiving Bay, Cold Storage Vault room, etc.</p>
-
-          <div className="mt-3 space-y-2 max-h-[260px] overflow-y-auto pr-1">
-            {fields.map((field, index) => (
-              <div key={field.id} className="flex items-center gap-3 bg-muted/30 border p-2 rounded-xl">
-                <div className="flex-1">
-                  <Input 
-                    placeholder="Staging identity string (e.g., Row 14, Rack B)" 
-                    className="text-xs h-9"
-                    {...register(`sublocations.${index}.name` as const)} 
-                  />
-                  {errors.sublocations?.[index]?.name && (
-                    <span className="text-[10px] text-destructive block mt-1">{errors.sublocations[index].name.message}</span>
+    <form id="form-vendor" onSubmit={handleSubmit(onSubmit)}> 
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Left Column */}
+        <div className="space-y-6 col-span-2">
+          <div className="bg-card border rounded-xl p-5 space-y-4 shadow-xs">
+            <h2 className="text-sm font-bold border-b pb-2 text-foreground flex items-center gap-1.5">
+              <MapPin className="w-4 h-4 text-primary" /> 
+              {isEditMode ? `Modify Logistics Hub: ${initialData?.name}` : "Establish New Logistics Facility"}
+            </h2>
+            <FieldGroup className="grid grid-cols-1 md:grid-cols-2 gap-3 ">
+            <Controller
+              name="name"
+              control={control}
+              render={({ field, fieldState }) => (
+                <Field data-invalid={fieldState.invalid} className="w-full">
+                  <FieldLabel htmlFor="form-name">
+                    Facility Depot Name <b className="text-red-500">*</b>
+                  </FieldLabel>
+                  <FieldContent className="relative">
+                    <Warehouse className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground/60" />
+                    <Input
+                      {...field}
+                      id="form-name"
+                      aria-invalid={fieldState.invalid}
+                      placeholder="e.g., Seattle Regional Fulfillment (WH-02)"
+                      autoComplete="off"
+                      className="pl-9 h-9 text-xs" 
+                    />
+                  </FieldContent>
+                  {fieldState.invalid && (
+                    <FieldError errors={[fieldState.error]} />
                   )}
+                </Field>
+              )}
+            />
+            <Controller
+              name="url"
+              control={control}
+              render={({ field, fieldState }) => (
+                <Field data-invalid={fieldState.invalid}>
+                  <FieldLabel htmlFor="form-url">
+                    Location Endpoint 
+                  </FieldLabel>
+                  <FieldContent className="relative">
+                    <Globe className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground/60" />
+                    <Input
+                      {...field}
+                      id="form-url"
+                      aria-invalid={fieldState.invalid}
+                      placeholder="https://"
+                      autoComplete="off"
+                      className="pl-9 h-9 text-xs" 
+                    />
+                  </FieldContent>
+                  {fieldState.invalid && (
+                    <FieldError errors={[fieldState.error]} />
+                  )}
+                </Field>
+              )}
+            />
+            </FieldGroup>
+
+            <FieldGroup className="grid grid-cols-1 md:grid-cols-2 gap-3 ">
+              <Field className="flex items-center justify-between border p-3 rounded-xl bg-muted/20">
+                <div>
+                  <FieldLabel className="text-xs font-semibold mb-0">Active Status</FieldLabel>
+                  <p className="text-[11px] text-muted-foreground">Allows processing order fulfillment transfers</p>
                 </div>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => remove(index)}
-                  className="h-9 w-9 text-muted-foreground hover:text-destructive shrink-0"
+                <Controller
+                  control={control}
+                  name="isActive"
+                  render={({ field }) => (
+                    <Switch checked={field.value} onCheckedChange={field.onChange} />
+                  )}
+                />
+              </Field>
+
+              <Field className="flex items-center justify-between border p-3 rounded-xl bg-muted/20">
+                <div>
+                  <FieldLabel className="text-xs font-semibold mb-0">Default System Site</FieldLabel>
+                  <p className="text-[11px] text-muted-foreground">Auto-selected on incoming procurement lines</p>
+                </div>
+                <Controller
+                  control={control}
+                  name="isDefault"
+                  render={({ field }) => (
+                    <Switch checked={field.value} onCheckedChange={field.onChange} />
+                  )}
+                />
+              </Field>
+            </FieldGroup>
+
+          </div>
+
+          {/* Section 2: Address */}
+          <div className="bg-card border rounded-xl p-5 space-y-4 shadow-xs">
+            <h2 className="text-sm font-bold text-foreground flex items-center gap-1.5">
+              <MapPin className="w-4 h-4 text-primary" /> Physical Site Coordinates & Address
+            </h2>
+              
+            <div className="p-4 border rounded-lg space-y-3 bg-muted/20 relative pt-6">
+              <FieldGroup className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <Controller 
+                  control={control} 
+                  name="address.address1"
+                  render={({ field, fieldState }) => (
+                    <Field>
+                      <FieldLabel htmlFor="form-address1">Street Address line 1 <b className="text-red-500">*</b></FieldLabel>
+                      <FieldContent>
+                        <Input
+                          {...field}
+                          id="form-address1"
+                          placeholder="e.g., 4200 Industry Highway"
+                          aria-invalid={fieldState.invalid}
+                        />
+                        {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
+                      </FieldContent>
+                    </Field>
+                  )}
+                />
+                <Controller 
+                  control={control} 
+                  name="address.address2"
+                  render={({ field, fieldState }) => (
+                    <Field>
+                      <FieldLabel htmlFor="form-address2">Suite / Aisle Box </FieldLabel>
+                      <FieldContent>
+                        <Input
+                          {...field}
+                          id="form-address2"
+                          placeholder="e.g., Suite 100"
+                          aria-invalid={fieldState.invalid}
+                        />
+                        {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
+                      </FieldContent>
+                    </Field>
+                  )}
+                />
+              </FieldGroup>
+
+              {/* City, State, and Postal Code */}
+              <FieldGroup className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <Controller 
+                  control={control} 
+                  name="address.city"
+                  render={({ field, fieldState }) => (
+                    <Field>
+                      <FieldLabel htmlFor="form-city">City <b className="text-red-500">*</b></FieldLabel>
+                      <FieldContent>
+                        <Input
+                          {...field}
+                          id="form-city"
+                          placeholder="e.g., San Juan"
+                          aria-invalid={fieldState.invalid}
+                        />
+                        {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
+                      </FieldContent>
+                    </Field>
+                  )}
+                />
+                <Controller 
+                  control={control} 
+                  name="address.state"
+                  render={({ field, fieldState }) => (
+                    <Field>
+                      <FieldLabel htmlFor="form-state">State / Province <b className="text-red-500">*</b></FieldLabel>
+                      <FieldContent>
+                        <Input
+                          {...field}
+                          id="form-state"
+                          placeholder="e.g., MN"
+                          aria-invalid={fieldState.invalid}
+                        />
+                        {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
+                      </FieldContent>
+                    </Field>
+                  )}
+                />
+                <Controller 
+                  control={control} 
+                  name="address.postalCode"
+                  render={({ field, fieldState }) => (
+                    <Field>
+                      <FieldLabel htmlFor="form-postalCode">Zip / Postal Code <b className="text-red-500">*</b></FieldLabel>
+                      <FieldContent>
+                        <Input
+                          {...field}
+                          id="form-postalCode"
+                          placeholder="e.g., 90001"
+                          aria-invalid={fieldState.invalid}
+                        />
+                        {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
+                      </FieldContent>
+                    </Field>
+                  )}
+                />
+              </FieldGroup>
+
+              {/* Country and Address Type */}
+              <FieldGroup className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <Controller 
+                  control={control} 
+                  name="address.country"
+                  render={({ field, fieldState }) => (
+                    <Field>
+                      <FieldLabel htmlFor="form-country">Country <b className="text-red-500">*</b></FieldLabel>
+                      <FieldContent>
+                        <Input
+                          {...field}
+                          id="form-country"
+                          placeholder="e.g., Philippines"
+                          aria-invalid={fieldState.invalid}
+                        />
+                        {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
+                      </FieldContent>
+                    </Field>
+                  )}
+                />
+                <Controller 
+                  control={control} 
+                  name="address.addressType"
+                  render={({ field, fieldState }) => (
+                    <Field>
+                      <FieldLabel htmlFor="form-addressType">Site Use Designation</FieldLabel>
+                      <FieldContent>
+                        <Input
+                          {...field}
+                          id="form-addressType"
+                          placeholder="e.g., Warehouse, Storefront, Logistics Partner"
+                          aria-invalid={fieldState.invalid}
+                        />
+                        {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
+                      </FieldContent>
+                    </Field>
+                  )}
+                />
+              </FieldGroup>
+
+              <Controller
+                name="address.remarks"
+                control={control}
+                render={({ field, fieldState }) => (
+                  <Field>
+                    <FieldLabel htmlFor="form-address-remarks">Logistical Operational Access Remarks</FieldLabel>
+                    <Textarea
+                      {...field}
+                      id="form-address-remarks"
+                      aria-invalid={fieldState.invalid}
+                      placeholder="Optional"
+                      className="min-h-[120px]"
+                    />
+                    {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
+                  </Field>
+                )}
+              />
+            </div>
+            
+          </div>
+        </div>
+
+        <div className="space-y-6">
+          {/* Section 3: */}
+          <div className="bg-card border rounded-xl p-5 space-y-4 shadow-xs">
+            <div>
+              <div className="flex items-center justify-between">
+                <h2 className="text-sm font-bold text-foreground flex items-center gap-1.5">
+                  <Layers className="w-4 h-4 text-primary" /> Internal Staging Sublocations
+                </h2>
+                <Button 
+                  type="button" 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={() => append({ name: "" })}
+                  className="h-8 text-xs gap-1"
                 >
-                  <Trash2 className="w-4 h-4" />
+                  <Plus className="w-3 h-3" /> Map Internal Sub-Zone
                 </Button>
               </div>
-            ))}
-            {fields.length === 0 && (
-              <div className="text-center py-6 text-xs text-muted-foreground border-2 border-dashed rounded-xl italic bg-muted/10">
-                No internal sublocations or storage racks mapped yet. This facility tracks item availability strictly across its root level.
-              </div>
-            )}
+              <p className="text-[11px] text-muted-foreground mt-0.5">Define distinct sections inside this hub like Aisle A, Receiving Bay, Cold Storage Vault room, etc.</p>
+            </div>
+        
+            <div className="mt-3 space-y-2 max-h-[260px] overflow-y-auto pr-1">
+              {fields.map((field, index) => (
+                <Controller
+                  key={field.id}
+                  name={`sublocations.${index}.name`}
+                  control={form.control}
+                  render={({ field: controllerField, fieldState }) => (
+                    <Field
+                      orientation="horizontal"
+                      data-invalid={fieldState.invalid}
+                      className="p-1"
+                    >
+                      <FieldContent>
+                        <InputGroup>
+                          <InputGroupInput
+                            {...controllerField}
+                            id={`form-subloc-array-name-${index}`}
+                            aria-invalid={fieldState.invalid}
+                            type="text"
+                          />
+                            <InputGroupAddon align="inline-end">
+                              <InputGroupButton
+                                type="button"
+                                variant="ghost"
+                                size="icon-xs"
+                                onClick={() => remove(index)}
+                                aria-label={`Remove email ${index + 1}`}
+                                className="h-9 w-9 text-muted-foreground hover:text-destructive shrink-0"
+                              >
+                                <Trash2 />
+                              </InputGroupButton>
+                            </InputGroupAddon>
+                        </InputGroup>
+                        {fieldState.invalid && (
+                          <FieldError errors={[fieldState.error]} />
+                        )}
+                      </FieldContent>
+                    </Field>
+                  )}
+                />
+              ))}
+              {fields.length === 0 && (
+                <div className="text-center py-6 text-xs text-muted-foreground border-2 border-dashed rounded-xl italic bg-muted/10">
+                  No internal sublocations or storage racks mapped yet. This facility tracks item availability strictly across its root level.
+                </div>
+              )}
+            </div>
+            
           </div>
-        </FieldSet>
-
-        {/* Action Controls Footer Row */}
-        <div className="flex items-center justify-between gap-4 border-t pt-4 mt-2">
-          <Button type="button" variant="ghost" size="sm" onClick={() => router.back()} className="text-xs gap-1">
-            <ArrowLeft className="w-3.5 h-3.5" /> Back
-          </Button>
-          <Button type="submit" disabled={isSubmitting} size="sm" className="min-w-[130px]">
-            {isSubmitting ? "Writing logistics records..." : isEditMode ? "Save Location Profile" : "Register Logistics Site"}
-          </Button>
         </div>
-      </FieldGroup>
+      </div>
+
+      <Field orientation="horizontal" className="flex justify-end pt-4">
+        <Button type="button" variant="outline" onClick={() => reset()}>
+          Reset
+        </Button>
+        <Button type="submit" form="form-vendor">
+          {isSubmitting ? "Submitting..." : "Submit"}
+        </Button>
+      </Field>
     </form>
   );
 }
+
+

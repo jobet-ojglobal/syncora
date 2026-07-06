@@ -6,15 +6,6 @@ import { InflowEvent, PartnerWebhook } from "../types/webhook";
 
 const PARTNER_WEBHOOK_URL = `${process.env.SITE_URL}/api/webhooks/partner`;
 
-// export type PartnerEvent = "order.created" | "order.shipped" | "inventory.updated";
-
-// export interface PartnerWebhookResponse {
-//   subscriptionId: string;
-//   url: string;
-//   events: string[];
-//   secret?: string;
-// }
-
 export async function listWebhooks() {
   return partnerApi.get<PartnerWebhook[]>("/webhooks");
 }

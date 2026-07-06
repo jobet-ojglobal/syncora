@@ -1387,32 +1387,7 @@ export const breadcrumbsMap = [
 ];
 
 
-export const branchNav = (id: string) => [
-  {
-    label: "Overview",
-    url: `/dashboard/branches/${id}`,
-  },
-  {
-    label: "Inventory",
-    url: `/dashboard/branches/${id}/inventory`,
-  },
-  {
-    label: "Orders",
-    url: `/dashboard/branches/${id}/orders`,
-  },
-  {
-    label: "Transfers",
-    url: `/dashboard/branches/${id}/transfers`,
-  },
-  {
-    label: "Performance",
-    url: `/dashboard/branches/${id}/performance`,
-  },
-  {
-    label: "Staff",
-    url: `/dashboard/branches/${id}/staff`,
-  },
-];
+
 
 export const productNav = (id: string) => [
   {

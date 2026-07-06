@@ -64,7 +64,7 @@ export default function LocationsListPage() {
   });
 
   return (
-    <div className="w-full max-w-6xl mx-auto p-6 space-y-6">
+    <div className="w-full mx-auto p-6 space-y-6">
       {/* Page Header */}
       <PageHeader 
         className=" border-b pb-5" 
@@ -131,7 +131,7 @@ export default function LocationsListPage() {
 
                     <div className="min-w-0 space-y-1">
                       <div className="flex items-center gap-2 flex-wrap">
-                        <Link href={`/dashboard/locations/${loc.inflowId}/inventory`} title="Go to Inventory">
+                        <Link href={`/dashboard/locations/${loc.id}`} title="Go to Inventory">
                           <h3 className="text-sm font-bold text-foreground hover:text-indigo-500 tracking-tight truncate">{loc.name}</h3>
                         </Link>
                         {/* Status Badges Group */}

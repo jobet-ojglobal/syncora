@@ -36,21 +36,21 @@ export default async function EditLocationPage({ params }: Props) {
   if(!location) notFound();
 
   return (
-      <div className="w-full max-w-5xl mx-auto p-6 space-y-6">
-        {/* HEADER */}
-        <Link
-          href="/dashboard/locations"
-          className="mb-4 inline-flex items-center gap-2 text-sm font-medium text-slate-600 hover:text-slate-900"
-        >
-          <ArrowLeft className="h-4 w-4" />
-          Back to Location
-        </Link>
-        <PageHeader 
-          title="Edit Location" 
-          description="Update location information." 
-        />
+    <div className="w-full max-w-7xl mx-auto px-6 py-12 space-y-6">
+      {/* HEADER */}
+      <Link
+        href="/dashboard/locations"
+        className="mb-4 inline-flex items-center gap-2 text-sm font-medium text-slate-600 hover:text-slate-900"
+      >
+        <ArrowLeft className="h-4 w-4" />
+        Back to Location
+      </Link>
+      <PageHeader 
+        title="Edit Location" 
+        description="Update location information." 
+      />
 
-        <LocationForm initialData={location} />
-      </div>
+      <LocationForm initialData={location} />
+    </div>
   );
 }

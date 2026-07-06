@@ -8,7 +8,7 @@ export const INFLOW_EVENTS: InflowEvent[] = [
   "customer", "salesOrder",
 ];
 
-export interface PartnerWebhook {
+export interface LocationWebhook {
   webHookSubscriptionId: string;
   url: string;
   events: string[];

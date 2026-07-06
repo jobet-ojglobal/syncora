@@ -1,8 +1,8 @@
-// app/admin/customers/new/page.tsx
 import { ArrowLeft, Building2 } from "lucide-react";
 import Link from "next/link";
 import PageHeader from "@/components/layout/dashboard/PageHeader";
 import UnifiedCustomerForm from "@/components/customer/unified-customer-form";
+import { prisma } from "@/lib/prisma"; 
 
 export const metadata = {
   title: "Onboard Business Client Partner | Management Directory",
@@ -10,16 +10,32 @@ export const metadata = {
 };
 
 export default async function OnboardNewCustomerAccountPage() {
+  // 2. Fetch directly from your DB/Services simultaneously. No HTTP requests!
   const [pricing, taxing, terms, locations, reps] = await Promise.all([
-    fetch(`${process.env.NEXT_PUBLIC_SITE_URL}/api/admin/pricing-scheme/basic`).then(r => r.json()),
-    fetch(`${process.env.NEXT_PUBLIC_SITE_URL}/api/admin/taxing-scheme/basic`).then(r => r.json()),
-    fetch(`${process.env.NEXT_PUBLIC_SITE_URL}/api/admin/payment-terms/basic`).then(r => r.json()),
-    fetch(`${process.env.NEXT_PUBLIC_SITE_URL}/api/admin/locations/basic`).then(r => r.json()),
-    fetch(`${process.env.NEXT_PUBLIC_SITE_URL}/api/admin/team-members/sales`).then(r => r.json()),
+    (await prisma.pricingScheme.findMany({ select: { inflowId: true, name: true }, orderBy: { name: "asc" } })).map(p => ({
+      id: p.inflowId,
+      name: p.name,
+    })), 
+    (await prisma.taxingScheme.findMany({ select: { inflowId: true, name: true }, orderBy: { name: "asc" } })).map(p => ({
+      id: p.inflowId,
+      name: p.name,
+    })),
+    (await prisma.paymentTerm.findMany({ select: { inflowId: true, name: true }, orderBy: { name: "asc" } })).map(p => ({
+      id: p.inflowId,
+      name: p.name,
+    })),
+    (await prisma.location.findMany({ select: { inflowId: true, name: true }, orderBy: { name: "asc" } })).map(p => ({
+      id: p.inflowId,
+      name: p.name,
+    })),
+    ( await prisma.teamMember.findMany({ where: { canBeSalesRep: true }, select: { inflowId: true, name: true }, orderBy: { name: "asc" } })).map(p => ({
+      id: p.inflowId,
+      name: p.name,
+    })),
   ]);
+
   return (
-    <div className="w-full max-w-5xl mx-auto px-6 py-12 space-y-4 ">
-      {/* HEADER */}
+    <div className="w-full mx-auto px-6 py-12 space-y-4 ">
       <Link
         href="/dashboard/customers"
         className="inline-flex items-center gap-2 text-sm font-medium text-slate-600 hover:text-slate-900"
@@ -31,12 +47,11 @@ export default async function OnboardNewCustomerAccountPage() {
         title="Onboard Customer Profile Account" 
         description="Initialize transactional record streams files configurations vectors, map operational point of contacts coordinators parameters metrics records, and bind standard ledger localized tax parameters."
         icon={Building2}
-        />
+      />
 
-      {/* Primary Execution Engine Sub-form layout entry point handle link element */}
       <UnifiedCustomerForm 
-        catalogs={{ pricing, taxing, terms, locations, reps }}
-       />
+        catalogs={{ pricing, taxing, terms, locations, reps }} 
+      />
     </div>
   );
 }

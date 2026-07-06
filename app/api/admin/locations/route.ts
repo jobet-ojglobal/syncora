@@ -20,7 +20,7 @@ export async function GET() {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { name, isActive, isDefault, address, sublocations } = body;
+    const { name, isActive, isDefault, address, sublocations, url } = body;
 
     if (!name?.trim()) {
       return NextResponse.json({ error: "Depot site name is a required field parameter." }, { status: 400 });
@@ -41,6 +41,7 @@ export async function POST(request: NextRequest) {
           name: name.trim(),
           isActive,
           isDefault,
+          url: url.trim(),
           address: {
             create: {
               address1: address.address1?.trim() || null,
@@ -76,7 +77,7 @@ export async function POST(request: NextRequest) {
 export async function PATCH(request: NextRequest) {
   try {
     const body = await request.json();
-    const { inflowId, name, isActive, isDefault, address, sublocations } = body;
+    const { inflowId, name, isActive, isDefault, address, sublocations, url } = body;
 
     if (!inflowId) {
       return NextResponse.json({ error: "Missing required inflowId target pointer." }, { status: 400 });
@@ -149,6 +150,7 @@ export async function PATCH(request: NextRequest) {
           name: name.trim(),
           isActive,
           isDefault,
+          url: url.trim(),
         },
         include: { address: true, sublocations: true }
       });

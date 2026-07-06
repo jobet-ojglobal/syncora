@@ -42,8 +42,7 @@ export async function POST(request: NextRequest) {
 
     // 2. Delegate data operations based on event type classifications
     switch (eventType) {
-      case "SalesOrderCreated":
-      case "SalesOrderUpdated": {
+      case "SalesOrder": {
         const batchID = payload.batch_id;
 
         if (batchID) {
@@ -82,8 +81,7 @@ export async function POST(request: NextRequest) {
         break;
       }
 
-      case "CustomerCreated":
-      case "CustomerUpdated": {
+      case "Customer": {
         const batchID = payload.batch_id;
 
         if (batchID) {

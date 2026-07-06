@@ -52,7 +52,6 @@ interface AttributeGroup {
 
 interface ProductGroupFormProps {
   brands: LookupItem[];
-  categories: LookupItem[];
   attributes: AttributeGroup[];
   initialData?: any | null;
 }
@@ -83,7 +82,7 @@ function computeLocalCartesianCount(
 }
 
 
-export function ProductGroupForm({ brands, categories, attributes, initialData }: ProductGroupFormProps) {
+export function ProductGroupForm({ brands, attributes, initialData }: ProductGroupFormProps) {
   const router = useRouter();
   const [tagInput, setTagInput] = useState("");
   const isEditMode = !!initialData;

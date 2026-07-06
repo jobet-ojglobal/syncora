@@ -710,6 +710,7 @@ model Location {
   name            String
   isActive        Boolean  @default(true)
   isDefault       Boolean  @default(false)
+  url             String?
 
   address             LocationAddress?
   inventories         Inventory[]
@@ -725,6 +726,7 @@ model Location {
   incomingTransfers TransferOrder[]  @relation("TransferTargetLocation")
   reorderTargets reorderSetting[] @relation("TargetLocation")
   reorderSources reorderSetting[] @relation("SourceLocation")
+  webhooks      LocationWebhook[]
   
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
@@ -769,6 +771,41 @@ model Sublocation {
   @@index([locationId])
 
   @@map("sublocation")
+}
+
+
+model LocationWebhook {
+  id                      String               @id @default(cuid())
+  locationId              String
+  location                Location             @relation(fields: [locationId], references: [inflowId], onDelete: Cascade)
+  url                     String               @unique
+  secret                  String?
+  events                  Json                 // Array of string event types, e.g., ["order.created", "stock.updated"]
+  isDisabled              Boolean              @default(false)
+  consecutiveFailureCount Int                  @default(0)
+  lastFailureMessage      String?
+  
+  createdAt               DateTime             @default(now())
+  updatedAt               DateTime             @updatedAt
+  deliveryLogs            LocationWebhookEvent[]
+
+  @@map("location_webhook")
+}
+
+model LocationWebhookEvent {
+  id              String         @id @default(cuid())
+  locationWebhookId String
+  webhook         LocationWebhook  @relation(fields: [locationWebhookId], references: [id], onDelete: Cascade)
+  eventType       String
+  payload         Json
+  responseStatus  Int?           // Store the receiver's HTTP status code (e.g., 200, 500)
+  errorMessage    String?        // Store error details if the fetch fails
+  processed       Boolean        @default(false)
+  receivedAt      DateTime       @default(now())
+
+  @@index([eventType])
+  @@index([receivedAt])
+  @@map("location_webhook_event")
 }
 
 
@@ -1652,6 +1689,8 @@ model PartnerWebhookEvent {
 // Sales Order Models
 // ==========================================
 
+
+
 model SalesOrder {
   id                     String    @id @default(cuid())
   inflowId               String    @unique
@@ -2172,6 +2211,7 @@ model PurchaseOrderAttachment {
 
   @@map("purchase_order_attachment")
 }
+
 
 // Customer Model
 // model Customer {
