@@ -39,7 +39,7 @@ export default async function EditPaymentTermsPage({ params }: EditPaymentTermsP
     id: existingTerm.id,
     inflowId: existingTerm.inflowId,
     name: existingTerm.name,
-    daysDue: existingTerm.daysDue !== null ? String(existingTerm.daysDue) : "",
+    daysDue: existingTerm.daysDue !== null ? Number(existingTerm.daysDue) : null,
     isActive: existingTerm.isActive,
   };
 

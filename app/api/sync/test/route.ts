@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { syncQueue } from "@/lib/queues/sync.queue";
+import { getSyncQueue } from "@/lib/queues/sync.queue";
 
 export async function POST(request: NextRequest) {
   try {
@@ -23,7 +23,7 @@ export async function POST(request: NextRequest) {
     });
 
     // Add job to queue
-    const job = await syncQueue.add(
+    const job = await getSyncQueue().add(
       "sync",
       { 
         jobId: syncJob.id,
@@ -53,7 +53,7 @@ export async function GET(request: NextRequest) {
     const jobId = searchParams.get("jobId");
 
     if (!jobId) {
-      const queueCount = await syncQueue.count();
+      const queueCount = await getSyncQueue().count();
       const pendingJobs = await prisma.syncJob.findMany({
         where: { status: "pending" },
         take: 10,

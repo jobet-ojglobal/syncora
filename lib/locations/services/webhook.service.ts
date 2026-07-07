@@ -5,7 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { InflowEvent, LocationWebhook } from "../types/webhook.type";
 
 const getWebhookUrlForLocation = (inflowId: string) => {
-  return `${process.env.SITE_URL}/api/webhooks/partner?locationId=${inflowId}`;
+  return `${process.env.SITE_URL}/api/webhooks/locations?locationId=${inflowId}`;
 };
 
 // Helper helper to get a location-specific API client
@@ -16,7 +16,7 @@ async function getClientForLocation(inflowId: string): Promise<{ client: BranchC
   });
 
   if (!location || !location.url) {
-    throw new Error(`Location with Inflow ID ${inflowId} does not have a configured partner API URL.`);
+    throw new Error(`Location with Inflow ID ${inflowId} does not have a configured location API URL.`);
   }
 
   return {
@@ -25,28 +25,30 @@ async function getClientForLocation(inflowId: string): Promise<{ client: BranchC
   };
 }
 
-export async function findPartnerWebhookByLocation(inflowId: string) {
+export async function findLocationWebhookByLocation(inflowId: string) {
   try {
     const { client } = await getClientForLocation(inflowId);
     
-    // Fetch from the custom location domain
-    const webhooks = await client.get<LocationWebhook[]>("/webhooks");
+    // Pass a shorter 1.5-second timeout override for quick UI rendering
+    const webhooks = await client.get<LocationWebhook[]>("/webhooks", { timeout: 1500 });
     const targetUrl = getWebhookUrlForLocation(inflowId);
     
     let match = webhooks.find(w => w.url === targetUrl);
     if (!match) {
-      match = webhooks.find(w => w.url.endsWith(`/api/webhooks/partner?locationId=${inflowId}`));
+      match = webhooks.find(w => w.url.endsWith(`/api/webhooks/locations?locationId=${inflowId}`));
     }
     return match;
   } catch (error) {
-    console.error(`Failed to list remote partner webhooks for location ${inflowId}`, error);
+    // If it times out or throws, we log it and return null.
+    // The UI will safely read webhook: null, hasUrl: true -> Show "Connection Stream Offline"
+    console.error(`Failed to list remote location webhooks for location ${inflowId}:`, error);
     return null;
   }
 }
 
-export async function createOrUpdatePartnerWebhook(inflowId: string, events: InflowEvent[]) {
+export async function createOrUpdateLocationWebhook(inflowId: string, events: InflowEvent[]) {
   const { client, locationName } = await getClientForLocation(inflowId);
-  const existing = await findPartnerWebhookByLocation(inflowId);
+  const existing = await findLocationWebhookByLocation(inflowId);
   
   const webHookSubscriptionId = existing?.webHookSubscriptionId ?? randomUUID();
   const targetUrl = existing?.url ?? getWebhookUrlForLocation(inflowId);
@@ -83,7 +85,7 @@ export async function createOrUpdatePartnerWebhook(inflowId: string, events: Inf
   return updatedWebhook;
 }
 
-export async function deletePartnerWebhook(inflowId: string, webHookSubscriptionId: string) {
+export async function deleteLocationWebhook(inflowId: string, webHookSubscriptionId: string) {
   const { client } = await getClientForLocation(inflowId);
   
   // Delete from the custom location domain
@@ -94,6 +96,6 @@ export async function deletePartnerWebhook(inflowId: string, webHookSubscription
       where: { id: webHookSubscriptionId },
     });
   } catch (e) {
-    console.error("Local partner DB cleanup failed", e);
+    console.error("Local location DB cleanup failed", e);
   }
 }

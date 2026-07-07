@@ -7,7 +7,7 @@ import { CustomerSyncResult } from "@/lib/partner/webhooks/webhook-customer.serv
 import { InflowSalesOrderWebhookService } from "@/lib/partner/webhooks/webhook-sales-order.service";
 import { InflowCustomerWebhookService } from "@/lib/partner/webhooks/webhook-customer.service";
 import { InflowProductWebhookService } from "../inflow/webhooks/webhook-product.service";
-import { midSyncQueue } from "../queues/sync.queue";
+import { getMidSyncQueue } from "../queues/sync.queue";
 
 interface PartnerWebhookJobData {
   source: "inflow_sales_order" | "inflow_product" | "inflow_customer";
@@ -49,7 +49,7 @@ const partnerWorker = new Worker<PartnerWebhookJobData>(
           
           if (customerResult.inflowPayload) {
             console.log(`[Partner Worker] Dispatching customer downstream job to midSyncQueue for ID: ${dataId}`);
-            await midSyncQueue.add(
+            await getMidSyncQueue().add(
               "customer_sync_job",
               {
                 source: "UPSERT_CLOUD_CUSTOMER",

@@ -1,7 +1,7 @@
 // app/api/admin/customers/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { midSyncQueue } from "@/lib/queues/sync.queue";
+import { getMidSyncQueue } from "@/lib/queues/sync.queue";
 import { Prisma } from "@/generated/prisma/client";
 
 export async function POST(request: NextRequest) {
@@ -354,7 +354,7 @@ export async function PATCH(request: NextRequest) {
       return { updatedCustomer, inflowPayload };
     });
 
-    await midSyncQueue.add(
+    await getMidSyncQueue().add(
       "customer_sync_job",
       {
         source: "CUSTOMER_SYNC_API",

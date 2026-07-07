@@ -14,6 +14,8 @@ export class LocationService {
           select: {
             sublocations: true, // Number of storage zones/aisles mapped
             inventories: true,  // Total product items actively stocked here
+            salesOrders: true,
+            
           }
         },
         sublocations: {

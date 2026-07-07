@@ -1,8 +1,10 @@
-// app/admin/customers/edit/[id]/page.tsx
 import { ArrowLeft, Edit3 } from "lucide-react";
 import PageHeader from "@/components/layout/dashboard/PageHeader";
 import Link from "next/link";
 import { VendorForm } from "@/components/vendor/vendor-form";
+import { prisma } from "@/lib/prisma";
+import { notFound } from "next/navigation";
+import { getVendorMetadata } from "@/services/vendor.metadata";
 
 interface EditVendorPageProps {
   params: Promise<{
@@ -15,33 +17,70 @@ export const metadata = {
   description: "Alter target legal partner entity operational configurations vectors rules or modify structural primary headquarters addresses vectors data fields lines nodes records."
 };
 
-async function fetchVendor(id: string) {
-  try {
-    const response = await fetch(
-      `${process.env.NEXT_PUBLIC_SITE_URL}/api/admin/vendors/${id}`,
-      {
-        cache: "no-store",
-      }
-    );
-
-    if (!response.ok) return null;
-    return await response.json();
-  } catch (error) {
-    console.error("Error loading vendor data:", error);
-    return null;
-  }
-}
-
 export default async function ModifyExistingVendorProfileLedgerPage({ params }: EditVendorPageProps) {
-  const resolvedParameters = await params;
-  const targetId = resolvedParameters.id;
+  const { id: targetId } = await params;
 
-  const [terms, taxing, currencies, vendorData] = await Promise.all([
-    fetch(`${process.env.NEXT_PUBLIC_SITE_URL}/api/admin/payment-terms/basic`).then(r => r.json()),
-    fetch(`${process.env.NEXT_PUBLIC_SITE_URL}/api/admin/taxing-scheme/basic`).then(r => r.json()),
-    fetch(`${process.env.NEXT_PUBLIC_SITE_URL}/api/admin/currencies/basic`).then(r => r.json()),
-    fetchVendor(targetId), 
+  // 1. Fetch catalogs and target vendor entity concurrently directly from the database layer
+  const [catalogs, vendorRaw] = await Promise.all([
+    getVendorMetadata(),
+    prisma.vendor.findUnique({
+      where: { id: targetId },
+      include: {
+        businessPartner: {
+          include: {
+            addresses: true,
+          },
+        },
+      },
+    }),
   ]);
+
+  // Fail gracefully if entity was deleted or not found
+  if (!vendorRaw || vendorRaw.deletedAt) return notFound();
+
+  const { businessPartner, ...vendorFields } = vendorRaw;
+
+  // Transform addresses to flag defaults matching your Zod/Form layout
+  const formattedAddresses = businessPartner.addresses.map((addr: any) => ({
+    id: addr.id,
+    name: addr.name ?? "",
+    address1: addr.address1 ?? "",
+    address2: addr.address2 ?? "",
+    city: addr.city ?? "",
+    state: addr.state ?? "",
+    country: addr.country ?? "Philippines",
+    postalCode: addr.postalCode ?? "",
+    addressType: addr.addressType ?? null,
+    remarks: addr.remarks ?? "",
+    isDefaultAddress: addr.inflowId ? addr.inflowId === vendorFields.defaultAddressId : false,
+  }));
+
+  // 2. Flatten relational structures cleanly for direct form consumption matching your target mapper
+  const initialFormData = {
+    id: vendorRaw.id,
+    name: vendorRaw.businessPartner.name,
+    contactName: vendorRaw.businessPartner.contactName ?? "",
+    email: vendorRaw.businessPartner.email || "",
+    phone: vendorRaw.businessPartner.phone ?? "",
+    fax: vendorRaw.businessPartner.fax || "",
+    website: vendorRaw.businessPartner.website || "",
+    isActive: vendorRaw.businessPartner.isActive,
+    remarks: vendorRaw.businessPartner.remarks || "",
+
+    defaultCarrier: vendorRaw.defaultCarrier || "",
+    defaultPaymentMethod: vendorRaw.defaultPaymentMethod || "",
+    
+    // Handles numeric transformations safely matching Zod rules
+    discount: vendorRaw.discount ? Number(vendorRaw.discount) : undefined, 
+    leadTimeDays: vendorRaw.leadTimeDays ?? undefined,
+    
+    defaultPaymentTermsId: vendorRaw.defaultPaymentTermsId || "",
+    taxingSchemeId: vendorRaw.taxingSchemeId || "",
+    isTaxInclusivePricing: vendorRaw.isTaxInclusivePricing ?? false,
+    currencyId: vendorRaw.currencyId || "",
+
+    addresses: formattedAddresses,
+  };
 
   return (
     <div className="w-full mx-auto px-6 space-y-4 py-12">
@@ -51,17 +90,19 @@ export default async function ModifyExistingVendorProfileLedgerPage({ params }: 
         className="inline-flex items-center gap-2 text-sm font-medium text-slate-600 hover:text-slate-900"
       >
         <ArrowLeft className="h-4 w-4" />
-          Return to Vendor Directory
+        Return to Vendor Directory
       </Link>
+      
       <PageHeader 
         title="Modify Vendor Portfolio File Ledger Row" 
         description="Adjust registered target vendor ledger parameters handles."
         icon={Edit3}
       />
+      
       <VendorForm
-        initialData={vendorData} 
-        catalogs={{ terms, taxing, currencies }}
-       /> 
+        initialData={initialFormData} 
+        catalogs={catalogs}
+      /> 
     </div>
   );
 }

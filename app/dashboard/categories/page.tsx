@@ -48,7 +48,7 @@ export default function CategoriesListPage() {
 
   useEffect(() => {
     fetchCategories();
-  }, [fetchCategories]);
+  }, []);
 
   const buildHierarchicalTree = (flatList: CategoryTreeItem[]): CategoryTreeItem[] => {
     const map: Record<string, CategoryTreeItem> = {};

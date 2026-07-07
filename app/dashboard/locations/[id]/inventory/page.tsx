@@ -121,7 +121,7 @@ export default function LocationInventoryPage() {
     if (locationId) {
       fetchDashboardData();
     }
-  }, [fetchDashboardData, locationId]);
+  }, [locationId]);
 
   const filteredItems = inventory.filter((item) => {
     const normQuery = searchQuery.toLowerCase();

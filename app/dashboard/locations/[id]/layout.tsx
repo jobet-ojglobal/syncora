@@ -4,6 +4,8 @@ import OverviewNav from "@/components/layout/dashboard/OverviewNav";
 import { locationStatusColors } from "@/helpers";
 import { notFound } from "next/navigation";
 import { LocationService } from "@/services/location.service";
+import { Button } from "@/components/ui/button";
+import { DeleteButton } from "@/components/shared/delete-button";
 
 export const locationNav = (id: string) => [
   {
@@ -51,20 +53,18 @@ export default async function LocationLayout({
 
   const navItems = locationNav(targetId);
 
+  const statusKey = location.isActive ? "Active" : "Inactive";
+
   return (
     <div>
       <div className="border-b border-slate-200">
         <div className="mx-auto px-6 py-6">
-          {/* HEADER BANNER CARD HERO */}
-          <div className="mb-7 ">
-            <div >
-              <Link
-                href="/admin/locations"
-                className="mb-4 inline-flex items-center gap-2 text-sm font-medium text-slate-600 hover:text-slate-900"
-              >
-                <ArrowLeft className="h-4 w-4" />
-                Back to Locations
-              </Link>
+          <div className="mb-7 space-y-3">
+              <Button asChild variant="ghost" size="sm" className="w-fit gap-1 text-xs -ml-2">
+                <Link href="/dashboard/locations">
+                  <ArrowLeft className="w-3.5 h-3.5" /> Back to Facilities
+                </Link>
+              </Button>
               
               <div className="flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
                 <div className="flex flex-col sm:flex-row items-start sm:items-center gap-5">
@@ -72,18 +72,22 @@ export default async function LocationLayout({
                     <Building2 className="h-8 w-8" />
                   </div>
                   <div>
-                    <div className="flex flex-wrap items-center gap-3">
-                      <h1 className="text-3xl font-black text-slate-900 tracking-tight">
+                    <div className="flex flex-wrap items-center gap-2.5">
+                      <h1 className="text-2xl md:text-3xl font-black text-slate-900 tracking-tight">
                         {location.name}
                       </h1>
+                      
                       {location.isDefault && (
-                        <span className="rounded-full bg-indigo-50 border border-indigo-200 px-3 py-1 text-xs font-bold text-indigo-700">
+                        <span className="inline-flex items-center rounded-full bg-indigo-50 border border-indigo-200 px-2.5 py-0.5 text-xs font-semibold text-indigo-700">
                           Primary Hub
                         </span>
                       )}
-                      <span className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-bold shadow-xs ${locationStatusColors["Online"]}`}>
-                        <span className="h-1.5 w-1.5 rounded-full bg-white animate-pulse" />
-                        {location.isActive}
+
+                      <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-semibold border shadow-2xs bg-slate-100 text-slate-700 border-slate-200`}>
+                        {location.isActive && (
+                          <span className="h-1.5 w-1.5 rounded-full bg-green-500 animate-pulse" />
+                        )}
+                        {statusKey}
                       </span>
                     </div>
                     
@@ -102,17 +106,22 @@ export default async function LocationLayout({
                 </div>
 
                 <Link
-                  href={`/admin/locations/${location.id}/edit`}
-                  className="inline-flex items-center gap-2 rounded-2xl bg-slate-900 px-5 py-4 font-semibold text-white hover:bg-slate-800"
+                  href={`/dashboard/locations/${location.id}/edit`}
+                  className="inline-flex items-center gap-2 rounded-xl bg-slate-900 px-3 py-2 font-semibold text-white hover:bg-slate-800"
                 >
                   <Pencil className="h-5 w-5" />
                   Edit Location
                 </Link>
+                {/* <DeleteButton
+                  itemId={location.id}
+                  itemName={loc.name}
+                  endpointUrl={`/api/admin/locations/${loc.id}/soft-delete`}
+                  onSuccess={fetchLocations}
+                  variant="icon"
+                /> */}
               </div>
-            </div>
           </div>
 
-          {/* NAV */}
           <OverviewNav items={navItems} />
         </div>
       </div>

@@ -12,13 +12,14 @@ import { toast } from "sonner";
 
 import { INFLOW_EVENTS } from "@/lib/locations/types/webhook.type";
 
-interface PartnerWorkspaceProps {
+interface LocationWorkspaceProps {
   selectedLocationInflowId: string;
 }
 
-const PartnerWorkspace = ({ selectedLocationInflowId }: PartnerWorkspaceProps) => {
+const LocationWorkspace = ({ selectedLocationInflowId }: LocationWorkspaceProps) => {
   const [pending, startTransition] = useTransition();
   const [webhook, setWebhook] = useState<any | null>(null);
+  const [hasUrl, setHasUrl] = useState<boolean>(false);
   const [loading, setLoading] = useState(true);
   const [logs, setLogs] = useState<any[]>([]);
   const [loadingLogs, setLoadingLogs] = useState(false);
@@ -43,7 +44,11 @@ const PartnerWorkspace = ({ selectedLocationInflowId }: PartnerWorkspaceProps) =
     try {
       const res = await fetch(`/api/settings/webhooks/locations?locationId=${selectedLocationInflowId}`);
       const data = await res.json();
-      if (data.success) setWebhook(data.webhook);
+      if (data.success) {
+        console.log(data.webhook)
+        setWebhook(data.webhook);
+        setHasUrl(data.hasUrl); 
+      }
     } catch {
       toast.error("Could not read configuration state.");
     } finally {
@@ -66,7 +71,7 @@ const PartnerWorkspace = ({ selectedLocationInflowId }: PartnerWorkspaceProps) =
       const data = await res.json();
       if (data.success) {
         setWebhook(data.webhook);
-        toast.success("Partner Workspace active for this location.");
+        toast.success("Webhook Workspace active for this location.");
       }
     });
   };
@@ -115,7 +120,7 @@ const PartnerWorkspace = ({ selectedLocationInflowId }: PartnerWorkspaceProps) =
   return (
     <div className="flex flex-col gap-6 p-6">
       <div>
-        <h1 className="text-3xl font-bold tracking-tight">Partner App Integration</h1>
+        <h1 className="text-3xl font-bold tracking-tight">Webhook Integration</h1>
         <p className="text-muted-foreground">Manage webhook automation.</p>
       </div>
 
@@ -146,6 +151,7 @@ const PartnerWorkspace = ({ selectedLocationInflowId }: PartnerWorkspaceProps) =
                   {webhook ? "Active Stream" : "Offline"}
                 </Badge>
               </CardHeader>
+
               <CardContent className="space-y-3 text-sm pt-4">
                 {webhook ? (
                   <>
@@ -155,7 +161,7 @@ const PartnerWorkspace = ({ selectedLocationInflowId }: PartnerWorkspaceProps) =
                     </div>
                     <div className="flex justify-between border-b pb-2">
                       <span className="font-medium text-muted-foreground">Subscription ID:</span>
-                      <span className="font-mono text-xs ">{webhook.webHookSubscriptionId}</span>
+                      <span className="font-mono text-xs">{webhook.webHookSubscriptionId}</span>
                     </div>
                     <div className="flex justify-between border-b pb-2">
                       <span className="font-medium text-muted-foreground">Active Subscriptions:</span>
@@ -169,17 +175,37 @@ const PartnerWorkspace = ({ selectedLocationInflowId }: PartnerWorkspaceProps) =
                     </div>
                   </>
                 ) : (
-                  <p className="text-sm text-muted-foreground py-4 text-center">
-                    Webhooks are currently uninitialized. Connect your instance to subscribe to real-time mutation events.
-                  </p>
+                  <div className="text-sm py-4 text-center space-y-1">
+                    <p className="text-destructive font-semibold">
+                      {!hasUrl ? "Integration API URL Missing" : "Connection Stream Offline"}
+                    </p>
+                    <p className="text-muted-foreground max-w-sm mx-auto text-xs">
+                      {!hasUrl 
+                        ? "Please configure your location's partner base URL endpoint settings prior to enabling automation pipelines."
+                        : "The partner workspace link is broken or remote webhook registration was removed on the destination server."}
+                    </p>
+                  </div>
                 )}
               </CardContent>
+
               <CardFooter className="flex justify-between border-t p-4 bg-muted/30">
                 <Button variant="outline" size="sm" onClick={refreshStatus}>Refresh State</Button>
+                
                 {webhook ? (
-                  <Button variant="destructive" size="sm" onClick={handleDisconnect} disabled={pending}>Disconnect Instance</Button>
+                  // If connected, show disconnect handler button
+                  <Button variant="destructive" size="sm" onClick={handleDisconnect} disabled={pending}>
+                    Disconnect Instance
+                  </Button>
+                ) : hasUrl ? (
+                  // If disconnected but hasUrl is configured, render the connect option button
+                  <Button size="sm" onClick={handleConnect} disabled={pending}>
+                    Connect Local App
+                  </Button>
                 ) : (
-                  <Button size="sm" onClick={handleConnect} disabled={pending}>Connect Partner App</Button>
+                  // If unconfigured entirely, render nothing or a disabled warning block
+                  <Button size="sm" disabled>
+                    Awaiting Configuration
+                  </Button>
                 )}
               </CardFooter>
             </Card>
@@ -191,7 +217,7 @@ const PartnerWorkspace = ({ selectedLocationInflowId }: PartnerWorkspaceProps) =
             <CardHeader>
               <CardTitle>Subscribed Topics</CardTitle>
               <CardDescription>
-                Toggle the topics you want PartnerApp to report to your system context hook payload.
+                Toggle the topics you want location to report to your system context hook payload.
               </CardDescription>
             </CardHeader>
             <CardContent className="divide-y divide-border">
@@ -222,7 +248,7 @@ const PartnerWorkspace = ({ selectedLocationInflowId }: PartnerWorkspaceProps) =
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
               <div>
                 <CardTitle>Recent Activity Log</CardTitle>
-                <CardDescription>The last 50 events received from your Partner App hooks hook context.</CardDescription>
+                <CardDescription>The last 50 events received from your local inflow hooks hook context.</CardDescription>
               </div>
               <Button variant="outline" size="sm" onClick={fetchLogs} disabled={loadingLogs}>
                 {loadingLogs ? "Refreshing..." : "Refresh Logs"}
@@ -289,4 +315,4 @@ const PartnerWorkspace = ({ selectedLocationInflowId }: PartnerWorkspaceProps) =
   );
 };
 
-export default PartnerWorkspace;
+export default LocationWorkspace;

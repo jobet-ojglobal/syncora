@@ -3,7 +3,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Plus, Search, MapPin, Warehouse, Layers, Boxes, CheckCircle2, XCircle, ChevronDown, ChevronUp, ExternalLink } from "lucide-react";
+import { Plus, Search, MapPin, Warehouse, Layers, Boxes, CheckCircle2, XCircle, ChevronDown, ChevronUp, ExternalLink, ArrowRight, ShoppingBag, Package } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -194,6 +194,26 @@ export default function LocationsListPage() {
                       onSuccess={fetchLocations}
                       variant="icon"
                     />
+                  </div>
+                  <div className="flex items-center justify-between ">
+                    {/* <div className="flex items-center gap-4 text-sm font-semibold text-slate-700">
+                      <div className="flex items-center gap-1.5" title="Customer Orders Placed">
+                        <ShoppingBag className="h-4 w-4 text-slate-400" />
+                        <span>{loc._count?.orders ?? 0} <span className="text-xs font-normal text-slate-500">Orders</span></span>
+                      </div>
+                      <div className="flex items-center gap-1.5" title="Inventory SKUs Blocked">
+                        <Package className="h-4 w-4 text-slate-400" />
+                        <span>{loc._count?.inventory ?? 0} <span className="text-xs font-normal text-slate-500">SKUs</span></span>
+                      </div>
+                    </div> */}
+
+                    <Link
+                      href={`/dashboard/locations/${loc.id}`}
+                      className="inline-flex items-center gap-1 rounded-xl bg-slate-50 px-4 py-2.5 text-sm font-bold group-hover:bg-slate-900 group-hover:text-white transition-all shadow-2xs"
+                    >
+                      Overview
+                      <ArrowRight className="h-4 w-4 transform transition-transform group-hover:translate-x-0.5" />
+                    </Link>
                   </div>
                 </div>
 

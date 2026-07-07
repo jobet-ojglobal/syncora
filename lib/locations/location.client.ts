@@ -15,30 +15,46 @@ export class BranchClient {
 
   private async request<T>(
     endpoint: string,
-    options?: RequestInit
+    options?: RequestInit & { timeout?: number } // Accept optional timeout override
   ): Promise<T> {
-    const response = await fetch(
-      `${this.baseUrl}${endpoint}`,
-      {
-        ...options,
-        headers: {
-          "Authorization": `Bearer ${env.PARTNER_API_KEY}`, // Assuming global key, or move to DB if needed
-          "Content-Type": "application/json",
-          ...options?.headers,
-        },
-        cache: "no-store",
+    const timeoutMs = options?.timeout ?? 2500; // Default: 2.5 second cutoff limit
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
+    try {
+      const response = await fetch(
+        `${this.baseUrl}${endpoint}`,
+        {
+          ...options,
+          signal: controller.signal, // Attach abort signal
+          headers: {
+            "Authorization": `Bearer ${env.PARTNER_API_KEY}`,
+            "Content-Type": "application/json",
+            ...options?.headers,
+          },
+          cache: "no-store",
+        }
+      );
+
+      if (!response.ok) {
+        const text = await response.text();
+        throw new Error(`InFlow API Error ${response.status}: ${text}`);
       }
-    );
 
-    if (!response.ok) {
-      const text = await response.text();
-      throw new Error(`Partner API Error [${response.status}] from ${this.baseUrl}: ${text}`);
+      return await response.json();
+    } catch (error: any) {
+      if (error.name === "AbortError") {
+        throw new Error(`Partner API connection timed out after ${timeoutMs}ms`);
+      }
+      throw error;
+    } finally {
+      clearTimeout(timeoutId); // Clean up memory reference
     }
-
-    return response.json();
   }
 
-  get<T>(endpoint: string): Promise<T> { return this.request<T>(endpoint); }
+  get<T>(endpoint: string, options?: { timeout?: number }): Promise<T> {
+    return this.request<T>(endpoint, { method: "GET", ...options });
+  }
   post<T>(endpoint: string, body: unknown): Promise<T> { return this.request<T>(endpoint, { method: "POST", body: JSON.stringify(body) }); }
   put<T>(endpoint: string, body: unknown): Promise<T> { return this.request<T>(endpoint, { method: "PUT", body: JSON.stringify(body) }); }
   patch<T>(endpoint: string, body: unknown): Promise<T> { return this.request<T>(endpoint, { method: "PATCH", body: JSON.stringify(body) }); }

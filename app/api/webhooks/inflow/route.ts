@@ -1,6 +1,6 @@
 // app/api/webhooks/inflow/route.ts
 import { prisma } from "@/lib/prisma";
-import { cloudSyncQueue } from "@/lib/queues/sync.queue";
+import { getCloudSyncQueue } from "@/lib/queues/sync.queue";
 import { listWebhooks } from "@/lib/inflow/webhooks/webhook-setting.service";
 import { NextRequest, NextResponse } from "next/server";
 
@@ -44,7 +44,7 @@ export async function POST(request: NextRequest) {
         const inflowId = payload.id || payload.productId;
 
         if (inflowId) {
-          await cloudSyncQueue.add(
+          await getCloudSyncQueue().add(
             "cloud_sync_job",
             {
               source: "inflow_product",
@@ -69,7 +69,7 @@ export async function POST(request: NextRequest) {
         const inflowId = payload.id || payload.customerId;
 
         if (inflowId) {
-          await cloudSyncQueue.add(
+          await getCloudSyncQueue().add(
             "cloud_sync_job",
             {
               source: "inflow_customer",
@@ -94,7 +94,7 @@ export async function POST(request: NextRequest) {
         const inflowId = payload.id || payload.vendorId;
 
         if (inflowId) {
-          await cloudSyncQueue.add(
+          await getCloudSyncQueue().add(
             "cloud_sync_job",
             {
               source: "inflow_vendor",
@@ -122,7 +122,7 @@ export async function POST(request: NextRequest) {
         if (orderId) {
           // Offload the sync processing to the dedicated background worker queue
           console.log(`api partner_sync_job ${eventType}`)
-          await cloudSyncQueue.add(
+          await getCloudSyncQueue().add(
             "partner_sync_job",
             {
               source: "inflow_sales_order",

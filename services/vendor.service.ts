@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import { midSyncQueue } from "@/lib/queues/sync.queue";
+import { getMidSyncQueue } from "@/lib/queues/sync.queue";
 import { Prisma } from "@/generated/prisma/client";
 import { VendorFormData } from "@/schemas/vendor.schema";
 
@@ -9,7 +9,7 @@ export class VendorService {
    * Dispatches outbound background synchronizations to BullMQ
    */
   private static async dispatchSyncJob(payload: any) {
-    await midSyncQueue.add(
+    await getMidSyncQueue().add(
       "vendor_sync_job",
       {
         source: "VENDOR_SYNC_API",
@@ -111,7 +111,7 @@ export class VendorService {
     });
 
     // 3. Atomically pass the entire list to Redis
-    await midSyncQueue.addBulk(bulkJobs);
+    await getMidSyncQueue().addBulk(bulkJobs);
 
     return { scheduledJobs: bulkJobs.length };
   }

@@ -1,6 +1,6 @@
 // app/api/webhooks/partner/route.ts
 import { prisma } from "@/lib/prisma";
-import { partnerSyncQueue } from "@/lib/queues/sync.queue";
+import { getPartnerSyncQueue } from "@/lib/queues/sync.queue";
 import { listWebhooks } from "@/lib/partner/services/webhook.service";
 import { NextRequest, NextResponse } from "next/server";
 import { partnerApi } from "@/lib/partner/partner.client";
@@ -86,7 +86,7 @@ export async function POST(request: NextRequest) {
 
         if (batchID) {
           // Offload the sync processing to the dedicated background worker queue
-          await partnerSyncQueue.add(
+          await getPartnerSyncQueue().add(
             "customer_sync_job",
             {
               source: "inflow_customer",

@@ -11,11 +11,20 @@ export async function GET(request: Request) {
       return NextResponse.json({ success: false, error: "Missing locationId context" }, { status: 400 });
     }
 
+    const location = await prisma.location.findUnique({
+      where: { id: locationId },
+      select: { inflowId: true }
+    })
+
+    if (!location) {
+      return NextResponse.json({ success: false, error: "Location not found." }, { status: 404 });
+    }
+
     // Pull events linked to the specific webhooks active on this location channel
     const logs = await prisma.locationWebhookEvent.findMany({
       where: {
         webhook: {
-          locationId: locationId,
+          locationId: location.inflowId,
         },
       },
       orderBy: {

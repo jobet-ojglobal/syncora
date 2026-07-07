@@ -1,9 +1,10 @@
 import { ArrowLeft, Edit3 } from "lucide-react";
+import Link from "next/link";
 import PageHeader from "@/components/layout/dashboard/PageHeader";
 import UnifiedCustomerForm from "@/components/customer/unified-customer-form";
-import Link from "next/link";
 import { prisma } from "@/lib/prisma"; 
 import { notFound } from "next/navigation";
+import { getCustomerMetadata } from "@/services/customer.metadata";
 
 interface EditCustomerPageProps {
   params: Promise<{
@@ -17,32 +18,11 @@ export const metadata = {
 };
 
 export default async function ModifyExistingCustomerProfileLedgerPage({ params }: EditCustomerPageProps) {
-  const resolvedParameters = await params;
-  const targetId = resolvedParameters.id;
+  const { id: targetId } = await params;
 
-  // 2. Fetch all catalogs and target customer data concurrently via Prisma
-  const [pricing, taxing, terms, locations, reps, customerData] = await Promise.all([
-    (await prisma.pricingScheme.findMany({ select: { inflowId: true, name: true }, orderBy: { name: "asc" } })).map(p => ({
-      id: p.inflowId,
-      name: p.name,
-    })), 
-    (await prisma.taxingScheme.findMany({ select: { inflowId: true, name: true }, orderBy: { name: "asc" } })).map(p => ({
-      id: p.inflowId,
-      name: p.name,
-    })),
-    (await prisma.paymentTerm.findMany({ select: { inflowId: true, name: true }, orderBy: { name: "asc" } })).map(p => ({
-      id: p.inflowId,
-      name: p.name,
-    })),
-    (await prisma.location.findMany({ select: { inflowId: true, name: true }, orderBy: { name: "asc" } })).map(p => ({
-      id: p.inflowId,
-      name: p.name,
-    })),
-    ( await prisma.teamMember.findMany({ where: { canBeSalesRep: true }, select: { inflowId: true, name: true }, orderBy: { name: "asc" } })).map(p => ({
-      id: p.inflowId,
-      name: p.name,
-    })),
-    // Fetch the specific customer data using the dynamic ID route param
+  // Resolve catalogs service and specific customer entity concurrently without HTTP overhead
+  const [catalogs, customerData] = await Promise.all([
+    getCustomerMetadata(),
     prisma.customer.findUnique({
       where: { id: targetId },
       include: {
@@ -52,14 +32,14 @@ export default async function ModifyExistingCustomerProfileLedgerPage({ params }
           },
         },
       },
-    })
+    }),
   ]);
 
   if (!customerData || customerData.deletedAt) return notFound();
 
   const { businessPartner, ...customerFields } = customerData;
 
-  // 2. Transform addresses to flag defaults matching your Zod/Form layout
+  // Transform addresses to flag defaults matching your Zod/Form layout
   const formattedAddresses = businessPartner.addresses.map((addr: any) => ({
     id: addr.id,
     name: addr.name ?? "",
@@ -71,12 +51,11 @@ export default async function ModifyExistingCustomerProfileLedgerPage({ params }
     postalCode: addr.postalCode ?? "",
     addressType: addr.addressType ?? null,
     remarks: addr.remarks ?? "",
-    // Compare against customer settings (via inflowId mapping)
     isDefaultBilling: addr.inflowId ? addr.inflowId === customerFields.defaultBillingAddressId : false,
     isDefaultShipping: addr.inflowId ? addr.inflowId === customerFields.defaultShippingAddressId : false,
   }));
 
-  // 3. Normalize the final payload to strictly align with CustomerMasterInput
+  // Normalize final payload to strictly align with CustomerMasterInput type structures
   const initialFormData = {
     id: customerFields.id,
     name: businessPartner.name,
@@ -88,26 +67,23 @@ export default async function ModifyExistingCustomerProfileLedgerPage({ params }
     remarks: businessPartner.remarks ?? "",
     fax: businessPartner.fax ?? "",
     
-    // Extended customer attributes
-    discount: customerFields.discount ? Number(customerFields.discount) : 0, // Convert Decimal to JS Number
+    discount: customerFields.discount ? Number(customerFields.discount) : 0, // Clean Decimal conversion
     taxExemptNumber: customerFields.taxExemptNumber ?? "",
     defaultCarrier: customerFields.defaultCarrier ?? "",
     defaultPaymentMethod: customerFields.defaultPaymentMethod ?? "",
     
-    // Structural Relational Lookups
     defaultLocationId: customerFields.defaultLocationId ?? "",
     defaultPaymentTermsId: customerFields.defaultPaymentTermsId ?? "",
     pricingSchemeId: customerFields.pricingSchemeId ?? "",
     taxingSchemeId: customerFields.taxingSchemeId ?? "",
     defaultSalesRepTeamMemberId: customerFields.defaultSalesRepTeamMemberId ?? "",
 
-    // Injected Sub-collection
     addresses: formattedAddresses,
   };
 
   return (
-    <div className="w-full mx-auto px-6 py-12 space-y-4 ">
-      {/* HEADER */}
+    <div className="w-full mx-auto px-6 py-12 space-y-4">
+      {/* NAVIGATION CONTROLS */}
       <Link
         href="/dashboard/customers"
         className="inline-flex items-center gap-2 text-sm font-medium text-slate-600 hover:text-slate-900"
@@ -124,7 +100,7 @@ export default async function ModifyExistingCustomerProfileLedgerPage({ params }
       
       <UnifiedCustomerForm 
         initialData={initialFormData} 
-        catalogs={{ pricing, taxing, terms, locations, reps }} 
+        catalogs={catalogs} 
       />
     </div>
   );

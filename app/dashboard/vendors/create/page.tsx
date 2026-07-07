@@ -3,15 +3,14 @@ import { ArrowLeft, Building2 } from "lucide-react";
 import Link from "next/link";
 import PageHeader from "@/components/layout/dashboard/PageHeader";
 import { VendorForm } from "@/components/vendor/vendor-form";
+import { getVendorMetadata } from "@/services/vendor.metadata";
 
-export default async function OnboardNewCustomerAccountPage() {
-  const [taxing, terms, currencies] = await Promise.all([
-    fetch(`${process.env.NEXT_PUBLIC_SITE_URL}/api/admin/taxing-scheme/basic`).then(r => r.json()),
-    fetch(`${process.env.NEXT_PUBLIC_SITE_URL}/api/admin/payment-terms/basic`).then(r => r.json()),
-    fetch(`${process.env.NEXT_PUBLIC_SITE_URL}/api/admin/currencies/basic`).then(r => r.json()),
-  ]);
+export default async function OnboardNewVendorAccountPage() {
+  // Resolve data matrices on the database layer; zero inner network runtime delays
+  const catalogs = await getVendorMetadata();
+
   return (
-    <div className="w-full mx-auto px-6 space-y-4 py-12 ">
+    <div className="w-full mx-auto px-6 space-y-4 py-12">
       {/* HEADER */}
       <Link
         href="/dashboard/vendors"
@@ -20,16 +19,14 @@ export default async function OnboardNewCustomerAccountPage() {
         <ArrowLeft className="h-4 w-4" />
         Back to Vendor Directory
       </Link>
+      
       <PageHeader 
         title="Create New Vendor" 
         description="Add a new business partner and vendor profile to your system."
         icon={Building2}
-        />
+      />
 
-      {/* Primary Execution Engine Sub-form layout entry point handle link element */}
-      <VendorForm
-        catalogs={{ terms, taxing, currencies }}
-       />
+      <VendorForm catalogs={catalogs} />
     </div>
   );
 }

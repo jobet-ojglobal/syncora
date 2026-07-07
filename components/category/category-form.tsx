@@ -81,7 +81,7 @@ export function CategoryForm({ initialData, onSuccess }: BrandFormProps) {
 
   useEffect(() => {
     fetchCategoryOptions().then(() => setIsLoading(false));
-  }, [fetchCategoryOptions]);
+  }, []);
 
   const onSubmit = async (values: CategoryInput) => {
     try {
