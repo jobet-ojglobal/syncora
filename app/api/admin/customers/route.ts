@@ -4,6 +4,227 @@ import { prisma } from "@/lib/prisma";
 import { getMidSyncQueue } from "@/lib/queues/sync.queue";
 import { Prisma } from "@/generated/prisma/client";
 
+// export async function POST(request: NextRequest) {
+//   try {
+//     const body = await request.json();
+//     const { 
+//       name, contactName, email, phone, fax, website, remarks, isActive, 
+//       taxExemptNumber, defaultCarrier, defaultPaymentMethod, discount, 
+//       defaultLocationId, defaultPaymentTermsId, pricingSchemeId, taxingSchemeId, 
+//       defaultSalesRepTeamMemberId, addresses = [], customFields = {}
+//     } = body;
+
+//     if (!name?.trim()) {
+//       return NextResponse.json({ error: "Missing required business name field." }, { status: 400 });
+//     }
+
+//     // Form clean native GUIDs to ensure 100% downstream compliance with inFlow's database schema
+//     const customerId = crypto.randomUUID().toLowerCase();
+//     const cleanEmail = email?.trim().toLowerCase() || null;
+
+//     const lastCustomer = await prisma.customer.findFirst({
+//       where: { defaultLocationId },
+//       orderBy: {
+//         localId: "desc",
+//       },
+//       select: {
+//         localId: true,
+//       },
+//     });
+
+//     const nextLocalId =
+//       ((parseInt(lastCustomer?.localId ?? "0", 10)) + 1)
+//         .toString()
+//         .padStart(7, "0");
+
+//     const customer = await prisma.customer.findFirst({
+//       where: {
+//         inflowId: defaultLocationId,
+//       },
+//       include: {
+//         businessPartner: {
+//           include: {
+//             addresses: {
+//               select: {
+//                 localId: true,
+//               },
+//               orderBy: {
+//                 localId: "desc",
+//               },
+//               take: 1,
+//             },
+//           },
+//         },
+//       },
+//     });
+
+//     const nextLocalAddressId =
+//       ((parseInt(customer?.businessPartner?.addresses?.[0].localId ?? "0", 10)) + 1)
+//         .toString()
+//         .padStart(7, "0");
+
+
+//     const result = await prisma.$transaction(async (tx) => {
+//       // 1. Create Parent Business Partner Node
+//       const businessPartner = await tx.businessPartner.create({
+//         data: { 
+//           name: name.trim(), 
+//           contactName: contactName?.trim(), 
+//           email: cleanEmail, 
+//           phone: phone?.trim(), 
+//           fax: fax?.trim(), 
+//           website: website?.trim(), 
+//           remarks: remarks?.trim(), 
+//           isActive: isActive ?? true 
+//         }
+//       });
+
+//       // 2. Create Related Address Vectors
+//       const savedAddresses = await Promise.all(
+//         addresses.map(async (addr: any) => {
+//           const addressId = crypto.randomUUID().toLowerCase(); // Native UUID string
+//           return await tx.businessPartnerAddress.create({
+//             data: {
+//               businessPartnerId: businessPartner.id,
+//               inflowId: addressId,
+
+//               name: addr.name?.trim() || "Primary Address",
+//               address1: addr.address1?.trim() || "",
+//               address2: addr.address2?.trim() || null,
+//               city: addr.city?.trim() || "",
+//               state: addr.state?.trim() || "",
+//               country: addr.country?.trim() || "Philippines",
+//               postalCode: addr.postalCode?.trim() || "",
+//               remarks: addr.remarks?.trim() || null,
+//               addressType: addr.addressType || "Commercial"
+//             }
+//           });
+//         })
+//       );
+
+//       // Determine explicit structural fallback selectors
+//       const billingIndex = addresses.findIndex((a: any) => a.isDefaultBilling === true);
+//       const shippingIndex = addresses.findIndex((a: any) => a.isDefaultShipping === true);
+      
+//       const billingInflowId = savedAddresses[billingIndex >= 0 ? billingIndex : 0]?.inflowId || null;
+//       const shippingInflowId = savedAddresses[shippingIndex >= 0 ? shippingIndex : 0]?.inflowId || null;
+
+//       // 3. Setup Core Customer Record Block
+//       const customer = await tx.customer.create({
+//         data: {
+//           businessPartnerId: businessPartner.id,
+//           inflowId: customerId,
+//           localId: nextLocalId,
+//           taxExemptNumber: taxExemptNumber?.trim() || null,
+//           defaultCarrier: defaultCarrier?.trim() || null,
+//           defaultPaymentMethod: defaultPaymentMethod?.trim() || null,
+//           discount: discount ? new Prisma.Decimal(discount) : 0,
+//           defaultLocationId: defaultLocationId || null,
+//           defaultPaymentTermsId: defaultPaymentTermsId || null,
+//           pricingSchemeId: pricingSchemeId || null,
+//           taxingSchemeId: taxingSchemeId || null,
+//           defaultSalesRepTeamMemberId: defaultSalesRepTeamMemberId || null,
+//           defaultBillingAddressId: billingInflowId,
+//           defaultShippingAddressId: shippingInflowId
+//         }
+//       });
+
+//       // 4. Seeding Financial Summaries
+//       const targetPricingScheme = pricingSchemeId 
+//         ? await tx.pricingScheme.findUnique({ where: { inflowId: pricingSchemeId }, select: { currencyId: true } })
+//         : null;
+
+//       const currencyId = targetPricingScheme?.currencyId || "USD";
+
+//       await Promise.all([
+//         tx.customerBalance.create({ data: { inflowId: crypto.randomUUID().toLowerCase(), localId: nextLocalId, customerId, currencyId, balance: 0 } }),
+//         tx.customerCredit.create({ data: { inflowId: crypto.randomUUID().toLowerCase(), localId: nextLocalId, customerId, currencyId, credit: 0 } }),
+//         tx.customerDue.create({ data: { inflowId: crypto.randomUUID().toLowerCase(), localId: nextLocalId, customerId, currencyId, amountCurrent: 0, amount1To30: 0, amount31To60: 0, amount61Plus: 0 } })
+//       ]);
+
+//       /**
+//        * STEP 5: Construct Outbound inFlow-Compliant Nested Payload Representation
+//        */
+//       const inflowPayload = {
+//         id: customer.id,
+//         customerId: nextLocalId,
+//         name: businessPartner.name,
+//         contactName: businessPartner.contactName,
+//         email: businessPartner.email,
+//         phone: businessPartner.phone,
+//         fax: businessPartner.fax,
+//         website: businessPartner.website,
+//         remarks: businessPartner.remarks,
+//         discount: customer.discount ? customer.discount.toString() : null,
+//         isActive: businessPartner.isActive,
+//         taxExemptNumber: customer.taxExemptNumber,
+//         defaultLocationId: customer.defaultLocationId,
+//         defaultCarrier: customer.defaultCarrier,
+//         defaultPaymentMethod: customer.defaultPaymentMethod,
+//         defaultPaymentTermsId: customer.defaultPaymentTermsId,
+//         pricingSchemeId: customer.pricingSchemeId,
+//         taxingSchemeId: customer.taxingSchemeId,
+//         defaultSalesRepTeamMemberId: customer.defaultSalesRepTeamMemberId,
+//         defaultBillingAddressId: customer.defaultBillingAddressId,
+//         defaultShippingAddressId: customer.defaultShippingAddressId,
+//         addresses: savedAddresses.map(addr => ({
+//           customerAddressId: addr.inflowId,
+//           customerId: customer.inflowId,
+//           name: addr.name,
+//           address: {
+//             addressType: addr.addressType,
+//             address1: addr.address1,
+//             address2: addr.address2,
+//             city: addr.city,
+//             state: addr.state,
+//             postalCode: addr.postalCode,
+//             country: addr.country,
+//             remarks: addr.remarks
+//           }
+//         })),
+//         customFields: {
+//           custom1: customFields.custom1 || null,
+//           custom2: customFields.custom2 || null,
+//           custom3: customFields.custom3 || null,
+//           custom4: customFields.custom4 || null,
+//           custom5: customFields.custom5 || null,
+//           custom6: customFields.custom6 || null,
+//           custom7: customFields.custom7 || null,
+//           custom8: customFields.custom8 || null,
+//           custom9: customFields.custom9 || null,
+//           custom10: customFields.custom10 || null,
+//         }
+//       };
+
+//       return { customer, inflowPayload };
+//     });
+
+//     // 6. Push safely to background worker queue outside the active DB transaction scope
+//     await getMidSyncQueue().add(
+//       "customer_sync_job",
+//       {
+//         source: "CUSTOMER_SYNC_API",
+//         model: "CUSTOMER",
+//         payload: result.inflowPayload,
+//         timestamp: new Date().toISOString(),
+//         locationId: defaultLocationId
+//       },
+//       { 
+//         attempts: 3, 
+//         backoff: { type: "exponential", delay: 2000 },
+//         removeOnComplete: true
+//       }
+//     );
+
+//     return NextResponse.json(result.customer, { status: 201 });
+//   } catch (error) {
+//     console.error("[CUSTOMER_POST_ERROR]:", error);
+    
+//     return NextResponse.json({ error: "Failed to process customer creation pipeline." }, { status: 500 });
+//   }
+// }
+
+
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
@@ -18,12 +239,30 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Missing required business name field." }, { status: 400 });
     }
 
-    // Form clean native GUIDs to ensure 100% downstream compliance with inFlow's database schema
     const customerId = crypto.randomUUID().toLowerCase();
     const cleanEmail = email?.trim().toLowerCase() || null;
 
+    // Execute database operations safely inside a single ACID isolation boundary
     const result = await prisma.$transaction(async (tx) => {
-      // 1. Create Parent Business Partner Node
+      
+      // 1. Safely calculate nextLocalId INSIDE the transaction to prevent race conditions
+      const lastCustomer = await tx.customer.findFirst({
+        where: { defaultLocationId },
+        orderBy: { localId: "desc" },
+        select: { localId: true },
+      });
+
+      const nextLocalId = ((parseInt(lastCustomer?.localId ?? "0", 10)) + 1)
+        .toString()
+        .padStart(7, "0");
+
+      // 2. Fetch Currency ID early in the block
+      const targetPricingScheme = pricingSchemeId 
+        ? await tx.pricingScheme.findUnique({ where: { inflowId: pricingSchemeId }, select: { currencyId: true } })
+        : null;
+      const currencyId = targetPricingScheme?.currencyId || "USD";
+
+      // 3. Create Parent Business Partner Node
       const businessPartner = await tx.businessPartner.create({
         data: { 
           name: name.trim(), 
@@ -37,10 +276,10 @@ export async function POST(request: NextRequest) {
         }
       });
 
-      // 2. Create Related Address Vectors
+      // 4. Create Related Address Vectors
       const savedAddresses = await Promise.all(
         addresses.map(async (addr: any) => {
-          const addressId = crypto.randomUUID().toLowerCase(); // Native UUID string
+          const addressId = crypto.randomUUID().toLowerCase();
           return await tx.businessPartnerAddress.create({
             data: {
               businessPartnerId: businessPartner.id,
@@ -66,11 +305,12 @@ export async function POST(request: NextRequest) {
       const billingInflowId = savedAddresses[billingIndex >= 0 ? billingIndex : 0]?.inflowId || null;
       const shippingInflowId = savedAddresses[shippingIndex >= 0 ? shippingIndex : 0]?.inflowId || null;
 
-      // 3. Setup Core Customer Record Block
+      // 5. Setup Core Customer Record Block
       const customer = await tx.customer.create({
         data: {
           businessPartnerId: businessPartner.id,
           inflowId: customerId,
+          localId: nextLocalId,
           taxExemptNumber: taxExemptNumber?.trim() || null,
           defaultCarrier: defaultCarrier?.trim() || null,
           defaultPaymentMethod: defaultPaymentMethod?.trim() || null,
@@ -85,25 +325,17 @@ export async function POST(request: NextRequest) {
         }
       });
 
-      // 4. Seeding Financial Summaries
-      const targetPricingScheme = pricingSchemeId 
-        ? await tx.pricingScheme.findUnique({ where: { inflowId: pricingSchemeId }, select: { currencyId: true } })
-        : null;
-
-      const currencyId = targetPricingScheme?.currencyId || "USD";
-
+      // 6. Seeding Financial Summaries concurrently
       await Promise.all([
-        tx.customerBalance.create({ data: { inflowId: crypto.randomUUID().toLowerCase(), customerId, currencyId, balance: 0 } }),
-        tx.customerCredit.create({ data: { inflowId: crypto.randomUUID().toLowerCase(), customerId, currencyId, credit: 0 } }),
-        tx.customerDue.create({ data: { inflowId: crypto.randomUUID().toLowerCase(), customerId, currencyId, amountCurrent: 0, amount1To30: 0, amount31To60: 0, amount61Plus: 0 } })
+        tx.customerBalance.create({ data: { inflowId: crypto.randomUUID().toLowerCase(), localId: nextLocalId, customerId, currencyId, balance: 0 } }),
+        tx.customerCredit.create({ data: { inflowId: crypto.randomUUID().toLowerCase(), localId: nextLocalId, customerId, currencyId, credit: 0 } }),
+        tx.customerDue.create({ data: { inflowId: crypto.randomUUID().toLowerCase(), localId: nextLocalId, customerId, currencyId, amountCurrent: 0, amount1To30: 0, amount31To60: 0, amount61Plus: 0 } })
       ]);
 
-      /**
-       * STEP 5: Construct Outbound inFlow-Compliant Nested Payload Representation
-       */
+      // 7. Construct Outbound payload representation
       const inflowPayload = {
         id: customer.id,
-        customerId: customer.inflowId,
+        customerId: nextLocalId,
         name: businessPartner.name,
         contactName: businessPartner.contactName,
         email: businessPartner.email,
@@ -155,26 +387,26 @@ export async function POST(request: NextRequest) {
       return { customer, inflowPayload };
     });
 
-    // 6. Push safely to background worker queue outside the active DB transaction scope
-    // await midSyncQueue.add(
-    //   "customer_sync_job",
-    //   {
-    //     source: "CUSTOMER_SYNC_API",
-    //     model: "CUSTOMER",
-    //     payload: result.inflowPayload,
-    //     timestamp: new Date().toISOString()
-    //   },
-    //   { 
-    //     attempts: 3, 
-    //     backoff: { type: "exponential", delay: 2000 },
-    //     removeOnComplete: true
-    //   }
-    // );
+    // 8. Push to queue outside the transaction to avoid holding database locks
+    await getMidSyncQueue().add(
+      "customer_sync_job",
+      {
+        source: "CUSTOMER_SYNC_API",
+        model: "CUSTOMER",
+        payload: result.inflowPayload,
+        timestamp: new Date().toISOString(),
+        locationId: defaultLocationId
+      },
+      { 
+        attempts: 3, 
+        backoff: { type: "exponential", delay: 2000 },
+        removeOnComplete: true
+      }
+    );
 
     return NextResponse.json(result.customer, { status: 201 });
   } catch (error) {
     console.error("[CUSTOMER_POST_ERROR]:", error);
-    
     return NextResponse.json({ error: "Failed to process customer creation pipeline." }, { status: 500 });
   }
 }
@@ -360,7 +592,8 @@ export async function PATCH(request: NextRequest) {
         source: "CUSTOMER_SYNC_API",
         model: "CUSTOMER",
         payload: result.inflowPayload,
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
+        locationId: defaultLocationId
       },
       { 
         attempts: 3, 

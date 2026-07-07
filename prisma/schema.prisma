@@ -1160,6 +1160,7 @@ model BusinessPartner {
 model BusinessPartnerAddress {
   id              String @id @default(cuid())
   inflowId        String? @unique
+  localId         String? @unique
   businessPartnerId String
   name            String?
   address1        String?
@@ -1196,6 +1197,7 @@ model Customer {
   id                            String @id @default(cuid())
   businessPartnerId             String @unique
   inflowId                      String @unique
+  localId                       String @unique
   taxExemptNumber               String?
   defaultCarrier                String?
   defaultPaymentMethod          String?
@@ -1244,6 +1246,7 @@ model Customer {
 model CustomerDue {
   id                String   @id @default(cuid())
   inflowId          String   @unique
+  localId           String   @unique
   customerId        String
   currencyId        String
   amountCurrent     Decimal  @db.Decimal(18,5)
@@ -1268,6 +1271,7 @@ model CustomerDue {
 model CustomerBalance {
   id                String   @id @default(cuid())
   inflowId          String   @unique
+  localId           String   @unique
   customerId        String
   currencyId        String
   balance           Decimal  @db.Decimal(18,5)
@@ -1288,6 +1292,7 @@ model CustomerBalance {
 model CustomerCredit {
   id                String   @id @default(cuid())
   inflowId          String   @unique
+  localId           String   @unique
   customerId        String
   currencyId        String
   credit            Decimal  @db.Decimal(18,5)

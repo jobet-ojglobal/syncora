@@ -38,6 +38,15 @@ export const getPartnerSyncQueue = () => {
   return partnerSyncQueue;
 };
 
+let locationSyncQueue: Queue | null = null;
+
+export const getLocationSyncQueue = () => {
+  if (!locationSyncQueue) {
+    locationSyncQueue = new Queue("location_sync", { connection });
+  }
+  return locationSyncQueue;
+};
+
 // Do the same for midSyncQueue, cloudSyncQueue, etc.
 
 // export const midSyncQueue = new Queue("mid_sync", {

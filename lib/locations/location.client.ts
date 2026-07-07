@@ -44,7 +44,7 @@ export class BranchClient {
       return await response.json();
     } catch (error: any) {
       if (error.name === "AbortError") {
-        throw new Error(`Partner API connection timed out after ${timeoutMs}ms`);
+        throw new Error(`Partner API connection timed out after ${timeoutMs}ms ${this.baseUrl}`);
       }
       throw error;
     } finally {

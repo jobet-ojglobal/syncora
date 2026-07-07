@@ -1,6 +1,6 @@
 // app/api/webhooks/locations/route.ts
 import { prisma } from "@/lib/prisma";
-import { getPartnerSyncQueue } from "@/lib/queues/sync.queue";
+import { getLocationSyncQueue } from "@/lib/queues/sync.queue";
 import { NextRequest, NextResponse } from "next/server";
 
 /**
@@ -76,15 +76,13 @@ export async function POST(request: NextRequest) {
         const batchID = payload.batch_id;
 
         if (batchID) {
-          await getPartnerSyncQueue().add(
+          await getLocationSyncQueue().add(
             "sales_order_sync_job",
             {
-              source: "inflow_sales_order",
-              action: "sync",
-              locationId, // critical context added for worker
-              dataId: batchID,
+              source: eventType,
               loggedEventId: loggedEvent.id,
-              eventType,
+              dataId: batchID,
+              locationId, 
             },
             {
               attempts: 3,
@@ -100,16 +98,13 @@ export async function POST(request: NextRequest) {
 
         if (batchID) {
           // Offload the sync processing to the dedicated background worker queue
-          await getPartnerSyncQueue().add(
+          await getLocationSyncQueue().add(
             "customer_sync_job",
             {
-              source: "inflow_customer",
-              action: "sync",
-              locationId, // critical context added for worker
-              dataId: batchID,
+              source: eventType,
               loggedEventId: loggedEvent.id,
-              outboundAuditId: payload.outboundAuditId,
-              eventType,
+              dataId: batchID,
+              locationId, 
             },
             {
               attempts: 3,

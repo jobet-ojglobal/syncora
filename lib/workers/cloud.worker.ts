@@ -1,4 +1,4 @@
-// workers/partner-webhook.worker.ts
+// workers/cloud-webhook.worker.ts
 import { Worker, Job } from "bullmq";
 import { prisma } from "@/lib/prisma";
 import { connection } from "@/lib/redis";
@@ -66,11 +66,11 @@ const cloudWorker = new Worker<CloudWebhookJobData>(
           const customerResult = result as CustomerSyncResult;
           
           if (customerResult.inflowPayload) {
-            console.log(`[Partner Worker] Dispatching customer downstream job to midSyncQueue for ID: ${dataId}`);
+            console.log(`[Cloud Worker] Dispatching customer downstream job to midSyncQueue for ID: ${dataId}`);
             await getMidSyncQueue().add(
               "customer_sync_job",
               {
-                source: "UPSERT_PARTNER_CUSTOMER",
+                source: "UPSERT_LOCAL_CUSTOMER",
                 model: "CUSTOMER",
                 payload: customerResult.inflowPayload, // 3. TypeScript is happy now!
                 timestamp: new Date().toISOString()
@@ -86,7 +86,7 @@ const cloudWorker = new Worker<CloudWebhookJobData>(
       }
 
     } catch (error) {
-      console.error(`[Partner Worker Error] Failed processing job ${job.id}:`, error);
+      console.error(`[Cloud Worker Error] Failed processing job ${job.id}:`, error);
       
       // We throw the error so BullMQ knows the job failed and can handle automatic retries
       throw error;
