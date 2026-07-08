@@ -9,6 +9,8 @@ import {
 } from "@/components/ui/sidebar";
 import { ModeToggle } from "@/components/shared/theme-toggle";
 
+export const dynamic = "force-dynamic";
+
 export default async function DashboardLayout({
   children,
 }: {

@@ -1,11 +1,10 @@
 // lib/partner/types/inflow.ts
 
 export type InflowEvent =
-  "customer" 
-  | "salesOrder" ;
+  "customer" | "salesOrder" | "taxingScheme" | "pricingScheme" | "currency" | "adjustmentStock";
 
 export const INFLOW_EVENTS: InflowEvent[] = [
-  "customer", "salesOrder",
+  "customer", "salesOrder", "taxingScheme", "pricingScheme", "currency", "adjustmentStock"
 ];
 
 export interface LocationWebhook {

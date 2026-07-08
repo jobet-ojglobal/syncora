@@ -59,6 +59,7 @@ CREATE TABLE "brand" (
 CREATE TABLE "category" (
     "id" TEXT NOT NULL,
     "inflowId" TEXT NOT NULL,
+    "localId" SERIAL NOT NULL,
     "name" TEXT NOT NULL,
     "slug" TEXT NOT NULL,
     "description" TEXT,
@@ -74,6 +75,7 @@ CREATE TABLE "category" (
 CREATE TABLE "product_group" (
     "id" TEXT NOT NULL,
     "inflowId" TEXT NOT NULL,
+    "localId" SERIAL NOT NULL,
     "name" TEXT NOT NULL,
     "slug" TEXT NOT NULL,
     "description" TEXT,
@@ -91,6 +93,7 @@ CREATE TABLE "product_group" (
 CREATE TABLE "product_variant" (
     "id" TEXT NOT NULL,
     "inflowId" TEXT NOT NULL,
+    "localId" SERIAL NOT NULL,
     "productGroupId" TEXT NOT NULL,
     "productId" TEXT NOT NULL,
     "defaultPrice" DECIMAL(18,5) NOT NULL,
@@ -107,6 +110,7 @@ CREATE TABLE "product_variant" (
 CREATE TABLE "product" (
     "id" TEXT NOT NULL,
     "inflowId" TEXT NOT NULL,
+    "localId" SERIAL NOT NULL,
     "sku" TEXT,
     "name" TEXT NOT NULL,
     "slug" TEXT NOT NULL,
@@ -147,6 +151,7 @@ CREATE TABLE "product" (
 CREATE TABLE "product_price" (
     "id" TEXT NOT NULL,
     "inflowId" TEXT NOT NULL,
+    "localId" SERIAL NOT NULL,
     "pricingSchemeId" TEXT NOT NULL,
     "productId" TEXT NOT NULL,
     "priceType" "ProductPriceType" NOT NULL,
@@ -162,6 +167,7 @@ CREATE TABLE "product_price" (
 CREATE TABLE "product_cost_adjustment" (
     "id" TEXT NOT NULL,
     "inflowId" TEXT NOT NULL,
+    "localId" SERIAL NOT NULL,
     "productId" TEXT NOT NULL,
     "lastModifiedById" TEXT,
     "dateTime" TIMESTAMP(3) NOT NULL,
@@ -177,6 +183,7 @@ CREATE TABLE "product_cost_adjustment" (
 CREATE TABLE "product_barcode" (
     "id" TEXT NOT NULL,
     "inflowId" TEXT NOT NULL,
+    "localId" SERIAL NOT NULL,
     "productId" TEXT NOT NULL,
     "barcode" TEXT NOT NULL,
     "lineNum" INTEGER NOT NULL,
@@ -190,6 +197,7 @@ CREATE TABLE "product_barcode" (
 CREATE TABLE "product_operation" (
     "id" TEXT NOT NULL,
     "inflowId" TEXT NOT NULL,
+    "localId" SERIAL NOT NULL,
     "productId" TEXT NOT NULL,
     "operationTypeId" TEXT NOT NULL,
     "lineNum" INTEGER NOT NULL,
@@ -208,6 +216,7 @@ CREATE TABLE "product_operation" (
 CREATE TABLE "operation_type" (
     "id" TEXT NOT NULL,
     "inflowId" TEXT NOT NULL,
+    "localId" SERIAL NOT NULL,
     "name" TEXT NOT NULL,
     "estimatedPerHourCost" DECIMAL(12,4) NOT NULL,
     "isActive" BOOLEAN NOT NULL DEFAULT true,
@@ -236,6 +245,7 @@ CREATE TABLE "product_tax_code" (
 CREATE TABLE "product_attachment" (
     "id" TEXT NOT NULL,
     "inflowId" TEXT NOT NULL,
+    "localId" SERIAL NOT NULL,
     "productId" TEXT NOT NULL,
     "attachmentUrl" TEXT NOT NULL,
     "fileName" TEXT NOT NULL,
@@ -251,6 +261,7 @@ CREATE TABLE "product_attachment" (
 CREATE TABLE "product_cost" (
     "id" TEXT NOT NULL,
     "inflowId" TEXT NOT NULL,
+    "localId" SERIAL NOT NULL,
     "productId" TEXT NOT NULL,
     "cost" DECIMAL(12,4) NOT NULL,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -263,6 +274,7 @@ CREATE TABLE "product_cost" (
 CREATE TABLE "product_reorder_setting" (
     "id" TEXT NOT NULL,
     "inflowId" TEXT NOT NULL,
+    "localId" SERIAL NOT NULL,
     "productId" TEXT NOT NULL,
     "locationId" TEXT NOT NULL,
     "fromLocationId" TEXT,
@@ -282,6 +294,7 @@ CREATE TABLE "product_reorder_setting" (
 CREATE TABLE "product_bom" (
     "id" TEXT NOT NULL,
     "inflowId" TEXT NOT NULL,
+    "localId" SERIAL NOT NULL,
     "productId" TEXT NOT NULL,
     "childProductId" TEXT NOT NULL,
     "quantity" DECIMAL(12,4) NOT NULL,
@@ -341,6 +354,7 @@ CREATE TABLE "unit_conversion" (
 CREATE TABLE "product_image" (
     "id" TEXT NOT NULL,
     "inflowId" TEXT NOT NULL,
+    "localId" SERIAL NOT NULL,
     "groupId" TEXT,
     "productId" TEXT,
     "position" INTEGER NOT NULL DEFAULT 0,
@@ -387,6 +401,7 @@ CREATE TABLE "product_variant_selection" (
 CREATE TABLE "product_group_option" (
     "id" TEXT NOT NULL,
     "inflowId" TEXT NOT NULL,
+    "localId" SERIAL NOT NULL,
     "productGroupId" TEXT NOT NULL,
     "lineNum" INTEGER NOT NULL,
     "attributeId" TEXT NOT NULL,
@@ -400,6 +415,7 @@ CREATE TABLE "product_group_option" (
 CREATE TABLE "product_group_option_value" (
     "id" TEXT NOT NULL,
     "inflowId" TEXT NOT NULL,
+    "localId" SERIAL NOT NULL,
     "optionId" TEXT NOT NULL,
     "lineNum" INTEGER NOT NULL,
     "attributeValueId" TEXT NOT NULL,
@@ -476,9 +492,11 @@ CREATE TABLE "product_tag" (
 CREATE TABLE "location" (
     "id" TEXT NOT NULL,
     "inflowId" TEXT NOT NULL,
+    "localId" SERIAL NOT NULL,
     "name" TEXT NOT NULL,
     "isActive" BOOLEAN NOT NULL DEFAULT true,
     "isDefault" BOOLEAN NOT NULL DEFAULT false,
+    "url" TEXT,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
     "deletedAt" TIMESTAMP(3),
@@ -511,6 +529,36 @@ CREATE TABLE "sublocation" (
     "updatedAt" TIMESTAMP(3) NOT NULL,
 
     CONSTRAINT "sublocation_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "location_webhook" (
+    "id" TEXT NOT NULL,
+    "locationId" TEXT NOT NULL,
+    "url" TEXT NOT NULL,
+    "secret" TEXT,
+    "events" JSONB NOT NULL,
+    "isDisabled" BOOLEAN NOT NULL DEFAULT false,
+    "consecutiveFailureCount" INTEGER NOT NULL DEFAULT 0,
+    "lastFailureMessage" TEXT,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "location_webhook_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "location_webhook_event" (
+    "id" TEXT NOT NULL,
+    "locationWebhookId" TEXT NOT NULL,
+    "eventType" TEXT NOT NULL,
+    "payload" JSONB NOT NULL,
+    "responseStatus" INTEGER,
+    "errorMessage" TEXT,
+    "processed" BOOLEAN NOT NULL DEFAULT false,
+    "receivedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "location_webhook_event_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
@@ -576,6 +624,7 @@ CREATE TABLE "inventory_adjustment_line" (
 CREATE TABLE "adjustment_reason" (
     "id" TEXT NOT NULL,
     "inflowId" TEXT NOT NULL,
+    "localId" SERIAL NOT NULL,
     "name" TEXT NOT NULL,
     "isActive" BOOLEAN NOT NULL DEFAULT true,
     "isInternal" BOOLEAN NOT NULL DEFAULT false,
@@ -637,6 +686,7 @@ CREATE TABLE "transfer_order_line" (
 CREATE TABLE "team_member" (
     "id" TEXT NOT NULL,
     "inflowId" TEXT NOT NULL,
+    "localId" SERIAL NOT NULL,
     "name" TEXT NOT NULL,
     "email" TEXT NOT NULL,
     "isActive" BOOLEAN NOT NULL DEFAULT true,
@@ -689,6 +739,7 @@ CREATE TABLE "business_partner" (
 CREATE TABLE "business_partner_address" (
     "id" TEXT NOT NULL,
     "inflowId" TEXT,
+    "localId" SERIAL,
     "businessPartnerId" TEXT NOT NULL,
     "name" TEXT,
     "address1" TEXT,
@@ -711,6 +762,7 @@ CREATE TABLE "customer" (
     "id" TEXT NOT NULL,
     "businessPartnerId" TEXT NOT NULL,
     "inflowId" TEXT NOT NULL,
+    "localId" SERIAL NOT NULL,
     "taxExemptNumber" TEXT,
     "defaultCarrier" TEXT,
     "defaultPaymentMethod" TEXT,
@@ -735,6 +787,7 @@ CREATE TABLE "customer" (
 CREATE TABLE "customer_due" (
     "id" TEXT NOT NULL,
     "inflowId" TEXT NOT NULL,
+    "localId" SERIAL NOT NULL,
     "customerId" TEXT NOT NULL,
     "currencyId" TEXT NOT NULL,
     "amountCurrent" DECIMAL(18,5) NOT NULL,
@@ -751,6 +804,7 @@ CREATE TABLE "customer_due" (
 CREATE TABLE "customer_balance" (
     "id" TEXT NOT NULL,
     "inflowId" TEXT NOT NULL,
+    "localId" SERIAL NOT NULL,
     "customerId" TEXT NOT NULL,
     "currencyId" TEXT NOT NULL,
     "balance" DECIMAL(18,5) NOT NULL,
@@ -764,6 +818,7 @@ CREATE TABLE "customer_balance" (
 CREATE TABLE "customer_credit" (
     "id" TEXT NOT NULL,
     "inflowId" TEXT NOT NULL,
+    "localId" SERIAL NOT NULL,
     "customerId" TEXT NOT NULL,
     "currencyId" TEXT NOT NULL,
     "credit" DECIMAL(18,5) NOT NULL,
@@ -776,16 +831,17 @@ CREATE TABLE "customer_credit" (
 -- CreateTable
 CREATE TABLE "vendor" (
     "id" TEXT NOT NULL,
-    "businessPartnerId" TEXT NOT NULL,
     "inflowId" TEXT NOT NULL,
-    "currencyId" TEXT,
-    "defaultAddressId" TEXT,
+    "localId" SERIAL NOT NULL,
+    "businessPartnerId" TEXT NOT NULL,
     "defaultCarrier" TEXT,
     "defaultPaymentMethod" TEXT,
-    "defaultPaymentTermsId" TEXT,
     "discount" DECIMAL(10,2),
     "isTaxInclusivePricing" BOOLEAN NOT NULL DEFAULT false,
     "leadTimeDays" INTEGER,
+    "currencyId" TEXT,
+    "defaultAddressId" TEXT,
+    "defaultPaymentTermsId" TEXT,
     "taxingSchemeId" TEXT,
     "lastModifiedById" TEXT,
     "lastModifiedDttm" TIMESTAMP(3),
@@ -800,6 +856,7 @@ CREATE TABLE "vendor" (
 CREATE TABLE "vendor_attachment" (
     "id" TEXT NOT NULL,
     "inflowId" TEXT NOT NULL,
+    "localId" SERIAL NOT NULL,
     "vendorId" TEXT NOT NULL,
     "fileName" TEXT,
     "fileUrl" TEXT,
@@ -815,6 +872,7 @@ CREATE TABLE "vendor_attachment" (
 CREATE TABLE "vendor_item" (
     "id" TEXT NOT NULL,
     "inflowId" TEXT NOT NULL,
+    "localId" SERIAL NOT NULL,
     "vendorId" TEXT NOT NULL,
     "productId" TEXT NOT NULL,
     "vendorSku" TEXT,
@@ -829,6 +887,7 @@ CREATE TABLE "vendor_item" (
 CREATE TABLE "vendor_due" (
     "id" TEXT NOT NULL,
     "inflowId" TEXT NOT NULL,
+    "localId" SERIAL NOT NULL,
     "vendorId" TEXT NOT NULL,
     "currencyId" TEXT NOT NULL,
     "amountCurrent" DECIMAL(18,5) NOT NULL,
@@ -845,6 +904,7 @@ CREATE TABLE "vendor_due" (
 CREATE TABLE "vendor_balance" (
     "id" TEXT NOT NULL,
     "inflowId" TEXT NOT NULL,
+    "localId" SERIAL NOT NULL,
     "vendorId" TEXT NOT NULL,
     "currencyId" TEXT NOT NULL,
     "balance" DECIMAL(18,5) NOT NULL,
@@ -858,6 +918,7 @@ CREATE TABLE "vendor_balance" (
 CREATE TABLE "vendor_credit" (
     "id" TEXT NOT NULL,
     "inflowId" TEXT NOT NULL,
+    "localId" SERIAL NOT NULL,
     "vendorId" TEXT NOT NULL,
     "currencyId" TEXT NOT NULL,
     "credit" DECIMAL(18,5) NOT NULL,
@@ -871,6 +932,7 @@ CREATE TABLE "vendor_credit" (
 CREATE TABLE "taxing_scheme" (
     "id" TEXT NOT NULL,
     "inflowId" TEXT NOT NULL,
+    "localId" SERIAL NOT NULL,
     "name" TEXT NOT NULL,
     "isActive" BOOLEAN NOT NULL DEFAULT true,
     "isDefault" BOOLEAN NOT NULL DEFAULT false,
@@ -891,6 +953,7 @@ CREATE TABLE "taxing_scheme" (
 CREATE TABLE "tax_code" (
     "id" TEXT NOT NULL,
     "inflowId" TEXT NOT NULL,
+    "localId" SERIAL NOT NULL,
     "taxingSchemeId" TEXT NOT NULL,
     "name" TEXT NOT NULL,
     "isActive" BOOLEAN NOT NULL DEFAULT true,
@@ -907,6 +970,7 @@ CREATE TABLE "tax_code" (
 CREATE TABLE "currency" (
     "id" TEXT NOT NULL,
     "inflowId" TEXT NOT NULL,
+    "localId" SERIAL NOT NULL,
     "name" TEXT NOT NULL,
     "isoCode" TEXT NOT NULL,
     "symbol" TEXT,
@@ -926,6 +990,7 @@ CREATE TABLE "currency" (
 CREATE TABLE "currency_conversion" (
     "id" TEXT NOT NULL,
     "inflowId" TEXT NOT NULL,
+    "localId" SERIAL NOT NULL,
     "currencyId" TEXT NOT NULL,
     "exchangeRate" DECIMAL(18,8) NOT NULL,
     "isManual" BOOLEAN NOT NULL DEFAULT false,
@@ -939,6 +1004,7 @@ CREATE TABLE "currency_conversion" (
 CREATE TABLE "pricing_scheme" (
     "id" TEXT NOT NULL,
     "inflowId" TEXT NOT NULL,
+    "localId" SERIAL NOT NULL,
     "currencyId" TEXT NOT NULL,
     "name" TEXT NOT NULL,
     "isActive" BOOLEAN NOT NULL DEFAULT true,
@@ -955,6 +1021,7 @@ CREATE TABLE "pricing_scheme" (
 CREATE TABLE "payment_terms" (
     "id" TEXT NOT NULL,
     "inflowId" TEXT NOT NULL,
+    "localId" SERIAL NOT NULL,
     "name" TEXT NOT NULL,
     "daysDue" INTEGER,
     "isActive" BOOLEAN NOT NULL DEFAULT true,
@@ -1035,6 +1102,7 @@ CREATE TABLE "partner_webhook_event" (
 CREATE TABLE "sales_order" (
     "id" TEXT NOT NULL,
     "inflowId" TEXT NOT NULL,
+    "localId" SERIAL NOT NULL,
     "orderNumber" TEXT NOT NULL,
     "poNumber" TEXT,
     "externalId" TEXT,
@@ -1252,6 +1320,7 @@ CREATE TABLE "sales_order_attachment" (
 CREATE TABLE "purchase_order" (
     "id" TEXT NOT NULL,
     "inflowId" TEXT NOT NULL,
+    "localId" SERIAL NOT NULL,
     "orderNumber" TEXT NOT NULL,
     "vendorOrderNumber" TEXT,
     "subTotal" DECIMAL(18,5) NOT NULL,
@@ -1408,16 +1477,25 @@ CREATE UNIQUE INDEX "brand_name_key" ON "brand"("name");
 CREATE UNIQUE INDEX "category_inflowId_key" ON "category"("inflowId");
 
 -- CreateIndex
+CREATE UNIQUE INDEX "category_localId_key" ON "category"("localId");
+
+-- CreateIndex
 CREATE UNIQUE INDEX "category_slug_key" ON "category"("slug");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "product_group_inflowId_key" ON "product_group"("inflowId");
 
 -- CreateIndex
+CREATE UNIQUE INDEX "product_group_localId_key" ON "product_group"("localId");
+
+-- CreateIndex
 CREATE UNIQUE INDEX "product_group_slug_key" ON "product_group"("slug");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "product_variant_inflowId_key" ON "product_variant"("inflowId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "product_variant_localId_key" ON "product_variant"("localId");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "product_variant_productId_key" ON "product_variant"("productId");
@@ -1438,10 +1516,16 @@ CREATE UNIQUE INDEX "product_variant_productGroupId_signature_key" ON "product_v
 CREATE UNIQUE INDEX "product_inflowId_key" ON "product"("inflowId");
 
 -- CreateIndex
+CREATE UNIQUE INDEX "product_localId_key" ON "product"("localId");
+
+-- CreateIndex
 CREATE UNIQUE INDEX "product_slug_key" ON "product"("slug");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "product_price_inflowId_key" ON "product_price"("inflowId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "product_price_localId_key" ON "product_price"("localId");
 
 -- CreateIndex
 CREATE INDEX "product_price_pricingSchemeId_idx" ON "product_price"("pricingSchemeId");
@@ -1456,6 +1540,9 @@ CREATE UNIQUE INDEX "product_price_pricingSchemeId_productId_key" ON "product_pr
 CREATE UNIQUE INDEX "product_cost_adjustment_inflowId_key" ON "product_cost_adjustment"("inflowId");
 
 -- CreateIndex
+CREATE UNIQUE INDEX "product_cost_adjustment_localId_key" ON "product_cost_adjustment"("localId");
+
+-- CreateIndex
 CREATE INDEX "product_cost_adjustment_productId_idx" ON "product_cost_adjustment"("productId");
 
 -- CreateIndex
@@ -1466,6 +1553,9 @@ CREATE INDEX "product_cost_adjustment_dateTime_idx" ON "product_cost_adjustment"
 
 -- CreateIndex
 CREATE UNIQUE INDEX "product_barcode_inflowId_key" ON "product_barcode"("inflowId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "product_barcode_localId_key" ON "product_barcode"("localId");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "product_barcode_barcode_key" ON "product_barcode"("barcode");
@@ -1480,6 +1570,9 @@ CREATE UNIQUE INDEX "product_barcode_productId_lineNum_key" ON "product_barcode"
 CREATE UNIQUE INDEX "product_operation_inflowId_key" ON "product_operation"("inflowId");
 
 -- CreateIndex
+CREATE UNIQUE INDEX "product_operation_localId_key" ON "product_operation"("localId");
+
+-- CreateIndex
 CREATE INDEX "product_operation_productId_idx" ON "product_operation"("productId");
 
 -- CreateIndex
@@ -1490,6 +1583,9 @@ CREATE UNIQUE INDEX "product_operation_productId_lineNum_key" ON "product_operat
 
 -- CreateIndex
 CREATE UNIQUE INDEX "operation_type_inflowId_key" ON "operation_type"("inflowId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "operation_type_localId_key" ON "operation_type"("localId");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "product_tax_code_productTaxCodeId_key" ON "product_tax_code"("productTaxCodeId");
@@ -1510,6 +1606,9 @@ CREATE UNIQUE INDEX "product_tax_code_productId_taxCodeId_key" ON "product_tax_c
 CREATE UNIQUE INDEX "product_attachment_inflowId_key" ON "product_attachment"("inflowId");
 
 -- CreateIndex
+CREATE UNIQUE INDEX "product_attachment_localId_key" ON "product_attachment"("localId");
+
+-- CreateIndex
 CREATE INDEX "product_attachment_productId_idx" ON "product_attachment"("productId");
 
 -- CreateIndex
@@ -1519,10 +1618,16 @@ CREATE INDEX "product_attachment_lastModifiedById_idx" ON "product_attachment"("
 CREATE UNIQUE INDEX "product_cost_inflowId_key" ON "product_cost"("inflowId");
 
 -- CreateIndex
+CREATE UNIQUE INDEX "product_cost_localId_key" ON "product_cost"("localId");
+
+-- CreateIndex
 CREATE UNIQUE INDEX "product_cost_productId_key" ON "product_cost"("productId");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "product_reorder_setting_inflowId_key" ON "product_reorder_setting"("inflowId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "product_reorder_setting_localId_key" ON "product_reorder_setting"("localId");
 
 -- CreateIndex
 CREATE INDEX "product_reorder_setting_productId_idx" ON "product_reorder_setting"("productId");
@@ -1538,6 +1643,9 @@ CREATE INDEX "product_reorder_setting_vendorId_idx" ON "product_reorder_setting"
 
 -- CreateIndex
 CREATE UNIQUE INDEX "product_bom_inflowId_key" ON "product_bom"("inflowId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "product_bom_localId_key" ON "product_bom"("localId");
 
 -- CreateIndex
 CREATE INDEX "product_bom_productId_idx" ON "product_bom"("productId");
@@ -1562,6 +1670,9 @@ CREATE UNIQUE INDEX "unit_conversion_fromUomId_toUomId_key" ON "unit_conversion"
 
 -- CreateIndex
 CREATE UNIQUE INDEX "product_image_inflowId_key" ON "product_image"("inflowId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "product_image_localId_key" ON "product_image"("localId");
 
 -- CreateIndex
 CREATE INDEX "product_image_groupId_position_idx" ON "product_image"("groupId", "position");
@@ -1591,6 +1702,9 @@ CREATE UNIQUE INDEX "product_variant_selection_variantId_optionId_key" ON "produ
 CREATE UNIQUE INDEX "product_group_option_inflowId_key" ON "product_group_option"("inflowId");
 
 -- CreateIndex
+CREATE UNIQUE INDEX "product_group_option_localId_key" ON "product_group_option"("localId");
+
+-- CreateIndex
 CREATE INDEX "product_group_option_productGroupId_idx" ON "product_group_option"("productGroupId");
 
 -- CreateIndex
@@ -1598,6 +1712,9 @@ CREATE UNIQUE INDEX "product_group_option_productGroupId_attributeId_key" ON "pr
 
 -- CreateIndex
 CREATE UNIQUE INDEX "product_group_option_value_inflowId_key" ON "product_group_option_value"("inflowId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "product_group_option_value_localId_key" ON "product_group_option_value"("localId");
 
 -- CreateIndex
 CREATE INDEX "product_group_option_value_optionId_idx" ON "product_group_option_value"("optionId");
@@ -1621,6 +1738,9 @@ CREATE UNIQUE INDEX "tag_name_key" ON "tag"("name");
 CREATE UNIQUE INDEX "location_inflowId_key" ON "location"("inflowId");
 
 -- CreateIndex
+CREATE UNIQUE INDEX "location_localId_key" ON "location"("localId");
+
+-- CreateIndex
 CREATE UNIQUE INDEX "location_address_locationId_key" ON "location_address"("locationId");
 
 -- CreateIndex
@@ -1628,6 +1748,15 @@ CREATE INDEX "sublocation_locationId_idx" ON "sublocation"("locationId");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "sublocation_locationId_name_key" ON "sublocation"("locationId", "name");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "location_webhook_url_key" ON "location_webhook"("url");
+
+-- CreateIndex
+CREATE INDEX "location_webhook_event_eventType_idx" ON "location_webhook_event"("eventType");
+
+-- CreateIndex
+CREATE INDEX "location_webhook_event_receivedAt_idx" ON "location_webhook_event"("receivedAt");
 
 -- CreateIndex
 CREATE INDEX "inventory_productId_idx" ON "inventory"("productId");
@@ -1654,6 +1783,9 @@ CREATE INDEX "inventory_adjustment_line_locationId_idx" ON "inventory_adjustment
 CREATE UNIQUE INDEX "adjustment_reason_inflowId_key" ON "adjustment_reason"("inflowId");
 
 -- CreateIndex
+CREATE UNIQUE INDEX "adjustment_reason_localId_key" ON "adjustment_reason"("localId");
+
+-- CreateIndex
 CREATE INDEX "adjustment_reason_name_idx" ON "adjustment_reason"("name");
 
 -- CreateIndex
@@ -1675,6 +1807,9 @@ CREATE INDEX "transfer_order_line_productId_idx" ON "transfer_order_line"("produ
 CREATE UNIQUE INDEX "team_member_inflowId_key" ON "team_member"("inflowId");
 
 -- CreateIndex
+CREATE UNIQUE INDEX "team_member_localId_key" ON "team_member"("localId");
+
+-- CreateIndex
 CREATE UNIQUE INDEX "team_member_email_key" ON "team_member"("email");
 
 -- CreateIndex
@@ -1693,6 +1828,9 @@ CREATE INDEX "business_partner_name_idx" ON "business_partner"("name");
 CREATE UNIQUE INDEX "business_partner_address_inflowId_key" ON "business_partner_address"("inflowId");
 
 -- CreateIndex
+CREATE UNIQUE INDEX "business_partner_address_localId_key" ON "business_partner_address"("localId");
+
+-- CreateIndex
 CREATE INDEX "business_partner_address_businessPartnerId_idx" ON "business_partner_address"("businessPartnerId");
 
 -- CreateIndex
@@ -1702,6 +1840,9 @@ CREATE UNIQUE INDEX "customer_businessPartnerId_key" ON "customer"("businessPart
 CREATE UNIQUE INDEX "customer_inflowId_key" ON "customer"("inflowId");
 
 -- CreateIndex
+CREATE UNIQUE INDEX "customer_localId_key" ON "customer"("localId");
+
+-- CreateIndex
 CREATE INDEX "customer_pricingSchemeId_idx" ON "customer"("pricingSchemeId");
 
 -- CreateIndex
@@ -1709,6 +1850,9 @@ CREATE INDEX "customer_taxingSchemeId_idx" ON "customer"("taxingSchemeId");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "customer_due_inflowId_key" ON "customer_due"("inflowId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "customer_due_localId_key" ON "customer_due"("localId");
 
 -- CreateIndex
 CREATE INDEX "customer_due_customerId_idx" ON "customer_due"("customerId");
@@ -1723,6 +1867,9 @@ CREATE UNIQUE INDEX "customer_due_customerId_currencyId_key" ON "customer_due"("
 CREATE UNIQUE INDEX "customer_balance_inflowId_key" ON "customer_balance"("inflowId");
 
 -- CreateIndex
+CREATE UNIQUE INDEX "customer_balance_localId_key" ON "customer_balance"("localId");
+
+-- CreateIndex
 CREATE INDEX "customer_balance_customerId_idx" ON "customer_balance"("customerId");
 
 -- CreateIndex
@@ -1735,6 +1882,9 @@ CREATE UNIQUE INDEX "customer_balance_customerId_currencyId_key" ON "customer_ba
 CREATE UNIQUE INDEX "customer_credit_inflowId_key" ON "customer_credit"("inflowId");
 
 -- CreateIndex
+CREATE UNIQUE INDEX "customer_credit_localId_key" ON "customer_credit"("localId");
+
+-- CreateIndex
 CREATE INDEX "customer_credit_customerId_idx" ON "customer_credit"("customerId");
 
 -- CreateIndex
@@ -1744,19 +1894,28 @@ CREATE INDEX "customer_credit_currencyId_idx" ON "customer_credit"("currencyId")
 CREATE UNIQUE INDEX "customer_credit_customerId_currencyId_key" ON "customer_credit"("customerId", "currencyId");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "vendor_businessPartnerId_key" ON "vendor"("businessPartnerId");
-
--- CreateIndex
 CREATE UNIQUE INDEX "vendor_inflowId_key" ON "vendor"("inflowId");
 
 -- CreateIndex
+CREATE UNIQUE INDEX "vendor_localId_key" ON "vendor"("localId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "vendor_businessPartnerId_key" ON "vendor"("businessPartnerId");
+
+-- CreateIndex
 CREATE UNIQUE INDEX "vendor_attachment_inflowId_key" ON "vendor_attachment"("inflowId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "vendor_attachment_localId_key" ON "vendor_attachment"("localId");
 
 -- CreateIndex
 CREATE INDEX "vendor_attachment_vendorId_idx" ON "vendor_attachment"("vendorId");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "vendor_item_inflowId_key" ON "vendor_item"("inflowId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "vendor_item_localId_key" ON "vendor_item"("localId");
 
 -- CreateIndex
 CREATE INDEX "vendor_item_vendorId_idx" ON "vendor_item"("vendorId");
@@ -1771,6 +1930,9 @@ CREATE UNIQUE INDEX "vendor_item_vendorId_productId_key" ON "vendor_item"("vendo
 CREATE UNIQUE INDEX "vendor_due_inflowId_key" ON "vendor_due"("inflowId");
 
 -- CreateIndex
+CREATE UNIQUE INDEX "vendor_due_localId_key" ON "vendor_due"("localId");
+
+-- CreateIndex
 CREATE INDEX "vendor_due_vendorId_idx" ON "vendor_due"("vendorId");
 
 -- CreateIndex
@@ -1781,6 +1943,9 @@ CREATE UNIQUE INDEX "vendor_due_vendorId_currencyId_key" ON "vendor_due"("vendor
 
 -- CreateIndex
 CREATE UNIQUE INDEX "vendor_balance_inflowId_key" ON "vendor_balance"("inflowId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "vendor_balance_localId_key" ON "vendor_balance"("localId");
 
 -- CreateIndex
 CREATE INDEX "vendor_balance_vendorId_idx" ON "vendor_balance"("vendorId");
@@ -1795,6 +1960,9 @@ CREATE UNIQUE INDEX "vendor_balance_vendorId_currencyId_key" ON "vendor_balance"
 CREATE UNIQUE INDEX "vendor_credit_inflowId_key" ON "vendor_credit"("inflowId");
 
 -- CreateIndex
+CREATE UNIQUE INDEX "vendor_credit_localId_key" ON "vendor_credit"("localId");
+
+-- CreateIndex
 CREATE INDEX "vendor_credit_vendorId_idx" ON "vendor_credit"("vendorId");
 
 -- CreateIndex
@@ -1807,7 +1975,13 @@ CREATE UNIQUE INDEX "vendor_credit_vendorId_currencyId_key" ON "vendor_credit"("
 CREATE UNIQUE INDEX "taxing_scheme_inflowId_key" ON "taxing_scheme"("inflowId");
 
 -- CreateIndex
+CREATE UNIQUE INDEX "taxing_scheme_localId_key" ON "taxing_scheme"("localId");
+
+-- CreateIndex
 CREATE UNIQUE INDEX "tax_code_inflowId_key" ON "tax_code"("inflowId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "tax_code_localId_key" ON "tax_code"("localId");
 
 -- CreateIndex
 CREATE INDEX "tax_code_taxingSchemeId_idx" ON "tax_code"("taxingSchemeId");
@@ -1816,10 +1990,16 @@ CREATE INDEX "tax_code_taxingSchemeId_idx" ON "tax_code"("taxingSchemeId");
 CREATE UNIQUE INDEX "currency_inflowId_key" ON "currency"("inflowId");
 
 -- CreateIndex
+CREATE UNIQUE INDEX "currency_localId_key" ON "currency"("localId");
+
+-- CreateIndex
 CREATE INDEX "currency_isoCode_idx" ON "currency"("isoCode");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "currency_conversion_inflowId_key" ON "currency_conversion"("inflowId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "currency_conversion_localId_key" ON "currency_conversion"("localId");
 
 -- CreateIndex
 CREATE INDEX "currency_conversion_currencyId_idx" ON "currency_conversion"("currencyId");
@@ -1828,10 +2008,16 @@ CREATE INDEX "currency_conversion_currencyId_idx" ON "currency_conversion"("curr
 CREATE UNIQUE INDEX "pricing_scheme_inflowId_key" ON "pricing_scheme"("inflowId");
 
 -- CreateIndex
+CREATE UNIQUE INDEX "pricing_scheme_localId_key" ON "pricing_scheme"("localId");
+
+-- CreateIndex
 CREATE INDEX "pricing_scheme_currencyId_idx" ON "pricing_scheme"("currencyId");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "payment_terms_inflowId_key" ON "payment_terms"("inflowId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "payment_terms_localId_key" ON "payment_terms"("localId");
 
 -- CreateIndex
 CREATE INDEX "payment_terms_name_idx" ON "payment_terms"("name");
@@ -1862,6 +2048,9 @@ CREATE INDEX "partner_webhook_event_receivedAt_idx" ON "partner_webhook_event"("
 
 -- CreateIndex
 CREATE UNIQUE INDEX "sales_order_inflowId_key" ON "sales_order"("inflowId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "sales_order_localId_key" ON "sales_order"("localId");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "sales_order_orderNumber_key" ON "sales_order"("orderNumber");
@@ -1934,6 +2123,9 @@ CREATE INDEX "sales_order_attachment_salesOrderId_idx" ON "sales_order_attachmen
 
 -- CreateIndex
 CREATE UNIQUE INDEX "purchase_order_inflowId_key" ON "purchase_order"("inflowId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "purchase_order_localId_key" ON "purchase_order"("localId");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "purchase_order_orderNumber_key" ON "purchase_order"("orderNumber");
@@ -2162,6 +2354,12 @@ ALTER TABLE "location_address" ADD CONSTRAINT "location_address_locationId_fkey"
 
 -- AddForeignKey
 ALTER TABLE "sublocation" ADD CONSTRAINT "sublocation_locationId_fkey" FOREIGN KEY ("locationId") REFERENCES "location"("inflowId") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "location_webhook" ADD CONSTRAINT "location_webhook_locationId_fkey" FOREIGN KEY ("locationId") REFERENCES "location"("inflowId") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "location_webhook_event" ADD CONSTRAINT "location_webhook_event_locationWebhookId_fkey" FOREIGN KEY ("locationWebhookId") REFERENCES "location_webhook"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "inventory" ADD CONSTRAINT "inventory_productId_fkey" FOREIGN KEY ("productId") REFERENCES "product"("inflowId") ON DELETE CASCADE ON UPDATE CASCADE;

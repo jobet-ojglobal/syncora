@@ -1,12 +1,12 @@
-import { InflowCustomer } from "@/lib/inflow/types";
+import { InflowCurrency} from "@/lib/inflow/types";
 import { BranchClient } from "../location.client";
 
-export async function getCustomer(
+export async function getCurrency(
   batchId: string,
   url: string
 ) {
  const apiClient = new BranchClient(url)
-  return await apiClient.get<InflowCustomer>(
+  return await apiClient.get<InflowCurrency>(
     `/inflow-local/payload/${batchId}`,
   );
 }
@@ -17,16 +17,16 @@ export interface UpsertResult {
   data?: any; 
 }
 
-export async function upsertCustomer(
-  payload: InflowCustomer,
+export async function upsertCurrency(
+  payload: InflowCurrency,
   url: string
 ) {
   const apiClient = new BranchClient(url)
   const { success, ...data } = await apiClient.post<UpsertResult>(
     `/inbound/receive`, {
-        "eventType": "customer",
-        "transactionType": "CUSTOMER",
-        "batch_id": `CSTMR-${crypto.randomUUID().toLowerCase()}`,
+        "eventType": "currency",
+        "transactionType": "CURRENCY",
+        "batch_id": `CRRNCY-${crypto.randomUUID().toLowerCase()}`,
         "sourceSystem": "MID",
         "sourceKey": "MID",
         "payload": payload

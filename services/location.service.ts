@@ -53,6 +53,19 @@ export class LocationService {
     });
   }
 
+  static async getLocationURL(inflowId: string) {
+    return await prisma.location.findUnique({
+      where: { inflowId },
+      select: { inflowId: true, url: true, name: true }
+    });
+  }
+
+  static async getLocationURLs() {
+    return await prisma.location.findMany({
+      select: { inflowId: true, url: true, name: true }
+    });
+  }
+
   static async getBasicLocation(id: string) {
     return prisma.location.findUnique({
       where: {

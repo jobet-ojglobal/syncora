@@ -576,7 +576,7 @@ export interface InflowProductCostAdjustment {
 }
 
 // PAYMENT TERM
-export interface InflowPaymentTerms {
+export interface InflowPaymentTerm {
   paymentTermsId: string;
   name: string;
   daysDue: number;
@@ -666,7 +666,7 @@ export interface InflowCustomer {
   defaultShippingAddress?: InflowCustomerAddress | null;
   defaultLocation?: InflowLocation | null;
   
-  defaultPaymentTerms?: InflowPaymentTerms | null;
+  defaultPaymentTerms?: InflowPaymentTerm | null;
   defaultSalesRepTeamMember?: InflowTeamMember | null;
   lastModifiedBy?: InflowTeamMember | null;
   pricingScheme?: InflowPricingScheme | null;
@@ -1176,7 +1176,7 @@ export interface InflowPurchaseOrder {
   lines: InflowPurchaseOrderLine[];
   location: InflowLocation;
   paymentLines: any[];
-  paymentTerms: InflowPaymentTerms;
+  paymentTerms: InflowPaymentTerm;
   receiveLines: InflowPurchaseReceiveLine[];
   taxingScheme: Record<string, any>;
   unstockLines: any[];

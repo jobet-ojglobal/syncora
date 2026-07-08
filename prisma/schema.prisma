@@ -71,6 +71,7 @@ model Brand {
 model Category {
   id          String   @id @default(cuid())
   inflowId    String   @unique
+  localId                   Int    @unique @default(autoincrement())
   name        String
   slug        String   @unique // e.g., "digital-cameras"
   description String?
@@ -95,6 +96,7 @@ model Category {
 model ProductGroup {
   id                String   @id @default(cuid())
   inflowId String   @unique
+  localId           Int    @unique @default(autoincrement())
   name              String
   slug              String   @unique 
   description       String?  @db.Text
@@ -121,6 +123,7 @@ model ProductGroup {
 model ProductVariant {
   id                String   @id @default(cuid())
   inflowId          String   @unique
+  localId                   Int    @unique @default(autoincrement())
   productGroupId    String
   productId         String   @unique
   defaultPrice      Decimal  @db.Decimal(18,5)
@@ -147,6 +150,7 @@ model ProductVariant {
 model Product {
   id                      String   @id @default(cuid())
   inflowId                String   @unique
+  localId                 Int    @unique @default(autoincrement())
   sku                     String?
   name                    String
   slug                    String   @unique 
@@ -234,6 +238,7 @@ enum ProductPriceType {
 model ProductPrice {
   id                String   @id @default(cuid())
   inflowId          String   @unique
+  localId           Int    @unique @default(autoincrement())
   pricingSchemeId   String
   productId         String   
   priceType         ProductPriceType
@@ -257,6 +262,7 @@ model ProductPrice {
 model ProductCostAdjustment {
   id                    String   @id @default(cuid())
   inflowId              String   @unique
+  localId               Int    @unique @default(autoincrement())
   productId             String
   lastModifiedById      String?
   dateTime              DateTime
@@ -279,6 +285,7 @@ model ProductCostAdjustment {
 model ProductBarcode {
   id            String @id @default(cuid())
   inflowId      String @unique
+  localId       Int    @unique @default(autoincrement())
   productId     String
   barcode       String @unique
   lineNum       Int
@@ -296,6 +303,7 @@ model ProductBarcode {
 model ProductOperation {
   id                   String        @id @default(cuid())
   inflowId             String        @unique
+  localId              Int    @unique @default(autoincrement())
   productId            String
   operationTypeId      String
   lineNum              Int
@@ -320,6 +328,7 @@ model ProductOperation {
 model OperationType {
   id                   String             @id @default(cuid())
   inflowId             String             @unique
+  localId              Int    @unique @default(autoincrement())
   name                 String
   estimatedPerHourCost Decimal            @db.Decimal(12, 4)
   isActive             Boolean            @default(true)
@@ -358,6 +367,7 @@ model ProductTaxCode {
 model ProductAttachment {
   id               String      @id @default(cuid())
   inflowId         String      @unique // Storing payload's attachmentId
+  localId          Int    @unique @default(autoincrement())
   productId        String
   attachmentUrl    String
   fileName         String
@@ -378,6 +388,7 @@ model ProductAttachment {
 model ProductCost {
   id            String   @id @default(cuid())
   inflowId      String   @unique // Storing payload's productCostId
+  localId       Int    @unique @default(autoincrement())
   productId     String   @unique // Enforces 1:1 relation with Product
   cost          Decimal  @db.Decimal(12, 4)
 
@@ -392,6 +403,7 @@ model ProductCost {
 model reorderSetting {
   id                 String   @id @default(cuid())
   inflowId           String   @unique // Storing payload's reorderSettingsId
+  localId            Int    @unique @default(autoincrement())
   productId          String
   locationId         String
   fromLocationId     String?
@@ -420,6 +432,7 @@ model reorderSetting {
 model ProductBom {
   id             String   @id @default(cuid())
   inflowId       String   @unique // Storing payload's itemBomId
+  localId        Int    @unique @default(autoincrement())
   productId      String   // The assembly/parent item
   childProductId String   // The component/child item
   quantity       Decimal  @db.Decimal(12, 4)
@@ -503,6 +516,7 @@ enum UomCategory {
 model ProductImage {
   id                  String @id @default(cuid())
   inflowId            String @unique
+  localId             Int    @unique @default(autoincrement())
   groupId             String?
   productId           String?
   position            Int @default(0)
@@ -565,6 +579,7 @@ model ProductVariantSelection {
 model ProductGroupOption {
   id                    String @id @default(cuid())
   inflowId              String @unique
+  localId               Int    @unique @default(autoincrement())
   productGroupId        String
   lineNum               Int
 
@@ -587,6 +602,7 @@ model ProductGroupOption {
 model ProductGroupOptionValue {
   id                     String @id @default(cuid())
   inflowId               String @unique
+  localId                Int    @unique @default(autoincrement())
   optionId               String
   lineNum                Int
 
@@ -707,6 +723,7 @@ model ProductTag {
 model Location {
   id              String   @id @default(cuid())
   inflowId        String   @unique
+  localId                   Int    @unique @default(autoincrement())
   name            String
   isActive        Boolean  @default(true)
   isDefault       Boolean  @default(false)
@@ -727,6 +744,9 @@ model Location {
   reorderTargets reorderSetting[] @relation("TargetLocation")
   reorderSources reorderSetting[] @relation("SourceLocation")
   webhooks      LocationWebhook[]
+
+  localTaxingSchemeMappings  TaxingSchemeLocationMap[]
+  localTaxCodeMappings       TaxCodeLocationMap[]
   
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
@@ -908,6 +928,7 @@ enum InventoryAdjustmentReason {
 model AdjustmentReason {
   id            String   @id @default(cuid())
   inflowId      String   @unique
+  localId                   Int    @unique @default(autoincrement())
   name          String
   isActive      Boolean  @default(true)
   isInternal    Boolean  @default(false)
@@ -1004,6 +1025,7 @@ enum TransferOrderStatus {
 model TeamMember {
   id                  String   @id @default(cuid())
   inflowId            String   @unique
+  localId                   Int    @unique @default(autoincrement())
   name                String
   email               String   @unique
   isActive            Boolean  @default(true)
@@ -1160,7 +1182,7 @@ model BusinessPartner {
 model BusinessPartnerAddress {
   id              String @id @default(cuid())
   inflowId        String? @unique
-  localId         String? @unique
+  localId         Int?    @unique @default(autoincrement())
   businessPartnerId String
   name            String?
   address1        String?
@@ -1197,7 +1219,7 @@ model Customer {
   id                            String @id @default(cuid())
   businessPartnerId             String @unique
   inflowId                      String @unique
-  localId                       String @unique
+  localId                       Int    @unique @default(autoincrement()) 
   taxExemptNumber               String?
   defaultCarrier                String?
   defaultPaymentMethod          String?
@@ -1246,7 +1268,7 @@ model Customer {
 model CustomerDue {
   id                String   @id @default(cuid())
   inflowId          String   @unique
-  localId           String   @unique
+  localId           Int      @unique @default(autoincrement())
   customerId        String
   currencyId        String
   amountCurrent     Decimal  @db.Decimal(18,5)
@@ -1271,7 +1293,7 @@ model CustomerDue {
 model CustomerBalance {
   id                String   @id @default(cuid())
   inflowId          String   @unique
-  localId           String   @unique
+  localId           Int      @unique @default(autoincrement())
   customerId        String
   currencyId        String
   balance           Decimal  @db.Decimal(18,5)
@@ -1292,7 +1314,7 @@ model CustomerBalance {
 model CustomerCredit {
   id                String   @id @default(cuid())
   inflowId          String   @unique
-  localId           String   @unique
+  localId           Int      @unique @default(autoincrement())
   customerId        String
   currencyId        String
   credit            Decimal  @db.Decimal(18,5)
@@ -1315,8 +1337,9 @@ model CustomerCredit {
 
 model Vendor {
   id                        String @id @default(cuid())
-  businessPartnerId         String @unique
   inflowId                  String @unique
+  localId                   Int    @unique @default(autoincrement())
+  businessPartnerId         String @unique
   defaultCarrier            String?
   defaultPaymentMethod      String?
   discount                  Decimal? @db.Decimal(10,2)
@@ -1357,6 +1380,7 @@ model Vendor {
 model VendorAttachment {
   id            String @id @default(cuid())
   inflowId      String @unique
+  localId                   Int    @unique @default(autoincrement())
   vendorId      String
   fileName      String?
   fileUrl       String?
@@ -1375,6 +1399,7 @@ model VendorAttachment {
 model VendorItem {
   id            String @id @default(cuid())
   inflowId      String @unique
+  localId                   Int    @unique @default(autoincrement())
   vendorId      String
   productId     String
   vendorSku     String?
@@ -1397,6 +1422,7 @@ model VendorItem {
 model VendorDue {
   id                String   @id @default(cuid())
   inflowId          String   @unique
+  localId                   Int    @unique @default(autoincrement())
   vendorId        String
   currencyId        String
   amountCurrent     Decimal  @db.Decimal(18,5)
@@ -1421,6 +1447,7 @@ model VendorDue {
 model VendorBalance {
   id                String   @id @default(cuid())
   inflowId          String   @unique
+  localId                   Int    @unique @default(autoincrement())
   vendorId        String
   currencyId        String
   balance           Decimal  @db.Decimal(18,5)
@@ -1441,6 +1468,7 @@ model VendorBalance {
 model VendorCredit {
   id                String   @id @default(cuid())
   inflowId          String   @unique
+  localId                   Int    @unique @default(autoincrement())
   vendorId        String
   currencyId        String
   credit            Decimal  @db.Decimal(18,5)
@@ -1458,57 +1486,102 @@ model VendorCredit {
   @@map("vendor_credit")
 }
 
-//  TAX MODELS
+// ==========================================
+// 🍕 TAX MODELS
+// ==========================================
 
 model TaxingScheme {
-  id                    String   @id @default(cuid())
-  inflowId              String   @unique
-  name                  String
-  isActive              Boolean  @default(true)
-  isDefault             Boolean  @default(false)
-  calculateTax2OnTax1   Boolean  @default(false)
-  tax1Name              String?
-  tax1OnShipping        Boolean  @default(false)
-  tax2Name              String?
-  tax2OnShipping        Boolean  @default(false)
-  defaultTaxCodeId      String?
+  id                  String   @id @default(cuid())
+  inflowId            String   @unique // Global Cloud Identifier
+  name                String
+  isActive            Boolean  @default(true)
+  isDefault           Boolean  @default(false)
+  calculateTax2OnTax1 Boolean  @default(false)
+  tax1Name            String?
+  tax1OnShipping      Boolean  @default(false)
+  tax2Name            String?
+  tax2OnShipping      Boolean  @default(false)
+  defaultTaxCodeId    String?
 
-  defaultTaxCode        TaxCode? @relation( "DefaultTaxCode", fields: [defaultTaxCodeId],references: [inflowId])
-  taxCodes              TaxCode[] @relation("SchemeTaxCodes")
-  productTaxCodes       ProductTaxCode[]
-  customers             Customer[]
-  vendors               Vendor[]
+  defaultTaxCode      TaxCode? @relation("DefaultTaxCode", fields: [defaultTaxCodeId], references: [inflowId])
+  taxCodes            TaxCode[] @relation("SchemeTaxCodes")
 
-  createdAt             DateTime @default(now())
-  updatedAt             DateTime @updatedAt
-  deletedAt             DateTime?
+  productTaxCodes     ProductTaxCode[]
+  customers           Customer[]
+  vendors             Vendor[]
+  
+  // 👉 RELATION: Link to the many local IDs this scheme has across your network
+  localMappings       TaxingSchemeLocationMap[]
+
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+  deletedAt           DateTime?
 
   @@map("taxing_scheme")
 }
 
 model TaxCode {
-  id                String   @id @default(cuid())
-  inflowId          String   @unique
-  taxingSchemeId    String
-  name              String
-  isActive          Boolean  @default(true)
-  tax1Rate          Decimal? @db.Decimal(10,4)
-  tax2Rate          Decimal? @db.Decimal(10,4)
+  id                  String   @id @default(cuid())
+  inflowId            String   @unique // Global Cloud Identifier
+  taxingSchemeId      String
+  name                String
+  isActive            Boolean  @default(true)
+  tax1Rate            Decimal? @db.Decimal(10,4)
+  tax2Rate            Decimal? @db.Decimal(10,4)
 
-  taxingScheme      TaxingScheme @relation("SchemeTaxCodes",fields: [taxingSchemeId],references: [inflowId],onDelete: Cascade)
-  defaultForSchemes TaxingScheme[] @relation("DefaultTaxCode")
+  taxingScheme        TaxingScheme @relation("SchemeTaxCodes", fields: [taxingSchemeId], references: [inflowId], onDelete: Cascade)
+  defaultForSchemes   TaxingScheme[] @relation("DefaultTaxCode")
+
   productTaxCodes   ProductTaxCode[]
 
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
-  deletedAt         DateTime?
+  // 👉 RELATION: Link to the many local IDs this tax code has across your network
+  localMappings       TaxCodeLocationMap[]
+
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+  deletedAt           DateTime?
 
   @@index([taxingSchemeId])
-
   @@map("tax_code")
 }
 
-//  CURRENCIES
+// ==========================================
+// 🗺️ NEW MAPPER MODELS
+// ==========================================
+
+model TaxingSchemeLocationMap {
+  id             String       @id @default(cuid())
+  taxingSchemeId String       // References TaxingScheme.inflowId
+  locationId     String       // References your Location table identifier
+  localId        Int          // The unique INT assigned by that specific local database
+
+  location       Location? @relation(fields: [locationId], references: [inflowId])
+
+  taxingScheme   TaxingScheme @relation(fields: [taxingSchemeId], references: [inflowId], onDelete: Cascade)
+
+  // Enforce that a location can only map a global taxing scheme exactly once
+  @@unique([taxingSchemeId, locationId])
+  @@index([locationId, localId]) // High-performance lookup when a local webhook sends updates
+  @@map("taxing_scheme_location_map")
+}
+
+model TaxCodeLocationMap {
+  id             String       @id @default(cuid())
+  taxCodeId      String       // References TaxCode.inflowId
+  locationId     String       // References your Location table identifier
+  localId        Int          // The unique INT assigned by that specific local database
+
+  location       Location? @relation(fields: [locationId], references: [inflowId])
+  taxCode        TaxCode      @relation(fields: [taxCodeId], references: [inflowId], onDelete: Cascade)
+
+  @@unique([taxCodeId, locationId])
+  @@index([locationId, localId])
+  @@map("tax_code_location_map")
+}
+
+// ==========================================
+// 🍔 CURRENCY MODELS
+// ==========================================
 
 enum CurrencyNegativeType {
   Leading
@@ -1519,6 +1592,7 @@ enum CurrencyNegativeType {
 model Currency {
   id                    String   @id @default(cuid())
   inflowId              String   @unique
+  localId               Int      @unique @default(autoincrement())
   name                  String
   isoCode               String
   symbol                String?
@@ -1552,6 +1626,7 @@ model Currency {
 model CurrencyConversion {
   id                    String   @id @default(cuid())
   inflowId              String   @unique
+  localId               Int      @unique @default(autoincrement())
   currencyId            String
   exchangeRate          Decimal  @db.Decimal(18, 8)
   isManual              Boolean  @default(false)
@@ -1570,6 +1645,7 @@ model CurrencyConversion {
 model PricingScheme {
   id                String   @id @default(cuid())
   inflowId          String   @unique
+  localId           Int      @unique @default(autoincrement())
   currencyId        String
   name              String
   isActive          Boolean  @default(true)
@@ -1593,6 +1669,7 @@ model PricingScheme {
 model PaymentTerm {
   id              String   @id @default(cuid())
   inflowId        String   @unique
+  localId         Int      @unique @default(autoincrement())
   name            String
   daysDue         Int?
   isActive        Boolean  @default(true)
@@ -1699,6 +1776,7 @@ model PartnerWebhookEvent {
 model SalesOrder {
   id                     String    @id @default(cuid())
   inflowId               String    @unique
+  localId           Int      @unique @default(autoincrement())
   orderNumber            String    @unique
   poNumber               String?
   externalId             String?
@@ -2012,6 +2090,7 @@ model SalesOrderAttachment {
 model PurchaseOrder {
   id                     String    @id @default(cuid())
   inflowId               String    @unique
+  localId                 Int      @unique  @default(autoincrement())
   orderNumber            String    @unique // e.g., "PO-000123"
   vendorOrderNumber      String?
   

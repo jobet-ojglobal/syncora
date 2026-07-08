@@ -3,6 +3,622 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getMidSyncQueue } from "@/lib/queues/sync.queue";
 import { Prisma } from "@/generated/prisma/client";
+import { LocationService } from "@/services/location.service";
+
+export async function POST(request: NextRequest) {
+  try {
+    const body = await request.json();
+    const { 
+      name, contactName, email, phone, fax, website, remarks, isActive, 
+      taxExemptNumber, defaultCarrier, defaultPaymentMethod, discount, 
+      defaultLocationId, defaultPaymentTermsId, pricingSchemeId, taxingSchemeId, 
+      defaultSalesRepTeamMemberId, addresses = [], customFields = {}
+    } = body;
+
+    if (!name?.trim()) {
+      return NextResponse.json({ error: "Missing required business name field." }, { status: 400 });
+    }
+
+    const customerId = crypto.randomUUID().toLowerCase();
+    const cleanEmail = email?.trim().toLowerCase() || null;
+
+    // Execute database operations safely inside a single ACID isolation boundary
+    const result = await prisma.$transaction(async (tx) => {
+
+      // 1. Fetch Currency ID early in the block
+      const targetPricingScheme = pricingSchemeId 
+        ? await tx.pricingScheme.findUnique({ where: { inflowId: pricingSchemeId }, select: { currencyId: true } })
+        : null;
+      const currencyId = targetPricingScheme?.currencyId || "USD";
+
+      // 2. Create Parent Business Partner Node
+      const businessPartner = await tx.businessPartner.create({
+        data: { 
+          name: name.trim(), 
+          contactName: contactName?.trim(), 
+          email: cleanEmail, 
+          phone: phone?.trim(), 
+          fax: fax?.trim(), 
+          website: website?.trim(), 
+          remarks: remarks?.trim(), 
+          isActive: isActive ?? true 
+        }
+      });
+
+      // 3. Create Related Address Vectors
+      const savedAddresses = await Promise.all(
+        addresses.map(async (addr: any) => {
+          const addressId = crypto.randomUUID().toLowerCase();
+          return await tx.businessPartnerAddress.create({
+            data: {
+              businessPartnerId: businessPartner.id,
+              inflowId: addressId,
+              name: addr.name?.trim() || "Primary Address",
+              address1: addr.address1?.trim() || "",
+              address2: addr.address2?.trim() || null,
+              city: addr.city?.trim() || "",
+              state: addr.state?.trim() || "",
+              country: addr.country?.trim() || "Philippines",
+              postalCode: addr.postalCode?.trim() || "",
+              remarks: addr.remarks?.trim() || null,
+              addressType: addr.addressType || "Commercial"
+            }
+          });
+        })
+      );
+
+      // Determine explicit structural fallback selectors
+      const billingIndex = addresses.findIndex((a: any) => a.isDefaultBilling === true);
+      const shippingIndex = addresses.findIndex((a: any) => a.isDefaultShipping === true);
+      
+      const billingInflowId = savedAddresses[billingIndex >= 0 ? billingIndex : 0]?.inflowId || null;
+      const shippingInflowId = savedAddresses[shippingIndex >= 0 ? shippingIndex : 0]?.inflowId || null;
+
+      // 5. Setup Core Customer Record Block
+      const customer = await tx.customer.create({
+        data: {
+          businessPartnerId: businessPartner.id,
+          inflowId: customerId,
+          taxExemptNumber: taxExemptNumber?.trim() || null,
+          defaultCarrier: defaultCarrier?.trim() || null,
+          defaultPaymentMethod: defaultPaymentMethod?.trim() || null,
+          discount: discount ? new Prisma.Decimal(discount) : 0,
+          defaultLocationId: defaultLocationId || null,
+          defaultPaymentTermsId: defaultPaymentTermsId || null,
+          pricingSchemeId: pricingSchemeId || null,
+          taxingSchemeId: taxingSchemeId || null,
+          defaultSalesRepTeamMemberId: defaultSalesRepTeamMemberId || null,
+          defaultBillingAddressId: billingInflowId,
+          defaultShippingAddressId: shippingInflowId
+        }
+      });
+
+      // 6. Seeding Financial Summaries concurrently
+      await Promise.all([
+        tx.customerBalance.create({ data: { inflowId: crypto.randomUUID().toLowerCase(), localId: customer.localId, customerId, currencyId, balance: 0 } }),
+        tx.customerCredit.create({ data: { inflowId: crypto.randomUUID().toLowerCase(), localId: customer.localId, customerId, currencyId, credit: 0 } }),
+        tx.customerDue.create({ data: { inflowId: crypto.randomUUID().toLowerCase(), localId: customer.localId, customerId, currencyId, amountCurrent: 0, amount1To30: 0, amount31To60: 0, amount61Plus: 0 } })
+      ]);
+
+      // 7. Construct Outbound payload representation
+      const inflowPayload = {
+        cloudId: customer.inflowId, 
+        localId: customer.localId, 
+        name: businessPartner.name,
+        contactName: businessPartner.contactName,
+        email: businessPartner.email,
+        phone: businessPartner.phone,
+        fax: businessPartner.fax,
+        website: businessPartner.website,
+        remarks: businessPartner.remarks,
+        discount: customer.discount ? customer.discount.toString() : null,
+        isActive: businessPartner.isActive,
+        taxExemptNumber: customer.taxExemptNumber,
+        defaultLocationId: customer.defaultLocationId,
+        defaultCarrier: customer.defaultCarrier,
+        defaultPaymentMethod: customer.defaultPaymentMethod,
+        defaultPaymentTermsId: customer.defaultPaymentTermsId,
+        pricingSchemeId: customer.pricingSchemeId,
+        taxingSchemeId: customer.taxingSchemeId,
+        defaultSalesRepTeamMemberId: customer.defaultSalesRepTeamMemberId,
+        defaultBillingAddressId: customer.defaultBillingAddressId,
+        defaultShippingAddressId: customer.defaultShippingAddressId,
+        addresses: savedAddresses.map(addr => ({
+          customerAddressId: addr.inflowId,
+          customerId: customer.inflowId,
+          name: addr.name,
+          address: {
+            addressType: addr.addressType,
+            address1: addr.address1,
+            address2: addr.address2,
+            city: addr.city,
+            state: addr.state,
+            postalCode: addr.postalCode,
+            country: addr.country,
+            remarks: addr.remarks
+          }
+        })),
+        customFields: {
+          custom1: customFields.custom1 || null,
+          custom2: customFields.custom2 || null,
+          custom3: customFields.custom3 || null,
+          custom4: customFields.custom4 || null,
+          custom5: customFields.custom5 || null,
+          custom6: customFields.custom6 || null,
+          custom7: customFields.custom7 || null,
+          custom8: customFields.custom8 || null,
+          custom9: customFields.custom9 || null,
+          custom10: customFields.custom10 || null,
+        }
+      };
+
+      return { customer, inflowPayload };
+    });
+
+    const location = await LocationService.getLocationURL(defaultLocationId);
+
+    if(location?.url){
+      await getMidSyncQueue().add(
+        "customer_sync_job",
+        {
+          source: "CUSTOMER_UPSERT_LOCAL",
+          model: "Customer",
+          payload: result.inflowPayload,
+          timestamp: new Date().toISOString(),
+          location: location
+        },
+        { 
+          attempts: 3, 
+          backoff: { type: "exponential", delay: 2000 },
+          removeOnComplete: true
+        }
+      );
+    }
+
+    // 8. Push to queue outside the transaction to avoid holding database locks
+    // await getMidSyncQueue().add(
+    //   "customer_sync_job",
+    //   {
+    //     source: "CUSTOMER_SYNC_API",
+    //     model: "CUSTOMER",
+    //     payload: result.inflowPayload,
+    //     timestamp: new Date().toISOString(),
+    //     locationId: defaultLocationId
+    //   },
+    //   { 
+    //     attempts: 3, 
+    //     backoff: { type: "exponential", delay: 2000 },
+    //     removeOnComplete: true
+    //   }
+    // );
+    return NextResponse.json(result.customer, { status: 201 });
+  } catch (error) {
+    console.error("[CUSTOMER_POST_ERROR]:", error);
+    return NextResponse.json({ error: "Failed to process customer creation pipeline." }, { status: 500 });
+  }
+}
+
+export async function PATCH(request: NextRequest) {
+  try {
+    const body = await request.json();
+    const { 
+      id, name, contactName, email, phone, fax, website, remarks, isActive, 
+      taxExemptNumber, defaultCarrier, defaultPaymentMethod, discount, 
+      defaultLocationId, defaultPaymentTermsId, pricingSchemeId, taxingSchemeId, 
+      defaultSalesRepTeamMemberId, addresses = [], customFields = {}
+    } = body;
+
+    if (!id) {
+      return NextResponse.json({ error: "Missing required customer target identification reference token." }, { status: 400 });
+    }
+
+    const cleanEmail = email?.trim().toLowerCase() || null;
+
+    const result = await prisma.$transaction(async (tx) => {
+      // 1. Fetch current database record contexts
+      const currentCustomer = await tx.customer.findUnique({
+        where: { id },
+        select: { businessPartnerId: true, inflowId: true }
+      });
+      if (!currentCustomer) throw new Error("Target customer record layout context was not located.");
+
+      // 2. Modify Core Legal Baseline Info
+      const businessPartner = await tx.businessPartner.update({
+        where: { id: currentCustomer.businessPartnerId },
+        data: { 
+          name: name?.trim(), 
+          contactName: contactName?.trim(), 
+          email: cleanEmail, 
+          phone: phone?.trim(), 
+          fax: fax?.trim(), 
+          website: website?.trim(), 
+          remarks: remarks?.trim(), 
+          isActive: isActive !== undefined ? isActive : undefined
+        }
+      });
+
+      const existingAddresses = await tx.businessPartnerAddress.findMany({
+        where: { businessPartnerId: currentCustomer.businessPartnerId },
+        select: { id: true }
+      });
+
+      const incomingIds = addresses
+        .filter((a: any) => a.id) // Only get addresses that have an ID
+        .map((a: any) => a.id);
+
+      // 2. Identify addresses to delete (exist in DB, but not in current payload)
+      const toDelete = existingAddresses.filter(addr => !incomingIds.includes(addr.id));
+
+      if (toDelete.length > 0) {
+        await tx.businessPartnerAddress.deleteMany({
+          where: { id: { in: toDelete.map(a => a.id) } }
+        });
+      }
+
+      // 3. Smart Address Alignment Strategy (Upserts matching structural states)
+      const syncedAddresses = await Promise.all(
+        addresses.map(async (addr: any) => {
+          const baseData = {
+            name: addr.name?.trim() || "Mailing Address",
+            address1: addr.address1?.trim() || "",
+            address2: addr.address2?.trim() || null,
+            city: addr.city?.trim() || "",
+            state: addr.state?.trim() || "",
+            country: addr.country?.trim() || "Philippines",
+            postalCode: addr.postalCode?.trim() || "",
+            remarks: addr.remarks?.trim() || null,
+            addressType: addr.addressType || "Commercial"
+          };
+
+          if (addr.id) {
+            return await tx.businessPartnerAddress.update({
+              where: { id: addr.id },
+              data: baseData
+            });
+          } else {
+            return await tx.businessPartnerAddress.create({
+              data: {
+                ...baseData,
+                businessPartnerId: currentCustomer.businessPartnerId,
+                inflowId: crypto.randomUUID().toLowerCase()
+              }
+            });
+          }
+        })
+      );
+
+      const billingIndex = addresses.findIndex((a: any) => a.isDefaultBilling === true);
+      const shippingIndex = addresses.findIndex((a: any) => a.isDefaultShipping === true);
+      
+      const billingInflowId = syncedAddresses[billingIndex >= 0 ? billingIndex : 0]?.inflowId || null;
+      const shippingInflowId = syncedAddresses[shippingIndex >= 0 ? shippingIndex : 0]?.inflowId || null;
+
+      // 4. Apply Sub-ledger Rule Context Overwrites
+      const updatedCustomer = await tx.customer.update({
+        where: { id },
+        data: {
+          taxExemptNumber: taxExemptNumber?.trim() || null,
+          defaultCarrier: defaultCarrier?.trim() || null,
+          defaultPaymentMethod: defaultPaymentMethod?.trim() || null,
+          discount: discount !== undefined ? new Prisma.Decimal(discount) : undefined,
+          defaultLocationId: defaultLocationId || null,
+          defaultPaymentTermsId: defaultPaymentTermsId || null,
+          pricingSchemeId: pricingSchemeId || null,
+          taxingSchemeId: taxingSchemeId || null,
+          defaultSalesRepTeamMemberId: defaultSalesRepTeamMemberId || null,
+          defaultBillingAddressId: billingInflowId,
+          defaultShippingAddressId: shippingInflowId
+        }
+      });
+
+      // 5. Build up all addresses associated with this business partner for full state sync
+      const finalAddresses = await tx.businessPartnerAddress.findMany({
+        where: { businessPartnerId: currentCustomer.businessPartnerId }
+      });
+
+      /**
+       * STEP 5: Construct Outbound inFlow-Compliant Upsert Representation
+       */
+      const inflowPayload = {
+        cloudId: updatedCustomer.inflowId, 
+        localId: updatedCustomer.localId, 
+        name: businessPartner.name,
+        contactName: businessPartner.contactName,
+        email: businessPartner.email,
+        phone: businessPartner.phone,
+        fax: businessPartner.fax,
+        website: businessPartner.website,
+        remarks: businessPartner.remarks,
+        discount: updatedCustomer.discount ? updatedCustomer.discount.toString() : null,
+        isActive: businessPartner.isActive,
+        taxExemptNumber: updatedCustomer.taxExemptNumber,
+        defaultLocationId: updatedCustomer.defaultLocationId,
+        defaultCarrier: updatedCustomer.defaultCarrier,
+        defaultPaymentMethod: updatedCustomer.defaultPaymentMethod,
+        defaultPaymentTermsId: updatedCustomer.defaultPaymentTermsId,
+        pricingSchemeId: updatedCustomer.pricingSchemeId,
+        taxingSchemeId: updatedCustomer.taxingSchemeId,
+        defaultSalesRepTeamMemberId: updatedCustomer.defaultSalesRepTeamMemberId,
+        defaultBillingAddressId: updatedCustomer.defaultBillingAddressId,
+        defaultShippingAddressId: updatedCustomer.defaultShippingAddressId,
+        addresses: finalAddresses.map(addr => ({
+          customerAddressId: addr.inflowId,
+          customerId: currentCustomer.inflowId,
+          name: addr.name,
+          address: {
+            addressType: addr.addressType,
+            address1: addr.address1,
+            address2: addr.address2,
+            city: addr.city,
+            state: addr.state,
+            postalCode: addr.postalCode,
+            country: addr.country,
+            remarks: addr.remarks
+          }
+        })),
+        customFields: {
+          custom1: customFields.custom1 || null,
+          custom2: customFields.custom2 || null,
+          custom3: customFields.custom3 || null,
+          custom4: customFields.custom4 || null,
+          custom5: customFields.custom5 || null,
+          custom6: customFields.custom6 || null,
+          custom7: customFields.custom7 || null,
+          custom8: customFields.custom8 || null,
+          custom9: customFields.custom9 || null,
+          custom10: customFields.custom10 || null,
+        }
+      };
+
+      return { updatedCustomer, inflowPayload };
+    });
+
+    // await getMidSyncQueue().add(
+    //   "customer_sync_job",
+    //   {
+    //     source: "CUSTOMER_SYNC_API",
+    //     model: "CUSTOMER",
+    //     payload: result.inflowPayload,
+    //     timestamp: new Date().toISOString(),
+    //     locationId: defaultLocationId
+    //   },
+    //   { 
+    //     attempts: 3, 
+    //     backoff: { type: "exponential", delay: 2000 },
+    //     removeOnComplete: true
+    //   }
+    // );
+
+    const location = await LocationService.getLocationURL(defaultLocationId);
+
+    if(location?.url){
+      await getMidSyncQueue().add(
+        "customer_sync_job",
+        {
+          source: "CUSTOMER_UPSERT_LOCAL",
+          model: "Customer",
+          payload: result.inflowPayload,
+          timestamp: new Date().toISOString(),
+          location: location
+        },
+        { 
+          attempts: 3, 
+          backoff: { type: "exponential", delay: 2000 },
+          removeOnComplete: true
+        }
+      );
+    }
+
+    return NextResponse.json(result.updatedCustomer, { status: 200 });
+  } catch (error: any) {
+    console.error("[CUSTOMER_PATCH_ERROR]:", error);
+    return NextResponse.json({ error: error.message || "Internal failure modifying transactional parameters." }, { status: 500 });
+  }
+}
+
+// export async function PATCH(request: NextRequest) {
+//   try {
+//     const body = await request.json();
+//     const { 
+//       id, name, contactName, email, phone, fax, website, remarks, isActive, 
+//       taxExemptNumber, defaultCarrier, defaultPaymentMethod, discount, 
+//       defaultLocationId, defaultPaymentTermsId, pricingSchemeId, taxingSchemeId, 
+//       defaultSalesRepTeamMemberId, addresses, customFields = {}
+//     } = body;
+
+//     if (!id) {
+//       return NextResponse.json({ error: "Missing required customer target identification reference token." }, { status: 400 });
+//     }
+
+//     const cleanEmail = email !== undefined ? (email?.trim().toLowerCase() || null) : undefined;
+
+//     const result = await prisma.$transaction(async (tx) => {
+//       // 1. Fetch current database record contexts
+//       const currentCustomer = await tx.customer.findUnique({
+//         where: { id },
+//         select: { businessPartnerId: true, inflowId: true }
+//       });
+//       if (!currentCustomer) throw new Error("Target customer record layout context was not located.");
+
+//       // 2. Modify Core Legal Baseline Info (using strict undefined checks for partial PATCH execution)
+//       const businessPartner = await tx.businessPartner.update({
+//         where: { id: currentCustomer.businessPartnerId },
+//         data: { 
+//           name: name !== undefined ? name?.trim() : undefined, 
+//           contactName: contactName !== undefined ? contactName?.trim() : undefined, 
+//           email: cleanEmail, 
+//           phone: phone !== undefined ? phone?.trim() : undefined, 
+//           fax: fax !== undefined ? fax?.trim() : undefined, 
+//           website: website !== undefined ? website?.trim() : undefined, 
+//           remarks: remarks !== undefined ? remarks?.trim() : undefined, 
+//           isActive: isActive !== undefined ? isActive : undefined
+//         }
+//       });
+
+//       let billingInflowId: string | null | undefined = undefined;
+//       let shippingInflowId: string | null | undefined = undefined;
+
+//       // Only handle address mutations if the addresses array was explicitly provided
+//       if (addresses && Array.isArray(addresses)) {
+//         const existingAddresses = await tx.businessPartnerAddress.findMany({
+//           where: { businessPartnerId: currentCustomer.businessPartnerId },
+//           select: { id: true }
+//         });
+
+//         const incomingIds = addresses.filter((a: any) => a.id).map((a: any) => a.id);
+//         const toDelete = existingAddresses.filter(addr => !incomingIds.includes(addr.id));
+
+//         if (toDelete.length > 0) {
+//           await tx.businessPartnerAddress.deleteMany({
+//             where: { id: { in: toDelete.map(a => a.id) } }
+//           });
+//         }
+
+//         // 3. Address Reconciliation Engine
+//         const syncedAddresses = await Promise.all(
+//           addresses.map(async (addr: any) => {
+//             const baseData = {
+//               name: addr.name?.trim() || "Mailing Address",
+//               address1: addr.address1?.trim() || "",
+//               address2: addr.address2?.trim() || null,
+//               city: addr.city?.trim() || "",
+//               state: addr.state?.trim() || "",
+//               country: addr.country?.trim() || "Philippines",
+//               postalCode: addr.postalCode?.trim() || "",
+//               remarks: addr.remarks?.trim() || null,
+//               addressType: addr.addressType || "Commercial"
+//             };
+
+//             if (addr.id) {
+//               return await tx.businessPartnerAddress.update({
+//                 where: { id: addr.id },
+//                 data: baseData
+//               });
+//             } else {
+//               return await tx.businessPartnerAddress.create({
+//                 data: {
+//                   ...baseData,
+//                   businessPartnerId: currentCustomer.businessPartnerId,
+//                   inflowId: crypto.randomUUID().toLowerCase()
+//                 }
+//               });
+//             }
+//           })
+//         );
+
+//         // Find explicit matching targets via structural indices derived safely from synced payload mappings
+//         const billingIndex = addresses.findIndex((a: any) => a.isDefaultBilling === true);
+//         const shippingIndex = addresses.findIndex((a: any) => a.isDefaultShipping === true);
+        
+//         billingInflowId = syncedAddresses[billingIndex >= 0 ? billingIndex : 0]?.inflowId || null;
+//         shippingInflowId = syncedAddresses[shippingIndex >= 0 ? shippingIndex : 0]?.inflowId || null;
+//       }
+
+//       // 4. Update Sub-ledger Rule Context safely without destroying un-passed properties
+//       const updatedCustomer = await tx.customer.update({
+//         where: { id },
+//         data: {
+//           taxExemptNumber: taxExemptNumber !== undefined ? (taxExemptNumber?.trim() || null) : undefined,
+//           defaultCarrier: defaultCarrier !== undefined ? (defaultCarrier?.trim() || null) : undefined,
+//           defaultPaymentMethod: defaultPaymentMethod !== undefined ? (defaultPaymentMethod?.trim() || null) : undefined,
+//           discount: discount !== undefined ? new Prisma.Decimal(discount) : undefined,
+//           defaultLocationId: defaultLocationId !== undefined ? defaultLocationId : undefined,
+//           defaultPaymentTermsId: defaultPaymentTermsId !== undefined ? defaultPaymentTermsId : undefined,
+//           pricingSchemeId: pricingSchemeId !== undefined ? pricingSchemeId : undefined,
+//           taxingSchemeId: taxingSchemeId !== undefined ? taxingSchemeId : undefined,
+//           defaultSalesRepTeamMemberId: defaultSalesRepTeamMemberId !== undefined ? defaultSalesRepTeamMemberId : undefined,
+//           defaultBillingAddressId: billingInflowId,
+//           defaultShippingAddressId: shippingInflowId
+//         }
+//       });
+
+//       // 5. Build current finalized sync representations
+//       const finalAddresses = await tx.businessPartnerAddress.findMany({
+//         where: { businessPartnerId: currentCustomer.businessPartnerId }
+//       });
+
+//       const inflowPayload = {
+//         id: updatedCustomer.id,
+//         customerId: currentCustomer.inflowId,
+//         name: businessPartner.name,
+//         contactName: businessPartner.contactName,
+//         email: businessPartner.email,
+//         phone: businessPartner.phone,
+//         fax: businessPartner.fax,
+//         website: businessPartner.website,
+//         remarks: businessPartner.remarks,
+//         discount: updatedCustomer.discount ? updatedCustomer.discount.toString() : null,
+//         isActive: businessPartner.isActive,
+//         taxExemptNumber: updatedCustomer.taxExemptNumber,
+//         defaultLocationId: updatedCustomer.defaultLocationId,
+//         defaultCarrier: updatedCustomer.defaultCarrier,
+//         defaultPaymentMethod: updatedCustomer.defaultPaymentMethod,
+//         defaultPaymentTermsId: updatedCustomer.defaultPaymentTermsId,
+//         pricingSchemeId: updatedCustomer.pricingSchemeId,
+//         taxingSchemeId: updatedCustomer.taxingSchemeId,
+//         defaultSalesRepTeamMemberId: updatedCustomer.defaultSalesRepTeamMemberId,
+//         defaultBillingAddressId: updatedCustomer.defaultBillingAddressId,
+//         defaultShippingAddressId: updatedCustomer.defaultShippingAddressId,
+//         addresses: finalAddresses.map(addr => ({
+//           customerAddressId: addr.inflowId,
+//           customerId: currentCustomer.inflowId,
+//           name: addr.name,
+//           address: {
+//             addressType: addr.addressType,
+//             address1: addr.address1,
+//             address2: addr.address2,
+//             city: addr.city,
+//             state: addr.state,
+//             postalCode: addr.postalCode,
+//             country: addr.country,
+//             remarks: addr.remarks
+//           }
+//         })),
+//         customFields: {
+//           custom1: customFields.custom1 || null,
+//           custom2: customFields.custom2 || null,
+//           custom3: customFields.custom3 || null,
+//           custom4: customFields.custom4 || null,
+//           custom5: customFields.custom5 || null,
+//           custom6: customFields.custom6 || null,
+//           custom7: customFields.custom7 || null,
+//           custom8: customFields.custom8 || null,
+//           custom9: customFields.custom9 || null,
+//           custom10: customFields.custom10 || null,
+//         }
+//       };
+
+//       return { updatedCustomer, inflowPayload };
+//     });
+
+//     // 6. Enqueue Outbound Mid-Sync Job Outside Active DB Block
+//     const location = await LocationService.getLocationURL(defaultLocationId);
+
+//     if(location?.url){
+//       await getMidSyncQueue().add(
+//         "customer_sync_job",
+//         {
+//           source: "CUSTOMER_UPSERT_LOCAL",
+//           model: "Customer",
+//           payload: result.inflowPayload,
+//           timestamp: new Date().toISOString(),
+//           location: location
+//         },
+//         { 
+//           attempts: 3, 
+//           backoff: { type: "exponential", delay: 2000 },
+//           removeOnComplete: true
+//         }
+//       );
+//     }
+    
+
+//     return NextResponse.json(result.updatedCustomer, { status: 200 });
+//   } catch (error: any) {
+//     console.error("[CUSTOMER_PATCH_ERROR]:", error);
+//     return NextResponse.json({ error: error.message || "Internal failure modifying transactional parameters." }, { status: 500 });
+//   }
+// }
 
 // export async function POST(request: NextRequest) {
 //   try {
@@ -224,387 +840,3 @@ import { Prisma } from "@/generated/prisma/client";
 //   }
 // }
 
-
-export async function POST(request: NextRequest) {
-  try {
-    const body = await request.json();
-    const { 
-      name, contactName, email, phone, fax, website, remarks, isActive, 
-      taxExemptNumber, defaultCarrier, defaultPaymentMethod, discount, 
-      defaultLocationId, defaultPaymentTermsId, pricingSchemeId, taxingSchemeId, 
-      defaultSalesRepTeamMemberId, addresses = [], customFields = {}
-    } = body;
-
-    if (!name?.trim()) {
-      return NextResponse.json({ error: "Missing required business name field." }, { status: 400 });
-    }
-
-    const customerId = crypto.randomUUID().toLowerCase();
-    const cleanEmail = email?.trim().toLowerCase() || null;
-
-    // Execute database operations safely inside a single ACID isolation boundary
-    const result = await prisma.$transaction(async (tx) => {
-      
-      // 1. Safely calculate nextLocalId INSIDE the transaction to prevent race conditions
-      const lastCustomer = await tx.customer.findFirst({
-        where: { defaultLocationId },
-        orderBy: { localId: "desc" },
-        select: { localId: true },
-      });
-
-      const nextLocalId = ((parseInt(lastCustomer?.localId ?? "0", 10)) + 1)
-        .toString()
-        .padStart(7, "0");
-
-      // 2. Fetch Currency ID early in the block
-      const targetPricingScheme = pricingSchemeId 
-        ? await tx.pricingScheme.findUnique({ where: { inflowId: pricingSchemeId }, select: { currencyId: true } })
-        : null;
-      const currencyId = targetPricingScheme?.currencyId || "USD";
-
-      // 3. Create Parent Business Partner Node
-      const businessPartner = await tx.businessPartner.create({
-        data: { 
-          name: name.trim(), 
-          contactName: contactName?.trim(), 
-          email: cleanEmail, 
-          phone: phone?.trim(), 
-          fax: fax?.trim(), 
-          website: website?.trim(), 
-          remarks: remarks?.trim(), 
-          isActive: isActive ?? true 
-        }
-      });
-
-      // 4. Create Related Address Vectors
-      const savedAddresses = await Promise.all(
-        addresses.map(async (addr: any) => {
-          const addressId = crypto.randomUUID().toLowerCase();
-          return await tx.businessPartnerAddress.create({
-            data: {
-              businessPartnerId: businessPartner.id,
-              inflowId: addressId,
-              name: addr.name?.trim() || "Primary Address",
-              address1: addr.address1?.trim() || "",
-              address2: addr.address2?.trim() || null,
-              city: addr.city?.trim() || "",
-              state: addr.state?.trim() || "",
-              country: addr.country?.trim() || "Philippines",
-              postalCode: addr.postalCode?.trim() || "",
-              remarks: addr.remarks?.trim() || null,
-              addressType: addr.addressType || "Commercial"
-            }
-          });
-        })
-      );
-
-      // Determine explicit structural fallback selectors
-      const billingIndex = addresses.findIndex((a: any) => a.isDefaultBilling === true);
-      const shippingIndex = addresses.findIndex((a: any) => a.isDefaultShipping === true);
-      
-      const billingInflowId = savedAddresses[billingIndex >= 0 ? billingIndex : 0]?.inflowId || null;
-      const shippingInflowId = savedAddresses[shippingIndex >= 0 ? shippingIndex : 0]?.inflowId || null;
-
-      // 5. Setup Core Customer Record Block
-      const customer = await tx.customer.create({
-        data: {
-          businessPartnerId: businessPartner.id,
-          inflowId: customerId,
-          localId: nextLocalId,
-          taxExemptNumber: taxExemptNumber?.trim() || null,
-          defaultCarrier: defaultCarrier?.trim() || null,
-          defaultPaymentMethod: defaultPaymentMethod?.trim() || null,
-          discount: discount ? new Prisma.Decimal(discount) : 0,
-          defaultLocationId: defaultLocationId || null,
-          defaultPaymentTermsId: defaultPaymentTermsId || null,
-          pricingSchemeId: pricingSchemeId || null,
-          taxingSchemeId: taxingSchemeId || null,
-          defaultSalesRepTeamMemberId: defaultSalesRepTeamMemberId || null,
-          defaultBillingAddressId: billingInflowId,
-          defaultShippingAddressId: shippingInflowId
-        }
-      });
-
-      // 6. Seeding Financial Summaries concurrently
-      await Promise.all([
-        tx.customerBalance.create({ data: { inflowId: crypto.randomUUID().toLowerCase(), localId: nextLocalId, customerId, currencyId, balance: 0 } }),
-        tx.customerCredit.create({ data: { inflowId: crypto.randomUUID().toLowerCase(), localId: nextLocalId, customerId, currencyId, credit: 0 } }),
-        tx.customerDue.create({ data: { inflowId: crypto.randomUUID().toLowerCase(), localId: nextLocalId, customerId, currencyId, amountCurrent: 0, amount1To30: 0, amount31To60: 0, amount61Plus: 0 } })
-      ]);
-
-      // 7. Construct Outbound payload representation
-      const inflowPayload = {
-        id: customer.id,
-        customerId: nextLocalId,
-        name: businessPartner.name,
-        contactName: businessPartner.contactName,
-        email: businessPartner.email,
-        phone: businessPartner.phone,
-        fax: businessPartner.fax,
-        website: businessPartner.website,
-        remarks: businessPartner.remarks,
-        discount: customer.discount ? customer.discount.toString() : null,
-        isActive: businessPartner.isActive,
-        taxExemptNumber: customer.taxExemptNumber,
-        defaultLocationId: customer.defaultLocationId,
-        defaultCarrier: customer.defaultCarrier,
-        defaultPaymentMethod: customer.defaultPaymentMethod,
-        defaultPaymentTermsId: customer.defaultPaymentTermsId,
-        pricingSchemeId: customer.pricingSchemeId,
-        taxingSchemeId: customer.taxingSchemeId,
-        defaultSalesRepTeamMemberId: customer.defaultSalesRepTeamMemberId,
-        defaultBillingAddressId: customer.defaultBillingAddressId,
-        defaultShippingAddressId: customer.defaultShippingAddressId,
-        addresses: savedAddresses.map(addr => ({
-          customerAddressId: addr.inflowId,
-          customerId: customer.inflowId,
-          name: addr.name,
-          address: {
-            addressType: addr.addressType,
-            address1: addr.address1,
-            address2: addr.address2,
-            city: addr.city,
-            state: addr.state,
-            postalCode: addr.postalCode,
-            country: addr.country,
-            remarks: addr.remarks
-          }
-        })),
-        customFields: {
-          custom1: customFields.custom1 || null,
-          custom2: customFields.custom2 || null,
-          custom3: customFields.custom3 || null,
-          custom4: customFields.custom4 || null,
-          custom5: customFields.custom5 || null,
-          custom6: customFields.custom6 || null,
-          custom7: customFields.custom7 || null,
-          custom8: customFields.custom8 || null,
-          custom9: customFields.custom9 || null,
-          custom10: customFields.custom10 || null,
-        }
-      };
-
-      return { customer, inflowPayload };
-    });
-
-    // 8. Push to queue outside the transaction to avoid holding database locks
-    await getMidSyncQueue().add(
-      "customer_sync_job",
-      {
-        source: "CUSTOMER_SYNC_API",
-        model: "CUSTOMER",
-        payload: result.inflowPayload,
-        timestamp: new Date().toISOString(),
-        locationId: defaultLocationId
-      },
-      { 
-        attempts: 3, 
-        backoff: { type: "exponential", delay: 2000 },
-        removeOnComplete: true
-      }
-    );
-
-    return NextResponse.json(result.customer, { status: 201 });
-  } catch (error) {
-    console.error("[CUSTOMER_POST_ERROR]:", error);
-    return NextResponse.json({ error: "Failed to process customer creation pipeline." }, { status: 500 });
-  }
-}
-
-export async function PATCH(request: NextRequest) {
-  try {
-    const body = await request.json();
-    const { 
-      id, name, contactName, email, phone, fax, website, remarks, isActive, 
-      taxExemptNumber, defaultCarrier, defaultPaymentMethod, discount, 
-      defaultLocationId, defaultPaymentTermsId, pricingSchemeId, taxingSchemeId, 
-      defaultSalesRepTeamMemberId, addresses = [], customFields = {}
-    } = body;
-
-    if (!id) {
-      return NextResponse.json({ error: "Missing required customer target identification reference token." }, { status: 400 });
-    }
-
-    const cleanEmail = email?.trim().toLowerCase() || null;
-
-    const result = await prisma.$transaction(async (tx) => {
-      // 1. Fetch current database record contexts
-      const currentCustomer = await tx.customer.findUnique({
-        where: { id },
-        select: { businessPartnerId: true, inflowId: true }
-      });
-      if (!currentCustomer) throw new Error("Target customer record layout context was not located.");
-
-      // 2. Modify Core Legal Baseline Info
-      const businessPartner = await tx.businessPartner.update({
-        where: { id: currentCustomer.businessPartnerId },
-        data: { 
-          name: name?.trim(), 
-          contactName: contactName?.trim(), 
-          email: cleanEmail, 
-          phone: phone?.trim(), 
-          fax: fax?.trim(), 
-          website: website?.trim(), 
-          remarks: remarks?.trim(), 
-          isActive: isActive !== undefined ? isActive : undefined
-        }
-      });
-
-      const existingAddresses = await tx.businessPartnerAddress.findMany({
-        where: { businessPartnerId: currentCustomer.businessPartnerId },
-        select: { id: true }
-      });
-
-      const incomingIds = addresses
-        .filter((a: any) => a.id) // Only get addresses that have an ID
-        .map((a: any) => a.id);
-
-      // 2. Identify addresses to delete (exist in DB, but not in current payload)
-      const toDelete = existingAddresses.filter(addr => !incomingIds.includes(addr.id));
-
-      if (toDelete.length > 0) {
-        await tx.businessPartnerAddress.deleteMany({
-          where: { id: { in: toDelete.map(a => a.id) } }
-        });
-      }
-
-      // 3. Smart Address Alignment Strategy (Upserts matching structural states)
-      const syncedAddresses = await Promise.all(
-        addresses.map(async (addr: any) => {
-          const baseData = {
-            name: addr.name?.trim() || "Mailing Address",
-            address1: addr.address1?.trim() || "",
-            address2: addr.address2?.trim() || null,
-            city: addr.city?.trim() || "",
-            state: addr.state?.trim() || "",
-            country: addr.country?.trim() || "Philippines",
-            postalCode: addr.postalCode?.trim() || "",
-            remarks: addr.remarks?.trim() || null,
-            addressType: addr.addressType || "Commercial"
-          };
-
-          if (addr.id) {
-            return await tx.businessPartnerAddress.update({
-              where: { id: addr.id },
-              data: baseData
-            });
-          } else {
-            return await tx.businessPartnerAddress.create({
-              data: {
-                ...baseData,
-                businessPartnerId: currentCustomer.businessPartnerId,
-                inflowId: crypto.randomUUID().toLowerCase()
-              }
-            });
-          }
-        })
-      );
-
-      const billingIndex = addresses.findIndex((a: any) => a.isDefaultBilling === true);
-      const shippingIndex = addresses.findIndex((a: any) => a.isDefaultShipping === true);
-      
-      const billingInflowId = syncedAddresses[billingIndex >= 0 ? billingIndex : 0]?.inflowId || null;
-      const shippingInflowId = syncedAddresses[shippingIndex >= 0 ? shippingIndex : 0]?.inflowId || null;
-
-      // 4. Apply Sub-ledger Rule Context Overwrites
-      const updatedCustomer = await tx.customer.update({
-        where: { id },
-        data: {
-          taxExemptNumber: taxExemptNumber?.trim() || null,
-          defaultCarrier: defaultCarrier?.trim() || null,
-          defaultPaymentMethod: defaultPaymentMethod?.trim() || null,
-          discount: discount !== undefined ? new Prisma.Decimal(discount) : undefined,
-          defaultLocationId: defaultLocationId || null,
-          defaultPaymentTermsId: defaultPaymentTermsId || null,
-          pricingSchemeId: pricingSchemeId || null,
-          taxingSchemeId: taxingSchemeId || null,
-          defaultSalesRepTeamMemberId: defaultSalesRepTeamMemberId || null,
-          defaultBillingAddressId: billingInflowId,
-          defaultShippingAddressId: shippingInflowId
-        }
-      });
-
-      // 5. Build up all addresses associated with this business partner for full state sync
-      const finalAddresses = await tx.businessPartnerAddress.findMany({
-        where: { businessPartnerId: currentCustomer.businessPartnerId }
-      });
-
-      /**
-       * STEP 5: Construct Outbound inFlow-Compliant Upsert Representation
-       */
-      const inflowPayload = {
-        id: updatedCustomer.id,
-        customerId: currentCustomer.inflowId, // Matches immutable external inFlow GUID
-        name: businessPartner.name,
-        contactName: businessPartner.contactName,
-        email: businessPartner.email,
-        phone: businessPartner.phone,
-        fax: businessPartner.fax,
-        website: businessPartner.website,
-        remarks: businessPartner.remarks,
-        discount: updatedCustomer.discount ? updatedCustomer.discount.toString() : null,
-        isActive: businessPartner.isActive,
-        taxExemptNumber: updatedCustomer.taxExemptNumber,
-        defaultLocationId: updatedCustomer.defaultLocationId,
-        defaultCarrier: updatedCustomer.defaultCarrier,
-        defaultPaymentMethod: updatedCustomer.defaultPaymentMethod,
-        defaultPaymentTermsId: updatedCustomer.defaultPaymentTermsId,
-        pricingSchemeId: updatedCustomer.pricingSchemeId,
-        taxingSchemeId: updatedCustomer.taxingSchemeId,
-        defaultSalesRepTeamMemberId: updatedCustomer.defaultSalesRepTeamMemberId,
-        defaultBillingAddressId: updatedCustomer.defaultBillingAddressId,
-        defaultShippingAddressId: updatedCustomer.defaultShippingAddressId,
-        addresses: finalAddresses.map(addr => ({
-          customerAddressId: addr.inflowId,
-          customerId: currentCustomer.inflowId,
-          name: addr.name,
-          address: {
-            addressType: addr.addressType,
-            address1: addr.address1,
-            address2: addr.address2,
-            city: addr.city,
-            state: addr.state,
-            postalCode: addr.postalCode,
-            country: addr.country,
-            remarks: addr.remarks
-          }
-        })),
-        customFields: {
-          custom1: customFields.custom1 || null,
-          custom2: customFields.custom2 || null,
-          custom3: customFields.custom3 || null,
-          custom4: customFields.custom4 || null,
-          custom5: customFields.custom5 || null,
-          custom6: customFields.custom6 || null,
-          custom7: customFields.custom7 || null,
-          custom8: customFields.custom8 || null,
-          custom9: customFields.custom9 || null,
-          custom10: customFields.custom10 || null,
-        }
-      };
-
-      return { updatedCustomer, inflowPayload };
-    });
-
-    await getMidSyncQueue().add(
-      "customer_sync_job",
-      {
-        source: "CUSTOMER_SYNC_API",
-        model: "CUSTOMER",
-        payload: result.inflowPayload,
-        timestamp: new Date().toISOString(),
-        locationId: defaultLocationId
-      },
-      { 
-        attempts: 3, 
-        backoff: { type: "exponential", delay: 2000 },
-        removeOnComplete: true
-      }
-    );
-
-    return NextResponse.json(result.updatedCustomer, { status: 200 });
-  } catch (error: any) {
-    console.error("[CUSTOMER_PATCH_ERROR]:", error);
-    return NextResponse.json({ error: error.message || "Internal failure modifying transactional parameters." }, { status: 500 });
-  }
-}

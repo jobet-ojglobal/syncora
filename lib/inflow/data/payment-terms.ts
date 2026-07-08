@@ -1,9 +1,9 @@
 import { inflow } from "@/lib/inflow/inflow.client";
-import { InflowPaymentTerms } from "../types";
+import { InflowPaymentTerm } from "../types";
 
 export async function getPaymentTerms() {
   const response =
-    await inflow.get<InflowPaymentTerms[]>(
+    await inflow.get<InflowPaymentTerm[]>(
       "/payment-terms"
     );
 
@@ -11,5 +11,5 @@ export async function getPaymentTerms() {
 }
 
 export async function getPaymentTerm(termID: string) {
-  return inflow.get<InflowPaymentTerms>(`/payment-terms/${termID}`);
+  return inflow.get<InflowPaymentTerm>(`/payment-terms/${termID}`);
 }

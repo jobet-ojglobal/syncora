@@ -1,12 +1,12 @@
-import { InflowCustomer } from "@/lib/inflow/types";
+import { InflowPricingScheme} from "@/lib/inflow/types";
 import { BranchClient } from "../location.client";
 
-export async function getCustomer(
+export async function getPricingScheme(
   batchId: string,
   url: string
 ) {
  const apiClient = new BranchClient(url)
-  return await apiClient.get<InflowCustomer>(
+  return await apiClient.get<InflowPricingScheme>(
     `/inflow-local/payload/${batchId}`,
   );
 }
@@ -17,16 +17,16 @@ export interface UpsertResult {
   data?: any; 
 }
 
-export async function upsertCustomer(
-  payload: InflowCustomer,
+export async function upsertPricingScheme(
+  payload: InflowPricingScheme,
   url: string
 ) {
   const apiClient = new BranchClient(url)
   const { success, ...data } = await apiClient.post<UpsertResult>(
     `/inbound/receive`, {
-        "eventType": "customer",
-        "transactionType": "CUSTOMER",
-        "batch_id": `CSTMR-${crypto.randomUUID().toLowerCase()}`,
+        "eventType": "pricingScheme",
+        "transactionType": "PRICING_SCHEME",
+        "batch_id": `PRCNGSCHM-${crypto.randomUUID().toLowerCase()}`,
         "sourceSystem": "MID",
         "sourceKey": "MID",
         "payload": payload

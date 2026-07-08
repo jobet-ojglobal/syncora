@@ -3,6 +3,7 @@ import { Worker, Job } from "bullmq";
 import { prisma } from "@/lib/prisma";
 import { connection } from "@/lib/redis";
 import { CustomerSyncResult, InflowCustomerWebhookService } from "../locations/services/customer.service";
+import { InflowTaxingSchemeWebhookService } from "../locations/services/taxing-scheme.service";
 
 // import { locationApi } from "@/lib/location/location.client";
 // import { CustomerSyncResult } from "@/lib/location/webhooks/webhook-customer.service";
@@ -14,12 +15,13 @@ interface LocationWebhookJobData {
   dataId: string;
   locationId: string; 
   loggedEventId: string;
+  data: any
 }
 
 const locationWorker = new Worker<LocationWebhookJobData>(
   "location_sync", // Ties this worker explicitly to the location_sync queue
   async (job: Job<LocationWebhookJobData>) => {
-    const { source, dataId, loggedEventId, locationId } = job.data;
+    const { source, dataId, loggedEventId, locationId, data } = job.data;
 
     console.log(`[Location Worker] Processing job ${job.id} for source: ${source}`);
 
@@ -32,6 +34,10 @@ const locationWorker = new Worker<LocationWebhookJobData>(
           break;
         case "salesOrder":
           result = { success: true};
+          break;
+
+        case "taxingScheme":
+          result = await InflowTaxingSchemeWebhookService.handleTaxingSchemeUpsert(data.taxingSchemeId, dataId, loggedEventId, locationId);
           break;
 
         default:
