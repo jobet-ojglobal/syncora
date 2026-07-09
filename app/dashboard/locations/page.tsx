@@ -7,7 +7,6 @@ import { Plus, Search, MapPin, Warehouse, Layers, Boxes, CheckCircle2, XCircle, 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { DeleteButton } from "@/components/shared/delete-button";
 import PageHeader from "@/components/layout/dashboard/PageHeader";
 
 interface SublocationMin {
@@ -24,6 +23,9 @@ interface LocationListItem {
   formattedAddress: string | null;
   sublocationsCount: number;
   inventoryItemsCount: number;
+  totalSalesOrdersCount: number,
+  activeSalesOrdersCount: number,
+  teamMembersCount: number;
   sublocationsList: SublocationMin[];
 }
 
@@ -64,19 +66,22 @@ export default function LocationsListPage() {
   });
 
   return (
-    <div className="w-full mx-auto p-6 space-y-6">
+    <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 py-8 space-y-6">
+      
       {/* Page Header */}
-      <PageHeader 
-        className=" border-b pb-5" 
-        title="Logistics & Storage Locations" 
-        description="Monitor inventory depots, verify fulfillment sites, and configure nested sublocation staging areas." 
-        >
-        <Button asChild size="sm" className="gap-1.5 shrink-0">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b pb-5">
+        <div className="space-y-1">
+          <h1 className="text-2xl font-bold tracking-tight text-foreground">Logistics & Storage Locations</h1>
+          <p className="text-sm text-muted-foreground">
+            Monitor inventory depots, verify fulfillment sites, and configure nested sublocation staging areas.
+          </p>
+        </div>
+        <Button asChild size="sm" className="gap-1.5 shrink-0 self-start sm:self-center">
           <Link href="/dashboard/locations/create">
             <Plus className="w-4 h-4" /> Add Logistics Site
           </Link>
         </Button>
-      </PageHeader>
+      </div>
 
       {/* Toolbar Controls */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -86,11 +91,11 @@ export default function LocationsListPage() {
             placeholder="Search depot names, cities, states..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-9 text-xs"
+            className="pl-9 text-xs w-full"
           />
         </div>
 
-        <div className="text-xs text-muted-foreground font-medium bg-muted/50 border px-3 py-1.5 rounded-lg flex items-center gap-1.5">
+        <div className="text-xs text-muted-foreground font-medium bg-muted/50 border px-3 py-1.5 rounded-lg flex items-center gap-1.5 self-start sm:self-auto">
           <Warehouse className="w-3.5 h-3.5 text-muted-foreground" />
           Active Facilities: <span className="font-bold text-foreground">{locations.length}</span>
         </div>
@@ -106,20 +111,22 @@ export default function LocationsListPage() {
           No facility records matching your search queries found.
         </div>
       ) : (
-        <div className="border rounded-xl bg-card shadow-sm overflow-hidden divide-y">
+        <div className="border rounded-xl bg-card shadow-sm overflow-hidden divide-y divide-border">
           {filteredLocations.map((loc) => {
             const isRowExpanded = !!expandedRows[loc.inflowId];
             return (
-              <div key={loc.inflowId} className="flex flex-col transition-all">
+              <div key={loc.inflowId} className="flex flex-col transition-all group">
                 
-                {/* Primary Hub Summary Row Segment */}
-                <div className="p-4 flex flex-col md:flex-row md:items-center justify-between gap-4 bg-card hover:bg-muted/10 transition-colors">
-                  <div className="flex items-start gap-3 min-w-0">
+                {/* Primary Hub Summary Container */}
+                <div className="p-4 grid grid-cols-1 md:grid-cols-12 gap-4 items-start md:items-center bg-card hover:bg-muted/5 transition-colors">
+                  
+                  {/* Identity Column */}
+                  <div className="flex items-start gap-3 min-w-0 md:col-span-5">
                     {/* Expand Sub-zones Toggler Button */}
                     <button
                       type="button"
                       onClick={() => toggleRowExpand(loc.inflowId)}
-                      className="mt-1 text-muted-foreground hover:bg-muted p-1 rounded transition-colors shrink-0"
+                      className="mt-0.5 text-muted-foreground hover:bg-muted p-1 rounded transition-colors shrink-0"
                       title="Inspect Sublocations Structure"
                     >
                       {isRowExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
@@ -131,17 +138,17 @@ export default function LocationsListPage() {
 
                     <div className="min-w-0 space-y-1">
                       <div className="flex items-center gap-2 flex-wrap">
-                        <Link href={`/dashboard/locations/${loc.id}`} title="Go to Inventory">
-                          <h3 className="text-sm font-bold text-foreground hover:text-indigo-500 tracking-tight truncate">{loc.name}</h3>
-                        </Link>
+                        <h3 className="text-sm font-bold text-foreground tracking-tight truncate">
+                          {loc.name}
+                        </h3>
                         {/* Status Badges Group */}
                         {loc.isDefault && (
-                          <Badge className="text-[10px] tracking-tight bg-blue-500 hover:bg-blue-500 text-white font-semibold h-4 px-1.5">
+                          <Badge className="text-[10px] tracking-tight bg-blue-500 hover:bg-blue-500 text-white font-semibold h-4 px-1.5 shrink-0">
                             System Default Site
                           </Badge>
                         )}
                         {!loc.isActive && (
-                          <Badge variant="destructive" className="text-[10px] tracking-tight font-semibold h-4 px-1.5">
+                          <Badge variant="destructive" className="text-[10px] tracking-tight font-semibold h-4 px-1.5 shrink-0">
                             Offline / Suspended
                           </Badge>
                         )}
@@ -155,79 +162,70 @@ export default function LocationsListPage() {
                     </div>
                   </div>
 
-                  {/* Operational Relational Asset Totals Metrics */}
-                  <div className="flex items-center gap-6 text-[11px] font-medium text-muted-foreground pl-9 md:pl-0">
+                  {/* Operational Relational Asset Metrics (Grid aligned on desktop) */}
+                  <div className="grid grid-cols-2 sm:grid-cols-4 md:flex md:items-center gap-4 text-[11px] font-medium text-muted-foreground pl-8 md:pl-0 md:col-span-5">
+                    
+                    {/* Storage Zones */}
                     <div className="flex items-center gap-1.5">
-                      <Layers className="w-3.5 h-3.5 text-blue-500/80" />
+                      <Layers className="w-3.5 h-3.5 text-blue-500/80 shrink-0" />
                       <span>
-                        <strong className="text-foreground">{loc.sublocationsCount}</strong> {loc.sublocationsCount === 1 ? "Storage Zone" : "Storage Zones"}
+                        <strong className="text-foreground">{loc.sublocationsCount}</strong> {loc.sublocationsCount === 1 ? "Zone" : "Zones"}
                       </span>
                     </div>
 
+                    {/* Active Lines */}
                     <div className="flex items-center gap-1.5">
-                      <Boxes className="w-3.5 h-3.5 text-emerald-500/80" />
-                      <span>
+                      <Boxes className="w-3.5 h-3.5 text-emerald-500/80 shrink-0" />
+                      <span className="truncate">
                         <strong className="text-foreground">{loc.inventoryItemsCount}</strong> Active lines
                       </span>
                     </div>
 
+                    {/* Sales Orders Metric */}
+                    <div className="flex items-center gap-1.5" title={`${loc.totalSalesOrdersCount} total lifetime orders`}>
+                      <ShoppingBag className="w-3.5 h-3.5 text-amber-500/80 shrink-0" />
+                      <span className="truncate">
+                        <strong className="text-foreground">{loc.activeSalesOrdersCount}</strong> Orders
+                      </span>
+                    </div>
+
+                    {/* Status Operational Metric */}
                     <div className="flex items-center gap-1">
                       {loc.isActive ? (
-                        <span className="inline-flex items-center gap-1 text-emerald-600"><CheckCircle2 className="w-3 h-3" /> Ready</span>
+                        <span className="inline-flex items-center gap-1 text-emerald-600"><CheckCircle2 className="w-3 h-3 shrink-0" /> Ready</span>
                       ) : (
-                        <span className="inline-flex items-center gap-1 text-destructive"><XCircle className="w-3 h-3" /> Locked</span>
+                        <span className="inline-flex items-center gap-1 text-destructive"><XCircle className="w-3 h-3 shrink-0" /> Locked</span>
                       )}
                     </div>
                   </div>
 
-                  {/* Actions Operations Controls Bar Panel */}
-                  <div className="flex items-center gap-1 justify-end pl-9 md:pl-0 shrink-0">
-                    <Button asChild variant="ghost" size="sm" className="h-8 text-xs font-semibold gap-1">
-                      <Link href={`/dashboard/locations/${loc.id}/edit`}>
-                        Modify <ExternalLink className="w-3 h-3" />
-                      </Link>
-                    </Button>
-                    <DeleteButton
-                      itemId={loc.id}
-                      itemName={loc.name}
-                      endpointUrl={`/api/admin/locations/${loc.id}/soft-delete`}
-                      onSuccess={fetchLocations}
-                      variant="icon"
-                    />
-                  </div>
-                  <div className="flex items-center justify-between ">
-                    {/* <div className="flex items-center gap-4 text-sm font-semibold text-slate-700">
-                      <div className="flex items-center gap-1.5" title="Customer Orders Placed">
-                        <ShoppingBag className="h-4 w-4 text-slate-400" />
-                        <span>{loc._count?.orders ?? 0} <span className="text-xs font-normal text-slate-500">Orders</span></span>
-                      </div>
-                      <div className="flex items-center gap-1.5" title="Inventory SKUs Blocked">
-                        <Package className="h-4 w-4 text-slate-400" />
-                        <span>{loc._count?.inventory ?? 0} <span className="text-xs font-normal text-slate-500">SKUs</span></span>
-                      </div>
-                    </div> */}
-
+                  {/* Operational Action Column */}
+                  <div className="flex items-center justify-end pl-8 md:pl-0 md:col-span-2 w-full">
                     <Link
                       href={`/dashboard/locations/${loc.id}`}
-                      className="inline-flex items-center gap-1 rounded-xl bg-slate-50 px-4 py-2.5 text-sm font-bold group-hover:bg-slate-900 group-hover:text-white transition-all shadow-2xs"
+                      className="w-full md:w-auto inline-flex items-center justify-center gap-1 rounded-xl bg-slate-50 dark:bg-slate-900 px-4 py-2 text-xs font-bold border border-slate-200 dark:border-slate-800 hover:bg-slate-900 dark:hover:bg-slate-50 hover:text-white dark:hover:text-slate-900 transition-all shadow-2xs"
                     >
                       Overview
-                      <ArrowRight className="h-4 w-4 transform transition-transform group-hover:translate-x-0.5" />
+                      <ArrowRight className="h-3.5 w-3.5 transform transition-transform group-hover:translate-x-0.5" />
                     </Link>
                   </div>
                 </div>
 
                 {/* Dropdown Section: Render Sublocations Rows Inside This Hub Node */}
                 {isRowExpanded && (
-                  <div className="bg-muted/10 px-14 py-3.5 border-b flex flex-col gap-2">
-                    <h4 className="text-[10px] uppercase font-bold tracking-wider text-muted-foreground/80">Mapped Internal Sublocation Zones Matrix</h4>
+                  <div className="bg-muted/10 px-6 md:px-16 py-4 border-t border-b border-border flex flex-col gap-2">
+                    <h4 className="text-[10px] uppercase font-bold tracking-wider text-muted-foreground/80">
+                      Mapped Internal Sublocation Zones Matrix
+                    </h4>
                     {loc.sublocationsList.length === 0 ? (
-                      <p className="text-xs text-muted-foreground/60 italic py-1">No internal staging zones or storage aisles configured. Items are mapped directly to the facility floor.</p>
+                      <p className="text-xs text-muted-foreground/60 italic py-1">
+                        No internal staging zones or storage aisles configured. Items are mapped directly to the facility floor.
+                      </p>
                     ) : (
                       <div className="flex flex-wrap gap-1.5 pt-1">
                         {loc.sublocationsList.map((sub) => (
                           <div key={sub.id} className="text-xs bg-background border rounded-lg px-2.5 py-1 font-medium text-foreground flex items-center gap-1.5 shadow-2xs">
-                            <span className="w-1.5 h-1.5 bg-slate-400 rounded-full shrink-0" />
+                            <span className="w-1.5 h-1.5 bg-slate-400 dark:bg-slate-600 rounded-full shrink-0" />
                             {sub.name}
                           </div>
                         ))}

@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
-import { Trash2, Plus, MapPin, Layers, ArrowLeft, Globe, Warehouse } from "lucide-react";
+import { Trash2, Plus, MapPin, Layers, Eye, EyeOff, Globe, Warehouse } from "lucide-react";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 import {
@@ -22,6 +22,7 @@ import {
 } from "@/components/ui/field";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../ui/select";
 import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from "../ui/input-group";
+import { useState } from "react";
 
 interface LocationFormProps {
   initialData?: {
@@ -47,6 +48,8 @@ interface LocationFormProps {
 export function LocationForm({ initialData }: LocationFormProps) {
   const router = useRouter();
   const isEditMode = !!initialData;
+  const [showUrl, setShowUrl] = useState(false);
+
 
   const form = useForm<LocationInput>({
     resolver: zodResolver(locationSchema),
@@ -142,6 +145,7 @@ export function LocationForm({ initialData }: LocationFormProps) {
                 </Field>
               )}
             />
+
             <Controller
               name="url"
               control={control}
@@ -151,16 +155,35 @@ export function LocationForm({ initialData }: LocationFormProps) {
                     Location Endpoint 
                   </FieldLabel>
                   <FieldContent className="relative">
+                    {/* Left Icon: Globe */}
                     <Globe className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground/60" />
+                    
                     <Input
                       {...field}
                       id="form-url"
+                      // Dynamically switch type between text and password
+                      type={showUrl ? "text" : "password"} 
                       aria-invalid={fieldState.invalid}
                       placeholder="https://"
                       autoComplete="off"
-                      className="pl-9 h-9 text-xs" 
+                      className="pl-9 pr-9 h-9 text-xs" // Added pr-9 to clear space for the right button
                     />
+
+                    {/* Right Button: Show/Hide Toggle */}
+                    <button
+                      type="button" // Prevents form submission on click
+                      onClick={() => setShowUrl(!showUrl)}
+                      className="absolute right-3 top-2.5 text-muted-foreground/60 hover:text-foreground transition-colors"
+                      aria-label={showUrl ? "Hide URL" : "Show URL"}
+                    >
+                      {showUrl ? (
+                        <EyeOff className="h-4 w-4" />
+                      ) : (
+                        <Eye className="h-4 w-4" />
+                      )}
+                    </button>
                   </FieldContent>
+                  
                   {fieldState.invalid && (
                     <FieldError errors={[fieldState.error]} />
                   )}
@@ -388,7 +411,7 @@ export function LocationForm({ initialData }: LocationFormProps) {
               <p className="text-[11px] text-muted-foreground mt-0.5">Define distinct sections inside this hub like Aisle A, Receiving Bay, Cold Storage Vault room, etc.</p>
             </div>
         
-            <div className="mt-3 space-y-2 max-h-[260px] overflow-y-auto pr-1">
+            <div className="mt-3 space-y-2 max-h-[340px] overflow-y-auto pr-1">
               {fields.map((field, index) => (
                 <Controller
                   key={field.id}
@@ -398,7 +421,6 @@ export function LocationForm({ initialData }: LocationFormProps) {
                     <Field
                       orientation="horizontal"
                       data-invalid={fieldState.invalid}
-                      className="p-1"
                     >
                       <FieldContent>
                         <InputGroup>

@@ -19,15 +19,15 @@ export default async function DashboardLayout({
   return (
     <SidebarProvider>
       <AppSidebar />
-      <SidebarInset>
-        <header className="flex h-16 shrink-0 items-center justify-between border-b px-4 transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-12">
-          
+      <SidebarInset className="flex flex-col min-h-screen">
+        {/* Animated Adaptive Workspace Dashboard Header */}
+        <header className="flex h-16 shrink-0 items-center justify-between border-b border-border bg-card px-6 transition-[height] duration-200 ease-in-out group-has-data-[collapsible=icon]/sidebar-wrapper:h-12 sticky top-0 z-10">
           {/* Left Side: Navigation & Identity Controls */}
           <div className="flex items-center gap-2">
-            <SidebarTrigger className="-ml-1" />
+            <SidebarTrigger className="-ml-1 text-muted-foreground hover:text-foreground transition-colors" />
             <Separator
               orientation="vertical"
-              className="mr-2 h-4"
+              className="mx-2 h-7 bg-border"
             />
             <Breadcrumb />
           </div>
@@ -36,13 +36,13 @@ export default async function DashboardLayout({
           <div className="flex items-center gap-2">
             <ModeToggle />
           </div>
-
         </header>
 
         {/* Adjusted workspace viewport node */}
-        <main className="flex-1 overflow-y-auto bg-background dark:bg-background">
+        <main className="flex-1 w-full bg-background">
           {children}
         </main>
+        
       </SidebarInset>
     </SidebarProvider>
   );

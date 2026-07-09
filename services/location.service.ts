@@ -12,11 +12,17 @@ export class LocationService {
         address: true,
         _count: {
           select: {
-            sublocations: true, // Number of storage zones/aisles mapped
-            inventories: true,  // Total product items actively stocked here
+            sublocations: true, 
+            inventories: true,  
+            teamLocations: true,
+            // Get total sales orders and broken-down statuses
             salesOrders: true,
-            
           }
+        },
+        // Optional: If you want to count open vs completed orders specifically
+        salesOrders: {
+          where: { isCompleted: false, isCancelled: false },
+          select: { id: true }
         },
         sublocations: {
           select: {
@@ -26,7 +32,7 @@ export class LocationService {
           orderBy: { name: "asc" }
         }
       },
-      orderBy: { isDefault: "desc" }, // Keep your global system baseline site at the top
+      orderBy: { isDefault: "desc" }, 
     });
 
     return locations.map((loc) => ({
@@ -40,6 +46,12 @@ export class LocationService {
         : null,
       sublocationsCount: loc._count.sublocations,
       inventoryItemsCount: loc._count.inventories,
+      teamMembersCount: loc._count.teamLocations,
+      
+      // Added Sales Order Data
+      totalSalesOrdersCount: loc._count.salesOrders,
+      activeSalesOrdersCount: loc.salesOrders.length, // Filtered active count
+      
       sublocationsList: loc.sublocations,
     }));
   }
