@@ -75,6 +75,23 @@ export class InflowCustomerWebhookService {
       return await syncCustomer(tx, fullCustomerData, caches);
     }, { timeout: 30000 }); 
 
+    //  const result = await prisma.customerLocationMap.upsert({
+    //     where: {
+    //       customerId_locationId: {
+    //         customerId: CurrencyId, 
+    //         locationId: locationId,       
+    //       }
+    //     },
+    //     update: {
+    //       localId: Number(localId)        
+    //     },
+    //     create: {
+    //       customerId: CurrencyId,
+    //       locationId: locationId,
+    //       localId: Number(localId)
+    //     }
+    //   });
+
     return { 
       success: true, 
       inflowPayload: builtPayload 

@@ -150,7 +150,7 @@ export default function UnifiedCustomerForm({ initialData, catalogs }: UnifiedCu
               name="name" 
               render={({ field, fieldState }) => (
                 <Field className="space-y-1.5">
-                  <FieldLabel>Registered Business Legal Name *</FieldLabel>
+                  <FieldLabel>Registered Business Legal Name <b className="text-red-500">*</b></FieldLabel>
                   <FieldContent><Input {...field} className="h-9 text-xs" /></FieldContent>
                   {fieldState.error && <FieldError>{fieldState.error.message}</FieldError>}
                 </Field>
@@ -163,7 +163,7 @@ export default function UnifiedCustomerForm({ initialData, catalogs }: UnifiedCu
                 name="contactName" 
                 render={({ field, fieldState }) => (
                   <Field className="space-y-1.5">
-                    <FieldLabel>Primary Contact</FieldLabel>
+                    <FieldLabel>Primary Contact <b className="text-red-500">*</b></FieldLabel>
                     <FieldContent>
                       <div className="relative">
                         <User className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground/60" />
@@ -205,7 +205,7 @@ export default function UnifiedCustomerForm({ initialData, catalogs }: UnifiedCu
               </Field>
 
               <Field className="space-y-1.5">
-                <FieldLabel>Phone Number</FieldLabel>
+                <FieldLabel>Phone Number <b className="text-red-500">*</b></FieldLabel>
                 <FieldContent>
                   <div className="relative">
                     <Phone className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground/60" />
@@ -349,7 +349,7 @@ export default function UnifiedCustomerForm({ initialData, catalogs }: UnifiedCu
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <Field>
-                <FieldLabel>Pricing Matrix *</FieldLabel>
+                <FieldLabel>Pricing Matrix <b className="text-red-500">*</b></FieldLabel>
                 <Controller
                   control={control}
                   name="pricingSchemeId"
@@ -376,7 +376,7 @@ export default function UnifiedCustomerForm({ initialData, catalogs }: UnifiedCu
               </Field>
 
               <Field>
-                <FieldLabel>Taxing Policy *</FieldLabel>
+                <FieldLabel>Taxing Policy <b className="text-red-500">*</b></FieldLabel>
                 <Controller
                   control={control}
                   name="taxingSchemeId"

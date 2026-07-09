@@ -24,11 +24,11 @@ export async function upsertCustomer(
   const apiClient = new BranchClient(url)
   const { success, ...data } = await apiClient.post<UpsertResult>(
     `/inbound/receive`, {
-        "eventType": "customer",
+        "eventType": "customerLocal",
         "transactionType": "CUSTOMER",
         "batch_id": `CSTMR-${crypto.randomUUID().toLowerCase()}`,
         "sourceSystem": "MID",
-        "sourceKey": "MID",
+        "sourceKey": payload.customerId,
         "payload": payload
       }
   );

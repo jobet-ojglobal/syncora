@@ -72,27 +72,77 @@ export class LocationService {
     });
   }
 
-  static async getLocationURLs() {
-    return await prisma.location.findMany({
-      select: { inflowId: true, url: true, name: true }
-    });
-  }
-
   static async getBasicLocation(id: string) {
-    return prisma.location.findUnique({
-      where: {
-        id,
-      },
+    const loc = await prisma.location.findUnique({
+      where: { id },
       include: {
         address: true,
+        _count: {
+          select: {
+            sublocations: true, 
+            inventories: true,  
+            teamLocations: true,
+            salesOrders: true,
+            
+            // Added multi-tenant override mappings to count object aggregation
+            localTaxingSchemeMappings: true,
+            localCurrencyMappings: true,
+            localPaymentTermMappings: true,
+            localProductCostAdjustmentMappings: true,
+            localProductBarcodeMappings: true,
+            localCategoryMappings: true,
+            localPricingSchemeMappings: true,
+            localCustomerBalanceMappings: true,
+            localVendorCreditMappings: true,
+          }
+        },
+        salesOrders: {
+          where: { isCompleted: false, isCancelled: false },
+          select: { id: true }
+        },
         sublocations: {
-           select: {
-              id: true,
-              name: true,
-            },
-            orderBy: { name: "asc" }
+          select: {
+            id: true,
+            name: true,
+          },
+          orderBy: { name: "asc" }
         }
-      }
+      },
     });
+
+    if (!loc) return null;
+
+    return {
+      id: loc.id,
+      inflowId: loc.inflowId,
+      name: loc.name,
+      address: loc.address,
+      isActive: loc.isActive,
+      isDefault: loc.isDefault,
+      formattedAddress: loc.address 
+        ? `${loc.address.city || ""}, ${loc.address.state || ""} ${loc.address.postalCode || ""}`.trim().replace(/^,/, "")
+        : null,
+      sublocationsCount: loc._count.sublocations,
+      inventoryItemsCount: loc._count.inventories,
+      teamMembersCount: loc._count.teamLocations,
+      
+      totalSalesOrdersCount: loc._count.salesOrders,
+      activeSalesOrdersCount: loc.salesOrders.length,
+      
+      sublocationsList: loc.sublocations,
+
+      // Flattened structural counts sent downstream to your dashboard grids
+      mappings: {
+        taxingSchemesCount: loc._count.localTaxingSchemeMappings,
+        currenciesCount: loc._count.localCurrencyMappings,
+        paymentTermsCount: loc._count.localPaymentTermMappings,
+        costAdjustmentsCount: loc._count.localProductCostAdjustmentMappings,
+        barcodesCount: loc._count.localProductBarcodeMappings,
+        categoriesCount: loc._count.localCategoryMappings,
+        pricingSchemesCount: loc._count.localPricingSchemeMappings,
+        customerBalancesCount: loc._count.localCustomerBalanceMappings,
+        vendorCreditsCount: loc._count.localVendorCreditMappings,
+      }
+    }
   }
 }

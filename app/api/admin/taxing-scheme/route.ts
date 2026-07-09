@@ -1,7 +1,7 @@
 // app/api/admin/taxing-schemes/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { LocationService } from "@/services/location.service";
+import { WebhookService } from "@/services/webhook.service";
 import { getMidSyncQueue } from "@/lib/queues/sync.queue";
 
 export async function POST(request: NextRequest) {
@@ -97,32 +97,38 @@ export async function POST(request: NextRequest) {
     // ==========================================
     // 🏢 STEP 1: DISPATCH CLOUD SYNC JOB
     // ==========================================
-    // await getMidSyncQueue().add(
-    //   "taxing_scheme_cloudsync_job",
-    //   {
-    //     source: "TAXING_SCHEME_UPSERT_CLOUD",
-    //     model: "TaxingScheme",
-    //     payload: {
-    //       ...cleanInflowPayload,
-    //       taxingSchemeId: cloudId,
-    //     },
-    //     timestamp: new Date().toISOString(),
-    //   },
-    //   { 
-    //     attempts: 3, 
-    //     backoff: { type: "exponential", delay: 2000 },
-    //     removeOnComplete: true
-    //   }
-    // );
+    const validCloudWebhook = await WebhookService.getCloudWebhookURL("taxingScheme");
+
+    if (validCloudWebhook) {
+      await getMidSyncQueue().add(
+        "taxing_scheme_cloudsync_job",
+        {
+          source: "TAXING_SCHEME_UPSERT_CLOUD",
+          model: "TaxingScheme",
+          payload: {
+            ...cleanInflowPayload,
+            taxingSchemeId: cloudId,
+          },
+          timestamp: new Date().toISOString(),
+        },
+        { 
+          attempts: 3, 
+          backoff: { type: "exponential", delay: 2000 },
+          removeOnComplete: true
+        }
+      );
+      console.log(`[Queue] Successfully broadcasted sync job to inflow cloud.`);
+    }
 
     // ==========================================
     // 📍 STEP 2: BROADCAST LOCAL SYNC JOBS
     // ==========================================
-    const locations = await LocationService.getLocationURLs();
-    const validLocations = locations.filter(loc => loc.url && loc.url.trim() !== "");
+    const validWebhooks = await WebhookService.getLocationWebhookURLs("taxingScheme");
 
-    if (validLocations.length > 0) {
-      const jobsToQueue = validLocations.map((loc) => ({
+    if (validWebhooks.length > 0) {
+      const jobsToQueue = validWebhooks
+      .filter(webhook => webhook.location.url && webhook.location.url.trim() !== "")
+      .map((webhook) => ({
         name: "taxing_scheme_localsync_job",
         data: {
           source: "TAXING_SCHEME_UPSERT_LOCAL",
@@ -133,7 +139,11 @@ export async function POST(request: NextRequest) {
             localId: null, // Always null on initial creation across your multi-tenant nodes
           },
           timestamp: new Date().toISOString(),
-          location: loc
+          location: {
+            inflowId: webhook.locationId,
+            url: webhook.location.url,
+            name: webhook.location.name
+          }
         },
         opts: { 
           attempts: 3, 
@@ -143,7 +153,7 @@ export async function POST(request: NextRequest) {
       }));
 
       await getMidSyncQueue().addBulk(jobsToQueue);
-      console.log(`[Queue] Successfully broadcasted sync jobs to ${validLocations.length} locations.`);
+      console.log(`[Queue] Successfully broadcasted sync jobs to ${jobsToQueue.length} locations.`);
     }
 
     return NextResponse.json(result.res, { status: 201 });
@@ -241,40 +251,46 @@ export async function PATCH(request: NextRequest) {
     // ==========================================
     // 🏢 STEP 1: DISPATCH CLOUD SYNC JOB
     // ==========================================
-    // await getMidSyncQueue().add(
-    //   "taxing_scheme_cloudsync_job",
-    //   {
-    //     source: "TAXING_SCHEME_UPSERT_CLOUD",
-    //     model: "TaxingScheme",
-    //     payload: {
-    //       ...cleanInflowPayload,
-    //       taxingSchemeId: cloudId,
-    //     },
-    //     timestamp: new Date().toISOString(),
-    //   },
-    //   { 
-    //     attempts: 3, 
-    //     backoff: { type: "exponential", delay: 2000 },
-    //     removeOnComplete: true
-    //   }
-    // );
+    const validCloudWebhook = await WebhookService.getCloudWebhookURL("taxingScheme");
+
+    if (validCloudWebhook) {
+      await getMidSyncQueue().add(
+        "taxing_scheme_cloudsync_job",
+        {
+          source: "TAXING_SCHEME_UPSERT_CLOUD",
+          model: "TaxingScheme",
+          payload: {
+            ...cleanInflowPayload,
+            taxingSchemeId: cloudId,
+          },
+          timestamp: new Date().toISOString(),
+        },
+        { 
+          attempts: 3, 
+          backoff: { type: "exponential", delay: 2000 },
+          removeOnComplete: true
+        }
+      );
+      console.log(`[Queue] Successfully broadcasted patch edits to inflow cloud.`);
+    }
 
     // ==========================================
     // 📍 STEP 2: BROADCAST LOCAL SYNC JOBS
     // ==========================================
-    const locations = await LocationService.getLocationURLs();
-    const validLocations = locations.filter(loc => loc.url && loc.url.trim() !== "");
+    const validWebhooks = await WebhookService.getLocationWebhookURLs("taxingScheme");
 
-    if (validLocations.length > 0) {
+    if (validWebhooks.length > 0) {
       // 🗺️ Query identity map registry to see which location already knows this record
       const existingMappings = await prisma.taxingSchemeLocationMap.findMany({
         where: { taxingSchemeId: cloudId },
         select: { locationId: true, localId: true }
       });
 
-      const jobsToQueue = validLocations.map((loc) => {
+      const jobsToQueue = validWebhooks
+        .filter(webhook => webhook.location.url && webhook.location.url.trim() !== "")
+        .map((webhook) => {
         // Find if this specific store branch has an integer mapping matching this entry
-        const match = existingMappings.find(m => m.locationId === loc.inflowId);
+        const match = existingMappings.find(m => m.locationId === webhook.locationId);
 
         return {
           name: "taxing_scheme_localsync_job",
@@ -287,7 +303,11 @@ export async function PATCH(request: NextRequest) {
               localId: match ? match.localId : null, // 💡 If exists, passes Int (e.g. 5). If null, local nodes create a fresh entry
             },
             timestamp: new Date().toISOString(),
-            location: loc
+            location: {
+              inflowId: webhook.locationId,
+              url: webhook.location.url,
+              name: webhook.location.name
+            }
           },
           opts: { 
             attempts: 3, 
@@ -298,7 +318,7 @@ export async function PATCH(request: NextRequest) {
       });
 
       await getMidSyncQueue().addBulk(jobsToQueue);
-      console.log(`[Queue] Successfully broadcasted patch edits to ${validLocations.length} store instances.`);
+      console.log(`[Queue] Successfully broadcasted patch edits to ${jobsToQueue.length} store instances.`);
     }
 
     return NextResponse.json(result.modifiedScheme, { status: 200 });
@@ -311,7 +331,7 @@ export async function PATCH(request: NextRequest) {
 // // app/api/admin/taxing-schemes/route.ts
 // import { NextRequest, NextResponse } from "next/server";
 // import { prisma } from "@/lib/prisma";
-// import { LocationService } from "@/services/location.service";
+// import { WebhookService } from "@/services/location.service";
 // import { getMidSyncQueue } from "@/lib/queues/sync.queue";
 
 // export async function POST(request: NextRequest) {
@@ -412,7 +432,7 @@ export async function PATCH(request: NextRequest) {
 //     const { cloudId, localId, ...inflowPayload} = compiledScheme;
 
 //     // 1. Fetch ALL locations from the database
-//     const locations = await LocationService.getLocationURLs();
+//     const locations = await WebhookService.getLocationURLs();
     
 //     // 2. Filter for locations that actually have a URL set
 //     const validLocations = locations.filter(loc => loc.url && loc.url.trim() !== "");
@@ -548,7 +568,7 @@ export async function PATCH(request: NextRequest) {
 //     const { cloudId, localId, ...inflowPayload} = modifiedScheme.inflowPayload;
 
 //     // 1. Fetch ALL locations from the database
-//     const locations = await LocationService.getLocationURLs();
+//     const locations = await WebhookService.getLocationURLs();
     
 //     // 2. Filter for locations that actually have a URL set
 //     const validLocations = locations.filter(loc => loc.url && loc.url.trim() !== "");

@@ -26,7 +26,7 @@ export async function GET(
 
     // 1. Verify existence of target location base node to ensure clean 404 responses
     const locationExists = await prisma.location.findUnique({
-      where: { inflowId: locationId },
+      where: { id: locationId },
       select: { name: true, isActive: true, isDefault: true  }
     });
 

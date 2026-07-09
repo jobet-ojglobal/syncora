@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { getMidSyncQueue } from "@/lib/queues/sync.queue";
 import { Prisma } from "@/generated/prisma/client";
 import { LocationService } from "@/services/location.service";
+import { WebhookService } from "@/services/webhook.service";
 
 export async function POST(request: NextRequest) {
   try {
@@ -95,15 +96,14 @@ export async function POST(request: NextRequest) {
 
       // 6. Seeding Financial Summaries concurrently
       await Promise.all([
-        tx.customerBalance.create({ data: { inflowId: crypto.randomUUID().toLowerCase(), localId: customer.localId, customerId, currencyId, balance: 0 } }),
-        tx.customerCredit.create({ data: { inflowId: crypto.randomUUID().toLowerCase(), localId: customer.localId, customerId, currencyId, credit: 0 } }),
-        tx.customerDue.create({ data: { inflowId: crypto.randomUUID().toLowerCase(), localId: customer.localId, customerId, currencyId, amountCurrent: 0, amount1To30: 0, amount31To60: 0, amount61Plus: 0 } })
+        tx.customerBalance.create({ data: { inflowId: crypto.randomUUID().toLowerCase(), customerId, currencyId, balance: 0 } }),
+        tx.customerCredit.create({ data: { inflowId: crypto.randomUUID().toLowerCase(), customerId, currencyId, credit: 0 } }),
+        tx.customerDue.create({ data: { inflowId: crypto.randomUUID().toLowerCase(), customerId, currencyId, amountCurrent: 0, amount1To30: 0, amount31To60: 0, amount61Plus: 0 } })
       ]);
 
       // 7. Construct Outbound payload representation
       const inflowPayload = {
         cloudId: customer.inflowId, 
-        localId: customer.localId, 
         name: businessPartner.name,
         contactName: businessPartner.contactName,
         email: businessPartner.email,
@@ -152,20 +152,31 @@ export async function POST(request: NextRequest) {
         }
       };
 
-      return { customer, inflowPayload };
+      return { res: customer, inflowPayload };
     });
 
-    const location = await LocationService.getLocationURL(defaultLocationId);
+    if (!result.res || !result.inflowPayload) {
+      return NextResponse.json({ error: "Failed to assemble customer components." }, { status: 500 });
+    }
 
-    if(location?.url){
+    const { cloudId, ...cleanInflowPayload } = result.inflowPayload;
+
+    // ==========================================
+    // 🏢 STEP 1: DISPATCH CLOUD SYNC JOB
+    // ==========================================
+    const validCloudWebhook = await WebhookService.getCloudWebhookURL("customer");
+
+    if (validCloudWebhook) {
       await getMidSyncQueue().add(
-        "customer_sync_job",
+        "customer_cloudsync_job",
         {
-          source: "CUSTOMER_UPSERT_LOCAL",
+          source: "CUSTOMER_UPSERT_CLOUD",
           model: "Customer",
-          payload: result.inflowPayload,
+          payload: {
+            ...cleanInflowPayload,
+            currencyId: cloudId,
+          },
           timestamp: new Date().toISOString(),
-          location: location
         },
         { 
           attempts: 3, 
@@ -173,25 +184,46 @@ export async function POST(request: NextRequest) {
           removeOnComplete: true
         }
       );
+      console.log(`[Queue] Successfully broadcasted sync job to inflow cloud.`);
     }
 
-    // 8. Push to queue outside the transaction to avoid holding database locks
-    // await getMidSyncQueue().add(
-    //   "customer_sync_job",
-    //   {
-    //     source: "CUSTOMER_SYNC_API",
-    //     model: "CUSTOMER",
-    //     payload: result.inflowPayload,
-    //     timestamp: new Date().toISOString(),
-    //     locationId: defaultLocationId
-    //   },
-    //   { 
-    //     attempts: 3, 
-    //     backoff: { type: "exponential", delay: 2000 },
-    //     removeOnComplete: true
-    //   }
-    // );
-    return NextResponse.json(result.customer, { status: 201 });
+    // ==========================================
+    // 📍 STEP 2: BROADCAST LOCAL SYNC JOBS
+    // ==========================================
+    const validWebhooks = await WebhookService.getLocationWebhookURLs("customer");
+
+    if (validWebhooks.length > 0) {
+      const jobsToQueue = validWebhooks
+      .filter(webhook => webhook.location.url && webhook.location.url.trim() !== "")
+      .map((webhook) => ({
+        name: "customer_localsync_job",
+        data: {
+          source: "CUSTOMER_UPSERT_LOCAL",
+          model: "Customer", 
+          payload: {
+            ...cleanInflowPayload,
+            currencyId: cloudId, 
+            localId: null, 
+          },
+          timestamp: new Date().toISOString(),
+          location: {
+            inflowId: webhook.locationId,
+            url: webhook.location.url,
+            name: webhook.location.name
+          }
+        },
+        opts: { 
+          attempts: 3, 
+          backoff: { type: "exponential", delay: 2000 },
+          removeOnComplete: true
+        }
+      }));
+
+      await getMidSyncQueue().addBulk(jobsToQueue);
+      console.log(`[Queue] Successfully broadcasted sync jobs to ${jobsToQueue.length} locations.`);
+    }
+
+    return NextResponse.json(result.res, { status: 201 });
   } catch (error) {
     console.error("[CUSTOMER_POST_ERROR]:", error);
     return NextResponse.json({ error: "Failed to process customer creation pipeline." }, { status: 500 });
@@ -321,7 +353,6 @@ export async function PATCH(request: NextRequest) {
        */
       const inflowPayload = {
         cloudId: updatedCustomer.inflowId, 
-        localId: updatedCustomer.localId, 
         name: businessPartner.name,
         contactName: businessPartner.contactName,
         email: businessPartner.email,
@@ -370,36 +401,31 @@ export async function PATCH(request: NextRequest) {
         }
       };
 
-      return { updatedCustomer, inflowPayload };
+      return { res: updatedCustomer, inflowPayload };
     });
 
-    // await getMidSyncQueue().add(
-    //   "customer_sync_job",
-    //   {
-    //     source: "CUSTOMER_SYNC_API",
-    //     model: "CUSTOMER",
-    //     payload: result.inflowPayload,
-    //     timestamp: new Date().toISOString(),
-    //     locationId: defaultLocationId
-    //   },
-    //   { 
-    //     attempts: 3, 
-    //     backoff: { type: "exponential", delay: 2000 },
-    //     removeOnComplete: true
-    //   }
-    // );
+    if (!result.res || !result.inflowPayload) {
+      return NextResponse.json({ error: "Failed to assemble customer components." }, { status: 500 });
+    }
 
-    const location = await LocationService.getLocationURL(defaultLocationId);
+    const { cloudId, ...cleanInflowPayload } = result.inflowPayload;
 
-    if(location?.url){
+    // ==========================================
+    // 🏢 STEP 1: DISPATCH CLOUD SYNC JOB
+    // ==========================================
+    const validCloudWebhook = await WebhookService.getCloudWebhookURL("customer");
+
+    if (validCloudWebhook) {
       await getMidSyncQueue().add(
-        "customer_sync_job",
+        "customer_cloudsync_job",
         {
-          source: "CUSTOMER_UPSERT_LOCAL",
+          source: "CUSTOMER_UPSERT_CLOUD",
           model: "Customer",
-          payload: result.inflowPayload,
+          payload: {
+            ...cleanInflowPayload,
+            currencyId: cloudId,
+          },
           timestamp: new Date().toISOString(),
-          location: location
         },
         { 
           attempts: 3, 
@@ -407,9 +433,57 @@ export async function PATCH(request: NextRequest) {
           removeOnComplete: true
         }
       );
+      console.log(`[Queue] Successfully broadcasted patch edits to inflow cloud.`);
     }
 
-    return NextResponse.json(result.updatedCustomer, { status: 200 });
+    // ==========================================
+    // 📍 STEP 2: BROADCAST LOCAL SYNC JOBS
+    // ==========================================
+    const validWebhooks = await WebhookService.getLocationWebhookURLs("customer");
+
+    if (validWebhooks.length > 0) {
+      // 🗺️ Query identity map registry to see which location already knows this record
+      const existingMappings = await prisma.customerLocationMap.findMany({
+        where: { customerId: cloudId },
+        select: { locationId: true, localId: true }
+      });
+
+      const jobsToQueue = validWebhooks
+        .filter(webhook => webhook.location.url && webhook.location.url.trim() !== "")
+        .map((webhook) => {
+        // Find if this specific store branch has an integer mapping matching this entry
+        const match = existingMappings.find(m => m.locationId === webhook.locationId);
+
+        return {
+          name: "customer_localsync_job",
+          data: {
+            source: "CUSTOMER_UPSERT_LOCAL",
+            model: "Customer",
+            payload: {
+              ...cleanInflowPayload,
+              customerId: cloudId, // Keeps the global trace uniform
+              localId: match ? match.localId : null, // 💡 If exists, passes Int (e.g. 5). If null, local nodes create a fresh entry
+            },
+            timestamp: new Date().toISOString(),
+            location: {
+              inflowId: webhook.locationId,
+              url: webhook.location.url,
+              name: webhook.location.name
+            }
+          },
+          opts: { 
+            attempts: 3, 
+            backoff: { type: "exponential", delay: 2000 },
+            removeOnComplete: true
+          }
+        };
+      });
+
+      await getMidSyncQueue().addBulk(jobsToQueue);
+      console.log(`[Queue] Successfully broadcasted patch edits to ${jobsToQueue.length} store instances.`);
+    }
+
+    return NextResponse.json(result.res, { status: 200 });
   } catch (error: any) {
     console.error("[CUSTOMER_PATCH_ERROR]:", error);
     return NextResponse.json({ error: error.message || "Internal failure modifying transactional parameters." }, { status: 500 });
@@ -594,7 +668,7 @@ export async function PATCH(request: NextRequest) {
 //     // 6. Enqueue Outbound Mid-Sync Job Outside Active DB Block
 //     const location = await LocationService.getLocationURL(defaultLocationId);
 
-//     if(location?.url){
+//     if(location?.location.url){
 //       await getMidSyncQueue().add(
 //         "customer_sync_job",
 //         {

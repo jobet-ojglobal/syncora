@@ -3,7 +3,7 @@ import { Worker, Job } from "bullmq";
 import { prisma } from "@/lib/prisma";
 import { connection } from "@/lib/redis";
 import { CustomerSyncResult, InflowCustomerWebhookService } from "../locations/services/customer.service";
-import { InflowTaxingSchemeWebhookService } from "../locations/services/taxing-scheme.service";
+import { MappingWebhookService } from "../locations/services/mapping.service";
 
 // import { locationApi } from "@/lib/location/location.client";
 // import { CustomerSyncResult } from "@/lib/location/webhooks/webhook-customer.service";
@@ -35,9 +35,14 @@ const locationWorker = new Worker<LocationWebhookJobData>(
         case "salesOrder":
           result = { success: true};
           break;
-
-        case "taxingScheme":
-          result = await InflowTaxingSchemeWebhookService.handleTaxingSchemeUpsert(data.taxingSchemeId, dataId, loggedEventId, locationId);
+        case "customerLocal":
+          result = await MappingWebhookService.handleCustomerMap(data.taxingSchemeId, dataId, loggedEventId, locationId);
+          break;
+        case "taxingSchemeLocal":
+          result = await MappingWebhookService.handleTaxingSchemeMap(data.taxingSchemeId, dataId, loggedEventId, locationId);
+          break;
+        case "currencyLocal":
+          result = await MappingWebhookService.handleCurrencyMap(data.taxingSchemeId, dataId, loggedEventId, locationId);
           break;
 
         default:

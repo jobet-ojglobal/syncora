@@ -15,7 +15,7 @@ export async function upsertTaxingScheme(
   const apiClient = new BranchClient(url)
   return await apiClient.post<UpsertResult>(
     `/inbound/receive`, {
-        "eventType": "taxingScheme",
+        "eventType": "taxingSchemeLocal",
         "transactionType": "TAXING_SCHEME",
         "batch_id": `TXSCM-${crypto.randomUUID().toLowerCase()}`,
         "sourceSystem": "MID",

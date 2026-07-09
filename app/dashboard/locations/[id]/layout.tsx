@@ -1,7 +1,7 @@
 import { ArrowLeft, Building2, Clock, MapPin, Pencil } from "lucide-react";
 import Link from "next/link";
 import OverviewNav from "@/components/layout/dashboard/OverviewNav";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { LocationService } from "@/services/location.service";
 import { Button } from "@/components/ui/button";
 import { DeleteButton } from "@/components/shared/delete-button";

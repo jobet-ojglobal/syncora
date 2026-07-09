@@ -13,6 +13,270 @@ function getCartesianProduct(arrays: any[][]): any[][] {
   );
 }
 
+// export async function POST(request: NextRequest) {
+//   try {
+//     const body = await request.json();
+//     const { 
+//       name, 
+//       description, 
+//       brandId, 
+//       categoryId, 
+//       isActive, 
+//       options, 
+//       tags, 
+//       features,
+//       skuPattern,   
+//       skuSeparator  
+//     } = body;
+
+//     if (!name || !options || options.length === 0) {
+//       return NextResponse.json({ error: "Missing required identification metadata matrix options." }, { status: 400 });
+//     }
+
+//     const activePattern = skuPattern || "[PARENT_SKU]-[VAL_1]-[VAL_2]-[INDEX]";
+//     const activeSeparator = typeof skuSeparator === "string" ? skuSeparator : "-";
+
+//     // 1. Resolve brand context for SKU prefixing patterns
+//     const brand = await prisma.brand.findUnique({
+//       where: { id: brandId || "" },
+//       select: { name: true }
+//     });
+//     const brandName = brand?.name || "GENERIC";
+
+//     const masterGroupInflowId = crypto.randomUUID().toLowerCase();
+//     const groupSlug = await genUniqueSlug(name, prisma.productGroup);
+
+//     // Execute everything safely wrapped in a sequential database isolation transaction
+//     const savedGroup = await prisma.$transaction(async (tx) => {
+      
+//       // 2. Insert primary Root ProductGroup configuration record node
+//       const group = await tx.productGroup.create({
+//         data: {
+//           inflowId: masterGroupInflowId,
+//           name,
+//           slug: groupSlug,
+//           description: description || null,
+//           brandId: brandId || null,
+//           categoryId: categoryId || null,
+//           isActive: isActive ?? true,
+//         }
+//       });
+
+//       // --- [Features & Tags mapping layers] ---
+//       const localizedFeaturesList: Array<{ featureId: string; featureValueId: string }> = [];
+//       for (const feat of (features || [])) {
+//         if (!feat.key.trim() || !feat.value.trim()) continue;
+//         const dbFeature = await tx.feature.upsert({
+//           where: { name: feat.key.trim() }, update: {}, create: { name: feat.key.trim() }
+//         });
+//         const dbFeatureValue = await tx.featureValue.upsert({
+//           where: { featureId_value: { featureId: dbFeature.id, value: feat.value.trim() } },
+//           update: {}, create: { featureId: dbFeature.id, value: feat.value.trim() }
+//         });
+//         localizedFeaturesList.push({ featureId: dbFeature.id, featureValueId: dbFeatureValue.id });
+//         await tx.productGroupFeature.create({
+//           data: { groupId: group.inflowId, featureId: dbFeature.id, featureValueId: dbFeatureValue.id }
+//         });
+//       }
+
+//       const localizedTagsList: string[] = [];
+//       for (const tagStr of (tags || [])) {
+//         if (!tagStr.trim()) continue;
+//         const dbTag = await tx.tag.upsert({
+//           where: { name: tagStr.trim() }, update: {}, create: { name: tagStr.trim() }
+//         });
+//         localizedTagsList.push(dbTag.id);
+//         await tx.productGroupTag.create({ data: { groupId: group.inflowId, tagId: dbTag.id } });
+//       }
+
+//       // 3. Structural Storage Map for items
+//       const structuralOptionsMap: Array<{
+//         optionInflowId: string;
+//         optionName: string;
+//         values: Array<{ valueInflowId: string; literalStr: string; isSkuDriver: boolean }>;
+//       }> = [];
+
+//       for (let i = 0; i < options.length; i++) {
+//         const opt = options[i];
+//         const optionInflowId = crypto.randomUUID().toLowerCase();
+//         const targetAttributeId = opt.attributeId && opt.attributeId !== "custom-literal-mode" ? opt.attributeId : null;
+
+//         let finalAttributeId = targetAttributeId;
+//         if (!finalAttributeId) {
+//           const fallbackAttribute = await tx.attribute.upsert({
+//             where: { name: opt.name.trim() }, update: {}, create: { name: opt.name.trim() }
+//           });
+//           finalAttributeId = fallbackAttribute.id;
+//         }
+
+//         const createdOpt = await tx.productGroupOption.create({
+//           data: { inflowId: optionInflowId, productGroupId: group.inflowId, lineNum: i + 1, attributeId: finalAttributeId }
+//         });
+
+//         const loggedValues: Array<{ valueInflowId: string; literalStr: string; isSkuDriver: boolean }> = [];
+//         for (let j = 0; j < opt.values.length; j++) {
+//           const val = opt.values[j];
+//           const valueInflowId = crypto.randomUUID().toLowerCase();
+          
+//           // 🎯 UPDATED: Map matching value definitions from incoming form body array
+//           const formValueObj = opt.values[j];
+//           const isSkuDriver = formValueObj?.isSkuDriver ?? true; // fallback to true if undefined
+
+//           const dbAttrValue = await tx.attributeValue.upsert({
+//             where: { attributeId_value: { attributeId: finalAttributeId, value: val.value.trim() } },
+//             update: {}, create: { attributeId: finalAttributeId, value: val.value.trim() }
+//           });
+          
+//           await tx.productGroupOptionValue.create({
+//             data: { inflowId: valueInflowId, optionId: createdOpt.inflowId, lineNum: j + 1, attributeValueId: dbAttrValue.id }
+//           });
+          
+//           loggedValues.push({ valueInflowId, literalStr: val.value, isSkuDriver });
+//         }
+//         structuralOptionsMap.push({ optionInflowId, optionName: opt.name, values: loggedValues });
+//       }
+
+//       // 🎯 UPDATED: Include ALL values for the initial cartesian engine loop matrix
+//       // const valueArraysForCartesian = structuralOptionsMap.map(opt => 
+//       //   opt.values.map(v => ({
+//       //     optionInflowId: opt.optionInflowId,
+//       //     optionName: opt.optionName,
+//       //     valueInflowId: v.valueInflowId,
+//       //     literalStr: v.literalStr,
+//       //     isSkuDriver: v.isSkuDriver // 👈 Forward flag to the loop index
+//       //   }))
+//       // );
+
+//       // // 7. Generate intersections dynamically across all available properties
+//       // const cartesianIntersections = getCartesianProduct(valueArraysForCartesian);
+
+//       // 🟢 STEP 6: Compute Matrix Array Intersections (Only include active SKU drivers)
+//       const valueArraysForCartesian = structuralOptionsMap
+//         .map(opt => {
+//           // Look up the matching incoming option payload block
+//           const originalOpt = options.find((o: any) => o.name === opt.optionName);
+          
+//           // 🎯 CRITICAL RULE: If option level is false, return empty array to skip child elements
+//           if (!originalOpt?.isDriver) return [];
+
+//           return opt.values
+//             .filter(v => v.isSkuDriver === true) // Check item level driver flag
+//             .map(v => ({
+//               optionInflowId: opt.optionInflowId,
+//               optionName: opt.optionName, 
+//               valueInflowId: v.valueInflowId,
+//               literalStr: v.literalStr,
+//               isSkuDriver: v.isSkuDriver 
+//             }));
+//         })
+//         // Drop groups that have no contributing driver elements
+//         .filter(group => group.length > 0); 
+
+//       const cartesianIntersections = getCartesianProduct(valueArraysForCartesian);
+
+//       // 8. Generate individual child products with variable values conditional mapping
+//       for (let index = 0; index < cartesianIntersections.length; index++) {
+//         const intersection = cartesianIntersections[index];
+//         const variationLabels = intersection.map(item => item.literalStr).join(" / ");
+//         const variantName = `${name} (${variationLabels})`;
+//         const variantProductInflowId = crypto.randomUUID().toLowerCase();
+        
+//         // Dynamic base setup variables strings
+//         const parentSkuMock = name.toUpperCase().substring(0, 6).replace(/\s+/g, "") + "-100";
+//         const brandTokenStr = brandName.toUpperCase().substring(0, 3).replace(/\s+/g, "");
+//         const incrementalSequenceStr = String(index + 1).padStart(3, "0");
+
+//         let generatedSku = activePattern
+//           .replace("[PARENT_SKU]", parentSkuMock)
+//           .replace("[BRAND]", brandTokenStr)
+//           .replace("[INDEX]", incrementalSequenceStr);
+
+//         // 🎯 UPDATED: Run the generator replacement loop conditionally based on value state overrides
+//         intersection.forEach((sel) => {
+//           const tokenKey = `[${sel.optionName.trim().toUpperCase().replace(/\s+/g, "_")}]`;
+          
+//           if (sel.isSkuDriver) {
+//             // Apply true value parameter formatting configuration string 
+//             const sanitizedValue = sel.literalStr.trim().toUpperCase().replace(/\s+/g, "");
+//             generatedSku = generatedSku.split(tokenKey).join(sanitizedValue);
+//           } else {
+//             // Strip option configuration tokens from the compiled result string if disabled
+//             generatedSku = generatedSku.split(tokenKey).join("");
+//           }
+//         });
+
+//         // Clean double/trailing spacer patterns left over from skipped parameters
+//         if (activeSeparator) {
+//           const doubleSepRegex = new RegExp(`\\${activeSeparator}+`, "g");
+//           generatedSku = generatedSku.replace(doubleSepRegex, activeSeparator);
+          
+//           if (generatedSku.startsWith(activeSeparator)) generatedSku = generatedSku.slice(activeSeparator.length);
+//           if (generatedSku.endsWith(activeSeparator)) generatedSku = generatedSku.slice(0, -activeSeparator.length);
+//         }
+
+//         const generatedSlug = await genUniqueSlug(variantName, prisma.product);
+
+//         // A. Insert base SKU catalog entity placeholder table record
+//         const childProduct = await tx.product.create({
+//           data: {
+//             inflowId: variantProductInflowId,
+//             sku: generatedSku, 
+//             name: variantName,
+//             slug: generatedSlug,
+//             description: description || null,
+//             isActive: false,
+//             brandId: brandId || null,
+//             categoryId: categoryId || null
+//           }
+//         });
+
+//         // B. Connect structural relationship layout balances definitions metrics mapping 
+//         const productVariantInflowId = crypto.randomUUID().toLowerCase();
+//         const variantSignature = intersection.map(item => item.valueInflowId).sort().join("-");
+
+//         await tx.productVariant.create({
+//           data: {
+//             inflowId: productVariantInflowId,
+//             productGroupId: group.inflowId,
+//             productId: childProduct.inflowId,
+//             defaultPrice: 0.00,
+//             signature: variantSignature, 
+//             variantCount: cartesianIntersections.length, 
+//             selections: {
+//               create: intersection.map((sel) => ({
+//                 optionId: sel.optionInflowId, 
+//                 optionValueId: sel.valueInflowId, 
+//               }))
+//             }
+//           }
+//         });
+
+//         // C & D Join layers
+//         for (const featRelation of localizedFeaturesList) {
+//           await tx.productFeature.create({
+//             data: { productId: childProduct.inflowId, featureId: featRelation.featureId, featureValueId: featRelation.featureValueId }
+//           });
+//         }
+//         for (const tagId of localizedTagsList) {
+//           await tx.productTag.create({
+//             data: { productId: childProduct.inflowId, tagId: tagId }
+//           });
+//         }
+//       }
+
+//       return group;
+//     });
+
+//     return NextResponse.json(savedGroup, { status: 201 });
+//   } catch (error: any) {
+//     console.error("Product Group generation crash failure:", error);
+//     return NextResponse.json(
+//       { error: error.message || "Database execution error during transactional commit layers." }, 
+//       { status: 500 }
+//     );
+//   }
+// }
+
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
@@ -118,9 +382,8 @@ export async function POST(request: NextRequest) {
           const val = opt.values[j];
           const valueInflowId = crypto.randomUUID().toLowerCase();
           
-          // 🎯 UPDATED: Map matching value definitions from incoming form body array
           const formValueObj = opt.values[j];
-          const isSkuDriver = formValueObj?.isSkuDriver ?? true; // fallback to true if undefined
+          const isSkuDriver = formValueObj?.isSkuDriver ?? true; 
 
           const dbAttrValue = await tx.attributeValue.upsert({
             where: { attributeId_value: { attributeId: finalAttributeId, value: val.value.trim() } },
@@ -136,31 +399,14 @@ export async function POST(request: NextRequest) {
         structuralOptionsMap.push({ optionInflowId, optionName: opt.name, values: loggedValues });
       }
 
-      // 🎯 UPDATED: Include ALL values for the initial cartesian engine loop matrix
-      // const valueArraysForCartesian = structuralOptionsMap.map(opt => 
-      //   opt.values.map(v => ({
-      //     optionInflowId: opt.optionInflowId,
-      //     optionName: opt.optionName,
-      //     valueInflowId: v.valueInflowId,
-      //     literalStr: v.literalStr,
-      //     isSkuDriver: v.isSkuDriver // 👈 Forward flag to the loop index
-      //   }))
-      // );
-
-      // // 7. Generate intersections dynamically across all available properties
-      // const cartesianIntersections = getCartesianProduct(valueArraysForCartesian);
-
       // 🟢 STEP 6: Compute Matrix Array Intersections (Only include active SKU drivers)
       const valueArraysForCartesian = structuralOptionsMap
         .map(opt => {
-          // Look up the matching incoming option payload block
           const originalOpt = options.find((o: any) => o.name === opt.optionName);
-          
-          // 🎯 CRITICAL RULE: If option level is false, return empty array to skip child elements
           if (!originalOpt?.isDriver) return [];
 
           return opt.values
-            .filter(v => v.isSkuDriver === true) // Check item level driver flag
+            .filter(v => v.isSkuDriver === true) 
             .map(v => ({
               optionInflowId: opt.optionInflowId,
               optionName: opt.optionName, 
@@ -169,7 +415,6 @@ export async function POST(request: NextRequest) {
               isSkuDriver: v.isSkuDriver 
             }));
         })
-        // Drop groups that have no contributing driver elements
         .filter(group => group.length > 0); 
 
       const cartesianIntersections = getCartesianProduct(valueArraysForCartesian);
@@ -177,13 +422,19 @@ export async function POST(request: NextRequest) {
       // 8. Generate individual child products with variable values conditional mapping
       for (let index = 0; index < cartesianIntersections.length; index++) {
         const intersection = cartesianIntersections[index];
-        const variationLabels = intersection.map(item => item.literalStr).join(" / ");
-        const variantName = `${name} (${variationLabels})`;
+        
+        // 🎯 UPDATED: Formats naming precisely like "Camera TX Pro (Air Force Blue / Muted Denim / Metal)"
+        const variationLabels = intersection.map(item => item.literalStr.trim()).join(" / ");
+        const variantName = `${name.trim()} (${variationLabels})`;
         const variantProductInflowId = crypto.randomUUID().toLowerCase();
         
         // Dynamic base setup variables strings
         const parentSkuMock = name.toUpperCase().substring(0, 6).replace(/\s+/g, "") + "-100";
-        const brandTokenStr = brandName.toUpperCase().substring(0, 3).replace(/\s+/g, "");
+        
+        // 🎯 UPDATED: Extracts the brand's full first word instead of slicing 3 letters
+        const firstBrandWord = brandName.trim().split(/\s+/)[0] || "GENERIC";
+        const brandTokenStr = firstBrandWord.toUpperCase().replace(/[^A-Z0-9]/g, "");
+        
         const incrementalSequenceStr = String(index + 1).padStart(3, "0");
 
         let generatedSku = activePattern
@@ -191,16 +442,13 @@ export async function POST(request: NextRequest) {
           .replace("[BRAND]", brandTokenStr)
           .replace("[INDEX]", incrementalSequenceStr);
 
-        // 🎯 UPDATED: Run the generator replacement loop conditionally based on value state overrides
         intersection.forEach((sel) => {
           const tokenKey = `[${sel.optionName.trim().toUpperCase().replace(/\s+/g, "_")}]`;
           
           if (sel.isSkuDriver) {
-            // Apply true value parameter formatting configuration string 
             const sanitizedValue = sel.literalStr.trim().toUpperCase().replace(/\s+/g, "");
             generatedSku = generatedSku.split(tokenKey).join(sanitizedValue);
           } else {
-            // Strip option configuration tokens from the compiled result string if disabled
             generatedSku = generatedSku.split(tokenKey).join("");
           }
         });
@@ -232,7 +480,12 @@ export async function POST(request: NextRequest) {
 
         // B. Connect structural relationship layout balances definitions metrics mapping 
         const productVariantInflowId = crypto.randomUUID().toLowerCase();
-        const variantSignature = intersection.map(item => item.valueInflowId).sort().join("-");
+        
+        // 🎯 UPDATED: Enhanced Variant Signature mapping structurally via OptionID:ValueID pairs, sorted alphabetically
+        const variantSignature = intersection
+          .map(item => `${item.optionInflowId}:${item.valueInflowId}`)
+          .sort()
+          .join("|");
 
         await tx.productVariant.create({
           data: {
@@ -405,7 +658,6 @@ export async function PATCH(request: NextRequest) {
           const val = opt.values[j];
           const valueInflowId = crypto.randomUUID().toLowerCase();
           
-          // 🎯 ATOMIC UPDATE: Capture value level toggle driver flags directly from request options schema context
           const isSkuDriver = val?.isSkuDriver ?? true;
 
           const dbAttrValue = await tx.attributeValue.upsert({
@@ -420,41 +672,23 @@ export async function PATCH(request: NextRequest) {
         structuralOptionsMap.push({ optionInflowId, optionName: opt.name, values: loggedValues });
       }
 
-      // 🟢 STEP 6: 🎯 REFACTOR: Pass ALL option data through to guarantee variant matrices arrays stay complete
-      // const valueArraysForCartesian = structuralOptionsMap.map(opt => 
-      //   opt.values.map(v => ({
-      //     optionInflowId: opt.optionInflowId,
-      //     optionName: opt.optionName, 
-      //     valueInflowId: v.valueInflowId,
-      //     fingerprintId: v.fingerprintId,
-      //     literalStr: v.literalStr,
-      //     isSkuDriver: v.isSkuDriver // 👈 Forward flag down to generation loops pipeline
-      //   }))
-      // );
-
-      // const newCartesianIntersections = getCartesianProduct(valueArraysForCartesian);
-
       // 🟢 STEP 6: Compute Matrix Array Intersections (Only include active SKU drivers)
       const valueArraysForCartesian = structuralOptionsMap
         .map(opt => {
-          // Look up the matching incoming option payload block
           const originalOpt = options.find((o: any) => o.name === opt.optionName);
-          
-          // 🎯 CRITICAL RULE: If option level is false, return empty array to skip child elements
           if (!originalOpt?.isDriver) return [];
 
           return opt.values
-            .filter(v => v.isSkuDriver === true) // Check item level driver flag
+            .filter(v => v.isSkuDriver === true) 
             .map(v => ({
               optionInflowId: opt.optionInflowId,
               optionName: opt.optionName, 
               valueInflowId: v.valueInflowId,
-              fingerprintId: v.fingerprintId ?? undefined, // Only needed for PATCH
+              fingerprintId: v.fingerprintId ?? undefined,
               literalStr: v.literalStr,
               isSkuDriver: v.isSkuDriver 
             }));
         })
-        // Drop groups that have no contributing driver elements
         .filter(group => group.length > 0); 
 
       const newCartesianIntersections = getCartesianProduct(valueArraysForCartesian);
@@ -484,39 +718,43 @@ export async function PATCH(request: NextRequest) {
         const currentSku = variant.product?.sku;
         if (!currentSku) return;
 
-        // Split on your active separator (e.g., "-")
         const parts = currentSku.split(activeSeparator);
         if (parts.length > 0) {
-          // Grab the last element in the SKU string token sequence
           const lastPart = parts[parts.length - 1]; 
           const parsedIndex = parseInt(lastPart, 10);
           
-          // Ensure it's a valid number before comparing
           if (!isNaN(parsedIndex) && parsedIndex > highestCurrentIndex) {
             highestCurrentIndex = parsedIndex;
           }
         }
       });
 
-      // Track our ongoing operational pointer safely out of the loop range
       let nextSequenceCounter = highestCurrentIndex + 1;
 
       for (let index = 0; index < newCartesianIntersections.length; index++) {
         const intersection = newCartesianIntersections[index];
         if (intersection.length === 0) continue;
 
-        const newSignature = intersection.map(item => item.fingerprintId).sort().join("-");
+        // 🎯 UPDATED: Enhanced Variant Signature layout mapping to match [OptionID]:[ValueID] joined by "|"
+        const newSignature = intersection
+          .map(item => `${item.optionInflowId}:${item.valueInflowId}`)
+          .sort()
+          .join("|");
+
         if (existingSignatures.includes(newSignature)) continue;
 
-        const variationLabels = intersection.map(item => item.literalStr).join(" / ");
-        const variantName = `${name} (${variationLabels})`;
+        // 🎯 UPDATED: Formats naming precisely like "Camera TX Pro (Air Force Blue / Muted Denim / Metal)"
+        const variationLabels = intersection.map(item => item.literalStr.trim()).join(" / ");
+        const variantName = `${name.trim()} (${variationLabels})`;
         const childProductInflowId = crypto.randomUUID().toLowerCase();
 
         // 🛠️ DYNAMIC SKU COMPILER LOGIC FOR NEW INTERSECTIONS
         const parentSkuMock = name.toUpperCase().substring(0, 6).replace(/\s+/g, "") + "-100";
-        const brandTokenStr = brandName.toUpperCase().substring(0, 3).replace(/\s+/g, "");
-        // const incrementalSequenceStr = String(index + 1).padStart(3, "0");
-        // 🎯 CRITICAL FIX: Instead of your loop's 'index', format the running sequence counter
+        
+        // 🎯 UPDATED: Extracts the brand's full first word instead of slicing 3 letters
+        const firstBrandWord = brandName.trim().split(/\s+/)[0] || "GENERIC";
+        const brandTokenStr = firstBrandWord.toUpperCase().replace(/[^A-Z0-9]/g, "");
+        
         const incrementalSequenceStr = String(nextSequenceCounter).padStart(3, "0");
 
         let generatedSku = activePattern
@@ -524,7 +762,6 @@ export async function PATCH(request: NextRequest) {
           .replace("[BRAND]", brandTokenStr)
           .replace("[INDEX]", incrementalSequenceStr);
 
-        // 🎯 INTERSECTION LOOP REFACTOR: Map runtime tokens conditionally based on item-level flag overrides
         intersection.forEach((sel) => {
           const tokenKey = `[${sel.optionName.trim().toUpperCase().replace(/\s+/g, "_")}]`;
           
@@ -532,7 +769,6 @@ export async function PATCH(request: NextRequest) {
             const sanitizedValue = sel.literalStr.trim().toUpperCase().replace(/\s+/g, "");
             generatedSku = generatedSku.split(tokenKey).join(sanitizedValue);
           } else {
-            // Strip option placeholder parameters if item is flagged to drop from dynamic compiling handles
             generatedSku = generatedSku.split(tokenKey).join("");
           }
         });
@@ -655,6 +891,371 @@ export async function PATCH(request: NextRequest) {
     return NextResponse.json({ error: error.message || "Internal Matrix Mutation Crash" }, { status: 500 });
   }
 }
+
+// export async function PATCH(request: NextRequest) {
+//   try {
+//     const body = await request.json();
+//     const { 
+//       id: groupId, 
+//       brandId, 
+//       categoryId, 
+//       isActive, 
+//       name, 
+//       features, 
+//       description, 
+//       tags, 
+//       options, 
+//       variants: incomingVariantsManager,
+//       skuPattern,   
+//       skuSeparator  
+//     } = body;
+
+//     if (!groupId || !name || !options || options.length === 0) {
+//       return NextResponse.json({ error: "Missing required identification metadata matrix options." }, { status: 400 });
+//     }
+
+//     // Default configuration fallbacks if missing
+//     const activePattern = skuPattern || "[PARENT_SKU]-[VAL_1]-[VAL_2]-[INDEX]";
+//     const activeSeparator = typeof skuSeparator === "string" ? skuSeparator : "-";
+
+//     const brand = await prisma.brand.findUnique({
+//       where: { id: brandId || "" },
+//       select: { name: true }
+//     });
+//     const brandName = brand?.name || "GENERIC";
+//     const groupSlug = await genUniqueSlug(name, prisma.productGroup, groupId);
+
+//     // Pre-deduplicate incoming tags & features in memory before transaction layer
+//     const uniqueFeaturesMap = new Map<string, string>();
+//     for (const feat of (features || [])) {
+//       if (feat.key?.trim() && feat.value?.trim()) {
+//         uniqueFeaturesMap.set(feat.key.trim(), feat.value.trim());
+//       }
+//     }
+
+//     const uniqueTagsSet = new Set<string>();
+//     for (const tagStr of (tags || [])) {
+//       if (tagStr?.trim()) uniqueTagsSet.add(tagStr.trim());
+//     }
+
+//     const updatedGroup = await prisma.$transaction(async (tx) => {
+      
+//       // 🟢 STEP 1: Purge Old Relational Join Mappings
+//       await tx.productGroupFeature.deleteMany({ where: { groupId } });
+//       await tx.productGroupTag.deleteMany({ where: { groupId } });
+      
+//       await tx.productGroupOptionValue.deleteMany({
+//         where: { option: { productGroupId: groupId } }
+//       });
+//       await tx.productGroupOption.deleteMany({ where: { productGroupId: groupId } });
+
+//       // 🟢 STEP 2: Update Primary Root ProductGroup Core Record Node
+//       const group = await tx.productGroup.update({
+//         where: { inflowId: groupId },
+//         data: {
+//           name,
+//           slug: groupSlug,
+//           description: description || null,
+//           brandId: brandId || null,
+//           categoryId: categoryId || null,
+//           isActive: isActive ?? true,
+//         }
+//       });
+
+//       const localizedFeaturesList: Array<{ id: string; val: string }> = [];
+//       const localizedTagsList: string[] = [];
+
+//       // 🟢 STEP 3: Re-map Structural System Features Configuration Definitions
+//       for (const [featKey, featVal] of uniqueFeaturesMap.entries()) {
+//         const dbFeature = await tx.feature.upsert({
+//           where: { name: featKey }, update: {}, create: { name: featKey }
+//         });
+//         const dbFeatureValue = await tx.featureValue.upsert({
+//           where: { featureId_value: { featureId: dbFeature.id, value: featVal } },
+//           update: {}, create: { featureId: dbFeature.id, value: featVal }
+//         });
+//         await tx.productGroupFeature.create({
+//           data: { groupId: group.inflowId, featureId: dbFeature.id, featureValueId: dbFeatureValue.id }
+//         });
+//         localizedFeaturesList.push({ id: dbFeature.id, val: featVal });
+//       }
+
+//       // 🟢 STEP 4: Re-map System Discoverability Search Keywords
+//       for (const tagStr of uniqueTagsSet) {
+//         const dbTag = await tx.tag.upsert({
+//           where: { name: tagStr }, update: {}, create: { name: tagStr }
+//         });
+//         await tx.productGroupTag.create({
+//           data: { groupId: group.inflowId, tagId: dbTag.id }
+//         });
+//         localizedTagsList.push(dbTag.id);
+//       }
+
+//       // 🟢 STEP 5: Populate Re-built Clean Database Metadata Configuration Rows
+//       const structuralOptionsMap: Array<{
+//         optionInflowId: string;
+//         optionName: string;
+//         values: Array<{ valueInflowId: string; fingerprintId: string; literalStr: string; isSkuDriver: boolean }>;
+//       }> = [];
+
+//       for (let i = 0; i < options.length; i++) {
+//         const opt = options[i];
+//         const optionInflowId = crypto.randomUUID().toLowerCase();
+//         const targetAttributeId = opt.attributeId && opt.attributeId !== "custom-literal-mode" ? opt.attributeId : null;
+
+//         let finalAttributeId = targetAttributeId;
+//         if (!finalAttributeId) {
+//           const fallbackAttribute = await tx.attribute.upsert({
+//             where: { name: opt.name.trim() }, update: {}, create: { name: opt.name.trim() }
+//           });
+//           finalAttributeId = fallbackAttribute.id;
+//         }
+
+//         const createdOpt = await tx.productGroupOption.create({
+//           data: { inflowId: optionInflowId, productGroupId: group.inflowId, lineNum: i + 1, attributeId: finalAttributeId }
+//         });
+
+//         const loggedValues: Array<{ valueInflowId: string; fingerprintId: string; literalStr: string; isSkuDriver: boolean }> = [];
+//         for (let j = 0; j < opt.values.length; j++) {
+//           const val = opt.values[j];
+//           const valueInflowId = crypto.randomUUID().toLowerCase();
+          
+//           // 🎯 ATOMIC UPDATE: Capture value level toggle driver flags directly from request options schema context
+//           const isSkuDriver = val?.isSkuDriver ?? true;
+
+//           const dbAttrValue = await tx.attributeValue.upsert({
+//             where: { attributeId_value: { attributeId: finalAttributeId, value: val.value.trim() } },
+//             update: {}, create: { attributeId: finalAttributeId, value: val.value.trim() }
+//           });
+//           await tx.productGroupOptionValue.create({
+//             data: { inflowId: valueInflowId, optionId: createdOpt.inflowId, lineNum: j + 1, attributeValueId: dbAttrValue.id }
+//           });
+//           loggedValues.push({ valueInflowId, fingerprintId: dbAttrValue.id, literalStr: val.value.trim(), isSkuDriver });
+//         }
+//         structuralOptionsMap.push({ optionInflowId, optionName: opt.name, values: loggedValues });
+//       }
+
+//       // 🟢 STEP 6: Compute Matrix Array Intersections (Only include active SKU drivers)
+//       const valueArraysForCartesian = structuralOptionsMap
+//         .map(opt => {
+//           // Look up the matching incoming option payload block
+//           const originalOpt = options.find((o: any) => o.name === opt.optionName);
+          
+//           // 🎯 CRITICAL RULE: If option level is false, return empty array to skip child elements
+//           if (!originalOpt?.isDriver) return [];
+
+//           return opt.values
+//             .filter(v => v.isSkuDriver === true) // Check item level driver flag
+//             .map(v => ({
+//               optionInflowId: opt.optionInflowId,
+//               optionName: opt.optionName, 
+//               valueInflowId: v.valueInflowId,
+//               fingerprintId: v.fingerprintId ?? undefined, // Only needed for PATCH
+//               literalStr: v.literalStr,
+//               isSkuDriver: v.isSkuDriver 
+//             }));
+//         })
+//         // Drop groups that have no contributing driver elements
+//         .filter(group => group.length > 0); 
+
+//       const newCartesianIntersections = getCartesianProduct(valueArraysForCartesian);
+
+//       // Fetch currently stored item variations for differential mapping updates
+//       const existingVariants = await tx.productVariant.findMany({
+//         where: { productGroupId: groupId },
+//         select: { inflowId: true, signature: true, productId: true }
+//       });
+//       const existingSignatures = existingVariants.map(v => v.signature);
+
+//       // 🟢 STEP 7: Append Structural Additions (With Custom SKU Engine Integration)
+
+//       // 1. Fetch ALL current products tied to this group to look up their actual assigned SKUs
+//       const groupProductsWithSkus = await tx.productVariant.findMany({
+//         where: { productGroupId: groupId },
+//         select: {
+//           product: {
+//             select: { sku: true }
+//           }
+//         }
+//       });
+
+//       // 2. Parse out the maximum numerical index suffix found (e.g., "003" -> 3)
+//       let highestCurrentIndex = 0;
+//       groupProductsWithSkus.forEach((variant) => {
+//         const currentSku = variant.product?.sku;
+//         if (!currentSku) return;
+
+//         // Split on your active separator (e.g., "-")
+//         const parts = currentSku.split(activeSeparator);
+//         if (parts.length > 0) {
+//           // Grab the last element in the SKU string token sequence
+//           const lastPart = parts[parts.length - 1]; 
+//           const parsedIndex = parseInt(lastPart, 10);
+          
+//           // Ensure it's a valid number before comparing
+//           if (!isNaN(parsedIndex) && parsedIndex > highestCurrentIndex) {
+//             highestCurrentIndex = parsedIndex;
+//           }
+//         }
+//       });
+
+//       // Track our ongoing operational pointer safely out of the loop range
+//       let nextSequenceCounter = highestCurrentIndex + 1;
+
+//       for (let index = 0; index < newCartesianIntersections.length; index++) {
+//         const intersection = newCartesianIntersections[index];
+//         if (intersection.length === 0) continue;
+
+//         const newSignature = intersection.map(item => item.fingerprintId).sort().join("-");
+//         if (existingSignatures.includes(newSignature)) continue;
+
+//         const variationLabels = intersection.map(item => item.literalStr).join(" / ");
+//         const variantName = `${name} (${variationLabels})`;
+//         const childProductInflowId = crypto.randomUUID().toLowerCase();
+
+//         // 🛠️ DYNAMIC SKU COMPILER LOGIC FOR NEW INTERSECTIONS
+//         const parentSkuMock = name.toUpperCase().substring(0, 6).replace(/\s+/g, "") + "-100";
+//         const brandTokenStr = brandName.toUpperCase().substring(0, 3).replace(/\s+/g, "");
+//         // const incrementalSequenceStr = String(index + 1).padStart(3, "0");
+//         // 🎯 CRITICAL FIX: Instead of your loop's 'index', format the running sequence counter
+//         const incrementalSequenceStr = String(nextSequenceCounter).padStart(3, "0");
+
+//         let generatedSku = activePattern
+//           .replace("[PARENT_SKU]", parentSkuMock)
+//           .replace("[BRAND]", brandTokenStr)
+//           .replace("[INDEX]", incrementalSequenceStr);
+
+//         // 🎯 INTERSECTION LOOP REFACTOR: Map runtime tokens conditionally based on item-level flag overrides
+//         intersection.forEach((sel) => {
+//           const tokenKey = `[${sel.optionName.trim().toUpperCase().replace(/\s+/g, "_")}]`;
+          
+//           if (sel.isSkuDriver) {
+//             const sanitizedValue = sel.literalStr.trim().toUpperCase().replace(/\s+/g, "");
+//             generatedSku = generatedSku.split(tokenKey).join(sanitizedValue);
+//           } else {
+//             // Strip option placeholder parameters if item is flagged to drop from dynamic compiling handles
+//             generatedSku = generatedSku.split(tokenKey).join("");
+//           }
+//         });
+
+//         // Cleanup trailing or duplicate structural separators left by skipped values
+//         if (activeSeparator) {
+//           const doubleSepRegex = new RegExp(`\\${activeSeparator}+`, "g");
+//           generatedSku = generatedSku.replace(doubleSepRegex, activeSeparator);
+          
+//           if (generatedSku.startsWith(activeSeparator)) generatedSku = generatedSku.slice(activeSeparator.length);
+//           if (generatedSku.endsWith(activeSeparator)) generatedSku = generatedSku.slice(0, -activeSeparator.length);
+//         }
+
+//         // A. Insert base SKU catalog entity placeholder table record
+//         const childProduct = await tx.product.create({
+//           data: {
+//             inflowId: childProductInflowId,
+//             sku: generatedSku, 
+//             name: variantName,
+//             slug: await genUniqueSlug(variantName, tx.product),
+//             isActive: false,
+//             brandId: brandId || null,
+//             categoryId: categoryId || null,
+//             description: description || null
+//           }
+//         });
+
+//         // B. Connect core inventory balance record with its relational matrix metadata 
+//         await tx.productVariant.create({
+//           data: {
+//             inflowId: crypto.randomUUID().toLowerCase(),
+//             productGroupId: groupId,
+//             productId: childProduct.inflowId,
+//             defaultPrice: 0.00,
+//             signature: newSignature,
+//             variantCount: newCartesianIntersections.length,
+//             selections: {
+//               create: intersection.map((sel) => ({
+//                 optionId: sel.optionInflowId,      
+//                 optionValueId: sel.valueInflowId,  
+//               }))
+//             }
+//           }
+//         });
+
+//         // C & D Join layers
+//         for (const featRelation of localizedFeaturesList) {
+//           const dbFeatureValue = await tx.featureValue.upsert({
+//             where: { featureId_value: { featureId: featRelation.id, value: featRelation.val } },
+//             update: {}, create: { featureId: featRelation.id, value: featRelation.val }
+//           });
+//           await tx.productFeature.create({
+//             data: { productId: childProduct.inflowId, featureId: featRelation.id, featureValueId: dbFeatureValue.id }
+//           });
+//         }
+
+//         for (const tagId of localizedTagsList) {
+//           await tx.productTag.create({
+//             data: { productId: childProduct.inflowId, tagId: tagId }
+//           });
+//         }
+
+//         nextSequenceCounter++;
+//       }
+
+//       // 🟢 STEP 8: Process UI Table Differential Mutations Lifecycles
+//       for (const UIItem of (incomingVariantsManager || [])) {
+//         if (UIItem.isExisting) {
+//           if (UIItem.status === "unlink") {
+//             await tx.productVariantSelection.deleteMany({
+//               where: { variant: { productId: UIItem.productId, productGroupId: groupId } }
+//             });
+//             await tx.productVariant.deleteMany({
+//               where: { productId: UIItem.productId, productGroupId: groupId }
+//             });
+//           } else if (UIItem.status === "delete") {
+//             await tx.productVariant.deleteMany({ where: { productId: UIItem.productId } });
+//             await tx.productFeature.deleteMany({ where: { productId: UIItem.productId } });
+//             await tx.productTag.deleteMany({ where: { productId: UIItem.productId } });
+//             await tx.product.delete({ where: { inflowId: UIItem.productId } });
+//           } else if (UIItem.status === "active") {
+//             await tx.productVariant.updateMany({
+//               where: { productId: UIItem.productId, productGroupId: groupId },
+//               data: { defaultPrice: Number(UIItem.defaultPrice) }
+//             });
+
+//             await tx.product.update({
+//               where: { inflowId: UIItem.productId },
+//               data: { brandId: brandId || null, categoryId: categoryId || null }
+//             });
+
+//             for (const featRelation of localizedFeaturesList) {
+//               const dbFeatureValue = await tx.featureValue.upsert({
+//                 where: { featureId_value: { featureId: featRelation.id, value: featRelation.val } },
+//                 update: {}, create: { featureId: featRelation.id, value: featRelation.val }
+//               });
+//               await tx.productFeature.upsert({
+//                 where: { productId_featureId: { productId: UIItem.productId, featureId: featRelation.id } },
+//                 update: { featureValueId: dbFeatureValue.id },
+//                 create: { productId: UIItem.productId, featureId: featRelation.id, featureValueId: dbFeatureValue.id }
+//               });
+//             }
+
+//             for (const tagId of localizedTagsList) {
+//               await tx.productTag.upsert({
+//                 where: { productId_tagId: { productId: UIItem.productId, tagId: tagId } },
+//                 update: {}, create: { productId: UIItem.productId, tagId: tagId }
+//               });
+//             }
+//           }
+//         }
+//       }
+
+//       return group;
+//     });
+
+//     return NextResponse.json(updatedGroup, { status: 200 });
+//   } catch (error: any) {
+//     console.error("⛔ MATRIX SYNC ERROR ENGINE FAIL:", error);
+//     return NextResponse.json({ error: error.message || "Internal Matrix Mutation Crash" }, { status: 500 });
+//   }
+// }
 
 
 // =============== >> SKU Server GENERATED >> =============

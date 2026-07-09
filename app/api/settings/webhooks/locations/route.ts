@@ -68,7 +68,7 @@ export async function POST(request: Request) {
       if (!webhookId) {
           const current = await findLocationWebhookByLocation(location.inflowId);
           if (current) {
-          await deleteLocationWebhook(location.inflowId, current.webHookSubscriptionId);
+            await deleteLocationWebhook(location.inflowId, current.webHookSubscriptionId);
           }
       } else {
           // Now requires inflowId to fetch the Location's API endpoint dynamically

@@ -6,6 +6,7 @@ import { upsertCustomer as upsertCloudCustomer } from "../inflow/data/customers"
 import { upsertVendor as upsertCloudVendor } from "../inflow/data/vendors";
 import { upsertCustomer as upsertLocalCustomer } from "../locations/data/customer";
 import { upsertTaxingScheme as upsertLocalTaxingScheme } from "../locations/data/taxing-scheme";
+import { upsertCurrency as upsertLocalCurrency } from "../locations/data/currency";
 
 interface MidWebhookJobData {
   source: string;
@@ -40,6 +41,18 @@ const midWorker = new Worker<MidWebhookJobData>(
             throw new Error(`Cannot sync taxing scheme: No location URL found for location ${location?.name}`);
           }
           result = await upsertLocalTaxingScheme(payload, locationUrl);
+          break;
+        case "CURRENCY_UPSERT_LOCAL":
+          if (!locationUrl) {
+            throw new Error(`Cannot sync currency: No location URL found for location ${location?.name}`);
+          }
+          result = await upsertLocalCurrency(payload, locationUrl);
+          break;
+        case "CUSTOMER_UPSERT_LOCAL":
+          if (!locationUrl) {
+            throw new Error(`Cannot sync currency: No location URL found for location ${location?.name}`);
+          }
+          result = await upsertLocalCustomer(payload, locationUrl);
           break;
 
         default:

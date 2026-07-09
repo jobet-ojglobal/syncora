@@ -72,6 +72,31 @@ export async function POST(request: NextRequest) {
 
     // 3. Delegate data operations based on event type classifications
     switch (eventType) {
+      case "currency": {
+        const currencyId = payload.source_key;
+
+        if (currencyId) {
+          // Offload the sync processing to the dedicated background worker queue
+          await getLocationSyncQueue().add(
+            "currency_sync_job",
+            {
+              source: eventType,
+              loggedEventId: loggedEvent.id,
+              dataId: payload.inflowId,
+              locationId, 
+              data: { currencyId }
+            },
+            {
+              attempts: 3,
+              backoff: {
+                type: "exponential",
+                delay: 2000, // Wait 2s, then 4s, then 8s on failure
+              },
+            }
+          );
+        }
+        break;
+      }
 
       case "taxingScheme": {
         const taxingSchemeId = payload.source_key;

@@ -38,3 +38,41 @@ const mapping = await prisma.taxingSchemeLocationMap.findUnique({
 
 const globalCloudId = mapping?.taxingSchemeId;
 // Now you know exactly which central cloud record needs modifying!
+
+
+
+
+
+
+CategoryLocationMap
+ProductGroupLocationMap
+ProductVariantLocationMap
+ProductLocationMap
+ProductPriceLocationMap
+ProductCostAdjustmentLocationMap
+ProductBarcodeLocationMap
+ProductOperationLocationMap
+OperationTypeLocationMap
+ProductAttachmentLocationMap
+ProductCostLocationMap
+ReorderSettingLocationMap
+ProductBomLocationMap
+ProductImageLocationMap
+ProductGroupOptionLocationMap
+ProductGroupOptionValueLocationMap
+AdjustmentReasonLocationMap
+CurrencyLocationMap
+CurrencyConversionLocationMap
+PricingSchemeLocationMap
+PaymentTermLocationMap
+TeamMemberLocationMapExtended
+CustomerLocationMap
+CustomerDueLocationMap
+CustomerBalanceLocationMap
+CustomerCreditLocationMap
+VendorLocationMap
+VendorAttachmentLocationMap
+VendorItemLocationMap
+VendorDueLocationMap
+VendorBalanceLocationMap
+VendorCreditLocationMap

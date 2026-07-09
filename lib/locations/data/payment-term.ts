@@ -24,7 +24,7 @@ export async function upsertPaymentTerm(
   const apiClient = new BranchClient(url)
   const { success, ...data } = await apiClient.post<UpsertResult>(
     `/inbound/receive`, {
-        "eventType": "paymentTerm",
+        "eventType": "paymentTermLocal",
         "transactionType": "PAYMENT_TERM",
         "batch_id": `PYMNTTRM-${crypto.randomUUID().toLowerCase()}`,
         "sourceSystem": "MID",

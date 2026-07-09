@@ -175,13 +175,11 @@ export function ProductForm({  brands, uoms, groups: productGroups, initialData 
       return [];
     }
 
-    // 1. Extract option structural array trees with the global attribute value ID included
+    // 1. Extract option structural array trees using inflow IDs matching the backend
     const arraysToCombine = selectedGroupDetails.options.map(opt => 
       opt.values.map(val => ({
-        optionId: opt.inflowId,
-        optionValueId: val.inflowId,
-        // 🎯 CRUCIAL FIX: Bring down the core attribute ID that matches your backend fingerprintId
-        attributeValueId: val.attributeValue?.id || "", 
+        optionId: opt.inflowId,         // Maps to backend item.optionInflowId
+        optionValueId: val.inflowId,    // Maps to backend item.valueInflowId
         value: val.attributeValue?.value || ""
       }))
     );
@@ -194,11 +192,16 @@ export function ProductForm({  brands, uoms, groups: productGroups, initialData 
     const intersections = getCartesian(arraysToCombine);
 
     return intersections.map((combination: any[]) => {
-      // 🎯 CRUCIAL FIX: Build signature matching the backend sorted attributeValue.id architecture
-      const signature = combination.map(c => c.attributeValueId).sort().join("-");
-      const labelString = combination.map(c => c.value).join(" / ");
+      // 🎯 UPDATED FRONTEND FIX: Build signature using exact backend format -> [optionInflowId]:[valueInflowId] joined by "|"
+      const signature = combination
+        .map(c => `${c.optionId}:${c.optionValueId}`)
+        .sort()
+        .join("|");
 
-      // Now this exact lookup will find your DB variant records seamlessly!
+      // 🎯 UPDATED FRONTEND FIX: Clean spacing to match the new backend variationLabels generation format
+      const labelString = combination.map(c => c.value.trim()).join(" / ");
+
+      // Now this exact lookup will find your DB variant records seamlessly using the enhanced signature string!
       const matchedDbVariant = selectedGroupDetails.variants?.find(v => v.signature === signature);
 
       return {
@@ -214,6 +217,51 @@ export function ProductForm({  brands, uoms, groups: productGroups, initialData 
       };
     });
   }, [selectedGroupDetails]);
+
+  // const computedVariantSlotsFromOptions = useMemo(() => {
+  //   if (!selectedGroupDetails || !selectedGroupDetails.options || selectedGroupDetails.options.length === 0) {
+  //     return [];
+  //   }
+
+  //   // 1. Extract option structural array trees with the global attribute value ID included
+  //   const arraysToCombine = selectedGroupDetails.options.map(opt => 
+  //     opt.values.map(val => ({
+  //       optionId: opt.inflowId,
+  //       optionValueId: val.inflowId,
+  //       // 🎯 CRUCIAL FIX: Bring down the core attribute ID that matches your backend fingerprintId
+  //       attributeValueId: val.attributeValue?.id || "", 
+  //       value: val.attributeValue?.value || ""
+  //     }))
+  //   );
+
+  //   // Classic Cartesian Product calculation function
+  //   const getCartesian = (arrays: any[][]): any[][] => {
+  //     return arrays.reduce((acc, curr) => acc.flatMap(d => curr.map(e => [...d, e])), [[]]);
+  //   };
+
+  //   const intersections = getCartesian(arraysToCombine);
+
+  //   return intersections.map((combination: any[]) => {
+  //     // 🎯 CRUCIAL FIX: Build signature matching the backend sorted attributeValue.id architecture
+  //     const signature = combination.map(c => c.attributeValueId).sort().join("-");
+  //     const labelString = combination.map(c => c.value).join(" / ");
+
+  //     // Now this exact lookup will find your DB variant records seamlessly!
+  //     const matchedDbVariant = selectedGroupDetails.variants?.find(v => v.signature === signature);
+
+  //     return {
+  //       signature,
+  //       labelString,
+  //       productId: matchedDbVariant?.productId || null,
+  //       product: matchedDbVariant?.product || null,
+  //       selections: combination.map(c => ({
+  //         optionId: c.optionId,
+  //         optionValueId: c.optionValueId,
+  //         optionValue: { attributeValue: { value: c.value } }
+  //       }))
+  //     };
+  //   });
+  // }, [selectedGroupDetails]);
 
    const currentSelectionBreakdown = useMemo(() => {
     if (!watchedVariantSignature || !computedVariantSlotsFromOptions) return [];

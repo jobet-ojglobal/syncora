@@ -24,7 +24,7 @@ export async function upsertPricingScheme(
   const apiClient = new BranchClient(url)
   const { success, ...data } = await apiClient.post<UpsertResult>(
     `/inbound/receive`, {
-        "eventType": "pricingScheme",
+        "eventType": "pricingSchemeLocal",
         "transactionType": "PRICING_SCHEME",
         "batch_id": `PRCNGSCHM-${crypto.randomUUID().toLowerCase()}`,
         "sourceSystem": "MID",
