@@ -1344,16 +1344,6 @@ CREATE TABLE "currency_conversion" (
 );
 
 -- CreateTable
-CREATE TABLE "currency_conversion_location_map" (
-    "id" TEXT NOT NULL,
-    "currencyConversionId" TEXT NOT NULL,
-    "locationId" TEXT NOT NULL,
-    "localId" INTEGER NOT NULL,
-
-    CONSTRAINT "currency_conversion_location_map_pkey" PRIMARY KEY ("id")
-);
-
--- CreateTable
 CREATE TABLE "pricing_scheme" (
     "id" TEXT NOT NULL,
     "inflowId" TEXT NOT NULL,
@@ -2425,6 +2415,9 @@ CREATE UNIQUE INDEX "tax_code_location_map_taxCodeId_locationId_key" ON "tax_cod
 CREATE UNIQUE INDEX "currency_inflowId_key" ON "currency"("inflowId");
 
 -- CreateIndex
+CREATE UNIQUE INDEX "currency_isoCode_key" ON "currency"("isoCode");
+
+-- CreateIndex
 CREATE INDEX "currency_isoCode_idx" ON "currency"("isoCode");
 
 -- CreateIndex
@@ -2438,12 +2431,6 @@ CREATE UNIQUE INDEX "currency_conversion_inflowId_key" ON "currency_conversion"(
 
 -- CreateIndex
 CREATE INDEX "currency_conversion_currencyId_idx" ON "currency_conversion"("currencyId");
-
--- CreateIndex
-CREATE INDEX "currency_conversion_location_map_locationId_localId_idx" ON "currency_conversion_location_map"("locationId", "localId");
-
--- CreateIndex
-CREATE UNIQUE INDEX "currency_conversion_location_map_currencyConversionId_locat_key" ON "currency_conversion_location_map"("currencyConversionId", "locationId");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "pricing_scheme_inflowId_key" ON "pricing_scheme"("inflowId");
@@ -3143,12 +3130,6 @@ ALTER TABLE "currency_location_map" ADD CONSTRAINT "currency_location_map_curren
 
 -- AddForeignKey
 ALTER TABLE "currency_conversion" ADD CONSTRAINT "currency_conversion_currencyId_fkey" FOREIGN KEY ("currencyId") REFERENCES "currency"("inflowId") ON DELETE CASCADE ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "currency_conversion_location_map" ADD CONSTRAINT "currency_conversion_location_map_locationId_fkey" FOREIGN KEY ("locationId") REFERENCES "location"("inflowId") ON DELETE RESTRICT ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "currency_conversion_location_map" ADD CONSTRAINT "currency_conversion_location_map_currencyConversionId_fkey" FOREIGN KEY ("currencyConversionId") REFERENCES "currency_conversion"("inflowId") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "pricing_scheme" ADD CONSTRAINT "pricing_scheme_currencyId_fkey" FOREIGN KEY ("currencyId") REFERENCES "currency"("inflowId") ON DELETE RESTRICT ON UPDATE CASCADE;

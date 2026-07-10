@@ -1,6 +1,6 @@
 // app/dashboard/locations/[id]/integrations/webhooks/page.tsx
 
-import LocationWorkspace from "@/components/webhook/location-workspace";
+import LocationWorkspace from "@/components/location/location-workspace";
 
 interface PageProps {
   params: Promise<{

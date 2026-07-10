@@ -1,7 +1,21 @@
-import { InflowTaxingScheme } from "@/lib/inflow/types";
 import { BranchClient } from "../location.client";
-import { taxingSchemeSchema } from "@/schemas/taxing-scheme.schema";
 
+export interface InflowTaxingScheme {
+    taxingSchemeId: string;
+    name: string;
+    tax1Name: string;
+    tax2Name: string;
+    calculateTax2OnTax1: number;
+    lastModUserId: number;
+    lastModDttm: string;
+    timestamp: string;
+    isActive: number;
+    tax1OnShipping: number;
+    defaultTaxCodeId: number;
+    tax2OnShipping: number;
+    syncedAt: string;
+  }
+  
 export interface UpsertResult {
   success: boolean;
   message?: string;
@@ -34,3 +48,4 @@ export async function getTaxingScheme(
     `/inflow-local/payload/${batchId}`,
   );
 }
+

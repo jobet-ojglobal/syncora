@@ -2,7 +2,7 @@
 import { Worker, Job } from "bullmq";
 import { prisma } from "@/lib/prisma";
 import { connection } from "@/lib/redis";
-import { CustomerSyncResult, InflowCustomerWebhookService } from "../locations/services/customer.service";
+import { CustomerSyncResult, InflowCustomerWebhookService } from "../locations/services/customer-upsert.service";
 import { MappingWebhookService } from "../locations/services/mapping.service";
 
 // import { locationApi } from "@/lib/location/location.client";
@@ -15,7 +15,7 @@ interface LocationWebhookJobData {
   dataId: string;
   locationId: string; 
   loggedEventId: string;
-  data: any
+  data?: any
 }
 
 const locationWorker = new Worker<LocationWebhookJobData>(
@@ -35,15 +35,27 @@ const locationWorker = new Worker<LocationWebhookJobData>(
         case "salesOrder":
           result = { success: true};
           break;
-        case "customerLocal":
-          result = await MappingWebhookService.handleCustomerMap(data.taxingSchemeId, dataId, loggedEventId, locationId);
-          break;
+
+        // Local map (inflowId, localId, eventId, locationId)
+        // case "categoriesLocal":
+        //   result = await MappingWebhookService.handleCustomerMap(data.customerId, dataId, loggedEventId, locationId); 
+        //   break;
+        // case "taxCodeLocal":
+        //   result = await MappingWebhookService.handleTaxCodeMap(data.currencyId, dataId, loggedEventId, locationId);
+        //   break;
         case "taxingSchemeLocal":
           result = await MappingWebhookService.handleTaxingSchemeMap(data.taxingSchemeId, dataId, loggedEventId, locationId);
           break;
-        case "currencyLocal":
-          result = await MappingWebhookService.handleCurrencyMap(data.taxingSchemeId, dataId, loggedEventId, locationId);
+        // case "currencyLocal":
+        //   result = await MappingWebhookService.handleCurrencyMap(data.currencyId, dataId, loggedEventId, locationId);
+        //   break;
+        // case "pricingSchemeLocal":
+        //   result = await MappingWebhookService.handlePricingSchemeMap(data.currencyId, dataId, loggedEventId, locationId);
+        //   break;
+         case "customerLocal":
+          result = await MappingWebhookService.handleCustomerMap(data.customerId, dataId, loggedEventId, locationId); 
           break;
+        
 
         default:
           throw new Error(`Unsupported webhook sync source: ${source}`);

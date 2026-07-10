@@ -13,6 +13,15 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Missing mandatory structural corporate standard validation fields parameters criteria tokens." }, { status: 400 });
     }
 
+
+    const isExistCode = await prisma.currency.findUnique({
+      where: { isoCode }
+    });
+
+    if(isExistCode) {
+      return NextResponse.json({ error: `A currency code "${isoCode.trim()}" already exists.` }, { status: 409 });
+    }
+
     const result = await prisma.$transaction(async (tx) => {
       // 1. Establish structural base localization formatting layout standard rules map card
       const currency = await tx.currency.create({

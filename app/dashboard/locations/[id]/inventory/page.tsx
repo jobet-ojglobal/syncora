@@ -142,11 +142,11 @@ export default function LocationInventoryPage() {
       
       {/* Back Navigation Bar */}
       <div className="flex flex-col gap-2">
-        <Button asChild variant="ghost" size="sm" className="w-fit gap-1 text-xs -ml-2">
+        {/* <Button asChild variant="ghost" size="sm" className="w-fit gap-1 text-xs -ml-2">
           <Link href="/dashboard/locations">
             <ArrowLeft className="w-3.5 h-3.5" /> Back to Facilities
           </Link>
-        </Button>
+        </Button> */}
         
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b pb-5">
           <div className="flex items-start gap-3">
@@ -154,7 +154,7 @@ export default function LocationInventoryPage() {
               <Warehouse className="w-5 h-5 text-muted-foreground" />
             </div>
             <div>
-              <h1 className="text-xl font-bold tracking-tight">{location?.name || "Loading Facility..."}</h1>
+              <h1 className="text-xl font-bold tracking-tight">Inventory</h1>
               <p className="text-xs text-muted-foreground mt-0.5">
                 Targeted internal warehouse balances, allocated bin vectors, and tracking references.
               </p>

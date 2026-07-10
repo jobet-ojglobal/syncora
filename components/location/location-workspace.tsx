@@ -11,6 +11,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { toast } from "sonner";
 
 import { INFLOW_EVENTS } from "@/lib/locations/types/webhook.type";
+import { SyncButtonOptions } from "./sync-button";
 
 interface LocationWorkspaceProps {
   selectedLocationInflowId: string;
@@ -152,9 +153,9 @@ const LocationWorkspace = ({ selectedLocationInflowId }: LocationWorkspaceProps)
                 </Badge>
               </CardHeader>
 
-              <CardContent className="space-y-3 text-sm pt-4">
+              <CardContent className="space-y-3 text-sm pt-4  h-full flex justify-center items-center">
                 {webhook ? (
-                  <>
+                  <div className="w-full">
                     <div className="flex justify-between border-b pb-2">
                       <span className="font-medium text-muted-foreground">Endpoint Target:</span>
                       <span className="font-mono text-xs max-w-[250px] truncate">{webhook.url}</span>
@@ -173,7 +174,7 @@ const LocationWorkspace = ({ selectedLocationInflowId }: LocationWorkspaceProps)
                         {webhook.consecutiveFailureCount} consecutive drops
                       </span>
                     </div>
-                  </>
+                  </div>
                 ) : (
                   <div className="text-sm py-4 text-center space-y-1">
                     <p className="text-destructive font-semibold">
@@ -208,6 +209,21 @@ const LocationWorkspace = ({ selectedLocationInflowId }: LocationWorkspaceProps)
                   </Button>
                 )}
               </CardFooter>
+            </Card>
+
+            {/* BATCH ENGINE SYNC UTILITIES SIDEBAR */}
+            <Card className="md:col-span-1">
+              <CardHeader>
+                <CardTitle>Batch Diagnostics</CardTitle>
+                <CardDescription>Force historical inventory execution sweeps manually.</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4 pt-0 max-h-[300px] overflow-y-auto">
+                <SyncButtonOptions source="categories_local" title="Categories" locationId={selectedLocationInflowId} isDisabled={!webhook} />
+                <SyncButtonOptions source="currencies_local" title="Currency" locationId={selectedLocationInflowId} isDisabled={!webhook}  />
+                <SyncButtonOptions source="tax_codes_local" title="Tax Code" locationId={selectedLocationInflowId} isDisabled={!webhook}  />
+                <SyncButtonOptions source="pricing_schemes_local" title="Pricing Schemes" locationId={selectedLocationInflowId} isDisabled={!webhook}  />
+                <SyncButtonOptions source="payment_terms_local" title="Payment Terms" locationId={selectedLocationInflowId} isDisabled={!webhook}   />
+              </CardContent>
             </Card>
           </div>
         </TabsContent>

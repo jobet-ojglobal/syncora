@@ -138,7 +138,7 @@ const InflowWorkspace = () => {
                   {webhook ? "Active Stream" : "Offline"}
                 </Badge>
               </CardHeader>
-              <CardContent className="space-y-3 text-sm pt-4">
+              <CardContent className="space-y-3 text-sm pt-4  h-full flex justify-center items-center">
                 {webhook ? (
                   <>
                     <div className="flex justify-between border-b pb-2">

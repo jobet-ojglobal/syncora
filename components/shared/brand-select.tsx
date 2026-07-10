@@ -1,7 +1,6 @@
 "use client";
 // @/components/shared/brand-select.tsx
 
-
 import * as React from "react";
 import { Check, ChevronsUpDown, Plus, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -52,7 +51,7 @@ export function BrandSelect({ value, onChange }: BrandSelectProps) {
   const fetchBrands = async () => {
     try {
       setLoading(true);
-      const res = await fetch("/api/admin/brands/basic"); // Adjust endpoint as needed
+      const res = await fetch("/api/admin/brands/basic"); 
       if (res.ok) {
         const data = await res.json();
         setBrands(data);
@@ -69,8 +68,12 @@ export function BrandSelect({ value, onChange }: BrandSelectProps) {
   }, []);
 
   // Handle creating a brand inline
-  const handleCreateBrand = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleCreateBrand = async (e?: React.SyntheticEvent) => {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation(); // 🎯 CRITICAL FIX: Stops the event from bubbling up to the product form hierarchy
+    }
+    
     if (!newBrandName.trim()) return;
 
     try {
@@ -89,11 +92,9 @@ export function BrandSelect({ value, onChange }: BrandSelectProps) {
 
       toast.success("Brand created successfully");
       
-      // Update local choices state and auto-select newly added asset record
       setBrands((prev) => [...prev, data]);
       onChange(data.id);
       
-      // Reset & Clean up modal flags
       setNewBrandName("");
       setDialogOpen(false);
       setOpen(false);
@@ -101,6 +102,15 @@ export function BrandSelect({ value, onChange }: BrandSelectProps) {
       toast.error("Creation Failed", { description: err.message });
     } finally {
       setCreating(false);
+    }
+  };
+
+  // 🎯 CRITICAL FIX: Submits on Enter key inside the input without native form trigger contexts
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      e.stopPropagation();
+      handleCreateBrand();
     }
   };
 
@@ -145,7 +155,6 @@ export function BrandSelect({ value, onChange }: BrandSelectProps) {
                 </Button>
               </CommandEmpty>
               <CommandGroup>
-                {/* None option mapping fallback */}
                 <CommandItem
                   value=""
                   onSelect={() => {
@@ -184,7 +193,6 @@ export function BrandSelect({ value, onChange }: BrandSelectProps) {
               </CommandGroup>
             </CommandList>
             
-            {/* Direct action access trace to instantiate provisioning form directly */}
             <div className="border-t p-1">
               <Button
                 type="button"
@@ -204,7 +212,8 @@ export function BrandSelect({ value, onChange }: BrandSelectProps) {
       {/* Embedded Provisioning Dialog Frame Matrix */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="sm:max-w-md">
-          <form onSubmit={handleCreateBrand} className="space-y-4">
+          {/* 🎯 CRITICAL FIX: Swapped out the nested `<form>` tag entirely for a standalone div workspace */}
+          <div className="space-y-4">
             <DialogHeader>
               <DialogTitle>Add New Brand</DialogTitle>
               <DialogDescription>
@@ -219,6 +228,7 @@ export function BrandSelect({ value, onChange }: BrandSelectProps) {
                 placeholder="e.g. Nike, Apple, Sony"
                 value={newBrandName}
                 onChange={(e) => setNewBrandName(e.target.value)}
+                onKeyDown={handleKeyDown} // 🎯 Intercepts the submit key event cleanly
                 autoFocus
               />
             </div>
@@ -231,12 +241,17 @@ export function BrandSelect({ value, onChange }: BrandSelectProps) {
               >
                 Cancel
               </Button>
-              <Button type="submit" disabled={creating || !newBrandName.trim()}>
+              {/* 🎯 CRITICAL FIX: Explicit type="button" layout alignment instead of type="submit" */}
+              <Button 
+                type="button" 
+                disabled={creating || !newBrandName.trim()} 
+                onClick={handleCreateBrand}
+              >
                 {creating && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                 Save Brand
               </Button>
             </DialogFooter>
-          </form>
+          </div>
         </DialogContent>
       </Dialog>
     </>

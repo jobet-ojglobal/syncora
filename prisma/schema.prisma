@@ -1064,7 +1064,6 @@ model Location {
   localProductGroupOptionValueMappings ProductGroupOptionValueLocationMap[]
   localAdjustmentReasonMappings AdjustmentReasonLocationMap[]
   localCurrencyMappings      CurrencyLocationMap[]
-  localCurrencyConversionMappings CurrencyConversionLocationMap[]
   localPricingSchemeMappings PricingSchemeLocationMap[]
   localPaymentTermMappings   PaymentTermLocationMap[]
   localTeamMemberMappingsExtended TeamMemberLocationMapExtended[]
@@ -2105,7 +2104,7 @@ model Currency {
   id                    String   @id @default(cuid())
   inflowId              String   @unique
   name                  String
-  isoCode               String
+  isoCode               String   @unique
   symbol                String?
   decimalPlaces         Int      @default(2)
   decimalSeparator      String?
@@ -2157,8 +2156,6 @@ model CurrencyConversion {
   isManual              Boolean  @default(false)
   currency              Currency @relation(fields: [currencyId],references: [inflowId], onDelete: Cascade)
 
-  localMappings         CurrencyConversionLocationMap[]
-
   createdAt             DateTime @default(now())
   updatedAt             DateTime @updatedAt
 
@@ -2167,19 +2164,7 @@ model CurrencyConversion {
   @@map("currency_conversion")
 }
 
-model CurrencyConversionLocationMap {
-  id                    String       @id @default(cuid())
-  currencyConversionId  String       // References CurrencyConversion.inflowId
-  locationId            String       // References your Location table identifier
-  localId               Int          // The unique INT assigned by that specific local database
 
-  location              Location? @relation(fields: [locationId], references: [inflowId])
-  currencyConversion    CurrencyConversion @relation(fields: [currencyConversionId], references: [inflowId], onDelete: Cascade)
-
-  @@unique([currencyConversionId, locationId])
-  @@index([locationId, localId])
-  @@map("currency_conversion_location_map")
-}
 
 // PRICING SCHEME MODELS
 

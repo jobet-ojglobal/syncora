@@ -66,8 +66,13 @@ export function CategorySelect({ value, onChange }: CategorySelectProps) {
     fetchCategories();
   }, []);
 
-  const handleCreateCategory = async (e: React.FormEvent) => {
-    e.preventDefault();
+  // Handle inline category generation safely
+  const handleCreateCategory = async (e?: React.SyntheticEvent) => {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation(); // 🎯 CRITICAL FIX: Halts event propagation up to the primary form
+    }
+    
     if (!newCategoryName.trim()) return;
 
     try {
@@ -77,7 +82,7 @@ export function CategorySelect({ value, onChange }: CategorySelectProps) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ 
           name: newCategoryName,
-          parentId: "root-level" // Matches route expectation fallback
+          parentId: "root-level" 
         }),
       });
 
@@ -90,7 +95,7 @@ export function CategorySelect({ value, onChange }: CategorySelectProps) {
       toast.success("Category created successfully");
       
       setCategories((prev) => [...prev, data]);
-      onChange(data.inflowId); // Using schema property key target
+      onChange(data.inflowId); 
       
       setNewCategoryName("");
       setDialogOpen(false);
@@ -99,6 +104,15 @@ export function CategorySelect({ value, onChange }: CategorySelectProps) {
       toast.error("Creation Failed", { description: err.message });
     } finally {
       setCreating(false);
+    }
+  };
+
+  // 🎯 CRITICAL FIX: Catches Enter keys safely without using form mechanics
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      e.stopPropagation();
+      handleCreateCategory();
     }
   };
 
@@ -200,7 +214,8 @@ export function CategorySelect({ value, onChange }: CategorySelectProps) {
       {/* Embedded Creator Drawer Framework */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="sm:max-w-md">
-          <form onSubmit={handleCreateCategory} className="space-y-4">
+          {/* 🎯 CRITICAL FIX: Removed parent <form> markup layout container entirely */}
+          <div className="space-y-4">
             <DialogHeader>
               <DialogTitle>Add New Category</DialogTitle>
               <DialogDescription>
@@ -215,6 +230,7 @@ export function CategorySelect({ value, onChange }: CategorySelectProps) {
                 placeholder="e.g. Electronics, Home Goods, Apparel"
                 value={newCategoryName}
                 onChange={(e) => setNewCategoryName(e.target.value)}
+                onKeyDown={handleKeyDown} // 🎯 Intercepts key events to block form bubble pipelines
                 autoFocus
               />
             </div>
@@ -227,12 +243,17 @@ export function CategorySelect({ value, onChange }: CategorySelectProps) {
               >
                 Cancel
               </Button>
-              <Button type="submit" disabled={creating || !newCategoryName.trim()}>
+              {/* 🎯 CRITICAL FIX: Changed attributes to standard standalone trigger buttons */}
+              <Button 
+                type="button" 
+                disabled={creating || !newCategoryName.trim()}
+                onClick={handleCreateCategory}
+              >
                 {creating && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                 Save Category
               </Button>
             </DialogFooter>
-          </form>
+          </div>
         </DialogContent>
       </Dialog>
     </>

@@ -22,7 +22,7 @@ const PRODUCTS = [
     rating: 4.9,
     reviews: 128,
     tag: 'Best Seller',
-    image: 'https://picsum.photos/seed/asd/200/300',
+    image: 'https://picsum.photos/seed/asd/900/900',
     colors: ['#000000', '#E5E7EB', '#3B82F6']
   },
   {
@@ -33,7 +33,7 @@ const PRODUCTS = [
     tag: 'New Release',
     rating: 4.8,
     reviews: 64,
-    image: 'https://picsum.photos/seed/ghhj/200/300',
+    image: 'https://picsum.photos/seed/ghhj/900/900',
     colors: ['#EF4444', '#111827']
   },
   {
@@ -43,7 +43,7 @@ const PRODUCTS = [
     price: '$549',
     rating: 5.0,
     reviews: 42,
-    image: 'https://picsum.photos/seed/tyt/200/300',
+    image: 'https://picsum.photos/seed/tyt/900/900',
     colors: ['#6B7280', '#000000']
   },
   {
@@ -53,7 +53,7 @@ const PRODUCTS = [
     price: '$295',
     rating: 4.6,
     reviews: 89,
-    image: 'https://picsum.photos/seed/eff/200/300',
+    image: 'https://picsum.photos/seed/eff/900/900',
     colors: ['#1F2937']
   }
 ];
@@ -145,10 +145,10 @@ export default function SyncoraStorefront() {
       <section className="relative bg-black text-white overflow-hidden">
         <div className="absolute inset-0 opacity-40 mix-blend-luminosity">
           <Image 
-            src="https://picsum.photos/seed/asht/200/300" 
+            src="https://picsum.photos/seed/jobet/1000/500" 
             alt="Hero Background" 
-              width={80}
-                    height={1500}
+            width={1000}
+            height={1500}
             className="w-full h-full object-cover object-center scale-105 transform transition duration-1000"
           />
         </div>
@@ -212,7 +212,7 @@ export default function SyncoraStorefront() {
                   <Image 
                     src={product.image} 
                     alt={product.name}
-                    width={80}
+                    width={1000}
                     height={1500}
 
                     className="w-full h-full object-cover object-center group-hover:scale-105 transition-transform duration-500"

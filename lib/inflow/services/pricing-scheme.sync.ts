@@ -46,7 +46,7 @@ export async function syncPricingScheme(
         decimalSeparator: curData?.decimalSeparator || ".",
         thousandsSeparator: curData?.thousandsSeparator || ",",
         isSymbolFirst: curData?.isSymbolFirst ?? true,
-        negativeType: curData?.negativeType || "leading",
+        negativeType: curData?.negativeType || "Leading",
       },
       update: {
         name: curData?.name || "Unknown Currency",
@@ -56,7 +56,7 @@ export async function syncPricingScheme(
         decimalSeparator: curData?.decimalSeparator || ".",
         thousandsSeparator: curData?.thousandsSeparator || ",",
         isSymbolFirst: curData?.isSymbolFirst ?? true,
-        negativeType: curData?.negativeType || "leading",
+        negativeType: curData?.negativeType || "Leading",
       },
     });
     

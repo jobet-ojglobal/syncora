@@ -32,6 +32,13 @@ import { ProductGroupImageSyncService } from "../inflow/services/product-group-i
 import { SalesOrderSyncService } from "../inflow/services/sales-order-sync.service";
 import { PurchaseOrderSyncService } from "../inflow/services/purchase-order-sync.service";
 
+// Local Imports
+import { CategorySyncMapService as LocalCategorySyncMapService } from "../locations/services/category-sync-map.service";
+import { CurrencySyncMapService as LocalCurrencySyncMapService } from "../locations/services/currency-sync-map.service";
+import { PaymentTermSyncMapService as LocalPaymentTermSyncMapService } from "../locations/services/payment-term-sync-map.service";
+import { PricingSchemeSyncMapService as LocalPricingSchemeSyncMapService } from "../locations/services/pricing-scheme-sync-map.service";
+import { TaxCodeSyncMapService as LocalTaxCodeSyncMapService } from "../locations/services/tax-code-sync-map.service";
+
 const testService = new TestSyncService();
 const categoryService = new CategorySyncService();
 
@@ -64,6 +71,14 @@ const paymentTermService = new PaymentTermSyncService();
 const salesOrderService = new SalesOrderSyncService();
 const purchaseOrderService = new PurchaseOrderSyncService();
 
+// Local Service 
+const categoryServiceLocal = new LocalCategorySyncMapService();
+const currencyServiceLocal = new LocalCurrencySyncMapService();
+const paymentServiceLocal = new LocalPaymentTermSyncMapService();
+const pricingServiceLocal = new LocalPricingSchemeSyncMapService();
+const taxCodeServiceLocal = new LocalTaxCodeSyncMapService();
+
+
 
 type SyncOptions = {
   onProgress?: (progress: number) => Promise<void>;
@@ -72,7 +87,9 @@ type SyncOptions = {
 const worker = new Worker(
   "sync",
   async (job) => {
-    const { jobId, source, includes } = job.data;
+    const { jobId, source, includes, location } = job.data;
+
+    const locationUrl = (location?.url && location.url.trim() !== "") ? location.url : null;
     
     const syncOptions: SyncOptions = {
       onProgress: async (progress) => {
@@ -99,7 +116,40 @@ const worker = new Worker(
       let result;
 
       switch (source) {
-         case "categories":
+        // Local Sync
+        case "categories_local":
+          if (!locationUrl) {
+            throw new Error(`Cannot sync category: No location URL found for location ${location?.name}`);
+          }
+          result = await categoryServiceLocal.sync(location, syncOptions);
+          break;
+        case "currencies_local":
+          if (!locationUrl) {
+            throw new Error(`Cannot sync currency: No location URL found for location ${location?.name}`);
+          }
+          result = await currencyServiceLocal.sync(location, syncOptions);
+          break;
+        case "payment_terms_local":
+          if (!locationUrl) {
+            throw new Error(`Cannot sync payment term: No location URL found for location ${location?.name}`);
+          }
+          result = await paymentServiceLocal.sync(location, syncOptions);
+          break;
+        case "pricing_schemes_local":
+          if (!locationUrl) {
+            throw new Error(`Cannot sync pricing scheme: No location URL found for location ${location?.name}`);
+          }
+          result = await pricingServiceLocal.sync(location, syncOptions);
+          break;
+        case "tax_codes_local":
+          if (!locationUrl) {
+            throw new Error(`Cannot sync tax code: No location URL found for location ${location?.name}`);
+          }
+          result = await taxCodeServiceLocal.sync(location, syncOptions);
+          break;
+
+        // Cloud Sync
+        case "categories":
           result = await categoryService.sync(syncOptions);
           break;
         case "product_groups":

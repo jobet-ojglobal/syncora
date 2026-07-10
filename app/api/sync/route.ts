@@ -8,7 +8,7 @@ export const dynamic = "force-dynamic";
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { source, includes } = body;
+    const { source, includes, locationId } = body;
 
     if (!source) {
       return NextResponse.json(
@@ -25,6 +25,11 @@ export async function POST(request: NextRequest) {
       },
     });
 
+    const location = await prisma.location.findUnique({
+      where:  { id: locationId },
+      select: { inflowId: true, url: true, name: true }
+    });
+
     // Add job to queue
     await getSyncQueue().add(
       "sync",
@@ -32,6 +37,7 @@ export async function POST(request: NextRequest) {
         jobId: syncJob.id,
         source, 
         includes: includes || [],
+        location,
         timestamp: new Date().toISOString() 
       },
       { attempts: 3, backoff: { type: "exponential", delay: 2000 } }

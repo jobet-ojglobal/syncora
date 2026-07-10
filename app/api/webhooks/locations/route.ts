@@ -72,7 +72,7 @@ export async function POST(request: NextRequest) {
 
     // 3. Delegate data operations based on event type classifications
     switch (eventType) {
-      case "currency": {
+      case "currencyLocal": {
         const currencyId = payload.source_key;
 
         if (currencyId) {
@@ -98,7 +98,7 @@ export async function POST(request: NextRequest) {
         break;
       }
 
-      case "taxingScheme": {
+      case "taxingSchemeLocal": {
         const taxingSchemeId = payload.source_key;
 
         if (taxingSchemeId) {
@@ -145,8 +145,9 @@ export async function POST(request: NextRequest) {
         break;
       }
 
-      case "customer": {
-        const batchID = payload.batch_id;
+      case "customer":
+      case "customerLocal": {
+        const batchID = payload.batch_id || payload.source_key;
 
         if (batchID) {
           // Offload the sync processing to the dedicated background worker queue
@@ -155,8 +156,9 @@ export async function POST(request: NextRequest) {
             {
               source: eventType,
               loggedEventId: loggedEvent.id,
-              dataId: batchID,
+              dataId: payload.inflowId || batchID,
               locationId, 
+              data: { currencyId: batchID }
             },
             {
               attempts: 3,

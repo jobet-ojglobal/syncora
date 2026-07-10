@@ -550,14 +550,12 @@ export interface InflowAdjustmentReason {
 export interface InflowPricingScheme {
   pricingSchemeId: string;
   currencyId: string;
-
   name: string;
-
   isActive: boolean;
   isDefault: boolean;
   isTaxInclusive: boolean;
   timestamp: string;
-  currency: InflowCurrency;
+  currency?: InflowCurrency;
   productPrices?: InflowProductPrice[];
 }
 
