@@ -12,7 +12,7 @@ import { toast } from "sonner";
 import { Field, FieldGroup, FieldLabel, FieldLegend, FieldSet } from "@/components/ui/field";
 
 interface TaxingSchemeFormProps {
-  initialData?: any | null;
+  initialData?: TaxingSchemeInput | null;
 }
 
 export function TaxingSchemeForm({ initialData }: TaxingSchemeFormProps) {
@@ -30,7 +30,6 @@ export function TaxingSchemeForm({ initialData }: TaxingSchemeFormProps) {
       tax1OnShipping: false,
       tax2Name: "",
       tax2OnShipping: false,
-      defaultTaxCodeId: "",
       taxCodes: [],
     },
   });
@@ -234,7 +233,7 @@ export function TaxingSchemeForm({ initialData }: TaxingSchemeFormProps) {
               type="button"
               variant="outline"
               size="sm"
-              onClick={() => appendTaxCode({ name: "", isActive: true, tax1Rate: 0, tax2Rate: 0 })}
+              onClick={() => appendTaxCode({ name: "", isActive: true, tax1Rate: 0, tax2Rate: 0, isDefault: taxCodeFields.length === 0 })} // Auto-default the first one appended
               className="h-8 text-xs gap-1.5 shadow-2xs hover:bg-muted font-medium"
             >
               <Plus className="w-3.5 h-3.5" /> Append Jurisdiction Rate Row
@@ -245,9 +244,10 @@ export function TaxingSchemeForm({ initialData }: TaxingSchemeFormProps) {
             {/* Table Headers Setup Column */}
             {taxCodeFields.length > 0 && (
               <div className="hidden md:grid grid-cols-12 gap-4 px-3 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/80 mb-1">
-                <div className="col-span-5">Tax Code Area/Zone Designation *</div>
+                <div className="col-span-4">Tax Code Area/Zone Designation *</div>
                 <div className="col-span-3 text-right pr-1">{watchedTax1Name} Rate (%)</div>
                 <div className="col-span-3 text-right pr-1">{hasTier2 ? `${watchedTax2Name} Rate (%)` : "Tier 2 (Disabled)"}</div>
+                <div className="col-span-1 text-center">Default</div> 
                 <div className="col-span-1 text-center">Actions</div>
               </div>
             )}
@@ -255,13 +255,13 @@ export function TaxingSchemeForm({ initialData }: TaxingSchemeFormProps) {
             {taxCodeFields.map((field, index) => (
               <div 
                 key={field.id} 
-                className="grid grid-cols-1 md:grid-cols-12 gap-3 items-center p-4 md:p-1.5 border md:border-transparent rounded-xl bg-muted/30 md:bg-transparent relative animate-in fade-in-50 duration-150 hover:md:bg-muted/30 md:rounded-lg transition-colors"
+                className="grid grid-cols-1 md:grid-cols-12 gap-3 items-center p-4 md:p-1.5 border md:border-transparent rounded-xl bg-muted/30 md:bg-transparent relative hover:md:bg-muted/30 md:rounded-lg transition-colors"
               >
                 {/* Specific Tax Code designation */}
-                <div className="col-span-1 md:col-span-5">
+                <div className="col-span-1 md:col-span-4"> {/* 👈 Reduced from col-span-5 to col-span-4 */}
                   <span className="block md:hidden text-[10px] uppercase font-bold text-muted-foreground mb-1">Jurisdiction Label</span>
                   <Input
-                    placeholder="e.g., NY-RETAIL, CA-EXEMPT, ON-STANDARD"
+                    placeholder="e.g., NY-RETAIL"
                     className="h-10 text-xs font-mono font-semibold bg-background"
                     {...register(`taxCodes.${index}.name` as const)}
                   />
@@ -301,13 +301,35 @@ export function TaxingSchemeForm({ initialData }: TaxingSchemeFormProps) {
                   </div>
                 </div>
 
+                <div className="col-span-1 md:col-span-1 flex flex-col items-start md:items-center justify-center">
+                  <span className="block md:hidden text-[10px] uppercase font-bold text-muted-foreground mb-1">Default Jurisdiction</span>
+                  <input
+                    type="radio"
+                    checked={watch(`taxCodes.${index}.isDefault`)}
+                    className="w-4 h-4 text-primary bg-background border-input accent-primary cursor-pointer"
+                    onChange={() => {
+                      // Set selected index to true, set all other item indexes to false
+                      taxCodeFields.forEach((_, i) => {
+                        setValue(`taxCodes.${i}.isDefault`, i === index);
+                      });
+                    }}
+                  />
+                </div>
+
                 {/* Drop Action Column */}
                 <div className="col-span-1 md:col-span-1 text-right md:text-center mt-2 md:mt-0">
                   <Button
                     type="button"
                     variant="ghost"
                     size="icon"
-                    onClick={() => removeTaxCode(index)}
+                    onClick={() => {
+                      const wasDefault = watch(`taxCodes.${index}.isDefault`);
+                      removeTaxCode(index);
+                      // If we deleted the default item, fall back safely to setting row 0 as default
+                      if (wasDefault && taxCodeFields.length > 1) {
+                        setValue(`taxCodes.0.isDefault`, true);
+                      }
+                    }}
                     className="h-10 w-9 text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
                   >
                     <Trash2 className="w-4 h-4" />

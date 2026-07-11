@@ -1,5 +1,15 @@
 import { BranchClient } from "../location.client";
 
+export interface InflowTaxCode {
+  taxCodeId: string;
+  taxingSchemeId: string;
+  name: string;
+  isActive: boolean;
+  tax1Rate: string;
+  tax2Rate: string;
+  syncedAt: string;
+}
+
 export interface InflowTaxingScheme {
     taxingSchemeId: string;
     name: string;
@@ -14,7 +24,10 @@ export interface InflowTaxingScheme {
     defaultTaxCodeId: number;
     tax2OnShipping: number;
     syncedAt: string;
+    taxCodes?: InflowTaxCode[]
   }
+
+  
   
 export interface UpsertResult {
   success: boolean;
@@ -36,6 +49,14 @@ export async function upsertTaxingScheme(
         "sourceKey": payload.taxingSchemeId,
         "payload": payload 
       }
+  );
+}
+
+
+export async function getTaxingSchemes(url: string) {
+ const apiClient = new BranchClient(url)
+  return await apiClient.get<InflowTaxingScheme[]>(
+    `/inflow-local/taxing-schemes`,
   );
 }
 

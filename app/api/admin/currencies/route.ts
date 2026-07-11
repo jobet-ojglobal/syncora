@@ -113,7 +113,7 @@ export async function POST(request: NextRequest) {
     // ==========================================
     // 📍 STEP 2: BROADCAST LOCAL SYNC JOBS
     // ==========================================
-    const validWebhooks = await WebhookService.getLocationWebhookURLs("currency");
+    const validWebhooks = await WebhookService.getLocationWebhookURLs("currencyLocal");
 
     if (validWebhooks.length > 0) {
       const jobsToQueue = validWebhooks
@@ -126,13 +126,7 @@ export async function POST(request: NextRequest) {
           payload: {
             ...cleanInflowPayload,
             currencyId: cloudId, 
-            localId: null, 
-            currencyConversions: currencyConversions.map(c => ({
-              currencyConversionId: null,
-              currencyId: c.currencyId,
-              exchangeRate: c.exchangeRate,
-              isManual: c.isManual,
-            }))
+            localId: null
           },
           timestamp: new Date().toISOString(),
           location: {
@@ -280,7 +274,7 @@ export async function PATCH(request: NextRequest) {
     // ==========================================
     // 📍 STEP 2: BROADCAST LOCAL SYNC JOBS
     // ==========================================
-    const validWebhooks = await WebhookService.getLocationWebhookURLs("currency");
+    const validWebhooks = await WebhookService.getLocationWebhookURLs("currencyLocal");
 
     if (validWebhooks.length > 0) {
       // 🗺️ Query identity map registry to see which location already knows this record
@@ -304,12 +298,6 @@ export async function PATCH(request: NextRequest) {
               ...cleanInflowPayload,
               currencyId: cloudId, // Keeps the global trace uniform
               localId: match ? match.localId : null, // 💡 If exists, passes Int (e.g. 5). If null, local nodes create a fresh entry
-              currencyConversions: currencyConversions.map(c => ({
-                currencyConversionId: null,
-                currencyId: c.currencyId,
-                exchangeRate: c.exchangeRate,
-                isManual: c.isManual,
-              }))
             },
             timestamp: new Date().toISOString(),
             location: {

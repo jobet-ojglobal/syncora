@@ -11,7 +11,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { toast } from "sonner";
 
 import { INFLOW_EVENTS } from "@/lib/locations/types/webhook.type";
-import { SyncButtonOptions } from "./sync-button";
+import { SyncButtonPreviewOptions } from "./sync-button-preview";
 
 interface LocationWorkspaceProps {
   selectedLocationInflowId: string;
@@ -218,11 +218,11 @@ const LocationWorkspace = ({ selectedLocationInflowId }: LocationWorkspaceProps)
                 <CardDescription>Force historical inventory execution sweeps manually.</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4 pt-0 max-h-[300px] overflow-y-auto">
-                <SyncButtonOptions source="categories_local" title="Categories" locationId={selectedLocationInflowId} isDisabled={!webhook} />
-                <SyncButtonOptions source="currencies_local" title="Currency" locationId={selectedLocationInflowId} isDisabled={!webhook}  />
-                <SyncButtonOptions source="tax_codes_local" title="Tax Code" locationId={selectedLocationInflowId} isDisabled={!webhook}  />
-                <SyncButtonOptions source="pricing_schemes_local" title="Pricing Schemes" locationId={selectedLocationInflowId} isDisabled={!webhook}  />
-                <SyncButtonOptions source="payment_terms_local" title="Payment Terms" locationId={selectedLocationInflowId} isDisabled={!webhook}   />
+                <SyncButtonPreviewOptions source="categories_local" title="Categories" locationId={selectedLocationInflowId} isDisabled={!webhook} />
+                <SyncButtonPreviewOptions source="currencies_local" title="Currency" locationId={selectedLocationInflowId} isDisabled={!webhook}  />
+                <SyncButtonPreviewOptions source="taxing_schemes_local" title="Taxing Schemes" locationId={selectedLocationInflowId} isDisabled={!webhook}  />
+                <SyncButtonPreviewOptions source="pricing_schemes_local" title="Pricing Schemes" locationId={selectedLocationInflowId} isDisabled={!webhook}  />
+                <SyncButtonPreviewOptions source="payment_terms_local" title="Payment Terms" locationId={selectedLocationInflowId} isDisabled={!webhook}   />
               </CardContent>
             </Card>
           </div>

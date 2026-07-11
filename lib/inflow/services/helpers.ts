@@ -3,11 +3,10 @@
 import { Prisma } from "@/generated/prisma/client";
 import { InflowInventoryLine, InflowProduct, InflowProductGroupImage } from "../types";
 import { syncUom } from "./uom-sync";
-
-type Tx = Prisma.TransactionClient;
+import type { ExtendedPrismaTransaction, prisma } from "@/lib/prisma";
 
 export async function syncBrand(
-  tx: Tx,
+  tx:  typeof prisma | ExtendedPrismaTransaction,
   brandName?: string | null
 ): Promise<string | null> {
   if (!brandName?.trim()) {
@@ -33,7 +32,7 @@ export async function syncBrand(
  * Guarantees foreign key integrity across downstream synchronizers.
  */
 export async function ensureLocationShell(
-  tx: Tx,
+  tx:  typeof prisma | ExtendedPrismaTransaction,
   payload: {
     inflowId: string;
     name: string;
@@ -136,7 +135,7 @@ export async function ensurePaymentTermsShell(
  * 📸 Separated Feature Synchronization Layer
  */
 export async function syncGroupFeatures(
-  tx: Tx,
+  tx:  typeof prisma | ExtendedPrismaTransaction,
   groupId: string,
   rawFeatures?: string | null
 ) {
@@ -197,7 +196,7 @@ export async function syncGroupFeatures(
  * 📸 Separated Feature Synchronization Layer
  */
 export async function syncProductFeatures(
-  tx: Tx,
+  tx:  typeof prisma | ExtendedPrismaTransaction,
   productId: string,
   rawFeatures?: string | null
 ) {
@@ -257,7 +256,7 @@ export async function syncProductFeatures(
  * 🏷️ Separated Tag Synchronization Layer
  */
 export async function syncGroupTags(
-  tx: Tx,
+  tx:  typeof prisma | ExtendedPrismaTransaction,
   groupId: string,
   rawTags?: string | null
 ) {
@@ -290,7 +289,7 @@ export async function syncGroupTags(
 }
 
 export async function syncProductTags(
-  tx: Tx,
+  tx:  typeof prisma | ExtendedPrismaTransaction,
   productId: string,
   rawTags?: string | null
 ) {
@@ -353,7 +352,7 @@ export function parseTags(
 }
 
 export async function syncPurchasingUom(
-  tx: Tx,
+  tx:  typeof prisma | ExtendedPrismaTransaction,
   product: InflowProduct
 ) {
   if (!product.purchasingUom) return;
@@ -387,7 +386,7 @@ export async function syncPurchasingUom(
 }
 
 export async function syncSalesUom(
-  tx: Tx,
+  tx:  typeof prisma | ExtendedPrismaTransaction,
   product: InflowProduct
 ) {
   if (!product.salesUom) return;
@@ -589,7 +588,7 @@ export async function syncInventoryLines1(
 
 
 // export async function syncImages(
-//   tx: Tx,
+//   tx:  typeof prisma | ExtendedPrismaTransaction,
 //   product: InflowProduct
 // ) {
 //   for (
@@ -679,7 +678,7 @@ export async function syncInventoryLines1(
 
 
 // export async function syncFeatures(
-//   tx: Tx,
+//   tx:  typeof prisma | ExtendedPrismaTransaction,
 //   inflowProductId: string,
 //   value?: string | null
 // ) {
@@ -726,7 +725,7 @@ export async function syncInventoryLines1(
 // }
 
 // export async function syncTags(
-//   tx: Tx,
+//   tx:  typeof prisma | ExtendedPrismaTransaction,
 //   inflowProductId: string,
 //   value?: string | null
 // ) {

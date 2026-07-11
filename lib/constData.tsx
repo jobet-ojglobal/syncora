@@ -71,6 +71,7 @@ import {
   RefreshCw,
   CreditCard,
   Landmark,
+  Trash,
 } from "lucide-react";
 
     
@@ -575,6 +576,11 @@ export const data = {
           title: "Tax Configuration",
           url: "/dashboard/settings/tax",
           icon: Landmark,
+        },
+        {
+          title: "Trash",
+          url: "/dashboard/settings/trash",
+          icon: Trash,
         },
       ],
     },
@@ -1321,6 +1327,11 @@ export const breadcrumbsMap = [
             id: "settings-payment",
             href: "/dashboard/settings/payment",
             label: "Payment",
+          },
+          {
+            id: "settings-trash",
+            href: "/dashboard/settings/trash",
+            label: "Trash",
           },
         ],
       },

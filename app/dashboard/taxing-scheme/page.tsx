@@ -225,7 +225,7 @@ export default function TaxingSchemesListPage() {
                         <DeleteButton
                           itemId={scheme.id} 
                           itemName={scheme.name} 
-                          endpointUrl={`/api/admin/taxing-scheme/${scheme.id}`}
+                          endpointUrl={`/api/admin/taxing-scheme/${scheme.id}/`}
                           onSuccess={(id) => {
                             setSchemes((prev) => prev.filter((s) => s.id !== id));
                           }} 

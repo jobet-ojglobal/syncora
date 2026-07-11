@@ -51,19 +51,22 @@ export async function POST(request: NextRequest) {
           isActive: tc.isActive ?? true,
           tax1Rate: tc.tax1Rate || 0,
           tax2Rate: tax2Name ? (tc.tax2Rate || 0) : 0,
+          isDefaultExplicit: !!tc.isDefault, // temporary flag reference to look up match
         }));
 
         await tx.taxCode.createMany({
-          data: taxCodesData,
+          data: taxCodesData.map(({ isDefaultExplicit, ...rest }) => rest), // Strip flag before insertion
         });
 
-        // Set the first item as the default tax code identifier
+        // Find which payload configuration was marked as true by the client
+        const selectedDefault = taxCodesData.find(tc => tc.isDefaultExplicit) || taxCodesData[0];
+
+        // Apply the targeted relational reference mapping identifier 
         await tx.taxingScheme.update({
           where: { id: scheme.id },
-          data: { defaultTaxCodeId: taxCodesData[0].inflowId },
+          data: { defaultTaxCodeId: selectedDefault.inflowId },
         });
       }
-
       const res = await tx.taxingScheme.findUnique({
         where: { id: scheme.id },
         include: { taxCodes: true },
@@ -123,7 +126,7 @@ export async function POST(request: NextRequest) {
     // ==========================================
     // 📍 STEP 2: BROADCAST LOCAL SYNC JOBS
     // ==========================================
-    const validWebhooks = await WebhookService.getLocationWebhookURLs("taxingScheme");
+    const validWebhooks = await WebhookService.getLocationWebhookURLs("taxingSchemeLocal");
 
     if (validWebhooks.length > 0) {
       const jobsToQueue = validWebhooks
@@ -192,26 +195,52 @@ export async function PATCH(request: NextRequest) {
         throw new Error("Taxing Scheme not found.");
       }
 
-      // Safe historic drop for child elements using global tracking link
-      await tx.taxCode.deleteMany({ where: { taxingSchemeId: scheme.inflowId } });
-
       let defaultTaxCodeId: string | null = null;
 
-      if (taxCodes && Array.isArray(taxCodes) && taxCodes.length > 0) {
-        const taxCodesData = taxCodes.map((tc) => ({
-          inflowId: crypto.randomUUID().toLowerCase(),
-          taxingSchemeId: scheme.inflowId,
-          name: tc.name.trim().toUpperCase(),
-          isActive: tc.isActive ?? true,
-          tax1Rate: tc.tax1Rate || 0,
-          tax2Rate: tax2Name ? (tc.tax2Rate || 0) : 0,
-        }));
+      if (taxCodes && Array.isArray(taxCodes)) {
+        // 1. Collect all incoming items that already possess a known global id
+        const incomingWithIds = taxCodes.filter((tc) => tc.inflowId);
+        const incomingIds = incomingWithIds.map((tc) => tc.inflowId as string);
 
-        await tx.taxCode.createMany({
-          data: taxCodesData,
+        // 2. Safely delete ONLY the old child rows omitted from your user's update payload
+        // This cleanly leaves active mappings untouched!
+        await tx.taxCode.deleteMany({
+          where: {
+            taxingSchemeId: scheme.inflowId,
+            NOT: { inflowId: { in: incomingIds } }
+          }
         });
 
-        defaultTaxCodeId = taxCodesData[0].inflowId;
+        const processedTaxCodes: string[] = [];
+
+        // 3. Process records individually via Upsert to protect mapping integrity
+        for (const tc of taxCodes) {
+          const targetInflowId = tc.inflowId || crypto.randomUUID().toLowerCase();
+          processedTaxCodes.push(targetInflowId);
+
+          await tx.taxCode.upsert({
+            where: { inflowId: targetInflowId },
+            create: {
+              inflowId: targetInflowId,
+              taxingSchemeId: scheme.inflowId,
+              name: tc.name.trim().toUpperCase(),
+              isActive: tc.isActive ?? true,
+              tax1Rate: tc.tax1Rate || 0,
+              tax2Rate: tax2Name ? (tc.tax2Rate || 0) : 0,
+            },
+            update: {
+              name: tc.name.trim().toUpperCase(),
+              isActive: tc.isActive ?? true,
+              tax1Rate: tc.tax1Rate || 0,
+              tax2Rate: tax2Name ? (tc.tax2Rate || 0) : 0,
+            }
+          });
+
+          // Track which record should act as the default choice reference key
+          if (tc.isDefault || (!defaultTaxCodeId && processedTaxCodes.length === 1)) {
+            defaultTaxCodeId = targetInflowId;
+          }
+        }
       }
 
       const modifiedScheme = await tx.taxingScheme.update({
@@ -225,13 +254,13 @@ export async function PATCH(request: NextRequest) {
           tax1OnShipping,
           tax2Name: tax2Name?.trim() || null,
           tax2OnShipping,
-          defaultTaxCodeId,
+          defaultTaxCodeId, 
         },
         include: { taxCodes: true }
       });
 
       const inflowPayload = {
-        cloudId: modifiedScheme.inflowId, // Central tracking cloud string
+        cloudId: modifiedScheme.inflowId,
         calculateTax2OnTax1: modifiedScheme.calculateTax2OnTax1,
         defaultTaxCodeId: modifiedScheme.defaultTaxCodeId,
         isActive: modifiedScheme.isActive,
@@ -240,7 +269,15 @@ export async function PATCH(request: NextRequest) {
         tax1Name: modifiedScheme.tax1Name,
         tax1OnShipping: modifiedScheme.tax1OnShipping,
         tax2Name: modifiedScheme.tax2Name,
-        tax2OnShipping: modifiedScheme.tax2OnShipping
+        tax2OnShipping: modifiedScheme.tax2OnShipping,
+        taxCodes: modifiedScheme.taxCodes.map(t => ({
+          isActive: t.isActive,
+          name: t.name,
+          tax1Rate: t.tax1Rate,
+          tax2Rate: t.tax2Rate,
+          taxCodeId: t.inflowId,
+          taxingSchemeId: t.taxingSchemeId,
+        }))
       };
 
       return { modifiedScheme, inflowPayload };
@@ -271,26 +308,32 @@ export async function PATCH(request: NextRequest) {
           removeOnComplete: true
         }
       );
-      console.log(`[Queue] Successfully broadcasted patch edits to inflow cloud.`);
     }
 
     // ==========================================
     // 📍 STEP 2: BROADCAST LOCAL SYNC JOBS
     // ==========================================
-    const validWebhooks = await WebhookService.getLocationWebhookURLs("taxingScheme");
+    const validWebhooks = await WebhookService.getLocationWebhookURLs("taxingSchemeLocal");
 
     if (validWebhooks.length > 0) {
-      // 🗺️ Query identity map registry to see which location already knows this record
+      
       const existingMappings = await prisma.taxingSchemeLocationMap.findMany({
         where: { taxingSchemeId: cloudId },
         select: { locationId: true, localId: true }
       });
 
+      const existingTaxCodeMaps = await prisma.taxCodeLocationMap.findMany({
+        where: { taxCode: { taxingSchemeId: cloudId } },
+        select: { taxCodeId: true, locationId: true, localId: true }
+      });
+
       const jobsToQueue = validWebhooks
         .filter(webhook => webhook.location.url && webhook.location.url.trim() !== "")
         .map((webhook) => {
-        // Find if this specific store branch has an integer mapping matching this entry
+          
         const match = existingMappings.find(m => m.locationId === webhook.locationId);
+
+
 
         return {
           name: "taxing_scheme_localsync_job",
@@ -299,8 +342,20 @@ export async function PATCH(request: NextRequest) {
             model: "TaxingScheme",
             payload: {
               ...cleanInflowPayload,
-              taxingSchemeId: cloudId, // Keeps the global trace uniform
-              localId: match ? match.localId : null, // 💡 If exists, passes Int (e.g. 5). If null, local nodes create a fresh entry
+              taxingSchemeId: cloudId,
+              localId: match ? match.localId : null,
+              
+              // 💡 MAP CHILD TAX CODES
+              taxCodes: cleanInflowPayload.taxCodes.map((tc) => {
+                const taxCodeMatch = existingTaxCodeMaps.find(
+                  m => m.taxCodeId === tc.taxCodeId && m.locationId === webhook.locationId
+                );
+                
+                return {
+                  ...tc,
+                  localId: taxCodeMatch ? taxCodeMatch.localId : null
+                };
+              })
             },
             timestamp: new Date().toISOString(),
             location: {
@@ -318,15 +373,183 @@ export async function PATCH(request: NextRequest) {
       });
 
       await getMidSyncQueue().addBulk(jobsToQueue);
-      console.log(`[Queue] Successfully broadcasted patch edits to ${jobsToQueue.length} store instances.`);
     }
 
     return NextResponse.json(result.modifiedScheme, { status: 200 });
   } catch (error) {
     console.error("Failed to update taxing scheme:", error);
-    return NextResponse.json({ error: "Internal server database write transaction failure." }, { status: 500 });
+    return NextResponse.json({ error: "Internal server database failure." }, { status: 500 });
   }
 }
+
+// export async function PATCH(request: NextRequest) {
+//   try {
+//     const body = await request.json();
+//     const { 
+//       id, name, isActive, isDefault, calculateTax2OnTax1, 
+//       tax1Name, tax1OnShipping, tax2Name, tax2OnShipping, taxCodes 
+//     } = body;
+
+//     if (!id) {
+//       return NextResponse.json({ error: "Target taxing scheme identifier is missing." }, { status: 400 });
+//     }
+
+//     const result = await prisma.$transaction(async (tx) => {
+//       if (isDefault) {
+//         await tx.taxingScheme.updateMany({
+//           where: { NOT: { id }, isDefault: true },
+//           data: { isDefault: false }
+//         });
+//       }
+
+//       const scheme = await tx.taxingScheme.findUnique({
+//         where: { id },
+//         select: { inflowId: true }
+//       });
+
+//       if (!scheme) {
+//         throw new Error("Taxing Scheme not found.");
+//       }
+
+//       // Safe historic drop for child elements using global tracking link
+//       await tx.taxCode.deleteMany({ where: { taxingSchemeId: scheme.inflowId } });
+
+//       let defaultTaxCodeId: string | null = null;
+
+//       if (taxCodes && Array.isArray(taxCodes) && taxCodes.length > 0) {
+//         const taxCodesData = taxCodes.map((tc) => ({
+//           inflowId: crypto.randomUUID().toLowerCase(),
+//           taxingSchemeId: scheme.inflowId,
+//           name: tc.name.trim().toUpperCase(),
+//           isActive: tc.isActive ?? true,
+//           tax1Rate: tc.tax1Rate || 0,
+//           tax2Rate: tax2Name ? (tc.tax2Rate || 0) : 0,
+//           isDefaultExplicit: !!tc.isDefault, // 🌟 Temporary indicator tracking link
+//         }));
+
+//         await tx.taxCode.createMany({
+//           // Strip indicator tag before database mapping schema validation insertion
+//           data: taxCodesData.map(({ isDefaultExplicit, ...rest }) => rest), 
+//         });
+
+//         // 🌟 Find explicitly targeted row object, fall back gracefully to row 0 if none checked
+//         const selectedDefault = taxCodesData.find(tc => tc.isDefaultExplicit) || taxCodesData[0];
+//         defaultTaxCodeId = selectedDefault.inflowId;
+//       }
+
+//       const modifiedScheme = await tx.taxingScheme.update({
+//         where: { id },
+//         data: {
+//           name: name?.trim(),
+//           isActive,
+//           isDefault,
+//           calculateTax2OnTax1: tax2Name ? calculateTax2OnTax1 : false,
+//           tax1Name: tax1Name?.trim() || null,
+//           tax1OnShipping,
+//           tax2Name: tax2Name?.trim() || null,
+//           tax2OnShipping,
+//           defaultTaxCodeId, // 🌟 Saves explicit relational mapping choice reference correctly
+//         },
+//         include: { taxCodes: true }
+//       });
+
+//       const inflowPayload = {
+//         cloudId: modifiedScheme.inflowId,
+//         calculateTax2OnTax1: modifiedScheme.calculateTax2OnTax1,
+//         defaultTaxCodeId: modifiedScheme.defaultTaxCodeId,
+//         isActive: modifiedScheme.isActive,
+//         isDefault: modifiedScheme.isDefault,
+//         name: modifiedScheme.name,
+//         tax1Name: modifiedScheme.tax1Name,
+//         tax1OnShipping: modifiedScheme.tax1OnShipping,
+//         tax2Name: modifiedScheme.tax2Name,
+//         tax2OnShipping: modifiedScheme.tax2OnShipping
+//       };
+
+//       return { modifiedScheme, inflowPayload };
+//     });
+
+//     const { cloudId, ...cleanInflowPayload } = result.inflowPayload;
+
+//     // ==========================================
+//     // 🏢 STEP 1: DISPATCH CLOUD SYNC JOB
+//     // ==========================================
+//     const validCloudWebhook = await WebhookService.getCloudWebhookURL("taxingScheme");
+
+//     if (validCloudWebhook) {
+//       await getMidSyncQueue().add(
+//         "taxing_scheme_cloudsync_job",
+//         {
+//           source: "TAXING_SCHEME_UPSERT_CLOUD",
+//           model: "TaxingScheme",
+//           payload: {
+//             ...cleanInflowPayload,
+//             taxingSchemeId: cloudId,
+//           },
+//           timestamp: new Date().toISOString(),
+//         },
+//         { 
+//           attempts: 3, 
+//           backoff: { type: "exponential", delay: 2000 },
+//           removeOnComplete: true
+//         }
+//       );
+//       console.log(`[Queue] Successfully broadcasted patch edits to inflow cloud.`);
+//     }
+
+//     // ==========================================
+//     // 📍 STEP 2: BROADCAST LOCAL SYNC JOBS
+//     // ==========================================
+//     const validWebhooks = await WebhookService.getLocationWebhookURLs("taxingScheme");
+
+//     if (validWebhooks.length > 0) {
+//       // 🗺️ Query identity map registry to see which location already knows this record
+//       const existingMappings = await prisma.taxingSchemeLocationMap.findMany({
+//         where: { taxingSchemeId: cloudId },
+//         select: { locationId: true, localId: true }
+//       });
+
+//       const jobsToQueue = validWebhooks
+//         .filter(webhook => webhook.location.url && webhook.location.url.trim() !== "")
+//         .map((webhook) => {
+//         // Find if this specific store branch has an integer mapping matching this entry
+//         const match = existingMappings.find(m => m.locationId === webhook.locationId);
+
+//         return {
+//           name: "taxing_scheme_localsync_job",
+//           data: {
+//             source: "TAXING_SCHEME_UPSERT_LOCAL",
+//             model: "TaxingScheme",
+//             payload: {
+//               ...cleanInflowPayload,
+//               taxingSchemeId: cloudId, // Keeps the global trace uniform
+//               localId: match ? match.localId : null, // 💡 If exists, passes Int (e.g. 5). If null, local nodes create a fresh entry
+//             },
+//             timestamp: new Date().toISOString(),
+//             location: {
+//               inflowId: webhook.locationId,
+//               url: webhook.location.url,
+//               name: webhook.location.name
+//             }
+//           },
+//           opts: { 
+//             attempts: 3, 
+//             backoff: { type: "exponential", delay: 2000 },
+//             removeOnComplete: true
+//           }
+//         };
+//       });
+
+//       await getMidSyncQueue().addBulk(jobsToQueue);
+//       console.log(`[Queue] Successfully broadcasted patch edits to ${jobsToQueue.length} store instances.`);
+//     }
+
+//     return NextResponse.json(result.modifiedScheme, { status: 200 });
+//   } catch (error) {
+//     console.error("Failed to update taxing scheme:", error);
+//     return NextResponse.json({ error: "Internal server database write transaction failure." }, { status: 500 });
+//   }
+// }
 
 // // app/api/admin/taxing-schemes/route.ts
 // import { NextRequest, NextResponse } from "next/server";

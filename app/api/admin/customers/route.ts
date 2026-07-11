@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getMidSyncQueue } from "@/lib/queues/sync.queue";
 import { Prisma } from "@/generated/prisma/client";
-import { LocationService } from "@/services/location.service";
+// import { LocationService } from "@/services/location.service";
 import { WebhookService } from "@/services/webhook.service";
 
 export async function POST(request: NextRequest) {
@@ -190,7 +190,7 @@ export async function POST(request: NextRequest) {
     // ==========================================
     // 📍 STEP 2: BROADCAST LOCAL SYNC JOBS
     // ==========================================
-    const validWebhooks = await WebhookService.getLocationWebhookURLs("customer");
+    const validWebhooks = await WebhookService.getLocationWebhookURLs("customerLocals");
 
     if (validWebhooks.length > 0) {
       const jobsToQueue = validWebhooks
@@ -439,7 +439,7 @@ export async function PATCH(request: NextRequest) {
     // ==========================================
     // 📍 STEP 2: BROADCAST LOCAL SYNC JOBS
     // ==========================================
-    const validWebhooks = await WebhookService.getLocationWebhookURLs("customer");
+    const validWebhooks = await WebhookService.getLocationWebhookURLs("customerLocal");
 
     if (validWebhooks.length > 0) {
       // 🗺️ Query identity map registry to see which location already knows this record

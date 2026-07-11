@@ -43,7 +43,6 @@ const createExtendedPrismaClient = () => {
     query: {
       $allModels: {
         async findMany({ model, operation, args, query }) {
-          // Access the DMMF directly from the instance using baseClient._dmmf
           const hasDeletedAt = (baseClient as any)._dmmf?.modelMap?.[model]
             ?.fields?.some((f: any) => f.name === 'deletedAt');
 
@@ -75,6 +74,12 @@ const createExtendedPrismaClient = () => {
 
           if (!hasDeletedAt || (args as any)?.where?.deletedAt !== undefined) return query(args);
           args.where = { ...args.where, deletedAt: null };
+          return query(args);
+        },
+        // ADD THIS EXPLICIT UPSERT INTERCEPTOR
+        async upsert({ model, operation, args, query }) {
+          // Do not mutate or inject deletedAt constraints into the upsert where block.
+          // This keeps unique constraints clean and prevents Null Constraint Violations.
           return query(args);
         },
       },
@@ -109,7 +114,7 @@ if (process.env.NODE_ENV === "production") {
 
 export { prisma };
 
-// // lib/prisma.ts
+// lib/prisma.ts
 // import "dotenv/config";
 // import { PrismaPg } from "@prisma/adapter-pg";
 // import { PrismaClient } from "../generated/prisma/client";

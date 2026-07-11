@@ -1,13 +1,11 @@
 // services/sync/products/product-group-sync.ts
-import { Prisma } from "@/generated/prisma/client"; // Adjust path according to your workspace generation path
 import { InflowProduct, InflowProductGroup } from "../types";
 import { syncBrand, syncGroupFeatures, syncGroupImages, syncGroupTags } from "./helpers";
 import { genInflowUniqueSlug } from "@/helpers/genUniqueSlug";
-
-type Tx = Prisma.TransactionClient;
+import type { ExtendedPrismaTransaction, prisma } from "@/lib/prisma";
 
 export async function syncProductGroup(
-  tx: Tx,
+  tx: typeof prisma | ExtendedPrismaTransaction,
   group: InflowProductGroup,
   firstProductInGroup?: InflowProduct 
 ) {

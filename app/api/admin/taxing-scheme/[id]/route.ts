@@ -34,9 +34,14 @@ export async function DELETE(request: NextRequest) {
       }, { status: 422 });
     }
 
-    await prisma.taxingScheme.delete({
-      where: { id },
-    });
+    await prisma.taxingScheme.softDelete(id);
+
+    // await prisma.taxingScheme.update({
+    //   where: { id },
+    //   data: {
+    //     deletedAt: new Date(),
+    //   }
+    // });
 
     return NextResponse.json({ success: true, message: "Fiscal scheme dropped safely" }, { status: 200 });
   } catch (error) {

@@ -38,6 +38,7 @@ import { CurrencySyncMapService as LocalCurrencySyncMapService } from "../locati
 import { PaymentTermSyncMapService as LocalPaymentTermSyncMapService } from "../locations/services/payment-term-sync-map.service";
 import { PricingSchemeSyncMapService as LocalPricingSchemeSyncMapService } from "../locations/services/pricing-scheme-sync-map.service";
 import { TaxCodeSyncMapService as LocalTaxCodeSyncMapService } from "../locations/services/tax-code-sync-map.service";
+import { TaxingSchemeSyncMapService as LocalTaxingSchemeSyncMapService } from "../locations/services/taxing-scheme-sync-map.service";
 
 const testService = new TestSyncService();
 const categoryService = new CategorySyncService();
@@ -77,11 +78,13 @@ const currencyServiceLocal = new LocalCurrencySyncMapService();
 const paymentServiceLocal = new LocalPaymentTermSyncMapService();
 const pricingServiceLocal = new LocalPricingSchemeSyncMapService();
 const taxCodeServiceLocal = new LocalTaxCodeSyncMapService();
+const taxingSchemeServiceLocal = new LocalTaxingSchemeSyncMapService();
 
 interface SyncWebhookJobData {
   jobId: string;
   source: string;
   includes: any;
+  selectedRecords: any;
   location: {
     inflowId: string;
     name: string;
@@ -96,7 +99,7 @@ type SyncOptions = {
 const worker = new Worker<SyncWebhookJobData>(
   "sync",
   async (job: Job<SyncWebhookJobData>) => {
-    const { jobId, source, includes, location } = job.data;
+    const { jobId, source, includes, location, selectedRecords } = job.data;
 
     const locationUrl = (location?.url && location.url.trim() !== "") ? location.url : null;
 
@@ -152,11 +155,11 @@ const worker = new Worker<SyncWebhookJobData>(
           }
           result = await pricingServiceLocal.sync(location, syncOptions);
           break;
-        case "tax_codes_local":
+        case "taxing_schemes_local":
           if (!locationUrl) {
-            throw new Error(`Cannot sync tax code: No location URL found for location ${location?.name}`);
+            throw new Error(`Cannot sync taxing scheme: No location URL found for location ${location?.name}`);
           }
-          result = await taxCodeServiceLocal.sync(location, syncOptions);
+          result = await taxingSchemeServiceLocal.sync(location, syncOptions, selectedRecords);
           break;
 
         // Cloud Sync
