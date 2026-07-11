@@ -1,7 +1,8 @@
 // lib/locations/services/pricing-scheme-sync-map.service.ts
 import { prisma } from "@/lib/prisma";
-import { getPricingSchemes } from "../data/pricing-scheme"; // Assuming this handles the data fetching
+import { getPricingSchemes } from "../data/pricing-scheme"; 
 import { upsertPricingScheme } from "@/lib/inflow/services/pricing-scheme-only.sync";
+import crypto from "crypto";
 
 type SyncOptions = {
   onProgress?: (processedCount: number) => Promise<void>;
@@ -31,39 +32,48 @@ export class PricingSchemeSyncMapService {
     await prisma.$transaction(
       async (tx) => {
         /**
-         * Step 1: Query global availability by name
+         * Step 1: Query global availability by name, or upsert inline
          */
         const existingSchemes = await Promise.all(
           pricingSchemes.map(async (scheme) => {
             // Check if the scheme already exists globally based on the name
-            const match = await tx.pricingScheme.findFirst({
+            let match = await tx.pricingScheme.findFirst({
               where: { name: scheme.name },
               select: { inflowId: true },
             });
 
+            // Find the global currency UUID mapped from this location's local currency ID
             const depCurrency = await tx.currencyLocationMap.findFirst({
-              where: { localId: Number(scheme.currencyId) }
+              where: { 
+                locationId: location.inflowId,
+                localId: Number(scheme.currencyId) 
+              },
+              select: { currencyId: true } // Adjust this field name to your schema configuration if necessary
             });
 
-            let newPricing = null
+            const newPricing = null;
             
-            if(depCurrency) {
+            // Only proceed with global insertion if the relational currency dependency exists
+            if (depCurrency) {
+              const generatedInflowId = crypto.randomUUID().toLowerCase();
+
               const payload = {
-                  pricingSchemeId: crypto.randomUUID().toString(),
-                  currencyId: scheme.currencyId,
-                  name: scheme.name,
-                  isActive: scheme.isActive == 1 ? true : false,
-                  isDefault: false,
-                  isTaxInclusive: scheme.isTaxInclusive == 1 ? true : false,
-                  timestamp: scheme.timestamp
+                pricingSchemeId: generatedInflowId,
+                currencyId: depCurrency.currencyId, // Pass the global String UUID, not the local Int
+                name: scheme.name,
+                isActive: Number(scheme.isActive) === 1,
+                isDefault: false,
+                isTaxInclusive: Number(scheme.isTaxInclusive) === 1,
+                timestamp: scheme.timestamp
               };
 
-              if(!match) {
-                  newPricing = await upsertPricingScheme(payload);
+              if (!match) {
+                // Pass down the running transaction context to avoid connection pool isolation issues
+                match = await upsertPricingScheme(tx, payload);
               }
             }
 
-            return { incoming: scheme, existing: match || newPricing };
+            return { incoming: scheme, existing: match };
           })
         );
 
@@ -85,15 +95,27 @@ export class PricingSchemeSyncMapService {
          */
         const mappingPromises = validSchemes.map(async ({ incoming, existing }) => {
           // Look up if a location map record is already tracking this scheme
-          const locationMap = await tx.pricingSchemeLocationMap.findUnique({
+          let locationMap = await tx.pricingSchemeLocationMap.findUnique({
             where: {
               pricingSchemeId_locationId: {
-                pricingSchemeId: existing!.inflowId, // Using verified global identifier
+                pricingSchemeId: existing!.inflowId, 
                 locationId: location.inflowId,
               },
             },
             select: { localId: true },
           });
+
+          // CRITICAL FIX: If mapping table bridge doesn't exist, create it!
+          if (!locationMap) {
+            locationMap = await tx.pricingSchemeLocationMap.create({
+              data: {
+                pricingSchemeId: existing!.inflowId,
+                locationId: location.inflowId,
+                localId: Number(incoming.pricingSchemeId),
+              },
+              select: { localId: true }
+            });
+          }
 
           syncResults.push({
             pricingSchemeInflowId: incoming.pricingSchemeId,
@@ -103,7 +125,6 @@ export class PricingSchemeSyncMapService {
         });
 
         await Promise.all(mappingPromises);
-
         processed = validSchemes.length;
       },
       {

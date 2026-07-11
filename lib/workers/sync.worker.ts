@@ -1,6 +1,6 @@
 // workers/product.worker.ts
 
-import { Worker } from "bullmq";
+import { Job, Worker } from "bullmq";
 import { prisma } from "@/lib/prisma";
 import { connection } from "@/lib/redis";
 
@@ -78,18 +78,29 @@ const paymentServiceLocal = new LocalPaymentTermSyncMapService();
 const pricingServiceLocal = new LocalPricingSchemeSyncMapService();
 const taxCodeServiceLocal = new LocalTaxCodeSyncMapService();
 
-
+interface SyncWebhookJobData {
+  jobId: string;
+  source: string;
+  includes: any;
+  location: {
+    inflowId: string;
+    name: string;
+    url: string;
+  };
+}
 
 type SyncOptions = {
   onProgress?: (progress: number) => Promise<void>;
 };
 
-const worker = new Worker(
+const worker = new Worker<SyncWebhookJobData>(
   "sync",
-  async (job) => {
+  async (job: Job<SyncWebhookJobData>) => {
     const { jobId, source, includes, location } = job.data;
 
     const locationUrl = (location?.url && location.url.trim() !== "") ? location.url : null;
+
+    console.log(`[Sync Worker] Processing job source: ${source} for location ${location.name}`);
     
     const syncOptions: SyncOptions = {
       onProgress: async (progress) => {

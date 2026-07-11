@@ -1,6 +1,6 @@
 import { prisma } from "@/lib/prisma";
+import type { ExtendedPrismaTransaction } from "@/lib/prisma";
 
-// Define a type matching the incoming structure from your external data source
 export type InflowPaymentTermInput = {
   paymentTermsId: string;
   name: string;
@@ -10,25 +10,28 @@ export type InflowPaymentTermInput = {
 
 /**
  * Executes a single atomic database upsert for an inFlow Payment Term.
- * Can be reused in loops, webhook handlers, or API endpoints.
+ * Accepts an optional transaction client context to stay within existing sync blocks.
  */
-export async function upsertPaymentTerm(term: InflowPaymentTermInput) {
-  return await prisma.$transaction(async (tx) => {
-    return await tx.paymentTerm.upsert({
-      where: {
-        inflowId: term.paymentTermsId,
-      },
-      create: {
-        inflowId: term.paymentTermsId,
-        name: term.name,
-        daysDue: term.daysDue,
-        isActive: term.isActive,
-      },
-      update: {
-        name: term.name,
-        daysDue: term.daysDue,
-        isActive: term.isActive,
-      },
-    });
+export async function upsertPaymentTerm(
+  txOrPrisma: typeof prisma | ExtendedPrismaTransaction,
+  term: InflowPaymentTermInput
+) {
+  // Use 'any' type conversion conditionally if the underlying runtime throws an internal matching issue,
+  // or call the client operation directly as shown here:
+  return await (txOrPrisma as any).paymentTerm.upsert({
+    where: {
+      inflowId: term.paymentTermsId,
+    },
+    create: {
+      inflowId: term.paymentTermsId,
+      name: term.name,
+      daysDue: term.daysDue,
+      isActive: term.isActive,
+    },
+    update: {
+      name: term.name,
+      daysDue: term.daysDue,
+      isActive: term.isActive,
+    },
   });
 }

@@ -1,34 +1,37 @@
 import { Prisma } from "@/generated/prisma/client";
-import { prisma } from "@/lib/prisma";
+import { ExtendedPrismaTransaction, prisma } from "@/lib/prisma";
 import { InflowTaxCode } from "../types";
 
-/**
- * Executes a single atomic database upsert for an inFlow Tax Code.
- * Safe for use in queues, looping orchestrators, or direct webhook endpoints.
- */
-export async function upsertTaxCode(taxCode: InflowTaxCode) {
-  return await prisma.$transaction(async (tx) => {
-    const payload = {
-      taxingSchemeId: taxCode.taxingSchemeId,
-      name: taxCode.name,
-      isActive: taxCode.isActive,
-      tax1Rate: taxCode.tax1Rate !== null && taxCode.tax1Rate !== undefined 
-        ? new Prisma.Decimal(taxCode.tax1Rate.toString()) 
-        : null,
-      tax2Rate: taxCode.tax2Rate !== null && taxCode.tax2Rate !== undefined 
-        ? new Prisma.Decimal(taxCode.tax2Rate.toString()) 
-        : null,
-    };
+type Tx = Prisma.TransactionClient;
 
-    return await tx.taxCode.upsert({
-      where: {
-        inflowId: taxCode.taxCodeId,
-      },
-      create: {
-        ...payload,
-        inflowId: taxCode.taxCodeId,
-      },
-      update: payload,
-    });
+/**
+ * Executes a single database upsert for an inFlow Tax Code.
+ * Accepts an optional transaction client context to stay within existing sync blocks.
+ */
+export async function upsertTaxCode(
+  txOrPrisma: typeof prisma | ExtendedPrismaTransaction,
+  taxCode: InflowTaxCode
+) {
+  const payload = {
+    taxingSchemeId: taxCode.taxingSchemeId,
+    name: taxCode.name,
+    isActive: taxCode.isActive,
+    tax1Rate: taxCode.tax1Rate !== null && taxCode.tax1Rate !== undefined 
+      ? new Prisma.Decimal(taxCode.tax1Rate.toString()) 
+      : null,
+    tax2Rate: taxCode.tax2Rate !== null && taxCode.tax2Rate !== undefined 
+      ? new Prisma.Decimal(taxCode.tax2Rate.toString()) 
+      : null,
+  };
+
+  return await txOrPrisma.taxCode.upsert({
+    where: {
+      inflowId: taxCode.taxCodeId,
+    },
+    create: {
+      ...payload,
+      inflowId: taxCode.taxCodeId,
+    },
+    update: payload,
   });
 }

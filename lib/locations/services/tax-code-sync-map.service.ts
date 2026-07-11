@@ -1,8 +1,8 @@
 // lib/locations/services/tax-code-sync-map.service.ts
 import { prisma } from "@/lib/prisma";
-import { getTaxCodes } from "../data/tax-code"; // Assuming this handles the data fetching
+import { getTaxCodes } from "../data/tax-code"; 
 import { upsertTaxCode } from "@/lib/inflow/services/tax-code.sync";
-
+import crypto from "crypto";
 
 type SyncOptions = {
   onProgress?: (processedCount: number) => Promise<void>;
@@ -32,39 +32,45 @@ export class TaxCodeSyncMapService {
     await prisma.$transaction(
       async (tx) => {
         /**
-         * Step 1: Query global availability by name
+         * Step 1: Query global availability by name, or upsert inline
          */
         const existingTaxCodes = await Promise.all(
           taxCodes.map(async (taxCode) => {
             // Find global tax code where name matches exactly
-            const match = await tx.taxCode.findFirst({
+            let match = await tx.taxCode.findFirst({
               where: { name: taxCode.name },
               select: { inflowId: true },
             });
 
+            // Find the global taxing scheme UUID mapped from this location's local scheme ID
             const depTaxScheme = await tx.taxingSchemeLocationMap.findFirst({
-              where: { localId: Number(taxCode.taxingSchemeId) }
+              where: { 
+                locationId: location.inflowId,
+                localId: Number(taxCode.taxingSchemeId) 
+              },
+              select: { taxingSchemeId: true } // Confirm this matches your junction table property name
             });
 
-            let newTaxCode = null
+            if (depTaxScheme) {
+              const generatedInflowId = crypto.randomUUID().toLowerCase();
 
-            if(depTaxScheme) {
               const payload = {
-                taxCodeId: crypto.randomUUID().toString(),
-                taxingSchemeId: taxCode.taxingSchemeId,
+                taxCodeId: generatedInflowId,
+                taxingSchemeId: depTaxScheme.taxingSchemeId, // Pass the global string UUID, not the local Int
                 name: taxCode.name,
-                isActive: taxCode.isActive == 1 ? true : false,
+                isActive: Number(taxCode.isActive) === 1,
                 tax1Rate: taxCode.tax1Rate,
                 tax2Rate: taxCode.tax2Rate,
                 timestamp: taxCode.timestamp
               };
 
-              if(!match) {
-                  newTaxCode = await upsertTaxCode(payload);
+              if (!match) {
+                // Pass down the running transaction client context
+                match = await upsertTaxCode(tx, payload);
               }
             }
 
-            return { incoming: taxCode, existing: match || newTaxCode };
+            return { incoming: taxCode, existing: match };
           })
         );
 
@@ -86,15 +92,27 @@ export class TaxCodeSyncMapService {
          */
         const mappingPromises = validTaxCodes.map(async ({ incoming, existing }) => {
           // Check for an existing map record unique to this taxCodeId + locationId composite key
-          const locationMap = await tx.taxCodeLocationMap.findUnique({
+          let locationMap = await tx.taxCodeLocationMap.findUnique({
             where: {
               taxCodeId_locationId: {
-                taxCodeId: existing!.inflowId, // Using verified global identification key
+                taxCodeId: existing!.inflowId, 
                 locationId: location.inflowId,
               },
             },
             select: { localId: true },
           });
+
+          // CRITICAL FIX: If mapping table row link doesn't exist, build it
+          if (!locationMap) {
+            locationMap = await tx.taxCodeLocationMap.create({
+              data: {
+                taxCodeId: existing!.inflowId,
+                locationId: location.inflowId,
+                localId: Number(incoming.taxCodeId),
+              },
+              select: { localId: true }
+            });
+          }
 
           syncResults.push({
             taxCodeInflowId: incoming.taxCodeId,
@@ -104,7 +122,6 @@ export class TaxCodeSyncMapService {
         });
 
         await Promise.all(mappingPromises);
-
         processed = validTaxCodes.length;
       },
       {

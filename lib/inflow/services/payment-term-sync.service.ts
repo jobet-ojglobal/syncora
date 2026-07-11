@@ -1,3 +1,4 @@
+import { prisma } from "@/lib/prisma"; // Ensure you import your default Prisma client instance
 import { getPaymentTerms } from "../data/payment-terms";
 import { upsertPaymentTerm } from "./payment-term.sync";
 
@@ -15,8 +16,8 @@ export class PaymentTermSyncService {
     for (let i = 0; i < total; i++) {
       const term = terms[i];
       
-      // Call our isolated, reusable single-sync function
-      await upsertPaymentTerm(term);
+      // CRITICAL FIX: Pass the base prisma instance as the first parameter
+      await upsertPaymentTerm(prisma, term);
 
       processed++;
 

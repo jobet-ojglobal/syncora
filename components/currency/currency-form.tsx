@@ -11,6 +11,7 @@ import { Coins, ArrowLeftRight, ArrowLeft, RefreshCw, Layers } from "lucide-reac
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Field, FieldGroup, FieldLabel, FieldLegend, FieldSet } from "@/components/ui/field";
+import { mutate } from "swr";
 
 interface CurrencyFormProps {
   initialData?: any | null;
@@ -113,25 +114,53 @@ export function CurrencyForm({ initialData }: CurrencyFormProps) {
   };
 
   const onSubmit = async (values: CurrencyInput) => {
-    try {
-      const response = await fetch("/api/admin/currencies", {
-        method: isEditMode ? "PATCH" : "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(values),
-      });
+  try {
+    const response = await fetch("/api/admin/currencies", {
+      method: isEditMode ? "PATCH" : "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(values),
+    });
 
-      if (!response.ok) {
-        const payload = await response.json();
-        throw new Error(payload.error || "Execution engine rejected monetary rule mutation mapping.");
-      }
-
-      toast.success(isEditMode ? "Currency properties updated" : "New trading currency initialized");
-      router.push("/dashboard/currencies");
-      router.refresh();
-    } catch (err: any) {
-      toast.error("Write Aborted", { description: err.message });
+    if (!response.ok) {
+      const payload = await response.json();
+      throw new Error(payload.error || "Execution engine rejected monetary rule mutation mapping.");
     }
-  };
+
+    toast.success(isEditMode ? "Currency properties updated" : "New trading currency initialized");
+    
+    // 1. Tell SWR globally to invalidate the cache for your filtered list API endpoint
+    // Using a function allows matching any pagination index or search string wildcard
+    mutate((key) => typeof key === "string" && key.startsWith("/api/admin/currencies/filtered"));
+
+    // 2. Safely redirect the user back
+    router.push("/dashboard/currencies");
+  } catch (err: any) {
+    toast.error("Write Aborted", { description: err.message });
+  }
+};
+
+  // const onSubmit = async (values: CurrencyInput) => {
+  //   try {
+  //     const response = await fetch("/api/admin/currencies", {
+  //       method: isEditMode ? "PATCH" : "POST",
+  //       headers: { "Content-Type": "application/json" },
+  //       body: JSON.stringify(values),
+  //     });
+
+  //     if (!response.ok) {
+  //       const payload = await response.json();
+  //       throw new Error(payload.error || "Execution engine rejected monetary rule mutation mapping.");
+  //     }
+
+  //     toast.success(isEditMode ? "Currency properties updated" : "New trading currency initialized");
+  //     router.push("/dashboard/currencies");
+  //     router.refresh();
+
+
+  //   } catch (err: any) {
+  //     toast.error("Write Aborted", { description: err.message });
+  //   }
+  // };
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="w-full max-w-5xl mx-auto p-6 bg-card border rounded-xl shadow-xs space-y-6 text-xs">

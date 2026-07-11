@@ -128,6 +128,7 @@ export class LocationService {
       
       totalSalesOrdersCount: loc._count.salesOrders,
       activeSalesOrdersCount: loc.salesOrders.length,
+      url: loc.url,
       
       sublocationsList: loc.sublocations,
 

@@ -1,228 +1,133 @@
-  import {
+import {
+  // Main Navigation / Tab Icons
   LayoutDashboard,
+  MonitorCheck,
+  BarChart3,
+  Users,
+  Building2,
+  FolderTree,
   Package,
   Boxes,
-  Tags,
   Layers,
-  Building2,
-  Users,
+  Tags,
+  Scale,
+  Sliders,
   Warehouse,
   Truck,
+  Percent,
+  DollarSign,
+  Banknote,
+  CalendarDays,
+  Contact2,
+  Briefcase,
+  ShieldAlert,
   ShoppingCart,
   ClipboardCheck,
-  BarChart3,
-  FileText,
   Database,
+  FileText,
   Settings,
-  FolderSync,
+
+  // Nested / Sub-item Icons
+  TrendingUp,
+  MapPin,
+  UserCheck,
+  Box,
+  Users2,
+  UserPlus,
+  Store,
+  PlusCircle,
+  Network,
+  PackageCheck,
+  PackagePlus,
+  LayoutGrid,
+  Shield,
+  Tag,
+  Ruler,
+  ListFilter,
+  Eye,
+  AlertTriangle,
+  XCircle,
+  ArrowUpCircle,
+  SlidersHorizontal,
+  Camera,
+  ArrowLeftRight,
   Receipt,
-  Tablet,
-  MonitorCheck,
-  DollarSign,
+  Coins,
+  FileClock,
+  UserCog,
+  ShoppingBag,
+  CheckSquare,
+  PackageOpen,
+  Ship,
+  CloudDownload,
+  Terminal,
+  LineChart,
+  PieChart,
+  Map,
+  Layers3,
+  Download,
+  ToggleLeft,
+  HardDrive,
+  RefreshCw,
+  CreditCard,
+  Landmark,
 } from "lucide-react";
 
-    // admin: [
-    //     {
-    //         name: "Global Inventory",
-    //         url: "/dashboard/inventory",
-    //         icon: Package,
-    //     },
-    //     {
-    //         name: "Transfer Orders",
-    //         url: "/dashboard/transfers",
-    //         icon: Send,
-    //     },
-    //     {
-    //         name: "Customer Orders",
-    //         url: "/dashboard/orders",
-    //         icon: Megaphone,
-    //     },
-    //     {
-    //         name: "Fulfillment Management",
-    //         url: "/dashboard/fulfillments",
-    //         icon: Truck,
-    //     },
-    //     {
-    //         name: "Products",
-    //         url: "/dashboard/products",
-    //         icon: Box,
-    //     },
-    //     {
-    //         name: "Attributes",
-    //         url: "/dashboard/attributes",
-    //         icon: Settings2,
-    //     },
-    //     {
-    //         name: "Brands",
-    //         url: "/dashboard/brands",
-    //         icon: Tags,
-    //     },
-    //     {
-    //         name: "Categories",
-    //         url: "/dashboard/categories",
-    //         icon: FolderTree,
-    //     },
-    //     {
-    //         name: "Configuration",
-    //         url: "/dashboard/configuration",
-    //         icon: Settings2,
-    //     },
-    //     {
-    //         name: "Branches & Locations",
-    //         url: "/dashboard/branches",
-    //         icon: MapPin,
-    //     },
-    // ],
-
+    
 export const data = {
-  // adminMain: [
-  //   {
-  //     title: "Global Inventory",
-  //     url: "/dashboard",
-  //     icon: Package,
-  //     isActive: true,
-  //   },
-  //   {
-  //     title: "Models",
-  //     url: "#",
-  //     icon: Bot,
-  //     items: [
-  //       {
-  //         title: "Genesis",
-  //         url: "/dashboard/genesis",
-  //       },
-  //       {
-  //         title: "Explorer",
-  //         url: "/dashboard/explorer",
-  //       },
-  //       {
-  //         title: "Quantum",
-  //         url: "/dashboard/quantum",
-  //       },
-  //     ],
-  //   },
-  //   {
-  //     title: "products",
-  //     url: "/dashboard/products",
-  //     icon: BookOpen,
-  //     items: [
-  //       {
-  //         title: "Create",
-  //         url: "/dashboard/products/create",
-  //       },
-  //     ],
-  //   },
-  // ],
-
 
   adminMain: [
     /* -------------------------------------------------------------------------- */
-    /*                                  DASHBOARD                                 */
+    /* CORE & SALES OPERATIONS                           */
     /* -------------------------------------------------------------------------- */
-
     {
       title: "Dashboard",
       url: "/dashboard",
       icon: LayoutDashboard,
     },
-
-    // {
-    //   title: "POS",
-    //   url: "/dashboard/pos",
-    //   icon: MonitorCheck,
-    // },
-
-    /* -------------------------------------------------------------------------- */
-    /*                                  ANALYTICS                                 */
-    /* -------------------------------------------------------------------------- */
-
-    // {
-    //   title: "Analytics",
-    //   url: "/dashboard/analytics",
-    //   icon: BarChart3,
-    //   items: [
-    //     {
-    //       title: "Sales",
-    //       url: "/dashboard/analytics/sales",
-    //     },
-    //     {
-    //       title: "Inventory",
-    //       url: "/dashboard/analytics/inventory",
-    //     },
-    //     {
-    //       title: "Branches",
-    //       url: "/dashboard/analytics/branches",
-    //     },
-    //     {
-    //       title: "Customers",
-    //       url: "/dashboard/analytics/customers",
-    //     },
-    //     {
-    //       title: "Products",
-    //       url: "/dashboard/analytics/products",
-    //     },
-    //   ],
-    // },
-
-    /* -------------------------------------------------------------------------- */
-    /*                                    USERS                                   */
-    /* -------------------------------------------------------------------------- */
-
-    // {
-    //   title: "Users",
-    //   url: "/dashboard/users",
-    //   icon: Users,
-    //   items: [
-    //     {
-    //       title: "All Users",
-    //       url: "/dashboard/users",
-    //     },
-    //     {
-    //       title: "Create User",
-    //       url: "/dashboard/users/create",
-    //     },
-    //   ],
-    // },
-
-    /* -------------------------------------------------------------------------- */
-    /*                                  BRANCHES                                  */
-    /* -------------------------------------------------------------------------- */
-
     {
-      title: "Locations",
-      url: "/dashboard/locations",
-      icon: Building2,
+      title: "POS",
+      url: "/dashboard/pos",
+      icon: MonitorCheck,
+    },
+    {
+      title: "Customer Orders",
+      url: "/dashboard/customer-orders",
+      icon: ShoppingCart,
       items: [
         {
-          title: "All Locations",
-          url: "/dashboard/locations",
+          title: "All Orders",
+          url: "/dashboard/customer-orders",
+          icon: ShoppingBag,
+        },
+      ],
+    },
+    {
+      title: "Fulfillments",
+      url: "/dashboard/fulfillments",
+      icon: ClipboardCheck,
+      items: [
+        {
+          title: "All Fulfillments",
+          url: "/dashboard/fulfillments",
+          icon: CheckSquare,
         },
         {
-          title: "Create Branch",
-          url: "/dashboard/locations/create",
+          title: "Pickup",
+          url: "/dashboard/fulfillments/pickup",
+          icon: PackageOpen,
+        },
+        {
+          title: "Delivery",
+          url: "/dashboard/fulfillments/delivery",
+          icon: Ship,
         },
       ],
     },
 
     /* -------------------------------------------------------------------------- */
-    /*                                  PRODUCTS                                  */
+    /* PRODUCT & CATALOG MANAGEMENT                        */
     /* -------------------------------------------------------------------------- */
-
-    {
-      title: "Groups",
-      url: "/dashboard/groups",
-      icon: Package,
-      items: [
-         {
-          title: "All Groups",
-          url: "/dashboard/groups",
-        },
-        {
-          title: "Create Group",
-          url: "/dashboard/groups/create",
-        },
-      ],
-    },
     {
       title: "Products",
       url: "/dashboard/products",
@@ -231,18 +136,32 @@ export const data = {
         {
           title: "All Products",
           url: "/dashboard/products",
+          icon: PackageCheck,
         },
         {
           title: "Create Product",
           url: "/dashboard/products/create",
+          icon: PackagePlus,
         },
       ],
     },
-
-    /* -------------------------------------------------------------------------- */
-    /*                                 CATEGORIES                                 */
-    /* -------------------------------------------------------------------------- */
-
+    {
+      title: "Groups",
+      url: "/dashboard/groups",
+      icon: FolderTree,
+      items: [
+         {
+          title: "All Groups",
+          url: "/dashboard/groups",
+          icon: Network,
+        },
+        {
+          title: "Create Group",
+          url: "/dashboard/groups/create",
+          icon: PlusCircle,
+        },
+      ],
+    },
     {
       title: "Categories",
       url: "/dashboard/categories",
@@ -251,18 +170,15 @@ export const data = {
         {
           title: "All Categories",
           url: "/dashboard/categories",
+          icon: LayoutGrid,
         },
         {
           title: "Create Category",
           url: "/dashboard/categories/create",
+          icon: PlusCircle,
         },
       ],
     },
-
-    /* -------------------------------------------------------------------------- */
-    /*                                    BRANDS                                  */
-    /* -------------------------------------------------------------------------- */
-
     {
       title: "Brands",
       url: "/dashboard/brands",
@@ -271,18 +187,15 @@ export const data = {
         {
           title: "All Brands",
           url: "/dashboard/brands",
+          icon: Shield,
         },
         {
           title: "Create Brand",
           url: "/dashboard/brands/create",
+          icon: PlusCircle,
         },
       ],
     },
-
-    /* -------------------------------------------------------------------------- */
-    /*                                     TAGS                                   */
-    /* -------------------------------------------------------------------------- */
-
     {
       title: "Tags",
       url: "/dashboard/tags",
@@ -291,54 +204,53 @@ export const data = {
         {
           title: "All Tags",
           url: "/dashboard/tags",
+          icon: Tag,
         },
         {
           title: "Create Tag",
           url: "/dashboard/tags/create",
+          icon: PlusCircle,
         },
       ],
     },
-
-     {
-      title: "Uoms",
-      url: "/dashboard/uoms",
-      icon: Tags,
-      items: [
-        {
-          title: "All Uoms",
-          url: "/dashboard/uoms",
-        },
-        {
-          title: "Create Uom",
-          url: "/dashboard/uoms/create",
-        },
-      ],
-    },
-
-    /* -------------------------------------------------------------------------- */
-    /*                                 ATTRIBUTES                                 */
-    /* -------------------------------------------------------------------------- */
-
     {
       title: "Attributes",
       url: "/dashboard/attributes",
-      icon: Layers,
+      icon: Sliders,
       items: [
         {
           title: "All Attributes",
           url: "/dashboard/attributes",
+          icon: ListFilter,
         },
         {
           title: "Create Attribute",
           url: "/dashboard/attributes/create",
+          icon: PlusCircle,
+        },
+      ],
+    },
+    {
+      title: "Uoms",
+      url: "/dashboard/uoms",
+      icon: Scale,
+      items: [
+        {
+          title: "All Uoms",
+          url: "/dashboard/uoms",
+          icon: Ruler,
+        },
+        {
+          title: "Create Uom",
+          url: "/dashboard/uoms/create",
+          icon: PlusCircle,
         },
       ],
     },
 
     /* -------------------------------------------------------------------------- */
-    /*                                  INVENTORY                                 */
+    /* INVENTORY & LOGISTICS                           */
     /* -------------------------------------------------------------------------- */
-
     {
       title: "Inventory",
       url: "/dashboard/inventory",
@@ -347,34 +259,35 @@ export const data = {
         {
           title: "Overview",
           url: "/dashboard/inventory",
+          icon: Eye,
         },
         {
           title: "Low Stock",
           url: "/dashboard/inventory/low-stock",
+          icon: AlertTriangle,
         },
         {
           title: "Out of Stock",
           url: "/dashboard/inventory/out-of-stock",
+          icon: XCircle,
         },
         {
           title: "Overstocked",
           url: "/dashboard/inventory/overstocked",
+          icon: ArrowUpCircle,
         },
         {
           title: "Adjustments",
           url: "/dashboard/inventory/adjustments",
+          icon: SlidersHorizontal,
         },
         {
           title: "Snapshots",
           url: "/dashboard/inventory/snapshots",
+          icon: Camera,
         },
       ],
     },
-
-    /* -------------------------------------------------------------------------- */
-    /*                               TRANSFER ORDERS                              */
-    /* -------------------------------------------------------------------------- */
-
     {
       title: "Transfer Orders",
       url: "/dashboard/transfers",
@@ -383,26 +296,134 @@ export const data = {
         {
           title: "All Transfers",
           url: "/dashboard/transfers",
+          icon: ArrowLeftRight,
         },
         {
           title: "Create Transfer",
           url: "/dashboard/transfers/create",
+          icon: PlusCircle,
         },
       ],
     },
 
+    /* -------------------------------------------------------------------------- */
+    /* CRM & RELATIONSHIPS                            */
+    /* -------------------------------------------------------------------------- */
+    {
+      title: "Customer",
+      url: "/dashboard/customers",
+      icon: Contact2,
+      items: [
+        {
+          title: "All Customers",
+          url: "/dashboard/customers",
+          icon: Users,
+        },
+         {
+          title: "Create Customer",
+          url: "/dashboard/customers/create",
+          icon: UserPlus,
+        },
+      ],
+    },
+    {
+      title: "Vendors",
+      url: "/dashboard/vendors",
+      icon: Briefcase,
+      items: [
+        {
+          title: "All Vendors",
+          url: "/dashboard/vendors",
+          icon: Store,
+        },
+         {
+          title: "Create Vendor",
+          url: "/dashboard/vendors/create",
+          icon: PlusCircle,
+        },
+      ],
+    },
+    {
+      title: "Users",
+      url: "/dashboard/users",
+      icon: Users,
+      items: [
+        {
+          title: "All Users",
+          url: "/dashboard/users",
+          icon: Users2,
+        },
+        {
+          title: "Create User",
+          url: "/dashboard/users/create",
+          icon: UserPlus,
+        },
+      ],
+    },
+    {
+      title: "Team Members",
+      url: "/dashboard/team-members",
+      icon: ShieldAlert,
+      items: [
+        {
+          title: "All Members",
+          url: "/dashboard/team-members",
+          icon: UserCog,
+        },
+      ],
+    },
+    {
+      title: "Locations",
+      url: "/dashboard/locations",
+      icon: Building2,
+      items: [
+        {
+          title: "All Locations",
+          url: "/dashboard/locations",
+          icon: Store,
+        },
+        {
+          title: "Create Branch",
+          url: "/dashboard/locations/create",
+          icon: PlusCircle,
+        },
+      ],
+    },
+
+    /* -------------------------------------------------------------------------- */
+    /* FINANCIAL SETUP                              */
+    /* -------------------------------------------------------------------------- */
+    {
+      title: "Pricing Scheme",
+      url: "/dashboard/pricing-scheme",
+      icon: Banknote,
+      items: [
+        {
+          title: "All Pricing Scheme",
+          url: "/dashboard/pricing-scheme",
+          icon: Tag,
+        },
+        {
+          title: "Create Pricing Scheme",
+          url: "/dashboard/pricing-scheme/create",
+          icon: PlusCircle,
+        },
+      ],
+    },
     {
       title: "Taxing Scheme",
       url: "/dashboard/taxing-scheme",
-      icon: Truck,
+      icon: Percent,
       items: [
         {
           title: "All Taxing Scheme",
           url: "/dashboard/taxing-scheme",
+          icon: Receipt,
         },
         {
           title: "Create Taxing Scheme",
           url: "/dashboard/taxing-scheme/create",
+          icon: PlusCircle,
         },
       ],
     },
@@ -414,143 +435,100 @@ export const data = {
         {
           title: "All Currency",
           url: "/dashboard/currencies",
+          icon: Coins,
         },
         {
           title: "Create Currency",
           url: "/dashboard/currencies/create",
-        },
-      ],
-    },
-    {
-      title: "Pricing Scheme",
-      url: "/dashboard/pricing-scheme",
-      icon: Truck,
-      items: [
-        {
-          title: "All Pricing Scheme",
-          url: "/dashboard/pricing-scheme",
-        },
-        {
-          title: "Create Pricing Scheme",
-          url: "/dashboard/pricing-scheme/create",
+          icon: PlusCircle,
         },
       ],
     },
     {
       title: "Payment Terms",
       url: "/dashboard/payment-terms",
-      icon: Truck,
+      icon: CalendarDays,
       items: [
         {
           title: "All Payment Terms",
           url: "/dashboard/payment-terms",
+          icon: FileClock,
         },
         {
           title: "Create Payment Terms",
           url: "/dashboard/payment-terms/create",
+          icon: PlusCircle,
         },
       ],
     },
 
-
     /* -------------------------------------------------------------------------- */
-    /*                               CUSTOMER ORDERS                              */
+    /* DATA, INSIGHTS & SETTINGS                          */
     /* -------------------------------------------------------------------------- */
     {
-      title: "Customer",
-      url: "/dashboard/customers",
-      icon: Users,
+      title: "Analytics",
+      url: "/dashboard/analytics",
+      icon: BarChart3,
       items: [
         {
-          title: "All Customers",
-          url: "/dashboard/customers",
+          title: "Sales",
+          url: "/dashboard/analytics/sales",
+          icon: TrendingUp,
         },
-         {
-          title: "Create Customer",
-          url: "/dashboard/customers/create",
-        },
-      ],
-    },
-     {
-      title: "Vendors",
-      url: "/dashboard/vendors",
-      icon: Users,
-      items: [
         {
-          title: "All Vendors",
-          url: "/dashboard/vendors",
+          title: "Inventory",
+          url: "/dashboard/analytics/inventory",
+          icon: Warehouse,
         },
-         {
-          title: "Create Vendor",
-          url: "/dashboard/vendors/create",
+        {
+          title: "Branches",
+          url: "/dashboard/analytics/branches",
+          icon: MapPin,
+        },
+        {
+          title: "Customers",
+          url: "/dashboard/analytics/customers",
+          icon: UserCheck,
+        },
+        {
+          title: "Products",
+          url: "/dashboard/analytics/products",
+          icon: Box,
         },
       ],
     },
     {
-      title: "Team Members",
-      url: "/dashboard/team-members",
-      icon: Users,
+      title: "Reports",
+      url: "/dashboard/reports",
+      icon: FileText,
       items: [
         {
-          title: "All Members",
-          url: "/dashboard/team-members",
+          title: "Sales",
+          url: "/dashboard/reports/sales",
+          icon: LineChart,
+        },
+        {
+          title: "Inventory",
+          url: "/dashboard/reports/inventory",
+          icon: PieChart,
+        },
+        {
+          title: "Branches",
+          url: "/dashboard/reports/branches",
+          icon: Map,
+        },
+        {
+          title: "Products",
+          url: "/dashboard/reports/products",
+          icon: Layers3,
+        },
+        {
+          title: "Export",
+          url: "/dashboard/reports/export",
+          icon: Download,
         },
       ],
     },
-    
-
-    
-
-    // {
-    //   title: "Customer Orders",
-    //   url: "/dashboard/customer-orders",
-    //   icon: ShoppingCart,
-    //   items: [
-    //     {
-    //       title: "All Orders",
-    //       url: "/dashboard/customer-orders",
-    //     },
-    //   ],
-    // },
-
-    /* -------------------------------------------------------------------------- */
-    /*                                FULFILLMENTS                                */
-    /* -------------------------------------------------------------------------- */
-
-    // {
-    //   title: "Fulfillments",
-    //   url: "/dashboard/fulfillments",
-    //   icon: ClipboardCheck,
-    //   items: [
-    //     {
-    //       title: "All Fulfillments",
-    //       url: "/dashboard/fulfillments",
-    //     },
-    //     {
-    //       title: "Pickup",
-    //       url: "/dashboard/fulfillments/pickup",
-    //     },
-    //     {
-    //       title: "Delivery",
-    //       url: "/dashboard/fulfillments/delivery",
-    //     },
-    //   ],
-    // },
-
-    /* -------------------------------------------------------------------------- */
-    /*                                    CARTS                                   */
-    /* -------------------------------------------------------------------------- */
-
-    // {
-    //   title: "Carts",
-    //   url: "/dashboard/carts",
-    //   icon: ShoppingCart,
-    // },
-
-    /* -------------------------------------------------------------------------- */
-    /*                                     ETL                                    */
-    /* -------------------------------------------------------------------------- */
-
     {
       title: "ETL",
       url: "/dashboard/etl",
@@ -559,89 +537,47 @@ export const data = {
         {
           title: "Inflow Cloud",
           url: "/dashboard/etl/inflow",
-        },
-        {
-          title: "Partner App",
-          url: "/dashboard/etl/partner",
+          icon: CloudDownload,
         },
         {
           title: "Logs",
           url: "/dashboard/etl/logs",
-        },
-        {
-          title: "Sync",
-          url: "/dashboard/etl/sync",
-        },
-        {
-          title: "Schedules",
-          url: "/dashboard/etl/schedules",
+          icon: Terminal,
         },
       ],
     },
-
-    /* -------------------------------------------------------------------------- */
-    /*                                   REPORTS                                  */
-    /* -------------------------------------------------------------------------- */
-
-    // {
-    //   title: "Reports",
-    //   url: "/dashboard/reports",
-    //   icon: FileText,
-    //   items: [
-    //     {
-    //       title: "Sales",
-    //       url: "/dashboard/reports/sales",
-    //     },
-    //     {
-    //       title: "Inventory",
-    //       url: "/dashboard/reports/inventory",
-    //     },
-    //     {
-    //       title: "Branches",
-    //       url: "/dashboard/reports/branches",
-    //     },
-    //     {
-    //       title: "Products",
-    //       url: "/dashboard/reports/products",
-    //     },
-    //     {
-    //       title: "Export",
-    //       url: "/dashboard/reports/export",
-    //     },
-    //   ],
-    // },
-
-    /* -------------------------------------------------------------------------- */
-    /*                                  SETTINGS                                  */
-    /* -------------------------------------------------------------------------- */
-
-    // {
-    //   title: "Settings",
-    //   url: "/dashboard/settings",
-    //   icon: Settings,
-    //   items: [
-    //     {
-    //       title: "General",
-    //       url: "/dashboard/settings/general",
-    //     },
-    //     {
-    //       title: "Database",
-    //       url: "/dashboard/settings/database",
-    //     },
-    //     {
-    //       title: "Sync",
-    //       url: "/dashboard/settings/sync",
-    //     },
-    //     {
-    //       title: "Payment",
-    //       url: "/dashboard/settings/payment",
-    //     },
-    //     {
-    //       title: "Tax Configuration",
-    //       url: "/dashboard/settings/tax",
-    //     },
-    //   ],
-    // },
+    {
+      title: "Settings",
+      url: "/dashboard/settings",
+      icon: Settings,
+      items: [
+        {
+          title: "General",
+          url: "/dashboard/settings/general",
+          icon: ToggleLeft,
+        },
+        {
+          title: "Database",
+          url: "/dashboard/settings/database",
+          icon: HardDrive,
+        },
+        {
+          title: "Sync",
+          url: "/dashboard/settings/sync",
+          icon: RefreshCw,
+        },
+        {
+          title: "Payment",
+          url: "/dashboard/settings/payment",
+          icon: CreditCard,
+        },
+        {
+          title: "Tax Configuration",
+          url: "/dashboard/settings/tax",
+          icon: Landmark,
+        },
+      ],
+    },
   ]
 }
 
@@ -940,6 +876,12 @@ export const breadcrumbsMap = [
                 id: "admin-locations-performance",
                 href: "/dashboard/locations/[id]/performance",
                 label: "Performance",
+              },
+
+              {
+                id: "admin-locations-webhook",
+                href: "/dashboard/locations/[id]/integrations/webhooks",
+                label: "Webhooks",
               },
             ],
           },
@@ -1387,8 +1329,6 @@ export const breadcrumbsMap = [
 ];
 
 
-
-
 export const productNav = (id: string) => [
   {
     label: "Overview",
@@ -1411,6 +1351,102 @@ export const productNav = (id: string) => [
     url: `/dashboard/products/${id}/analytics`,
   },
 ];
+
+
+
+// admin: [
+    //     {
+    //         name: "Global Inventory",
+    //         url: "/dashboard/inventory",
+    //         icon: Package,
+    //     },
+    //     {
+    //         name: "Transfer Orders",
+    //         url: "/dashboard/transfers",
+    //         icon: Send,
+    //     },
+    //     {
+    //         name: "Customer Orders",
+    //         url: "/dashboard/orders",
+    //         icon: Megaphone,
+    //     },
+    //     {
+    //         name: "Fulfillment Management",
+    //         url: "/dashboard/fulfillments",
+    //         icon: Truck,
+    //     },
+    //     {
+    //         name: "Products",
+    //         url: "/dashboard/products",
+    //         icon: Box,
+    //     },
+    //     {
+    //         name: "Attributes",
+    //         url: "/dashboard/attributes",
+    //         icon: Settings2,
+    //     },
+    //     {
+    //         name: "Brands",
+    //         url: "/dashboard/brands",
+    //         icon: Tags,
+    //     },
+    //     {
+    //         name: "Categories",
+    //         url: "/dashboard/categories",
+    //         icon: FolderTree,
+    //     },
+    //     {
+    //         name: "Configuration",
+    //         url: "/dashboard/configuration",
+    //         icon: Settings2,
+    //     },
+    //     {
+    //         name: "Branches & Locations",
+    //         url: "/dashboard/branches",
+    //         icon: MapPin,
+    //     },
+    // ],
+
+
+    // adminMain: [
+  //   {
+  //     title: "Global Inventory",
+  //     url: "/dashboard",
+  //     icon: Package,
+  //     isActive: true,
+  //   },
+  //   {
+  //     title: "Models",
+  //     url: "#",
+  //     icon: Bot,
+  //     items: [
+  //       {
+  //         title: "Genesis",
+  //         url: "/dashboard/genesis",
+  //       },
+  //       {
+  //         title: "Explorer",
+  //         url: "/dashboard/explorer",
+  //       },
+  //       {
+  //         title: "Quantum",
+  //         url: "/dashboard/quantum",
+  //       },
+  //     ],
+  //   },
+  //   {
+  //     title: "products",
+  //     url: "/dashboard/products",
+  //     icon: BookOpen,
+  //     items: [
+  //       {
+  //         title: "Create",
+  //         url: "/dashboard/products/create",
+  //       },
+  //     ],
+  //   },
+  // ],
+  
 
 // export const breadcrumbsMap = [
 //   {

@@ -1,3 +1,4 @@
+import { prisma } from "@/lib/prisma";
 import { getTaxCodes } from "../data/tax-codes"; // Adjust path to your data layer
 import { upsertTaxCode } from "./tax-code.sync";
 
@@ -15,15 +16,7 @@ export class TaxCodeSyncService {
       const taxCode = taxCodes[i];
       
       // Execute decoupled database transaction logic
-      await upsertTaxCode({
-        taxCodeId: taxCode.taxCodeId,
-        taxingSchemeId: taxCode.taxingSchemeId,
-        name: taxCode.name,
-        isActive: taxCode.isActive,
-        tax1Rate: taxCode.tax1Rate,
-        tax2Rate: taxCode.tax2Rate,
-        timestamp: taxCode.timestamp
-      });
+      await upsertTaxCode(prisma, taxCode);
 
       processed++;
 

@@ -1,11 +1,9 @@
 import { genInflowUniqueSlug } from "@/helpers/genUniqueSlug";
 import { InflowCategory } from "../types";
-import { Prisma } from "@/generated/prisma/client";
-
-type Tx = Prisma.TransactionClient;
+import type { ExtendedPrismaTransaction, prisma } from "@/lib/prisma";
 
 export async function syncCategory(
-  tx: Tx,
+  tx: typeof prisma | ExtendedPrismaTransaction,
   category: InflowCategory
 ) {
   if (!category) return;

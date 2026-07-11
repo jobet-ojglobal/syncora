@@ -56,6 +56,42 @@ model InflowWebhookEvent {
   @@map("inflow_webhook_event")
 }
 
+
+model LocationWebhook {
+  id                      String               @id @default(cuid())
+  locationId              String               
+  location                Location             @relation(fields: [locationId], references: [inflowId], onDelete: Cascade)
+  url                     String               @unique
+  secret                  String?
+  events                  Json                 // Array of string event types, e.g., ["salesOrder", "currency", "taxingScheme"]
+  isDisabled              Boolean              @default(false)
+  consecutiveFailureCount Int                  @default(0)
+  lastFailureMessage      String?
+  
+  createdAt               DateTime             @default(now())
+  updatedAt               DateTime             @updatedAt
+  
+  deliveryLogs            LocationWebhookEvent[]
+
+  @@map("location_webhook")
+}
+
+model LocationWebhookEvent {
+  id              String         @id @default(cuid())
+  locationWebhookId String
+  webhook         LocationWebhook  @relation(fields: [locationWebhookId], references: [id], onDelete: Cascade)
+  eventType       String
+  payload         Json
+  responseStatus  Int?           // Store the receiver's HTTP status code (e.g., 200, 500)
+  errorMessage    String?        // Store error details if the fetch fails
+  processed       Boolean        @default(false)
+  receivedAt      DateTime       @default(now())
+
+  @@index([eventType])
+  @@index([receivedAt])
+  @@map("location_webhook_event")
+}
+
 // PARTNER MODELS
 
 model PartnerWebhook {
@@ -116,9 +152,11 @@ model User {
 
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
+  deletedAt     DateTime?
 
   @@map("user")
 }
+
 model Brand {
   id          String @id @default(cuid())
   name        String @unique
@@ -131,7 +169,6 @@ model Brand {
 
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
-
   deletedAt   DateTime?
 
   @@map("brand")
@@ -154,6 +191,7 @@ model Category {
 
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
+  deletedAt         DateTime?
 
   @@map("category")
 }
@@ -232,6 +270,7 @@ model ProductVariant {
 
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
+  deletedAt         DateTime?
 
   @@unique([productGroupId, productId])
   @@unique([productGroupId, signature])
@@ -334,7 +373,7 @@ model Product {
 
   createdAt             DateTime @default(now())
   updatedAt             DateTime @updatedAt
-  deletedAt   DateTime?
+  deletedAt             DateTime?
 
   @@map("product")
 }
@@ -375,6 +414,7 @@ model ProductPrice {
 
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
+  deletedAt         DateTime?
 
   @@unique([pricingSchemeId, productId])
 
@@ -414,6 +454,7 @@ model ProductCostAdjustment {
 
   createdAt             DateTime @default(now())
   updatedAt             DateTime @updatedAt
+  deletedAt             DateTime?
 
   @@index([productId])
   @@index([lastModifiedById])
@@ -448,6 +489,7 @@ model ProductBarcode {
 
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
+  deletedAt     DateTime?
 
   @@index([productId])
   @@unique([productId, lineNum])
@@ -488,6 +530,7 @@ model ProductOperation {
 
   createdAt            DateTime      @default(now())
   updatedAt            DateTime      @updatedAt
+  deletedAt            DateTime?
 
   @@index([productId])
   @@index([operationTypeId])
@@ -523,6 +566,7 @@ model OperationType {
 
   createdAt            DateTime           @default(now())
   updatedAt            DateTime           @updatedAt
+  deletedAt            DateTime?
 
   @@map("operation_type")
 }
@@ -554,6 +598,7 @@ model ProductTaxCode {
 
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt
+  deletedAt      DateTime?
 
   @@index([productId])
   @@index([taxCodeId])
@@ -574,10 +619,11 @@ model ProductAttachment {
   product          Product     @relation(fields: [productId], references: [inflowId], onDelete: Cascade)
   lastModifiedBy   TeamMember? @relation(fields: [lastModifiedById], references: [inflowId])
 
-localMappings      ProductAttachmentLocationMap[]
+  localMappings      ProductAttachmentLocationMap[]
 
   createdAt        DateTime    @default(now())
   updatedAt        DateTime    @updatedAt
+  deletedAt        DateTime?
 
   @@index([productId])
   @@index([lastModifiedById])
@@ -610,6 +656,7 @@ model ProductCost {
 
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
+  deletedAt     DateTime?
 
   @@map("product_cost")
 }
@@ -650,6 +697,7 @@ model reorderSetting {
 
   createdAt          DateTime @default(now())
   updatedAt          DateTime @updatedAt
+  deletedAt          DateTime?
 
   @@index([productId])
   @@index([locationId])
@@ -686,6 +734,7 @@ model ProductBom {
 
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
+  deletedAt      DateTime?
 
   @@index([productId])
   @@index([childProductId])
@@ -745,8 +794,9 @@ model UnitOfMeasure {
   productSalesUoms ProductSalesUom[]
   productUoms      ProductUom[]
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  deletedAt       DateTime?
 
   @@map("unit_of_measure")
 }
@@ -788,6 +838,9 @@ model ProductImage {
 
   localMappings       ProductImageLocationMap[]
 
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
   @@index([groupId, position])
   @@index([productId, position])
 
@@ -813,6 +866,10 @@ model Attribute {
   name      String @unique
   values    AttributeValue[]
   inflowOptions ProductGroupOption[]
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  deletedAt       DateTime?
 
   @@map("attribute")
 }
@@ -1082,7 +1139,6 @@ model Location {
   
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
-
   deletedAt   DateTime?
 
   @@map("location")
@@ -1123,40 +1179,6 @@ model Sublocation {
   @@index([locationId])
 
   @@map("sublocation")
-}
-
-model LocationWebhook {
-  id                      String               @id @default(cuid())
-  locationId              String               
-  location                Location             @relation(fields: [locationId], references: [inflowId], onDelete: Cascade)
-  url                     String               @unique
-  secret                  String?
-  events                  Json                 // Array of string event types, e.g., ["salesOrder", "currency", "taxingScheme"]
-  isDisabled              Boolean              @default(false)
-  consecutiveFailureCount Int                  @default(0)
-  lastFailureMessage      String?
-  
-  createdAt               DateTime             @default(now())
-  updatedAt               DateTime             @updatedAt
-  deliveryLogs            LocationWebhookEvent[]
-
-  @@map("location_webhook")
-}
-
-model LocationWebhookEvent {
-  id              String         @id @default(cuid())
-  locationWebhookId String
-  webhook         LocationWebhook  @relation(fields: [locationWebhookId], references: [id], onDelete: Cascade)
-  eventType       String
-  payload         Json
-  responseStatus  Int?           // Store the receiver's HTTP status code (e.g., 200, 500)
-  errorMessage    String?        // Store error details if the fetch fails
-  processed       Boolean        @default(false)
-  receivedAt      DateTime       @default(now())
-
-  @@index([eventType])
-  @@index([receivedAt])
-  @@map("location_webhook_event")
 }
 
 model Inventory {
@@ -1215,7 +1237,9 @@ model InventoryAdjustment {
   performedById     String
   performedBy       User     @relation(fields: [performedById], references: [id], onDelete: Cascade)
   lines             InventoryAdjustmentLine[]
+
   createdAt         DateTime @default(now())
+
   @@map("inventory_adjustment")
 }
 
@@ -1233,6 +1257,7 @@ model InventoryAdjustmentLine {
   product               Product @relation(fields: [productId], references: [inflowId], onDelete: Cascade)
   location              Location @relation(fields: [locationId], references: [inflowId], onDelete: Cascade)
   sublocation           Sublocation? @relation(fields: [sublocationId], references: [id], onDelete: Cascade)
+
   createdAt             DateTime @default(now())
 
   @@index([productId])
@@ -1298,9 +1323,10 @@ model InventoryLedger {
   quantityBefore    Decimal @db.Decimal(18,4)
   quantityAfter     Decimal @db.Decimal(18,4)
   performedById     String?
-  createdAt         DateTime @default(now())
   product           Product @relation(fields: [productId], references: [inflowId], onDelete: Cascade)
   location          Location @relation(fields: [locationId], references: [inflowId], onDelete: Cascade)
+
+  createdAt         DateTime @default(now())
 }
 
 enum InventoryTransactionType {
@@ -1420,7 +1446,6 @@ model TeamMemberLocationMapExtended {
 
 model TeamMemberAccessRight {
   id            String     @id @default(cuid())
-
   teamMemberId  String
   rightName     AccessRight
 
@@ -1529,6 +1554,7 @@ model BusinessPartner {
   customer        Customer?
   vendor          Vendor?
   addresses       BusinessPartnerAddress[]
+
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
   deletedAt       DateTime?
@@ -1615,7 +1641,6 @@ model Customer {
 
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
-
   deletedAt  DateTime?
 
   @@index([pricingSchemeId])
@@ -2164,8 +2189,6 @@ model CurrencyConversion {
   @@map("currency_conversion")
 }
 
-
-
 // PRICING SCHEME MODELS
 
 model PricingScheme {
@@ -2665,6 +2688,10 @@ model PurchaseOrder {
   unstockLines           PurchaseOrderUnstockLine[]
   attachments            PurchaseOrderAttachment[]
   localMappings          PurchaseOrderLocationMap[]
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
 
   @@index([inflowId])
   @@index([orderNumber])

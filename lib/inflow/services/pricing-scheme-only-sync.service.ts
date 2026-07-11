@@ -1,3 +1,4 @@
+import { prisma } from "@/lib/prisma";
 import { getPricingSchemes } from "../data/pricing-schemes"; // Adjust import path to your data source
 import { upsertPricingScheme } from "./pricing-scheme-only.sync";
 
@@ -14,7 +15,7 @@ export class PricingSchemeSyncService {
     for (let i = 0; i < total; i++) {
       const scheme = schemes[i];
       
-      await upsertPricingScheme(scheme);
+      await upsertPricingScheme(prisma, scheme);
 
       processed++;
 
