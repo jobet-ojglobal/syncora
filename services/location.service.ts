@@ -94,6 +94,10 @@ export class LocationService {
             localPricingSchemeMappings: true,
             localCustomerBalanceMappings: true,
             localVendorCreditMappings: true,
+
+            localProductMappings: true,
+            localCustomerMappings: true,
+            localVendorMappings: true,
           }
         },
         salesOrders: {
@@ -143,6 +147,10 @@ export class LocationService {
         pricingSchemesCount: loc._count.localPricingSchemeMappings,
         customerBalancesCount: loc._count.localCustomerBalanceMappings,
         vendorCreditsCount: loc._count.localVendorCreditMappings,
+
+        customersCount: loc._count.localCustomerMappings,
+        vendorsCount: loc._count.localVendorMappings,
+        productsCount: loc._count.localProductMappings,
       }
     }
   }

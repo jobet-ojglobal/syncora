@@ -174,5 +174,9 @@ export interface BasicLocationResponse {
     pricingSchemesCount: number;
     customerBalancesCount: number;
     vendorCreditsCount: number;
+
+    customersCount: number;
+    vendorsCount: number;
+    productsCount: number;
   };
 }

@@ -85,7 +85,15 @@ export async function POST(request: NextRequest) {
         tax1Name: res.tax1Name,
         tax1OnShipping: res.tax1OnShipping,
         tax2Name: res.tax2Name,
-        tax2OnShipping: res.tax2OnShipping
+        tax2OnShipping: res.tax2OnShipping,
+        taxCodes: res.taxCodes.map(t => ({
+          isActive: t.isActive,
+          name: t.name,
+          tax1Rate: t.tax1Rate,
+          tax2Rate: t.tax2Rate,
+          taxCodeId: t.inflowId,
+          taxingSchemeId: t.taxingSchemeId,
+        }))
       };
 
       return { res, inflowPayload };
@@ -137,10 +145,19 @@ export async function POST(request: NextRequest) {
           source: "TAXING_SCHEME_UPSERT_LOCAL",
           model: "TaxingScheme",
           payload: {
-            ...cleanInflowPayload,
-            taxingSchemeId: cloudId, // 💡 Pass the global cloudId! The local system will use this to verify mapping records later.
-            localId: null, // Always null on initial creation across your multi-tenant nodes
-          },
+              ...cleanInflowPayload,
+              taxingSchemeId: cloudId,
+              localId: null,
+              
+              // 💡 MAP CHILD TAX CODES
+              taxCodes: cleanInflowPayload.taxCodes.map((tc) => {
+                return {
+                  ...tc,
+                  localId: null,
+                  taxingSchemeId: null,
+                };
+              })
+            },
           timestamp: new Date().toISOString(),
           location: {
             inflowId: webhook.locationId,
@@ -333,8 +350,6 @@ export async function PATCH(request: NextRequest) {
           
         const match = existingMappings.find(m => m.locationId === webhook.locationId);
 
-
-
         return {
           name: "taxing_scheme_localsync_job",
           data: {
@@ -353,7 +368,8 @@ export async function PATCH(request: NextRequest) {
                 
                 return {
                   ...tc,
-                  localId: taxCodeMatch ? taxCodeMatch.localId : null
+                  localId: taxCodeMatch ? taxCodeMatch.localId : null,
+                  taxingSchemeId: match ? match.localId : null,
                 };
               })
             },

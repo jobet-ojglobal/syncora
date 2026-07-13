@@ -26,9 +26,25 @@ const createExtendedPrismaClient = () => {
       $allModels: {
         async softDelete<T>(this: T, id: string | number) {
           const context = Prisma.getExtensionContext(this);
+          
+          // 1. Extract the active model's name from the Prisma context
+          const modelName = (context as any).$name;
+
+          // 2. Safely check if this specific model has an 'isDefault' column
+          const hasIsDefault = (baseClient as any)._dmmf?.modelMap?.[modelName]
+            ?.fields?.some((f: any) => f.name === 'isDefault');
+
+          // 3. Build the update payload dynamically
+          const updateData: any = { deletedAt: new Date() };
+          
+          if (hasIsDefault) {
+            updateData.isDefault = false;
+          }
+
+          // 4. Execute the update
           return (context as any).update({
             where: { id },
-            data: { deletedAt: new Date() },
+            data: updateData,
           });
         },
         async restore<T>(this: T, id: string | number) {

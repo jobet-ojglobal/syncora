@@ -98,6 +98,8 @@ export async function POST(request: NextRequest) {
         break;
       }
 
+      
+
       case "taxingSchemeLocal": {
         const taxingSchemeId = payload.source_key;
 
@@ -158,7 +160,7 @@ export async function POST(request: NextRequest) {
               loggedEventId: loggedEvent.id,
               dataId: payload.inflowId || batchID,
               locationId, 
-              data: { currencyId: batchID }
+              data: { customerId: batchID }
             },
             {
               attempts: 3,

@@ -2,6 +2,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { genUniqueSlug } from "@/helpers/genUniqueSlug";
+import { Prisma } from "@/generated/prisma/client";
 
 // export async function GET() {
 //   try {
@@ -284,6 +285,10 @@ export async function POST(request: NextRequest) {
         }
       }
 
+      // Fetch a primary default fallback configuration scheme if available
+      const primaryScheme = await tx.pricingScheme.findFirst({ select: { inflowId: true } });
+      const targetSchemeId = primaryScheme?.inflowId || crypto.randomUUID().toLowerCase();
+
       // A. Create root product document item node
       const newProduct = await tx.product.create({
         data: {
@@ -330,6 +335,15 @@ export async function POST(request: NextRequest) {
             }
           } : undefined,
 
+          // prices: {
+          //   create: [{
+          //     inflowId: crypto.randomUUID().toLowerCase(),
+          //     pricingSchemeId: targetSchemeId,
+          //     priceType: "Normal",
+          //     unitPrice: new Prisma.Decimal(initialPrice)
+          //   }]
+          // },
+
           barcodes: barcodes.length > 0 ? {
             create: barcodes
               .filter((b: any) => b?.barcode?.trim())
@@ -352,6 +366,14 @@ export async function POST(request: NextRequest) {
                 thumbUrl: img.originalUrl.trim(),
               }))
           } : undefined
+        },
+        include: {
+          purchasingUom: true,
+          salesUom: true,
+          cost: true,
+          prices: true,
+          barcodes: true,
+          images: true
         }
       });
 

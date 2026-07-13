@@ -37,8 +37,8 @@ import { CategorySyncMapService as LocalCategorySyncMapService } from "../locati
 import { CurrencySyncMapService as LocalCurrencySyncMapService } from "../locations/services/currency-sync-map.service";
 import { PaymentTermSyncMapService as LocalPaymentTermSyncMapService } from "../locations/services/payment-term-sync-map.service";
 import { PricingSchemeSyncMapService as LocalPricingSchemeSyncMapService } from "../locations/services/pricing-scheme-sync-map.service";
-import { TaxCodeSyncMapService as LocalTaxCodeSyncMapService } from "../locations/services/tax-code-sync-map.service";
 import { TaxingSchemeSyncMapService as LocalTaxingSchemeSyncMapService } from "../locations/services/taxing-scheme-sync-map.service";
+import { CustomerSyncMapService as LocalCustomerSyncMapService } from "../locations/services/customer-sync-map.service";
 
 const testService = new TestSyncService();
 const categoryService = new CategorySyncService();
@@ -77,8 +77,8 @@ const categoryServiceLocal = new LocalCategorySyncMapService();
 const currencyServiceLocal = new LocalCurrencySyncMapService();
 const paymentServiceLocal = new LocalPaymentTermSyncMapService();
 const pricingServiceLocal = new LocalPricingSchemeSyncMapService();
-const taxCodeServiceLocal = new LocalTaxCodeSyncMapService();
 const taxingSchemeServiceLocal = new LocalTaxingSchemeSyncMapService();
+const customerServiceLocal = new LocalCustomerSyncMapService();
 
 interface SyncWebhookJobData {
   jobId: string;
@@ -160,6 +160,12 @@ const worker = new Worker<SyncWebhookJobData>(
             throw new Error(`Cannot sync taxing scheme: No location URL found for location ${location?.name}`);
           }
           result = await taxingSchemeServiceLocal.sync(location, syncOptions, selectedRecords);
+          break;
+        case "customers_local":
+          if (!locationUrl) {
+            throw new Error(`Cannot sync customer: No location URL found for location ${location?.name}`);
+          }
+          result = await customerServiceLocal.sync(location, syncOptions);
           break;
 
         // Cloud Sync

@@ -1084,7 +1084,7 @@ model Location {
   isActive        Boolean  @default(true)
   isDefault       Boolean  @default(false)
   url             String?
-
+  
   address             LocationAddress?
   inventories         Inventory[]
   sublocations        Sublocation[]

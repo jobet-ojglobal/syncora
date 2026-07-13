@@ -45,6 +45,7 @@ const midWorker = new Worker<MidWebhookJobData>(
           if (!locationUrl) {
             throw new Error(`Cannot sync currency: No location URL found for location ${location?.name}`);
           }
+          console.log(payload)
           result = await upsertLocalCustomer(payload, locationUrl);
           break;
 

@@ -15,3 +15,14 @@ export const INVENTORY_STATUS: Record<number, string> = {
   3: "Fulfilled",
   4: "Completed",
 };
+
+export const ADDRESS_TYPE: Record<number, string> = {
+  0: "Not Specified",
+  1: "Commercial",
+  2: "Residential",
+};
+
+export const ADDRESS_TYPE_MAP: Record<string, number> = {
+  "Commercial": 1,
+  "Residential": 2,
+};

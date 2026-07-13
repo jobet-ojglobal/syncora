@@ -41,6 +41,7 @@ export async function permanentDeleteItem(id: string, modelType: string) {
     revalidatePath("/dashboard/settings/trash");
     return { success: true };
   } catch (error: any) {
-    return { error: error.message || "Failed to permanently delete item." };
+    console.error("Critical failure dropping catalog configuration elements:", error);
+    return { error: error.message || "Internal Database execution permanently delete error occurred.." };
   }
 }
