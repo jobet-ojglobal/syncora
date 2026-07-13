@@ -18,7 +18,8 @@ import {
   Image as ImageIcon, 
   Link2, 
   Settings, 
-  Hourglass 
+  Hourglass, 
+  DollarSign
 } from "lucide-react";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
@@ -107,12 +108,28 @@ interface ProductFormProps {
   brands: BrandLookupOption[];
   uoms: UomLookupReference[]; // 🟢 Added global metrics dependency array
   groups: ProductGroupLookupDetail[];
+  pricingSchemes: {
+    inflowId: string;
+    name: string;
+  }[]
   initialData?: any | null;
 }
 
-export function ProductForm({  brands, uoms, groups: productGroups, initialData }: ProductFormProps) {
+export function ProductForm({  brands, uoms, groups: productGroups, pricingSchemes = [], initialData }: ProductFormProps) {
   const router = useRouter();
   const isEditMode = !!initialData;
+
+  // Pre-calculate baseline pricing matrices mapped over existing master templates
+  const initialPrices = pricingSchemes.map((scheme) => {
+    const existingPrice = initialData?.prices?.find((p: any) => p.pricingSchemeId === scheme.inflowId);
+    return {
+      inflowId: existingPrice?.inflowId || undefined,
+      pricingSchemeId: scheme.inflowId,
+      priceType: existingPrice?.priceType || "Normal",
+      unitPrice: existingPrice?.unitPrice ? Number(existingPrice.unitPrice) : 0,
+      fixedMarkup: existingPrice?.fixedMarkup ? Number(existingPrice.fixedMarkup) : 0,
+    };
+  });
 
   const form = useForm<ProductInput>({
     resolver: zodResolver(productSchema),
@@ -140,6 +157,21 @@ export function ProductForm({  brands, uoms, groups: productGroups, initialData 
       width: initialData?.width ? Number(initialData.width) : 0,
       height: initialData?.height ? Number(initialData.height) : 0,
       length: initialData?.length ? Number(initialData.length) : 0,
+
+      // Seed extended valuation allocations
+      initialCost: initialData?.cost?.cost ? Number(initialData.cost.cost) : 0,
+      prices: initialData?.prices?.map((p: any) => ({
+        id: p.id,
+        inflowId: p.inflowId,
+        pricingSchemeId: p.pricingSchemeId,
+        priceType: p.priceType || "Normal",
+        unitPrice: p.unitPrice ? Number(p.unitPrice) : 0,
+        fixedMarkup: p.fixedMarkup ? Number(p.fixedMarkup) : 0,
+      })) || [
+        // Fallback initial clean block if registering a brand new product
+        { pricingSchemeId: pricingSchemes[0]?.inflowId || "", priceType: "Normal", unitPrice: 0, fixedMarkup: 0 }
+      ],
+
       originCountry: initialData?.originCountry || "",
       hsTariffNumber: initialData?.hsTariffNumber || "",
       remarks: initialData?.remarks || "",
@@ -160,7 +192,10 @@ export function ProductForm({  brands, uoms, groups: productGroups, initialData 
   });
 
   const { register, control, handleSubmit, setValue, formState: { errors, isSubmitting } } = form;
-
+  const { fields: priceFields, append: appendPrice, remove: removePrice } = useFieldArray({
+    control,
+    name: "prices"
+  });
   // Watch the matrix relationship variables
   const watchedGroupId = useWatch({ control, name: "productGroupId" });
   const watchedVariantSignature = useWatch({ control, name: "variantSignature" });
@@ -169,6 +204,8 @@ export function ProductForm({  brands, uoms, groups: productGroups, initialData 
     if (!watchedGroupId || !productGroups) return null;
     return productGroups.find(g => g.inflowId === watchedGroupId);
   }, [watchedGroupId, productGroups]);
+
+  
 
   const computedVariantSlotsFromOptions = useMemo(() => {
     if (!selectedGroupDetails || !selectedGroupDetails.options || selectedGroupDetails.options.length === 0) {
@@ -530,6 +567,9 @@ export function ProductForm({  brands, uoms, groups: productGroups, initialData 
           </Field>
         </FieldSet>
 
+
+        
+
         {/* Operational Flow Settings */}
         <FieldSet className="grid grid-cols-1 md:grid-cols-3 gap-6 border-t pt-4">
           <FieldLegend className="col-span-1 md:col-span-3 flex items-center gap-2 border-b pb-2">
@@ -709,6 +749,117 @@ export function ProductForm({  brands, uoms, groups: productGroups, initialData 
             </Field>
           </FieldSet>
         )}
+
+        {/* 🏢 Financial Valuations Cost & Multi-Scheme Matrix Controls */}
+        {/* 🏢 Dynamic Multi-Tier Pricing Matrix Section */}
+        <FieldSet className="border-t pt-4 space-y-4">
+          <div className="flex items-center justify-between border-b pb-2">
+            <FieldLegend className="flex items-center gap-2">
+              <DollarSign className="w-4 h-4 text-primary" /> Multi-Scheme Pricing Matrix
+            </FieldLegend>
+            <Button 
+              type="button" 
+              variant="outline" 
+              size="sm" 
+              onClick={() => appendPrice({ pricingSchemeId: pricingSchemes[0]?.inflowId || "", priceType: "Normal", unitPrice: 0, fixedMarkup: 0 })} 
+              className="h-7 text-xs gap-1"
+            >
+              <Plus className="w-3 h-3" /> Append Price Tier
+            </Button>
+          </div>
+
+          {/* Standard Base Cost input row */}
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 bg-muted/20 p-4 rounded-xl border">
+            <Field className="md:col-span-1">
+              <FieldLabel>Standard Base Cost ($) *</FieldLabel>
+              <Input 
+                type="number" 
+                step="0.00001" 
+                placeholder="0.00" 
+                {...register("initialCost", { valueAsNumber: true })} 
+              />
+              {errors.initialCost && <span className="text-xs text-destructive">{errors.initialCost.message}</span>}
+            </Field>
+
+            {/* Multiple Pricing Rows Box Container */}
+            <div className="md:col-span-3 space-y-2">
+              <FieldLabel>Price Matrix Lines Mapping</FieldLabel>
+              
+              {priceFields.map((field, idx) => (
+                <div key={field.id} className="grid grid-cols-1 sm:grid-cols-12 gap-2 items-center border p-2.5 rounded-xl bg-background shadow-2xs">
+                  
+                  {/* Target Scheme Dropdown Selection */}
+                  <div className="sm:col-span-4">
+                    <select
+                      className="w-full text-xs h-8 rounded-md border border-input bg-background px-2 py-1 focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-ring"
+                      {...register(`prices.${idx}.pricingSchemeId` as const)}
+                    >
+                      {pricingSchemes.map((scheme) => (
+                        <option key={scheme.inflowId} value={scheme.inflowId}>
+                          {scheme.name}
+                        </option>
+                      ))}
+                    </select>
+                    {errors.prices?.[idx]?.pricingSchemeId && (
+                      <span className="text-[10px] text-destructive block mt-0.5">{errors.prices[idx].pricingSchemeId?.message}</span>
+                    )}
+                  </div>
+
+                  {/* Price Type Assignment Selection */}
+                  <div className="sm:col-span-3">
+                    <select
+                      className="w-full text-xs h-8 rounded-md border border-input bg-background px-2 py-1 focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-ring"
+                      {...register(`prices.${idx}.priceType` as const)}
+                    >
+              <option value="Normal">Normal</option>
+              <option value="Wholesale">Wholesale</option>
+              <option value="Promo">Promo</option>
+            </select>
+          </div>
+
+          {/* Value Inputs Group */}
+          <div className="sm:col-span-2">
+            <Input 
+              type="number" 
+              step="0.00001" 
+              placeholder="Price ($)"
+              className="h-8 text-xs text-right"
+              {...register(`prices.${idx}.unitPrice` as const, { valueAsNumber: true })} 
+            />
+            {errors.prices?.[idx]?.unitPrice && (
+              <span className="text-[10px] text-destructive block mt-0.5">{errors.prices[idx].unitPrice?.message}</span>
+            )}
+          </div>
+
+          <div className="sm:col-span-2">
+            <Input 
+              type="number" 
+              step="0.00001" 
+              placeholder="Markup ($)"
+              className="h-8 text-xs text-right"
+              {...register(`prices.${idx}.fixedMarkup` as const, { valueAsNumber: true })} 
+            />
+          </div>
+
+          {/* Action Delete Trigger Button */}
+          <div className="sm:col-span-1 flex justify-center">
+            <Button 
+              type="button" 
+              variant="ghost" 
+              size="icon" 
+              disabled={priceFields.length <= 1}
+              onClick={() => removePrice(idx)} 
+              className="h-8 w-8 text-muted-foreground hover:text-destructive disabled:opacity-30 shrink-0"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+            </Button>
+          </div>
+          
+        </div>
+      ))}
+    </div>
+  </div>
+</FieldSet>
 
         {/* Internal Administration Remarks */}
         <FieldSet className="border-t pt-4">

@@ -131,17 +131,20 @@ export async function DELETE(
     }
 
     // 3. Execute cascades cleanly inside an atomic transaction block
-    await prisma.$transaction(async (tx) => {
-      // Clear dependent component line manifests first to satisfy foreign key constraints
-      await tx.transferOrderLine.deleteMany({
-        where: { transferOrderId: id }
-      });
+    // await prisma.$transaction(async (tx) => {
+    //   // Clear dependent component line manifests first to satisfy foreign key constraints
+    //   await tx.transferOrderLine.deleteMany({
+    //     where: { transferOrderId: id }
+    //   });
 
-      // Clear the root transfer order node record
-      await tx.transferOrder.delete({
-        where: { id }
-      });
-    });
+    //   // Clear the root transfer order node record
+    //   await tx.transferOrder.delete({
+    //     where: { id }
+    //   });
+    // });
+
+    await prisma.transferOrder.softDelete(id);
+
 
     return NextResponse.json(
       { message: `Transfer manifest ${currentOrder.transferNumber} successfully purged from storage ledgers.` }, 

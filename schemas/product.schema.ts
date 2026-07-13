@@ -38,6 +38,18 @@ export const productSchema = z.object({
   remarks: z.string().nullable().optional(),
   standardUomName: z.string(),
 
+  // 💰 Financial Costing & Pricing Elements
+  initialCost: z.number().min(0, "Cost basis cannot be negative"),
+  prices: z.array(
+    z.object({
+      inflowId: z.string().optional(),
+      pricingSchemeId: z.string().min(1, "Target execution pricing scheme is required"),
+      priceType: z.enum(["Normal", "Promo", "Wholesale"]),
+      unitPrice: z.number().min(0, "Base unit retail price cannot be negative"),
+      fixedMarkup: z.number().min(0).optional(),
+    })
+  ).min(1, "At least one default pricing matrix line is required"),
+
   // 📥 1:1 Purchasing UOM Object Relation
   purchasingUom: z.object({
     name: z.string().min(1, "Purchasing unit name is required (e.g. Box, Case)"),

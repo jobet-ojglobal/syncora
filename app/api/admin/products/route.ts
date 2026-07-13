@@ -3,6 +3,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { genUniqueSlug } from "@/helpers/genUniqueSlug";
 import { Prisma } from "@/generated/prisma/client";
+import { getMidSyncQueue } from "@/lib/queues/sync.queue";
+import { WebhookService } from "@/services/webhook.service";
 
 // export async function GET() {
 //   try {
@@ -224,7 +226,7 @@ export async function POST(request: NextRequest) {
       autoAssemble, isActive, isManufacturable, includeQuantityBuildable,
       trackExpiry, trackLots, trackSerials, shelfLifeDays, sellBeforeExpiryDays,
       expiryNotificationDays, weight, width, height, length, originCountry,
-      hsTariffNumber, remarks, standardUomName, purchasingUom, salesUom, 
+      hsTariffNumber, remarks, standardUomName, purchasingUom, salesUom, prices,
       productGroupId,   
       variantSignature,  
       barcodes = [], 
@@ -335,14 +337,16 @@ export async function POST(request: NextRequest) {
             }
           } : undefined,
 
-          // prices: {
-          //   create: [{
-          //     inflowId: crypto.randomUUID().toLowerCase(),
-          //     pricingSchemeId: targetSchemeId,
-          //     priceType: "Normal",
-          //     unitPrice: new Prisma.Decimal(initialPrice)
-          //   }]
-          // },
+          // 🪐 Iterating through incoming pricing configurations directly
+          prices: {
+            create: prices.map((p: any) => ({
+              inflowId: crypto.randomUUID().toLowerCase(),
+              pricingSchemeId: p.pricingSchemeId,
+              priceType: p.priceType || "Normal",
+              unitPrice: new Prisma.Decimal(p.unitPrice || 0),
+              fixedMarkup: new Prisma.Decimal(p.fixedMarkup || 0)
+            }))
+          },
 
           barcodes: barcodes.length > 0 ? {
             create: barcodes
@@ -417,10 +421,163 @@ export async function POST(request: NextRequest) {
         });
       }
 
-      return newProduct;
+      // C. Extract structural object tree configuration to safely handle outbound pipeline tasks
+      const inflowPayload = {
+        cloudId: newProduct.inflowId,
+        sku: newProduct.sku,
+        name: newProduct.name,
+        slug: newProduct.slug,
+        description: newProduct.description,
+        itemType: newProduct.itemType,
+        brandId: newProduct.brandId,
+        categoryId: newProduct.categoryId,
+        autoAssemble: newProduct.autoAssemble,
+        isActive: newProduct.isActive,
+        isManufacturable: newProduct.isManufacturable,
+        includeQuantityBuildable: newProduct.includeQuantityBuildable,
+        standardUomName: newProduct.standardUomName,
+        trackExpiry: newProduct.trackExpiry,
+        trackLots: newProduct.trackLots,
+        trackSerials: newProduct.trackSerials,
+        shelfLifeDays: newProduct.shelfLifeDays,
+        sellBeforeExpiryDays: newProduct.sellBeforeExpiryDays,
+        expiryNotificationDays: newProduct.expiryNotificationDays,
+        weight: newProduct.weight?.toString() || null,
+        width: newProduct.width?.toString() || null,
+        height: newProduct.height?.toString() || null,
+        length: newProduct.length?.toString() || null,
+        originCountry: newProduct.originCountry,
+        hsTariffNumber: newProduct.hsTariffNumber,
+        remarks: newProduct.remarks,
+
+        // Subordinate Embedded Framework Elements
+        cost: newProduct.cost ? {
+          inflowId: newProduct.cost.inflowId,
+          cost: newProduct.cost.cost.toString()
+        } : null,
+
+        prices: newProduct.prices.map(p => ({
+          inflowId: p.inflowId,
+          pricingSchemeId: p.pricingSchemeId,
+          priceType: p.priceType,
+          unitPrice: p.unitPrice?.toString() || "0",
+          fixedMarkup: p.fixedMarkup?.toString() || "0"
+        })),
+
+        barcodes: newProduct.barcodes.map(b => ({
+          inflowId: b.inflowId,
+          barcode: b.barcode,
+          lineNum: b.lineNum
+        })),
+
+        images: newProduct.images.map(img => ({
+          inflowId: img.inflowId,
+          position: img.position,
+          originalUrl: img.originalUrl,
+          largeUrl: img.largeUrl,
+          mediumUrl: img.mediumUrl,
+          thumbUrl: img.thumbUrl
+        }))
+      };
+
+      return { databaseRecord: newProduct, inflowPayload };
     });
 
-    return NextResponse.json(outputTransaction, { status: 201 });
+    const { databaseRecord, inflowPayload } = outputTransaction;
+
+    // ==========================================
+    // 🏢 STEP 1: DISPATCH CLOUD SYNC JOB
+    // ==========================================
+    const validCloudWebhook = await WebhookService.getCloudWebhookURL("product");
+    if (validCloudWebhook) {
+      await getMidSyncQueue().add(
+        "product_cloudsync_job",
+        {
+          source: "PRODUCT_UPSERT_CLOUD",
+          model: "Product",
+          payload: inflowPayload,
+          timestamp: new Date().toISOString(),
+        },
+        { 
+          attempts: 3, 
+          backoff: { type: "exponential", delay: 2000 },
+          removeOnComplete: true
+        }
+      );
+    }
+
+    // ==========================================
+    // 📍 STEP 2: BROADCAST LOCAL SYNC JOBS
+    // ==========================================
+    const validWebhooks = await WebhookService.getLocationWebhookURLs("productLocal");
+
+    if (validWebhooks.length > 0) {
+      // Gather relevant pricing scheme identity mappings concurrently to assign local references
+      const pricingSchemesInPayload = inflowPayload.prices.map(p => p.pricingSchemeId);
+      const existingPricingMaps = await prisma.pricingSchemeLocationMap.findMany({
+        where: { pricingSchemeId: { in: pricingSchemesInPayload } },
+        select: { pricingSchemeId: true, locationId: true, localId: true }
+      });
+
+      const jobsToQueue = validWebhooks
+        .filter(webhook => webhook.location.url && webhook.location.url.trim() !== "")
+        .map((webhook) => {
+          return {
+            name: "product_localsync_job",
+            data: {
+              source: "PRODUCT_UPSERT_LOCAL",
+              model: "Product",
+              payload: {
+                ...inflowPayload,
+                localId: null, // Signals a clean native database record insert down at the edge
+
+                cost: inflowPayload.cost ? {
+                  ...inflowPayload.cost,
+                  localId: null
+                } : null,
+
+                prices: inflowPayload.prices.map(p => {
+                  const match = existingPricingMaps.find(
+                    m => m.pricingSchemeId === p.pricingSchemeId && m.locationId === webhook.locationId
+                  );
+                  return {
+                    ...p,
+                    pricingSchemeId: match ? match.localId : null, // Resolves to the specific native integer map ID
+                    localId: null
+                  };
+                }),
+
+                barcodes: inflowPayload.barcodes.map(b => ({
+                  ...b,
+                  localId: null
+                })),
+
+                images: inflowPayload.images.map(img => ({
+                  ...img,
+                  localId: null
+                }))
+              },
+              timestamp: new Date().toISOString(),
+              location: {
+                inflowId: webhook.locationId,
+                url: webhook.location.url,
+                name: webhook.location.name
+              }
+            },
+            opts: { 
+              attempts: 3, 
+              backoff: { type: "exponential", delay: 2000 },
+              removeOnComplete: true
+            }
+          };
+        });
+
+      if (jobsToQueue.length > 0) {
+        await getMidSyncQueue().addBulk(jobsToQueue);
+      }
+    }
+
+    return NextResponse.json(databaseRecord, { status: 201 });
   } catch (error: any) {
     console.error("Critical failure adding product configuration tracking metadata:", error);
     return NextResponse.json(
