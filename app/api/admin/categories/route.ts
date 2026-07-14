@@ -98,7 +98,7 @@ export async function POST(
             ...cleanInflowPayload,
             categoryId: cloudId, 
             localId: null,
-            parentId: matchParent?.localId || null
+            parentCategoryId: matchParent?.localId || null
           },
           timestamp: new Date().toISOString(),
           location: {
@@ -203,7 +203,7 @@ export async function PATCH(
             ...cleanInflowPayload,
             categoryId: cloudId, 
             localId: match?.localId || null,
-            parentId: matchParent?.localId || null
+            parentCategoryId: matchParent?.localId || null
           },
           timestamp: new Date().toISOString(),
           location: {

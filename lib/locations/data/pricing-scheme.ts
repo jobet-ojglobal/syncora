@@ -28,3 +28,26 @@ export async function getPricingSchemes(url: string) {
     `/inflow-local/pricing-schemes`,
   );
 }
+
+export interface UpsertResult {
+  success: boolean;
+  message?: string;
+  data?: any; 
+}
+
+export async function upsertPricingScheme(
+  payload: InflowPricingScheme,
+  url: string
+) {
+  const apiClient = new BranchClient(url)
+  return await apiClient.post<UpsertResult>(
+    `/inbound/receive`, {
+        "eventType": "pricingSchemeLocal",
+        "transactionType": "PRICING_SCHEME",
+        "batch_id": `PRCNGSCHM-${crypto.randomUUID().toLowerCase()}`,
+        "sourceSystem": "MID",
+        "sourceKey": payload.pricingSchemeId,
+        "payload": payload 
+      }
+  );
+}

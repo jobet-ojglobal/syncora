@@ -72,79 +72,79 @@ export async function POST(request: NextRequest) {
       return { res: currency, inflowPayload };
     });
     
-    if (!result.res || !result.inflowPayload) {
-      return NextResponse.json({ error: "Failed to assemble currency scheme components." }, { status: 500 });
-    }
+    // if (!result.res || !result.inflowPayload) {
+    //   return NextResponse.json({ error: "Failed to assemble currency scheme components." }, { status: 500 });
+    // }
 
-    const { cloudId, currencyConversions, ...cleanInflowPayload } = result.inflowPayload;
+    // const { cloudId, currencyConversions, ...cleanInflowPayload } = result.inflowPayload;
 
-    // ==========================================
-    // 🏢 STEP 1: DISPATCH CLOUD SYNC JOB
-    // ==========================================
-    const validCloudWebhook = await WebhookService.getCloudWebhookURL("currency");
+    // // ==========================================
+    // // 🏢 STEP 1: DISPATCH CLOUD SYNC JOB
+    // // ==========================================
+    // const validCloudWebhook = await WebhookService.getCloudWebhookURL("currency");
 
-    if (validCloudWebhook) {
-      await getMidSyncQueue().add(
-        "currency_cloudsync_job",
-        {
-          source: "CURRENCY_UPSERT_CLOUD",
-          model: "CurrencyScheme",
-          payload: {
-            ...cleanInflowPayload,
-            currencyId: cloudId,
-            currencyConversions: currencyConversions.map(c => ({
-              currencyConversionId: c.cloudId,
-              currencyId: c.currencyId,
-              exchangeRate: c.exchangeRate,
-              isManual: c.isManual,
-            }))
-          },
-          timestamp: new Date().toISOString(),
-        },
-        { 
-          attempts: 3, 
-          backoff: { type: "exponential", delay: 2000 },
-          removeOnComplete: true
-        }
-      );
-      console.log(`[Queue] Successfully broadcasted sync job to inflow cloud.`);
-    }
+    // if (validCloudWebhook) {
+    //   await getMidSyncQueue().add(
+    //     "currency_cloudsync_job",
+    //     {
+    //       source: "CURRENCY_UPSERT_CLOUD",
+    //       model: "CurrencyScheme",
+    //       payload: {
+    //         ...cleanInflowPayload,
+    //         currencyId: cloudId,
+    //         currencyConversions: currencyConversions.map(c => ({
+    //           currencyConversionId: c.cloudId,
+    //           currencyId: c.currencyId,
+    //           exchangeRate: c.exchangeRate,
+    //           isManual: c.isManual,
+    //         }))
+    //       },
+    //       timestamp: new Date().toISOString(),
+    //     },
+    //     { 
+    //       attempts: 3, 
+    //       backoff: { type: "exponential", delay: 2000 },
+    //       removeOnComplete: true
+    //     }
+    //   );
+    //   console.log(`[Queue] Successfully broadcasted sync job to inflow cloud.`);
+    // }
 
-    // ==========================================
-    // 📍 STEP 2: BROADCAST LOCAL SYNC JOBS
-    // ==========================================
-    const validWebhooks = await WebhookService.getLocationWebhookURLs("currencyLocal");
+    // // ==========================================
+    // // 📍 STEP 2: BROADCAST LOCAL SYNC JOBS
+    // // ==========================================
+    // const validWebhooks = await WebhookService.getLocationWebhookURLs("currencyLocal");
 
-    if (validWebhooks.length > 0) {
-      const jobsToQueue = validWebhooks
-      .filter(webhook => webhook.location.url && webhook.location.url.trim() !== "")
-      .map((webhook) => ({
-        name: "currency_localsync_job",
-        data: {
-          source: "CURRENCY_UPSERT_LOCAL",
-          model: "CurrencyScheme", 
-          payload: {
-            ...cleanInflowPayload,
-            currencyId: cloudId, 
-            localId: null
-          },
-          timestamp: new Date().toISOString(),
-          location: {
-            inflowId: webhook.locationId,
-            url: webhook.location.url,
-            name: webhook.location.name
-          }
-        },
-        opts: { 
-          attempts: 3, 
-          backoff: { type: "exponential", delay: 2000 },
-          removeOnComplete: true
-        }
-      }));
+    // if (validWebhooks.length > 0) {
+    //   const jobsToQueue = validWebhooks
+    //   .filter(webhook => webhook.location.url && webhook.location.url.trim() !== "")
+    //   .map((webhook) => ({
+    //     name: "currency_localsync_job",
+    //     data: {
+    //       source: "CURRENCY_UPSERT_LOCAL",
+    //       model: "CurrencyScheme", 
+    //       payload: {
+    //         ...cleanInflowPayload,
+    //         currencyId: cloudId, 
+    //         localId: null
+    //       },
+    //       timestamp: new Date().toISOString(),
+    //       location: {
+    //         inflowId: webhook.locationId,
+    //         url: webhook.location.url,
+    //         name: webhook.location.name
+    //       }
+    //     },
+    //     opts: { 
+    //       attempts: 3, 
+    //       backoff: { type: "exponential", delay: 2000 },
+    //       removeOnComplete: true
+    //     }
+    //   }));
 
-      await getMidSyncQueue().addBulk(jobsToQueue);
-      console.log(`[Queue] Successfully broadcasted sync jobs to ${jobsToQueue.length} locations.`);
-    }
+    //   await getMidSyncQueue().addBulk(jobsToQueue);
+    //   console.log(`[Queue] Successfully broadcasted sync jobs to ${jobsToQueue.length} locations.`);
+    // }
 
     return NextResponse.json(result.res, { status: 201 });
   } catch (error: any) {
@@ -233,90 +233,90 @@ export async function PATCH(request: NextRequest) {
       return { currency, inflowPayload };
     });
 
-    if (!result.currency || !result.inflowPayload) {
-      return NextResponse.json({ error: "Failed to assemble currency scheme components." }, { status: 500 });
-    }
+    // if (!result.currency || !result.inflowPayload) {
+    //   return NextResponse.json({ error: "Failed to assemble currency scheme components." }, { status: 500 });
+    // }
 
-    const { cloudId, currencyConversions, ...cleanInflowPayload } = result.inflowPayload;
+    // const { cloudId, currencyConversions, ...cleanInflowPayload } = result.inflowPayload;
 
-    // ==========================================
-    // 🏢 STEP 1: DISPATCH CLOUD SYNC JOB
-    // ==========================================
-    const validCloudWebhook = await WebhookService.getCloudWebhookURL("currency");
+    // // ==========================================
+    // // 🏢 STEP 1: DISPATCH CLOUD SYNC JOB
+    // // ==========================================
+    // const validCloudWebhook = await WebhookService.getCloudWebhookURL("currency");
 
-    if (validCloudWebhook) {
-      await getMidSyncQueue().add(
-        "currency_cloudsync_job",
-        {
-          source: "CURRENCY_UPSERT_CLOUD",
-          model: "CurrencyScheme",
-          payload: {
-            ...cleanInflowPayload,
-            currencyId: cloudId,
-            currencyConversions: currencyConversions.map(c => ({
-              currencyConversionId: c.cloudId,
-              currencyId: c.currencyId,
-              exchangeRate: c.exchangeRate,
-              isManual: c.isManual,
-            }))
-          },
-          timestamp: new Date().toISOString(),
-        },
-        { 
-          attempts: 3, 
-          backoff: { type: "exponential", delay: 2000 },
-          removeOnComplete: true
-        }
-      );
-      console.log(`[Queue] Successfully broadcasted patch edits to inflow cloud.`);
-    }
+    // if (validCloudWebhook) {
+    //   await getMidSyncQueue().add(
+    //     "currency_cloudsync_job",
+    //     {
+    //       source: "CURRENCY_UPSERT_CLOUD",
+    //       model: "CurrencyScheme",
+    //       payload: {
+    //         ...cleanInflowPayload,
+    //         currencyId: cloudId,
+    //         currencyConversions: currencyConversions.map(c => ({
+    //           currencyConversionId: c.cloudId,
+    //           currencyId: c.currencyId,
+    //           exchangeRate: c.exchangeRate,
+    //           isManual: c.isManual,
+    //         }))
+    //       },
+    //       timestamp: new Date().toISOString(),
+    //     },
+    //     { 
+    //       attempts: 3, 
+    //       backoff: { type: "exponential", delay: 2000 },
+    //       removeOnComplete: true
+    //     }
+    //   );
+    //   console.log(`[Queue] Successfully broadcasted patch edits to inflow cloud.`);
+    // }
 
-    // ==========================================
-    // 📍 STEP 2: BROADCAST LOCAL SYNC JOBS
-    // ==========================================
-    const validWebhooks = await WebhookService.getLocationWebhookURLs("currencyLocal");
+    // // ==========================================
+    // // 📍 STEP 2: BROADCAST LOCAL SYNC JOBS
+    // // ==========================================
+    // const validWebhooks = await WebhookService.getLocationWebhookURLs("currencyLocal");
 
-    if (validWebhooks.length > 0) {
-      // 🗺️ Query identity map registry to see which location already knows this record
-      const existingMappings = await prisma.currencyLocationMap.findMany({
-        where: { currencyId: cloudId },
-        select: { locationId: true, localId: true }
-      });
+    // if (validWebhooks.length > 0) {
+    //   // 🗺️ Query identity map registry to see which location already knows this record
+    //   const existingMappings = await prisma.currencyLocationMap.findMany({
+    //     where: { currencyId: cloudId },
+    //     select: { locationId: true, localId: true }
+    //   });
 
-      const jobsToQueue = validWebhooks
-        .filter(webhook => webhook.location.url && webhook.location.url.trim() !== "")
-        .map((webhook) => {
-        // Find if this specific store branch has an integer mapping matching this entry
-        const match = existingMappings.find(m => m.locationId === webhook.locationId);
+    //   const jobsToQueue = validWebhooks
+    //     .filter(webhook => webhook.location.url && webhook.location.url.trim() !== "")
+    //     .map((webhook) => {
+    //     // Find if this specific store branch has an integer mapping matching this entry
+    //     const match = existingMappings.find(m => m.locationId === webhook.locationId);
 
-        return {
-          name: "currency_localsync_job",
-          data: {
-            source: "CURRENCY_UPSERT_LOCAL",
-            model: "Currency",
-            payload: {
-              ...cleanInflowPayload,
-              currencyId: cloudId, // Keeps the global trace uniform
-              localId: match ? match.localId : null, // 💡 If exists, passes Int (e.g. 5). If null, local nodes create a fresh entry
-            },
-            timestamp: new Date().toISOString(),
-            location: {
-              inflowId: webhook.locationId,
-              url: webhook.location.url,
-              name: webhook.location.name
-            }
-          },
-          opts: { 
-            attempts: 3, 
-            backoff: { type: "exponential", delay: 2000 },
-            removeOnComplete: true
-          }
-        };
-      });
+    //     return {
+    //       name: "currency_localsync_job",
+    //       data: {
+    //         source: "CURRENCY_UPSERT_LOCAL",
+    //         model: "Currency",
+    //         payload: {
+    //           ...cleanInflowPayload,
+    //           currencyId: cloudId, // Keeps the global trace uniform
+    //           localId: match ? match.localId : null, // 💡 If exists, passes Int (e.g. 5). If null, local nodes create a fresh entry
+    //         },
+    //         timestamp: new Date().toISOString(),
+    //         location: {
+    //           inflowId: webhook.locationId,
+    //           url: webhook.location.url,
+    //           name: webhook.location.name
+    //         }
+    //       },
+    //       opts: { 
+    //         attempts: 3, 
+    //         backoff: { type: "exponential", delay: 2000 },
+    //         removeOnComplete: true
+    //       }
+    //     };
+    //   });
 
-      await getMidSyncQueue().addBulk(jobsToQueue);
-      console.log(`[Queue] Successfully broadcasted patch edits to ${jobsToQueue.length} store instances.`);
-    }
+    //   await getMidSyncQueue().addBulk(jobsToQueue);
+    //   console.log(`[Queue] Successfully broadcasted patch edits to ${jobsToQueue.length} store instances.`);
+    // }
 
     return NextResponse.json(result.currency, { status: 200 });
   } catch (error) {

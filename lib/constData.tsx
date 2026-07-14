@@ -311,6 +311,28 @@ export const data = {
     /* CRM & RELATIONSHIPS                            */
     /* -------------------------------------------------------------------------- */
     {
+      title: "Business Partners",
+      url: "/dashboard/business-partners",
+      icon: Contact2,
+      items: [
+        {
+          title: "All Business Partners",
+          url: "/dashboard/business-partners",
+          icon: Users,
+        },
+        {
+          title: "Create Customer",
+          url: "/dashboard/customers/create",
+          icon: UserPlus,
+        },
+        {
+          title: "Create Vendor",
+          url: "/dashboard/vendors/create",
+          icon: PlusCircle,
+        },
+      ],
+    },
+    {
       title: "Customer",
       url: "/dashboard/customers",
       icon: Contact2,
@@ -337,7 +359,7 @@ export const data = {
           url: "/dashboard/vendors",
           icon: Store,
         },
-         {
+        {
           title: "Create Vendor",
           url: "/dashboard/vendors/create",
           icon: PlusCircle,

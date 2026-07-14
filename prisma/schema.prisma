@@ -1181,6 +1181,39 @@ model Sublocation {
   @@map("sublocation")
 }
 
+
+// model LocationServer {
+//   id         String   @id @default(cuid())
+//   name       String   // e.g., "Warehouse A Server", "Manila Hub Server"
+//   ipAddress  String?  // Connection metadata for your sync engine
+//   locationId String   @unique // The one-to-one link: One Server per Main Location
+  
+//   location   Location @relation(fields: [locationId], references: [inflowId], onDelete: Cascade)
+//   mappings   LocalSublocationMap[]
+
+//   createdAt  DateTime @default(now())
+//   updatedAt  DateTime @updatedAt
+
+//   @@map("location_server")
+// }
+
+// model LocalSublocationMap {
+//   id               String   @id @default(cuid())
+//   serverId         String   // References LocationServer
+//   localId          Int      // The flat ID assigned by that local database (e.g. 1, 2)
+//   sublocationId    String   // References your actual Sublocation table CUID
+
+//   server           LocationServer @relation(fields: [serverId], references: [id], onDelete: Cascade)
+//   sublocation      Sublocation    @relation(fields: [sublocationId], references: [id], onDelete: Cascade)
+
+//   // A local database ID on a specific server can only map to exactly one of your sublocations
+//   @@unique([serverId, localId])
+//   // Prevent mapping the same application sublocation twice on the same local server
+//   @@unique([serverId, sublocationId])
+  
+//   @@map("local_sublocation_map")
+// }
+
 model Inventory {
   id             String @id @default(cuid())
   productId      String

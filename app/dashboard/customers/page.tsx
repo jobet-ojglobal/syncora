@@ -3,12 +3,14 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Plus, Search, Building2, UserCheck, ShieldCheck, Landmark, Edit3, Trash2, CheckCircle2, XCircle, ShoppingBag, MapPin } from "lucide-react";
+import { Plus, Search, UserCheck, ShieldCheck, Landmark, Edit3, CheckCircle2, XCircle, ShoppingBag, MapPin, Contact2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { toast } from "sonner";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { DeleteButton } from "@/components/shared/delete-button";
+import PageHeader from "@/components/layout/dashboard/PageHeader";
+import { DataTablePagination } from "@/components/shared/data-table-pagination";
+import useSWR from "swr";
 
 interface FinancialMatrixNode {
   netBalance: number;
@@ -31,87 +33,67 @@ interface CustomerRow {
   financialMetrics: FinancialMatrixNode;
 }
 
+const fetcher = (url: string) => fetch(url).then((res) => {
+  if (!res.ok) throw new Error("CRM Sync Breakdown");
+  return res.json();
+});
+
 export default function CustomersDirectoryListPage() {
-  const [directory, setDirectory] = useState<CustomerRow[]>([]);
+  // 1. Double-state setup for instantaneous typing vs debounced network execution
   const [searchQuery, setSearchQuery] = useState("");
-  const [isLoading, setIsLoading] = useState(true);
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  
+  const [pageIndex, setPageIndex] = useState(0);
+  const PAGE_SIZE = 10;
 
-  const fetchDirectory = async () => {
-    try {
-      setIsLoading(true);
-      const res = await fetch("/api/admin/customers/list");
-      if (res.ok) {
-        const payload = await res.json();
-        setDirectory(payload);
-      }
-    } catch (err) {
-      toast.error("CRM Sync Breakdown", { description: "Failed assembling active legal customer directories collections rows." });
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
+  // 2. Sync typing input to debounced state with a 300ms window delay
   useEffect(() => {
-    fetchDirectory();
-  }, []);
+    const timer = setTimeout(() => {
+      setDebouncedSearch(searchQuery);
+      setPageIndex(0); // Safely reset page baseline whenever search boundaries finish mutating
+    }, 300);
 
-  const handleArchiveCustomer = async (id: string, inflowId: string, legalName: string, orderCount: number) => {
-    if (orderCount > 0) {
-      toast.error("Relational Constraint Alarm", {
-        description: `Customer account "${legalName}" cannot be deleted. Operative tracking file maintains ${orderCount} live historical sales orders line items links.`
-      });
-      return;
-    }
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
 
-    if (!confirm(`Are you entirely certain you want to soft-delete commercial partner entry "${legalName}"? This action detaches address mapping components layers.`)) return;
+  // 3. SWR bound to server-side query filters
+  const { data: payload, error, isLoading, mutate } = useSWR(
+    `/api/admin/customers/filtered?search=${debouncedSearch}&page=${pageIndex}&limit=${PAGE_SIZE}`,
+    fetcher,
+    { keepPreviousData: true }
+  );
 
-    try {
-      const res = await fetch("/api/admin/customers", {
-        method: "DELETE",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ inflowId })
-      });
+  const directory: CustomerRow[] = payload?.data || [];
+  const totalRecords = payload?.totalRecords || 0;
+  const pageCount = payload?.pageCount || 0;
 
-      if (!res.ok) throw new Error();
-      toast.success(`Business Account archived safely`);
-      setDirectory(prev => prev.filter(c => c.inflowId !== inflowId));
-    } catch (err) {
-      toast.error("Archival Pipeline Aborted", { description: "Database isolation guard rules aborted processing target deletion script." });
-    }
-  };
-
-  const filteredDirectory = directory.filter(c => {
-    const term = searchQuery.toLowerCase().trim();
+  if (error) {
     return (
-      c.legalName.toLowerCase().includes(term) ||
-      c.inflowId.toLowerCase().includes(term) ||
-      c.contactName.toLowerCase().includes(term) ||
-      c.email.toLowerCase().includes(term)
+      <div className="p-6 text-center text-xs text-red-500 bg-destructive/10 border border-destructive/20 rounded-xl font-medium">
+        CRM Sync Failure: Failed assembling active legal customer directories collections rows.
+      </div>
     );
-  });
+  }
 
   return (
     <div className="w-full mx-auto p-6 space-y-6 text-xs">
-      
-      {/* Structural Upper Control Strip Ribbon */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b pb-5">
-        <div>
-          <h1 className="text-xl font-bold tracking-tight text-foreground flex items-center gap-2">
-            <Building2 className="w-5 h-5 text-primary" /> Commercial Customer Portfolio Ledger
-          </h1>
-          <p className="text-xs text-muted-foreground mt-0.5">
-            Monitor institutional account status lines, coordinate global pricing matrix channels allocations, track localized regional tax metrics compliance, and inspect multi-currency account statements.
-          </p>
-        </div>
+
+      {/* Upper Heading Action Block */}
+      <PageHeader 
+        className="border-b pb-5" 
+        title="Commercial Customer Portfolio Ledger" 
+        description="Monitor institutional account status lines, coordinate global pricing matrix channels allocations, track localized regional tax metrics compliance, and inspect multi-currency account statements." 
+        icon={Contact2}
+      >
         <Button asChild size="sm" className="gap-1.5 shrink-0 text-xs">
           <Link href="/dashboard/customers/create">
             <Plus className="w-4 h-4" /> Onboard Business Client
           </Link>
         </Button>
-      </div>
+      </PageHeader>
 
       {/* Filtering Utility Box bar */}
-      <div className="w-full sm:max-w-xs relative">
+      <div className="w-full sm:max-w-md relative">
         <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground/70" />
         <Input
           placeholder="Filter accounts by legal name, POC, system code token..."
@@ -126,7 +108,7 @@ export default function CustomersDirectoryListPage() {
         <div className="p-20 text-center text-xs text-muted-foreground bg-card border rounded-xl shadow-3xs italic animate-pulse">
           Synchronizing transactional sales logs pipelines and indexing corporate sub-ledger customer tables data streams...
         </div>
-      ) : filteredDirectory.length === 0 ? (
+      ) : directory.length === 0 ? (
         <div className="p-20 text-center text-xs text-muted-foreground border-dashed border-2 rounded-xl bg-card">
           No registered institutional customer profiles located matching target search parameter indicators.
         </div>
@@ -147,7 +129,7 @@ export default function CustomersDirectoryListPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-border/60 text-xs font-medium">
-                {filteredDirectory.map((customer) => (
+                {directory.map((customer) => (
                   <tr key={customer.id} className="hover:bg-muted/5 transition-colors items-start">
                     
                     {/* Legal Corporate Identification Data Frame Cell Block */}
@@ -244,25 +226,9 @@ export default function CustomersDirectoryListPage() {
                           itemId={customer.id} 
                           itemName={customer.legalName} 
                           endpointUrl={`/api/admin/customers/${customer.id}`}
-                          onSuccess={(id) => {
-                            setDirectory(prev => prev.filter(c => c.inflowId !== id));
-                          }} 
+                          onSuccess={() => mutate()} 
                           variant="icon"
                         />
-                        {/* <Button 
-                          variant="ghost" 
-                          size="icon" 
-                          onClick={() => handleArchiveCustomer(customer.id, customer.inflowId, customer.legalName, customer.salesOrderCount)}
-                          disabled={customer.salesOrderCount > 0}
-                          className={`h-8 w-8 ${
-                            customer.salesOrderCount > 0 
-                              ? "text-muted-foreground/30 cursor-not-allowed opacity-40" 
-                              : "text-muted-foreground hover:text-destructive hover:bg-destructive/5"
-                          }`}
-                          title={customer.salesOrderCount > 0 ? `Locked: Business account points to active operational invoicing pipelines.` : "Archive corporate client partner dossier records node."}
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </Button> */}
                       </div>
                     </td>
 
@@ -271,6 +237,15 @@ export default function CustomersDirectoryListPage() {
               </tbody>
             </table>
           </div>
+
+          <DataTablePagination
+            pageIndex={pageIndex}
+            pageSize={PAGE_SIZE}
+            pageCount={pageCount}
+            totalRecords={totalRecords}
+            loading={isLoading}
+            onPageChange={(nextIndex: number) => setPageIndex(nextIndex)}
+          />
         </div>
       )}
 

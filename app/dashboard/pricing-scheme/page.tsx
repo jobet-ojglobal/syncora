@@ -84,7 +84,7 @@ export default function PricingSchemesListPage() {
       </PageHeader>
      
       {/* Lookup search component utility filter toolbar segment */}
-      <div className="w-full sm:max-w-xs relative">
+      <div className="w-full sm:max-w-md relative">
         <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground/70" />
         <Input
           placeholder="Filter schemes by template name, ID index..."

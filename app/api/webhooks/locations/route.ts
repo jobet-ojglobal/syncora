@@ -72,6 +72,31 @@ export async function POST(request: NextRequest) {
 
     // 3. Delegate data operations based on event type classifications
     switch (eventType) {
+      case "locationLocal": {
+        const batchID = payload.batch_id || payload.source_key;
+
+        if (batchID) {
+          // Offload the sync processing to the dedicated background worker queue
+          await getLocationSyncQueue().add(
+            "location_sync_job",
+            {
+              source: eventType,
+              loggedEventId: loggedEvent.id,
+              dataId: payload.inflowId || batchID,
+              locationId, 
+              data: { locationId: batchID }
+            },
+            {
+              attempts: 3,
+              backoff: {
+                type: "exponential",
+                delay: 2000, // Wait 2s, then 4s, then 8s on failure
+              },
+            }
+          );
+        }
+        break;
+      }
       case "currencyLocal": {
         const currencyId = payload.source_key;
 
@@ -161,6 +186,32 @@ export async function POST(request: NextRequest) {
               dataId: payload.inflowId || batchID,
               locationId, 
               data: { customerId: batchID }
+            },
+            {
+              attempts: 3,
+              backoff: {
+                type: "exponential",
+                delay: 2000, // Wait 2s, then 4s, then 8s on failure
+              },
+            }
+          );
+        }
+        break;
+      }
+
+      case "categoryLocal": {
+        const batchID = payload.batch_id || payload.source_key;
+
+        if (batchID) {
+          // Offload the sync processing to the dedicated background worker queue
+          await getLocationSyncQueue().add(
+            "category_sync_job",
+            {
+              source: eventType,
+              loggedEventId: loggedEvent.id,
+              dataId: payload.inflowId || batchID,
+              locationId, 
+              data: { categoryId: batchID }
             },
             {
               attempts: 3,

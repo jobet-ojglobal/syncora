@@ -37,9 +37,12 @@ const locationWorker = new Worker<LocationWebhookJobData>(
           break;
 
         // Local map (inflowId, localId, eventId, locationId)
-        // case "categoriesLocal":
-        //   result = await MappingWebhookService.handleCustomerMap(data.customerId, dataId, loggedEventId, locationId); 
-        //   break;
+        case "locationLocal":
+          result = await MappingWebhookService.handleLocationMap(data.locationId, dataId, loggedEventId, locationId); 
+          break;
+        case "categoryLocal":
+          result = await MappingWebhookService.handleCategoryMap(data.categoryId, dataId, loggedEventId, locationId); 
+          break;
         // case "taxCodeLocal":
         //   result = await MappingWebhookService.handleTaxCodeMap(data.currencyId, dataId, loggedEventId, locationId);
         //   break;
@@ -52,7 +55,7 @@ const locationWorker = new Worker<LocationWebhookJobData>(
         // case "pricingSchemeLocal":
         //   result = await MappingWebhookService.handlePricingSchemeMap(data.currencyId, dataId, loggedEventId, locationId);
         //   break;
-         case "customerLocal":
+        case "customerLocal":
           result = await MappingWebhookService.handleCustomerMap(data.customerId, dataId, loggedEventId, locationId); 
           break;
         

@@ -108,7 +108,9 @@ export async function DELETE(
   { params }: Props
 ) {
   try {
+    const body = await request.json();
     const { id } = await params;
+    const { isSoftDelete } = body
 
     if (!id) {
       return NextResponse.json({ error: "Missing required core customer profile registry identity string token tracking handle parameter." }, { status: 400 });
@@ -143,25 +145,30 @@ export async function DELETE(
 
       if (!customerNode) throw new Error("Target customer registry record path untracked.");
 
-      // 2. Wipe down multi-currency ledger zero state rows configurations profiles explicitly
-      await tx.customerBalance.deleteMany({ where: { customerId: customer.inflowId } });
-      await tx.customerCredit.deleteMany({ where: { customerId: customer.inflowId } });
-      await tx.customerDue.deleteMany({ where: { customerId: customer.inflowId } });
+      if(!isSoftDelete) {
+        // await tx.customer.delete({
+        //   where: { inflowId: customer.inflowId },
+        // }); 
 
-      // 3. Apply soft-delete timestamp markers onto the primary sub-ledger registry node card
-      await tx.customer.update({
-        where: { inflowId: customer.inflowId },
-        data: { deletedAt: new Date() }
-      }); 
+        await tx.businessPartner.delete({
+          where: { id: customerNode.businessPartnerId },
+        });
 
-      // 4. Mirror active status flags adjustments down onto parent partner details table row node sheet
-      await tx.businessPartner.update({
-        where: { id: customerNode.businessPartnerId },
-        data: { 
-          isActive: false,
-          deletedAt: new Date()
-        }
-      });
+      } else {
+        await tx.customer.update({
+          where: { inflowId: customer.inflowId },
+          data: { deletedAt: new Date() }
+        }); 
+
+        await tx.businessPartner.update({
+          where: { id: customerNode.businessPartnerId },
+          data: { 
+            isActive: false,
+            deletedAt: new Date()
+          }
+        });
+      }
+      
     });
 
     return NextResponse.json({ success: true, message: "Business Account archived safely" }, { status: 200 });

@@ -9,69 +9,69 @@ export interface SyncResult {
 
 export class MappingWebhookService {
 
-  // static async handleCategoryMap(inflowId: string, localId: string, eventId: string, locationId: string): Promise<SyncResult> {
-  //   console.log(`[Webhook Service] Processing real-time update for category ID: ${inflowId}`);
+  static async handleCategoryMap(inflowId: string, localId: string, eventId: string, locationId: string): Promise<SyncResult> {
+    console.log(`[Webhook Service] Processing real-time update for category ID: ${inflowId}`);
     
-  //   const result = await prisma.categoryLocationMap.upsert({
-  //     where: {
-  //       categoryId_locationId: {
-  //         categoryId: inflowId, 
-  //         locationId: locationId,   
-  //       }
-  //     },
-  //     update: {
-  //       localId: Number(localId)            
-  //     },
-  //     create: {
-  //       categoryId: inflowId,
-  //       locationId: locationId,
-  //       localId: Number(localId)
-  //     }
-  //   });
+    const result = await prisma.categoryLocationMap.upsert({
+      where: {
+        categoryId_locationId: {
+          categoryId: inflowId, 
+          locationId: locationId,   
+        }
+      },
+      update: {
+        localId: Number(localId)            
+      },
+      create: {
+        categoryId: inflowId,
+        locationId: locationId,
+        localId: Number(localId)
+      }
+    });
 
-  //   if (result && eventId) {
-  //     await prisma.locationWebhookEvent.update({
-  //       where: { id: eventId },
-  //       data: { processed: true }
-  //     });
+    if (result && eventId) {
+      await prisma.locationWebhookEvent.update({
+        where: { id: eventId },
+        data: { processed: true }
+      });
 
-  //     return { success: true };
-  //   }
+      return { success: true };
+    }
 
-  //   return { success: false };
-  // }
+    return { success: false };
+  }
 
-  // static async handleTaxCodeMap(inflowId: string, localId: string, eventId: string, locationId: string): Promise<SyncResult> {
-  //   console.log(`[Webhook Service] Processing real-time update for taxing code ID: ${inflowId}`);
+  static async handleLocationMap(inflowId: string, localId: string, eventId: string, locationId: string): Promise<SyncResult> {
+    console.log(`[Webhook Service] Processing real-time update for taxing code ID: ${inflowId}`);
     
-  //   const result = await prisma.taxCodeLocationMap.upsert({
-  //     where: {
-  //       taxCodeId_locationId: {
-  //         taxCodeId: inflowId, 
-  //         locationId: locationId,   
-  //       }
-  //     },
-  //     update: {
-  //       localId: Number(localId)            
-  //     },
-  //     create: {
-  //       taxCodeId: inflowId,
-  //       locationId: locationId,
-  //       localId: Number(localId)
-  //     }
-  //   });
+    const result = await prisma.taxCodeLocationMap.upsert({
+      where: {
+        taxCodeId_locationId: {
+          taxCodeId: inflowId, 
+          locationId: locationId,   
+        }
+      },
+      update: {
+        localId: Number(localId)            
+      },
+      create: {
+        taxCodeId: inflowId,
+        locationId: locationId,
+        localId: Number(localId)
+      }
+    });
 
-  //   if (result && eventId) {
-  //     await prisma.locationWebhookEvent.update({
-  //       where: { id: eventId },
-  //       data: { processed: true }
-  //     });
+    if (result && eventId) {
+      await prisma.locationWebhookEvent.update({
+        where: { id: eventId },
+        data: { processed: true }
+      });
 
-  //     return { success: true };
-  //   }
+      return { success: true };
+    }
 
-  //   return { success: false };
-  // }
+    return { success: false };
+  }
 
   static async handleTaxingSchemeMap(inflowId: string, localId: string, eventId: string, locationId: string): Promise<SyncResult> {
     console.log(`[Webhook Service] Processing real-time update for taxing scheme ID: ${inflowId}`);
@@ -170,7 +170,7 @@ export class MappingWebhookService {
   // }
 
   static async handleCustomerMap(inflowId: string, localId: string, eventId: string, locationId: string): Promise<SyncResult> {
-    console.log(`[Webhook Service] Processing real-time update for taxing scheme ID: ${inflowId}`);
+    console.log(`[Webhook Service] Processing real-time update for customer ID: ${inflowId}`);
     
     const result = await prisma.customerLocationMap.upsert({
       where: {

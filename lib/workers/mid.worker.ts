@@ -7,6 +7,7 @@ import { upsertVendor as upsertCloudVendor } from "../inflow/data/vendors";
 import { upsertCustomer as upsertLocalCustomer } from "../locations/data/customer";
 import { upsertCategory as upsertLocalCategory } from "../locations/data/category";
 import { upsertTaxingScheme as upsertLocalTaxingScheme } from "../locations/data/taxing-scheme";
+import { upsertPricingScheme as upsertLocalPricingScheme } from "../locations/data/pricing-scheme";
 
 interface MidWebhookJobData {
   source: string;
@@ -36,26 +37,38 @@ const midWorker = new Worker<MidWebhookJobData>(
 
       switch (source) {
         // ========= TAXING SCHEME ============
-        case "TAXING_SCHEME_UPSERT_LOCAL":
+        case "TAXING_SCHEME_UPSERT_LOCAL": // OK
           if (!locationUrl) {
             throw new Error(`Cannot sync taxing scheme: No location URL found for location ${location?.name}`);
           }
           result = await upsertLocalTaxingScheme(payload, locationUrl);
           break;
-        case "CUSTOMER_UPSERT_LOCAL":
+        case "CUSTOMER_UPSERT_LOCAL": // OK
           if (!locationUrl) {
             throw new Error(`Cannot sync currency: No location URL found for location ${location?.name}`);
           }
-          console.log(payload)
           result = await upsertLocalCustomer(payload, locationUrl);
           break;
-        case "CATEGORY_UPSERT_LOCAL":
+        case "VENDOR_UPSERT_LOCAL": 
+          if (!locationUrl) {
+            throw new Error(`Cannot sync currency: No location URL found for location ${location?.name}`);
+          }
+          result = { success: true } //await upsertLocalCustomer(payload, locationUrl);
+          break;
+        case "CATEGORY_UPSERT_LOCAL": 
           if (!locationUrl) {
             throw new Error(`Cannot sync category: No location URL found for location ${location?.name}`);
           }
-          console.log(payload)
           result = await upsertLocalCategory(payload, locationUrl);
           break;
+        case "PRICING_SCHEME_UPSERT_LOCAL": // OK
+          if (!locationUrl) {
+            throw new Error(`Cannot sync pricing scheme: No location URL found for location ${location?.name}`);
+          }
+          result = await upsertLocalPricingScheme(payload, locationUrl);
+          break;
+
+          
 
         default:
           throw new Error(`Unsupported mid sync source: ${source}`);

@@ -1,7 +1,5 @@
 import { BranchClient } from "../location.client";
 
-
-
 export interface InflowCurrency {
   currencyId: string;
   code: string;
@@ -16,8 +14,6 @@ export interface InflowCurrency {
   cRNegativeType: string;
   syncedAt: string;
 }
-
-
 
 export async function getCurrency(
   batchId: string,

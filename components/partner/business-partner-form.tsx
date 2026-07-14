@@ -20,8 +20,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Field, FieldLabel, FieldError, FieldContent, FieldGroup } from "@/components/ui/field";
 
 import { customerFormSchema, CustomerFormData } from "@/schemas/customer.schema";
-import { addressFormSchema } from "@/schemas/address.schema";
-import z from "zod";
 
 interface UnifiedCustomerFormProps {
   initialData?: Partial<CustomerFormData>;
@@ -34,7 +32,7 @@ interface UnifiedCustomerFormProps {
   };
 }
 
-export default function UnifiedCustomerForm({ initialData, catalogs }: UnifiedCustomerFormProps) {
+export default function UnifiedBusinessPartnerForm({ initialData, catalogs }: UnifiedCustomerFormProps) {
   const router = useRouter();
   const isEditMode = !!initialData;
 
@@ -903,168 +901,3 @@ export default function UnifiedCustomerForm({ initialData, catalogs }: UnifiedCu
     </form>
   );
 }
-
-
-            {/* {fields.map((field, index) => (
-              <div key={field.id} className="p-4 border rounded-lg space-y-3 bg-muted/20 relative pt-6">
-                <button 
-                  type="button" 
-                  onClick={() => remove(index)}
-                  className="absolute top-2 right-2 text-xs text-destructive hover:underline"
-                >
-                  Remove
-                </button>
-
-                
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <Controller 
-                    control={control} 
-                    name={`addresses.${index}.name`} 
-                    render={({ field }) => (
-                      <Field>
-                        <FieldLabel>Label (e.g. Home A)</FieldLabel>
-                        <FieldContent><Input {...field} className="h-8 text-xs w-full" /></FieldContent>
-                        {getAddressError(index, "name") && <FieldError>{getAddressError(index, "name")}</FieldError>}
-                      </Field>
-                    )}
-                  />
-                  <Controller 
-                    control={control} 
-                    name={`addresses.${index}.address1`} 
-                    render={({ field }) => (
-                      <Field>
-                        <FieldLabel>Street Address</FieldLabel>
-                        <FieldContent><Input {...field} className="h-8 text-xs w-full" /></FieldContent>
-                        {getAddressError(index, "address1") && <FieldError>{getAddressError(index, "address1")}</FieldError>}
-                      </Field>
-                    )}
-                  />
-                </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <Controller 
-                    control={control} 
-                    name={`addresses.${index}.city`} 
-                    render={({ field }) => (
-                      <Field>
-                        <FieldLabel>City</FieldLabel>
-                        <FieldContent><Input {...field} className="h-8 text-xs w-full" /></FieldContent>
-                        {getAddressError(index, "city") && <FieldError>{getAddressError(index, "city")}</FieldError>}
-                      </Field>
-                    )}
-                  />
-                  <Controller 
-                    control={control} 
-                    name={`addresses.${index}.state`} 
-                    render={({ field }) => (
-                      <Field>
-                        <FieldLabel>State</FieldLabel>
-                        <FieldContent><Input {...field} className="h-8 text-xs w-full" /></FieldContent>
-                        {getAddressError(index, "state") && <FieldError>{getAddressError(index, "state")}</FieldError>}
-                      </Field>
-                    )}
-                  />
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
-                  <Controller 
-                    control={control} 
-                    name={`addresses.${index}.postalCode`} 
-                    render={({ field }) => (
-                      <Field>
-                        <FieldLabel>Zip</FieldLabel>
-                        <FieldContent><Input {...field} className="h-8 text-xs w-full" /></FieldContent>
-                        {getAddressError(index, "postalCode") && <FieldError>{getAddressError(index, "postalCode")}</FieldError>}
-                      </Field>
-                    )}
-                  />
-                  <Controller 
-                    control={control} 
-                    name={`addresses.${index}.addressType`} 
-                    render={({ field }) => (
-                      <Field>
-                        <FieldLabel>Address Type</FieldLabel>
-                        <FieldContent>
-                          <Select 
-                            onValueChange={(val) => field.onChange(val === "null" ? null : val)} 
-                            value={field.value ?? "null"}
-                          >
-                            <SelectTrigger className="h-9 text-xs w-full">
-                              <SelectValue placeholder="Select type (optional)" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="null">Not Specified</SelectItem>
-                              <SelectItem value="Commercial">Commercial</SelectItem>
-                              <SelectItem value="Residential">Residential</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </FieldContent>
-                      </Field>
-                    )}
-                  />
-
-                  <Controller 
-                    control={control} 
-                    name={`addresses.${index}.address2`} 
-                    render={({ field }) => (
-                      <Field>
-                        <FieldLabel>Suite / Floor / Unit</FieldLabel>
-                        <FieldContent>
-                          <Input {...field} placeholder="Optional" className="h-9 text-xs w-full" />
-                        </FieldContent>
-                        {getAddressError(index, "address2") && <FieldError>{getAddressError(index, "address2")}</FieldError>}
-                      </Field>
-                    )}
-                  />
-                </div>
-
-                <Controller 
-                  control={control} 
-                  name={`addresses.${index}.remarks`} 
-                  render={({ field }) => (
-                    <Field>
-                      <FieldLabel>Remarks</FieldLabel>
-                      <FieldContent>
-                        <Input {...field} placeholder="Delivery instructions..." className="h-9 text-xs" />
-                      </FieldContent>
-                      {getAddressError(index, "remarks") && <FieldError>{getAddressError(index, "remarks")}</FieldError>}
-                    </Field>
-                  )}
-                />
-
-                <div className="flex gap-4 border-t pt-3">
-                  <Controller 
-                    control={control} 
-                    name={`addresses.${index}.isDefaultBilling`} 
-                    render={({ field }) => (
-                      <label className="flex items-center gap-2 cursor-pointer select-none">
-                        <input 
-                          type="checkbox" 
-                          checked={field.value} 
-                          onChange={(e) => {
-                            field.onChange(e.target.checked);
-                            handleDefaultChange(index, "isDefaultBilling", e.target.checked);
-                          }} 
-                        /> Default Billing
-                      </label>
-                    )}
-                  />
-
-                  <Controller 
-                    control={control} 
-                    name={`addresses.${index}.isDefaultShipping`} 
-                    render={({ field }) => (
-                      <label className="flex items-center gap-2 cursor-pointer select-none">
-                        <input 
-                          type="checkbox" 
-                          checked={field.value} 
-                          onChange={(e) => {
-                            field.onChange(e.target.checked);
-                            handleDefaultChange(index, "isDefaultShipping", e.target.checked);
-                          }} 
-                        /> Default Shipping
-                      </label>
-                    )}
-                  />
-                </div>
-              </div>
-            ))} */}

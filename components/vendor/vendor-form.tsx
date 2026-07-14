@@ -58,7 +58,7 @@ export function VendorForm({ initialData, catalogs }: VendorFormProps) {
 
       defaultCarrier: initialData?.defaultCarrier || "",
 
-      defaultPaymentMethod: initialData?.defaultPaymentMethod || "",
+      defaultPaymentMethod: initialData?.defaultPaymentMethod || "Cash",
       defaultPaymentTermsId: initialData?.defaultPaymentTermsId || "",
       taxingSchemeId: initialData?.taxingSchemeId || "",
       currencyId: initialData?.currencyId || "",
@@ -370,13 +370,13 @@ export function VendorForm({ initialData, catalogs }: VendorFormProps) {
                 render={({ field, fieldState }) => (
                   <Field data-invalid={fieldState.invalid}>
                     <FieldLabel htmlFor="form-taxingScheme">
-                      Taxing Policy <b className="text-red-500">*</b>
+                      Taxing Scheme <b className="text-red-500">*</b>
                     </FieldLabel>
                     <FieldContent className="relative">
                       <Select
                         name={field.name}
-                        value={field.value}
-                        onValueChange={field.onChange}
+                        value={field.value ?? ""}
+                        onValueChange={(val) => field.onChange(val === "null" ? "" : val)} 
                       >
                         <SelectTrigger
                           id="form-taxingScheme"
@@ -386,12 +386,15 @@ export function VendorForm({ initialData, catalogs }: VendorFormProps) {
                           <SelectValue placeholder="Select" />
                         </SelectTrigger>
                         <SelectContent position="item-aligned">
-
-                          {catalogs.taxing.map((val) => (
-                            <SelectItem key={val.id} value={val.id}>
-                              {val.name}
-                            </SelectItem>
-                          ))}
+                          { catalogs.taxing.length > 0 ? (
+                            catalogs.taxing.map((val) => (
+                              <SelectItem key={val.id} value={val.id}>
+                                {val.name}
+                              </SelectItem>
+                            )))
+                          : (
+                            <SelectItem value="null">No taxing scheme available</SelectItem>
+                          )}
                         </SelectContent>
                       </Select>
                     </FieldContent>
@@ -407,13 +410,13 @@ export function VendorForm({ initialData, catalogs }: VendorFormProps) {
                 render={({ field, fieldState }) => (
                   <Field data-invalid={fieldState.invalid}>
                     <FieldLabel htmlFor="form-defaultPaymentTerms">
-                      Payment Terms 
+                      Payment Term 
                     </FieldLabel>
                     <FieldContent className="relative">
                       <Select
                         name={field.name}
-                        value={field.value}
-                        onValueChange={field.onChange}
+                        value={field.value ?? ""}
+                        onValueChange={(val) => field.onChange(val === "null" ? "" : val)} 
                       >
                         <SelectTrigger
                           id="form-defaultPaymentTerms"
@@ -423,12 +426,15 @@ export function VendorForm({ initialData, catalogs }: VendorFormProps) {
                           <SelectValue placeholder="Select" />
                         </SelectTrigger>
                         <SelectContent position="item-aligned">
-
-                          {catalogs.terms.map((val) => (
-                            <SelectItem key={val.id} value={val.id}>
-                              {val.name}
-                            </SelectItem>
-                          ))}
+                          { catalogs.terms.length > 0 ? (
+                            catalogs.terms.map((val) => (
+                              <SelectItem key={val.id} value={val.id}>
+                                {val.name}
+                              </SelectItem>
+                            )))
+                          : (
+                            <SelectItem value="null">No payment term available</SelectItem>
+                          )}
                         </SelectContent>
                       </Select>
                     </FieldContent>
@@ -440,6 +446,47 @@ export function VendorForm({ initialData, catalogs }: VendorFormProps) {
               />
             </FieldGroup>
             <FieldGroup className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              
+              <Controller
+                name="currencyId"
+                control={control}
+                render={({ field, fieldState }) => (
+                  <Field data-invalid={fieldState.invalid}>
+                    <FieldLabel htmlFor="form-currency">
+                      Currency <b className="text-red-500">*</b>
+                    </FieldLabel>
+                    <FieldContent className="relative">
+                      <Select
+                        name={field.name}
+                        value={field.value}
+                        onValueChange={field.onChange}
+                      >
+                        <SelectTrigger
+                          id="form-currency"
+                          aria-invalid={fieldState.invalid}
+                          className="w-full"
+                        >
+                          <SelectValue placeholder="Select" />
+                        </SelectTrigger>
+                        <SelectContent position="item-aligned">
+                          { catalogs.currencies.length > 0 ? (
+                            catalogs.currencies.map((val) => (
+                              <SelectItem key={val.id} value={val.id}>
+                                {val.name}
+                              </SelectItem>
+                            )))
+                          : (
+                            <SelectItem value="null">No currency available</SelectItem>
+                          )}
+                        </SelectContent>
+                      </Select>
+                    </FieldContent>
+                    {fieldState.invalid && (
+                      <FieldError errors={[fieldState.error]} />
+                    )}
+                  </Field>
+                )}
+              />
               <Controller
                 name="defaultPaymentMethod"
                 control={control}
@@ -466,43 +513,6 @@ export function VendorForm({ initialData, catalogs }: VendorFormProps) {
                           {["Cash", "Online Payment", "Cheque", "Master Card", "VISA"].map((value) => (
                             <SelectItem key={value} value={value}>
                               {value}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </FieldContent>
-                    {fieldState.invalid && (
-                      <FieldError errors={[fieldState.error]} />
-                    )}
-                  </Field>
-                )}
-              />
-              <Controller
-                name="currencyId"
-                control={control}
-                render={({ field, fieldState }) => (
-                  <Field data-invalid={fieldState.invalid}>
-                    <FieldLabel htmlFor="form-currency">
-                      Currency <b className="text-red-500">*</b>
-                    </FieldLabel>
-                    <FieldContent className="relative">
-                      <Select
-                        name={field.name}
-                        value={field.value}
-                        onValueChange={field.onChange}
-                      >
-                        <SelectTrigger
-                          id="form-currency"
-                          aria-invalid={fieldState.invalid}
-                          className="w-full"
-                        >
-                          <SelectValue placeholder="Select" />
-                        </SelectTrigger>
-                        <SelectContent position="item-aligned">
-
-                          {catalogs.currencies.map((val) => (
-                            <SelectItem key={val.id} value={val.id}>
-                              {val.name}
                             </SelectItem>
                           ))}
                         </SelectContent>
@@ -608,7 +618,6 @@ export function VendorForm({ initialData, catalogs }: VendorFormProps) {
                 <h2 className="text-sm font-bold text-foreground flex items-center gap-1.5">
                   <MapPin className="w-4 h-4 text-primary" /> Managed Addresses
                 </h2>
-            
               </div>
 
               {/* CUSTOM ERROR ALERT FOR ADDRESSES ARRAY */}
