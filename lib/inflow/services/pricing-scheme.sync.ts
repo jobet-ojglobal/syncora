@@ -1,4 +1,4 @@
-import { PrismaClient, Prisma } from "@/generated/prisma/client";
+import { Prisma } from "@/generated/prisma/client";
 import { ProductPriceType } from "@/generated/prisma/enums";
 import { syncProduct } from "./product.sync";
 import { InflowPricingScheme } from "../types";

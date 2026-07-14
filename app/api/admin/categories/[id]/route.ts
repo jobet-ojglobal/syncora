@@ -3,6 +3,8 @@ import {
   NextResponse,
 } from "next/server";
 import { CategoryService } from "@/services/category.service";
+import { prisma } from "@/lib/prisma";
+import { SoftDeleteRepository } from "@/lib/softDeleteRepository";
 
 interface Props {
   params: Promise<{
@@ -51,9 +53,7 @@ export async function DELETE(
   try {
     const { id } = await params;
 
-    await CategoryService.deleteCategory(
-      id
-    );
+    await SoftDeleteRepository.softDelete('category', id);
 
     return NextResponse.json({
       success: true,

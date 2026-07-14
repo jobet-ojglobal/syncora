@@ -132,7 +132,8 @@ export async function getProductMetadata() {
         orderBy: {
           createdAt: "desc", 
         },
-      })
+      }),
+      prisma.pricingScheme.findMany({ select: { inflowId: true, name: true }, orderBy: { name: "asc" } }),
     ]);
 
     const groups = groupsRaw.map((group) => ({

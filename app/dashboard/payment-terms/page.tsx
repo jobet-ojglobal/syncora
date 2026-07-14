@@ -46,31 +46,6 @@ export default function PaymentTermsListPage() {
     fetchPaymentTerms();
   }, []);
 
-  const handlePrunePaymentTerm = async (id: string, inflowId: string, name: string, totalDependencies: number) => {
-    if (totalDependencies > 0) {
-      toast.error("Relational Constraint Alarm", {
-        description: `Maturity framework "${name}" is locked. It coordinates ${totalDependencies} active client ledgers, trade creditor nodes, or historical logistics orders blocks.`
-      });
-      return;
-    }
-
-    if (!confirm(`Are you entirely certain you want to soft-delete payment rule template "${name}"?`)) return;
-
-    try {
-      const res = await fetch("/api/admin/payment-terms", {
-        method: "DELETE",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ inflowId }),
-      });
-
-      if (!res.ok) throw new Error();
-      toast.success("Maturity framework decoupled safely");
-      setTerms((prev) => prev.filter((t) => t.inflowId !== inflowId));
-    } catch (err) {
-      toast.error("Instruction Terminated", { description: "Database transaction block rejected structural deletion sequence rules." });
-    }
-  };
-
   const filteredTerms = terms.filter((t) => {
     const term = searchQuery.toLowerCase().trim();
     return t.name.toLowerCase().includes(term) || t.inflowId.toLowerCase().includes(term);
@@ -220,3 +195,28 @@ export default function PaymentTermsListPage() {
     </div>
   );
 }
+
+//  const handlePrunePaymentTerm = async (id: string, inflowId: string, name: string, totalDependencies: number) => {
+//     if (totalDependencies > 0) {
+//       toast.error("Relational Constraint Alarm", {
+//         description: `Maturity framework "${name}" is locked. It coordinates ${totalDependencies} active client ledgers, trade creditor nodes, or historical logistics orders blocks.`
+//       });
+//       return;
+//     }
+
+//     if (!confirm(`Are you entirely certain you want to soft-delete payment rule template "${name}"?`)) return;
+
+//     try {
+//       const res = await fetch("/api/admin/payment-terms", {
+//         method: "DELETE",
+//         headers: { "Content-Type": "application/json" },
+//         body: JSON.stringify({ inflowId }),
+//       });
+
+//       if (!res.ok) throw new Error();
+//       toast.success("Maturity framework decoupled safely");
+//       setTerms((prev) => prev.filter((t) => t.inflowId !== inflowId));
+//     } catch (err) {
+//       toast.error("Instruction Terminated", { description: "Database transaction block rejected structural deletion sequence rules." });
+//     }
+//   };

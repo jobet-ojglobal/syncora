@@ -1,7 +1,8 @@
 // lib/inflow/services/taxing-scheme.sync.ts
-import { Prisma } from "@/generated/prisma/client";
 import { prisma } from "@/lib/prisma";
-import type { ExtendedPrismaTransaction } from "@/lib/prisma";
+import { Prisma } from "@/generated/prisma/client";
+
+type Tx = Prisma.TransactionClient;
 
 export type InflowNestedTaxCodeInput = {
   taxCodeId: string;
@@ -30,7 +31,7 @@ export type InflowTaxingSchemeInput = {
  * Executes a transactional upsert for an inFlow Taxing Scheme record along with its nested Tax Codes.
  */
 export async function upsertTaxingScheme(
-  txOrPrisma: typeof prisma | ExtendedPrismaTransaction,
+  txOrPrisma: typeof prisma | Tx,
   scheme: InflowTaxingSchemeInput
 ) {
   const payload = {

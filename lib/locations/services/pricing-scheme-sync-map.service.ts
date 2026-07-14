@@ -15,12 +15,21 @@ export class PricingSchemeSyncMapService {
       name: string;
       url: string;
     },
-    options: SyncOptions
+    options: SyncOptions,
+    selectedRecords?: any[]
   ) {
     const { onProgress } = options;
     
     // Fetch pricing schemes from your source location endpoint
-    const pricingSchemes = await getPricingSchemes(location.url);
+    let pricingSchemes = await getPricingSchemes(location.url);
+
+    if (selectedRecords && selectedRecords.length > 0) {
+      const allowedIds = selectedRecords.map(item => String(item.id));
+      pricingSchemes = pricingSchemes.filter((data: any) => 
+        allowedIds.includes(String(data.pricingSchemeId))
+      );
+    }
+
     let processed = 0;
 
     const syncResults: Array<{

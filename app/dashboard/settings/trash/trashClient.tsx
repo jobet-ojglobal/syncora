@@ -53,7 +53,7 @@ export function TrashClient({ initialData }: TrashClientProps) {
 
   // --- Handlers ---
   
-  const handleRowRestore = async (id: string, modelType: string) => {
+  const handleRowRestore = async (id: string, modelType: TrashItem["modelType"]) => {
     setLoading(true)
     const res = await restoreItem(id, modelType)
     if (!res.error) {
@@ -65,7 +65,7 @@ export function TrashClient({ initialData }: TrashClientProps) {
     setLoading(false)
   }
 
-  const handleRowPurge = async (id: string, modelType: string) => {
+  const handleRowPurge = async (id: string, modelType: TrashItem["modelType"]) => {
     if (!confirm(`Permanently delete this ${modelType}?`)) return
     setLoading(true)
     const res = await permanentDeleteItem(id, modelType)
@@ -78,7 +78,7 @@ export function TrashClient({ initialData }: TrashClientProps) {
     setLoading(false)
   }
 
-  const handleBulkRestore = async (items: { id: string, modelType: string }[]) => {
+  const handleBulkRestore = async (items: { id: string, modelType: TrashItem["modelType"] }[]) => {
     setLoading(true)
     let successCount = 0
     // Using Promise.all for parallel execution. For massive datasets, use a dedicated bulk API.
@@ -93,7 +93,7 @@ export function TrashClient({ initialData }: TrashClientProps) {
     setLoading(false)
   }
 
-  const handleBulkPurge = async (items: { id: string, modelType: string }[]) => {
+  const handleBulkPurge = async (items: { id: string, modelType: TrashItem["modelType"] }[]) => {
     if (!confirm(`Permanently obliterate ${items.length} records? This cannot be undone.`)) return
     setLoading(true)
     let successCount = 0

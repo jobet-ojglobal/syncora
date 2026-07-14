@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { SoftDeleteRepository } from "@/lib/softDeleteRepository";
 import { NextRequest, NextResponse } from "next/server";
 
 export async function DELETE(request: NextRequest) {
@@ -34,7 +35,7 @@ export async function DELETE(request: NextRequest) {
       }, { status: 422 });
     }
 
-    await prisma.taxingScheme.softDelete(id);
+    await SoftDeleteRepository.softDelete('taxingScheme', id);
 
     return NextResponse.json({ success: true, message: "Fiscal scheme dropped safely" }, { status: 200 });
   } catch (error) {

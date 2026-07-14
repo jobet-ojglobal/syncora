@@ -4,7 +4,18 @@ import { ColumnDef } from "@tanstack/react-table"
 import { TrashItem } from "@/actions/trash"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
-import { RefreshCw, Trash2 } from "lucide-react"
+import { RefreshCw, Trash2, AlertTriangle } from "lucide-react"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog"
 
 export const columns: ColumnDef<TrashItem>[] = [
   {
@@ -72,6 +83,7 @@ export const columns: ColumnDef<TrashItem>[] = [
 
       return (
         <div className="flex gap-2 justify-end">
+          {/* Restore Button */}
           <Button 
             variant="outline" 
             size="sm"
@@ -80,14 +92,51 @@ export const columns: ColumnDef<TrashItem>[] = [
           >
             <RefreshCw className="h-3.5 w-3.5 mr-1.5" /> Restore
           </Button>
-          <Button 
-            variant="destructive" 
-            size="sm"
-            className="h-8 w-8 p-0"
-            onClick={() => meta.purgeRow(item.id, item.modelType)}
-          >
-            <Trash2 className="h-4 w-4" />
-          </Button>
+
+          {/* Purge / Delete Confirmation Dialog */}
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button 
+                variant="destructive" 
+                size="sm"
+                className="h-8 w-8 p-0"
+              >
+                <Trash2 className="h-4 w-4" />
+              </Button>
+            </AlertDialogTrigger>
+            
+            <AlertDialogContent className="max-w-md rounded-xl">
+              <AlertDialogHeader>
+                <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-full bg-destructive/10 text-destructive sm:mx-0 mb-2">
+                  <AlertTriangle className="h-5 w-5" />
+                </div>
+                <AlertDialogTitle className="text-left">
+                  Are you absolutely sure?
+                </AlertDialogTitle>
+                <AlertDialogDescription className="text-left text-sm text-muted-foreground mt-1">
+                  This will permanently delete <span className="font-semibold text-foreground">&quot;{item.title}&quot;</span>. This action cannot be undone.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              
+              <AlertDialogFooter className="mt-4 gap-2 sm:gap-0">
+                <AlertDialogCancel asChild>
+                  <Button variant="outline" size="sm" className="h-9 rounded-xl">
+                    Cancel
+                  </Button>
+                </AlertDialogCancel>
+                <AlertDialogAction asChild>
+                  <Button
+                    variant="destructive"
+                    size="sm"
+                    className="h-9 min-w-[100px] rounded-xl"
+                    onClick={() => meta.purgeRow(item.id, item.modelType)}
+                  >
+                    Confirm Delete
+                  </Button>
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
         </div>
       )
     }

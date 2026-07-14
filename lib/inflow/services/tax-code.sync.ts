@@ -1,6 +1,6 @@
 import { Prisma } from "@/generated/prisma/client";
-import { ExtendedPrismaTransaction, prisma } from "@/lib/prisma";
 import { InflowTaxCode } from "../types";
+import { prisma } from "@/lib/prisma";
 
 type Tx = Prisma.TransactionClient;
 
@@ -9,7 +9,7 @@ type Tx = Prisma.TransactionClient;
  * Accepts an optional transaction client context to stay within existing sync blocks.
  */
 export async function upsertTaxCode(
-  txOrPrisma: typeof prisma | ExtendedPrismaTransaction,
+  txOrPrisma: typeof prisma | Tx,
   taxCode: InflowTaxCode
 ) {
   const payload = {

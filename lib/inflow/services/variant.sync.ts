@@ -1,5 +1,9 @@
+import { Prisma } from "@/generated/prisma/client";
+
+type Tx = Prisma.TransactionClient;
+
 export async function syncVariant(
-  tx: any,
+  tx: Tx,
   productGroupId: string,
   variant: any
 ) {

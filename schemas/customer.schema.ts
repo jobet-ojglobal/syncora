@@ -28,7 +28,7 @@ export const customerFormSchema = z.object({
 
   taxExemptNumber: z.string().optional(),
   defaultCarrier: z.string().optional(),
-  defaultPaymentMethod: z.string().optional(),
+  defaultPaymentMethod: z.string().min(1, "Payment method is required"),
   
   // Coerce string input to number safely
   discount: z.coerce.number().min(0).max(100).optional(),

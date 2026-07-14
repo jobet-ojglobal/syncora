@@ -62,7 +62,7 @@ export class CategoryService {
 
   static async getCategories() {
     return prisma.category.findMany({
-
+      where: { deletedAt: null },
       select: {
         id: true,
         inflowId: true,

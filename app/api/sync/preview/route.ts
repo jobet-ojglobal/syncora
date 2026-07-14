@@ -91,13 +91,13 @@ export async function GET(request: NextRequest) {
 
       return NextResponse.json({ items: previewItems });
     } else if (source === "categories_local") {
-      const rawCurrency = await getCategories(location.url);
+      const rawCategories = await getCategories(location.url);
       
       // Transform records into a uniform preview structure
-      const previewItems = rawCurrency.map((scheme: any) => ({
-        id: String(scheme.currencyId), // incoming original ID
+      const previewItems = rawCategories.map((scheme: any) => ({
+        id: String(scheme.categoryId), // incoming original ID
         name: scheme.name,
-        description: `${scheme.address?.length || 0} nested items present`,
+        description: `0 nested items present`,
         rawData: scheme, // Cache full object to pass back later
       }));
 

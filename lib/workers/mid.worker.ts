@@ -5,6 +5,7 @@ import { connection } from "@/lib/redis";
 import { upsertCustomer as upsertCloudCustomer } from "../inflow/data/customers";
 import { upsertVendor as upsertCloudVendor } from "../inflow/data/vendors";
 import { upsertCustomer as upsertLocalCustomer } from "../locations/data/customer";
+import { upsertCategory as upsertLocalCategory } from "../locations/data/category";
 import { upsertTaxingScheme as upsertLocalTaxingScheme } from "../locations/data/taxing-scheme";
 
 interface MidWebhookJobData {
@@ -47,6 +48,13 @@ const midWorker = new Worker<MidWebhookJobData>(
           }
           console.log(payload)
           result = await upsertLocalCustomer(payload, locationUrl);
+          break;
+        case "CATEGORY_UPSERT_LOCAL":
+          if (!locationUrl) {
+            throw new Error(`Cannot sync category: No location URL found for location ${location?.name}`);
+          }
+          console.log(payload)
+          result = await upsertLocalCategory(payload, locationUrl);
           break;
 
         default:

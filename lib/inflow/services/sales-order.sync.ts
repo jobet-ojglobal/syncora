@@ -1,6 +1,4 @@
 // services/sync/sales/sales-order.sync.ts
-
-import { Prisma } from "@/generated/prisma/client";
 import { SalesOrderMapper } from "./sales-order-mappers";
 import { getCustomer } from "../data/customers";
 import { syncCustomer } from "./customer.sync";
@@ -12,12 +10,17 @@ export interface SalesOrderSyncValidationSets {
   validProducts: Set<string>;
 }
 
+import { Prisma } from "@/generated/prisma/client";
+
+type Tx = Prisma.TransactionClient;
+
+
 /**
  * Syncs a single sales order record along with all its respective child dependencies 
  * using an isolated, active transaction pointer instance.
  */
 export async function syncSalesOrder(
-  tx: any,
+  tx: Tx,
   order: any,
   validationSets: SalesOrderSyncValidationSets
 ) {

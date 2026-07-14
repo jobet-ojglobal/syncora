@@ -1,6 +1,9 @@
 // app/api/admin/categories/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { CategoryService } from "@/services/category.service";
+import { WebhookService } from "@/services/webhook.service";
+import { getMidSyncQueue } from "@/lib/queues/sync.queue";
+import { prisma } from "@/lib/prisma";
 
 // =====================================================
 // GET ALL CATEGORIES
@@ -59,6 +62,62 @@ export async function POST(
         name, description, imageUrl, parentId: parentCategory ,
       });
 
+    // Re-map structural fields targeting Cloud Global Identifiers
+    const inflowPayload = {
+      cloudId: newCategory.inflowId,
+      name: newCategory.name,
+      parentId: newCategory.parentId
+    };
+    
+        
+    if (!newCategory || !inflowPayload) {
+      return NextResponse.json({ error: "Failed to assemble category scheme components." }, { status: 500 });
+    }
+    
+    const { cloudId, ...cleanInflowPayload } = inflowPayload;
+
+    const validWebhooks = await WebhookService.getLocationWebhookURLs("categoryLocal");
+
+    const existingParentMappings = await prisma.categoryLocationMap.findMany({
+      where: { categoryId: cleanInflowPayload.parentId || undefined },
+      select: { locationId: true, localId: true }
+    });
+    
+    if (validWebhooks.length > 0) {
+      const jobsToQueue = validWebhooks
+      .filter(webhook => webhook.location.url && webhook.location.url.trim() !== "")
+      .map((webhook) => {
+        const matchParent = existingParentMappings.find(m => m.locationId === webhook.locationId);
+        
+        return {
+        name: "category_localsync_job",
+        data: {
+          source: "CATEGORY_UPSERT_LOCAL",
+          model: "Category", 
+          payload: {
+            ...cleanInflowPayload,
+            categoryId: cloudId, 
+            localId: null,
+            parentId: matchParent?.localId || null
+          },
+          timestamp: new Date().toISOString(),
+          location: {
+            inflowId: webhook.locationId,
+            url: webhook.location.url,
+            name: webhook.location.name
+          }
+        },
+        opts: { 
+          attempts: 3, 
+          backoff: { type: "exponential", delay: 2000 },
+          removeOnComplete: true
+        }
+      }});
+
+      await getMidSyncQueue().addBulk(jobsToQueue);
+      console.log(`[Queue] Successfully broadcasted sync jobs to ${jobsToQueue.length} locations.`);
+    }
+
     return NextResponse.json(newCategory, { status: 201 });
   } catch (error: any) {
     console.error("Critical failure during Category transaction writes:", error);
@@ -101,6 +160,69 @@ export async function PATCH(
     const updatedCategory = await CategoryService.updateCategory({
       id, name, description, imageUrl, parentId: parentCategory,
     });
+
+    // Re-map structural fields targeting Cloud Global Identifiers
+    const inflowPayload = {
+      cloudId: updatedCategory.inflowId,
+      name: updatedCategory.name,
+      parentId: updatedCategory.parentId
+    };
+    
+        
+    if (!updatedCategory || !inflowPayload) {
+      return NextResponse.json({ error: "Failed to assemble category scheme components." }, { status: 500 });
+    }
+    
+    const { cloudId, ...cleanInflowPayload } = inflowPayload;
+
+    const validWebhooks = await WebhookService.getLocationWebhookURLs("categoryLocal");
+
+    const existingMappings = await prisma.categoryLocationMap.findMany({
+      where: { categoryId: cloudId },
+      select: { locationId: true, localId: true }
+    });
+
+    const existingParentMappings = await prisma.categoryLocationMap.findMany({
+      where: { categoryId: cleanInflowPayload.parentId || undefined },
+      select: { locationId: true, localId: true }
+    });
+    
+    if (validWebhooks.length > 0) {
+      const jobsToQueue = validWebhooks
+      .filter(webhook => webhook.location.url && webhook.location.url.trim() !== "")
+      .map((webhook) => {
+        const match = existingMappings.find(m => m.locationId === webhook.locationId);
+        const matchParent = existingParentMappings.find(m => m.locationId === webhook.locationId);
+        
+        return {
+        name: "category_localsync_job",
+        data: {
+          source: "CATEGORY_UPSERT_LOCAL",
+          model: "Category", 
+          payload: {
+            ...cleanInflowPayload,
+            categoryId: cloudId, 
+            localId: match?.localId || null,
+            parentId: matchParent?.localId || null
+          },
+          timestamp: new Date().toISOString(),
+          location: {
+            inflowId: webhook.locationId,
+            url: webhook.location.url,
+            name: webhook.location.name
+          }
+        },
+        opts: { 
+          attempts: 3, 
+          backoff: { type: "exponential", delay: 2000 },
+          removeOnComplete: true
+        }
+      }});
+
+      await getMidSyncQueue().addBulk(jobsToQueue);
+      console.log(`[Queue] Successfully broadcasted sync jobs to ${jobsToQueue.length} locations.`);
+    }
+
 
     return NextResponse.json(updatedCategory, { status: 200 });
   } catch (error: any) {

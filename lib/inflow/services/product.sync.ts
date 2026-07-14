@@ -1,4 +1,3 @@
-import { prisma } from "@/lib/prisma";
 import { InflowProduct } from "../types";
 import { 
   syncBrand, 
@@ -11,12 +10,15 @@ import {
   syncSalesUom
 } from "./helpers";
 import { genInflowUniqueSlug } from "@/helpers/genUniqueSlug";
-import { Prisma } from "@/generated/prisma/client";
 import { getVendor } from "../data/vendors";
 import { syncVendor } from "./vendor.sync";
 
+import { Prisma } from "@/generated/prisma/client";
+
+type Tx = Prisma.TransactionClient;
+
 export async function syncProduct(
-  tx: any,
+  tx: Tx,
   product: InflowProduct,
   groupId?: string
 ) {

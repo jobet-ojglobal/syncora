@@ -1,6 +1,7 @@
 // app/api/admin/payment-terms/route.ts
 
 import { prisma } from "@/lib/prisma";
+import { SoftDeleteRepository } from "@/lib/softDeleteRepository";
 import { NextRequest } from "next/dist/server/web/spec-extension/request";
 import { NextResponse } from "next/dist/server/web/spec-extension/response";
 
@@ -43,14 +44,7 @@ export async function DELETE(
       );
     }
 
-    // Execute atomic validation updating parameter mutations flags changes inside transactional scope
-    await prisma.paymentTerm.update({
-      where: { id: paymentTerm.id },
-      data: {
-        deletedAt: new Date(),
-        isActive: false // Mask completely from lookup workflows drop options boxes maps
-      }
-    });
+    await SoftDeleteRepository.softDelete('paymentTerm', termId);
 
     return NextResponse.json({ success: true, message: "Payment terms rule archived successfully." }, { status: 200 });
   } catch (error) {

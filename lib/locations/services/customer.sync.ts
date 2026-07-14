@@ -1,7 +1,8 @@
 // lib/inflow/services/customer.sync.ts
-import { Prisma } from "@/generated/prisma/client";
-import type { ExtendedPrismaTransaction } from "@/lib/prisma";
 import { prisma } from "@/lib/prisma";
+import { Prisma } from "@/generated/prisma/client";
+
+type Tx = Prisma.TransactionClient;
 
 export type InflowCustomerInput = {
   inflowId: string;
@@ -40,7 +41,7 @@ export type InflowCustomerInput = {
  * without dropping identity-map records through targeted differential sub-upserts.
  */
 export async function upsertCustomer(
-  txOrPrisma: ExtendedPrismaTransaction | typeof prisma,
+  txOrPrisma: Tx | typeof prisma,
   input: InflowCustomerInput
 ) {
   const payload = {

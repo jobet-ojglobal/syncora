@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { SoftDeleteRepository } from "@/lib/softDeleteRepository";
 import { NextRequest, NextResponse } from "next/server";
 
 interface Props {
@@ -43,7 +44,7 @@ export async function DELETE(
     //   });
     // });
 
-    await prisma.attribute.softDelete(id)
+    await SoftDeleteRepository.softDelete('attribute', id);
 
     return NextResponse.json({ success: true, removedAttributeId: id }, { status: 200 });
   } catch (error) {

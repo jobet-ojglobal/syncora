@@ -1,27 +1,32 @@
 "use server"
-import { prisma } from "@/lib/prisma";
+import { ModelName, SoftDeleteRepository } from "@/lib/softDeleteRepository";
 import { revalidatePath } from "next/cache";
+import { TrashItem } from "./trash";
 
-// Helper to map UI string identifiers to Prisma model keys
-const getModelClient = (modelType: string) => {
-  const modelMap: Record<string, any> = {
-    "Brand": prisma.brand,
-    "Category": prisma.category,
-    "Product": prisma.product,
-    "Taxing Scheme": prisma.taxingScheme,
-    "Tax Code": prisma.taxCode,
-    "Customer": prisma.customer,
-  };
-  return modelMap[modelType];
+// Map UI identifiers to Prisma model names
+const modelMap: Record<TrashItem["modelType"], ModelName> = {
+  User: "user",
+  Attribute: "attribute",
+  Category: "category",
+  Currency: "currency",
+  "Taxing Scheme": "taxingScheme",
+  "Pricing Scheme": "pricingScheme",
+  "Payment Term": "paymentTerm",
+  Product: "product",
+  Brand: "brand",
+  Customer: "customer",
+  Vendor: "vendor",
+  "Product Group": "productGroup",
+  Location: "location",
+  "Team Member": "teamMember",
 };
 
-export async function restoreItem(id: string, modelType: string) {
+export async function restoreItem(id: string, modelType: TrashItem["modelType"]) {
   try {
-    const modelClient = getModelClient(modelType);
-    if (!modelClient) throw new Error("Invalid model type");
+    const modelName = modelMap[modelType];
+    if (!modelName) throw new Error("Invalid model type");
 
-    // Utilizing your Prisma Extension restore function
-    await modelClient.restore(id);
+    await SoftDeleteRepository.restore(modelName, id);
     
     revalidatePath("/dashboard/settings/trash");
     return { success: true };
@@ -30,18 +35,17 @@ export async function restoreItem(id: string, modelType: string) {
   }
 }
 
-export async function permanentDeleteItem(id: string, modelType: string) {
+export async function permanentDeleteItem(id: string, modelType: TrashItem["modelType"]) {
   try {
-    const modelClient = getModelClient(modelType);
-    if (!modelClient) throw new Error("Invalid model type");
+    const modelName = modelMap[modelType];
+    if (!modelName) throw new Error("Invalid model type");
 
-    // Hard delete bypasses the soft-delete extension natively
-    await modelClient.delete({ where: { id } });
+    await SoftDeleteRepository.permanentDelete(modelName, id);
 
     revalidatePath("/dashboard/settings/trash");
     return { success: true };
   } catch (error: any) {
     console.error("Critical failure dropping catalog configuration elements:", error);
-    return { error: error.message || "Internal Database execution permanently delete error occurred.." };
+    return { error: error.message || "Internal Database execution permanently delete error occurred." };
   }
 }

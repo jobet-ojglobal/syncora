@@ -111,7 +111,7 @@ interface ProductFormProps {
   pricingSchemes: {
     inflowId: string;
     name: string;
-  }[]
+  }[];
   initialData?: any | null;
 }
 
@@ -119,17 +119,34 @@ export function ProductForm({  brands, uoms, groups: productGroups, pricingSchem
   const router = useRouter();
   const isEditMode = !!initialData;
 
-  // Pre-calculate baseline pricing matrices mapped over existing master templates
-  const initialPrices = pricingSchemes.map((scheme) => {
-    const existingPrice = initialData?.prices?.find((p: any) => p.pricingSchemeId === scheme.inflowId);
-    return {
-      inflowId: existingPrice?.inflowId || undefined,
-      pricingSchemeId: scheme.inflowId,
-      priceType: existingPrice?.priceType || "Normal",
-      unitPrice: existingPrice?.unitPrice ? Number(existingPrice.unitPrice) : 0,
-      fixedMarkup: existingPrice?.fixedMarkup ? Number(existingPrice.fixedMarkup) : 0,
-    };
-  });
+  // 1. Pre-calculate all pricing schemes mapped over initial values
+  const initialPrices = useMemo(() => {
+    // If we have existing data rows, group them by scheme to preserve them
+    if (initialData?.prices && initialData.prices.length > 0) {
+      return initialData.prices.map((p: any) => ({
+        id: p.id,
+        inflowId: p.inflowId,
+        pricingSchemeId: p.pricingSchemeId,
+        priceType: p.priceType || "Normal",
+        unitPrice: p.unitPrice ? Number(p.unitPrice) : 0,
+        fixedMarkup: p.fixedMarkup ? Number(p.fixedMarkup) : 0,
+      }));
+    }
+
+    // If it's a brand new product, cleanly loop through all platform schemes 
+    // so the operator doesn't have to hit "Append Tier" 5 times manually.
+    if (pricingSchemes && pricingSchemes.length > 0) {
+      return pricingSchemes.map((scheme) => ({
+        pricingSchemeId: scheme.inflowId,
+        priceType: "Normal",
+        unitPrice: 0,
+        fixedMarkup: 0,
+      }));
+    }
+
+    // Bare minimum fallback array structure
+    return [{ pricingSchemeId: "", priceType: "Normal", unitPrice: 0, fixedMarkup: 0 }];
+  }, [initialData, pricingSchemes]);
 
   const form = useForm<ProductInput>({
     resolver: zodResolver(productSchema),
@@ -160,17 +177,8 @@ export function ProductForm({  brands, uoms, groups: productGroups, pricingSchem
 
       // Seed extended valuation allocations
       initialCost: initialData?.cost?.cost ? Number(initialData.cost.cost) : 0,
-      prices: initialData?.prices?.map((p: any) => ({
-        id: p.id,
-        inflowId: p.inflowId,
-        pricingSchemeId: p.pricingSchemeId,
-        priceType: p.priceType || "Normal",
-        unitPrice: p.unitPrice ? Number(p.unitPrice) : 0,
-        fixedMarkup: p.fixedMarkup ? Number(p.fixedMarkup) : 0,
-      })) || [
-        // Fallback initial clean block if registering a brand new product
-        { pricingSchemeId: pricingSchemes[0]?.inflowId || "", priceType: "Normal", unitPrice: 0, fixedMarkup: 0 }
-      ],
+      // 2. Pass our clean computed matrix here 🌟
+      prices: initialPrices,
 
       originCountry: initialData?.originCountry || "",
       hsTariffNumber: initialData?.hsTariffNumber || "",
@@ -255,50 +263,6 @@ export function ProductForm({  brands, uoms, groups: productGroups, pricingSchem
     });
   }, [selectedGroupDetails]);
 
-  // const computedVariantSlotsFromOptions = useMemo(() => {
-  //   if (!selectedGroupDetails || !selectedGroupDetails.options || selectedGroupDetails.options.length === 0) {
-  //     return [];
-  //   }
-
-  //   // 1. Extract option structural array trees with the global attribute value ID included
-  //   const arraysToCombine = selectedGroupDetails.options.map(opt => 
-  //     opt.values.map(val => ({
-  //       optionId: opt.inflowId,
-  //       optionValueId: val.inflowId,
-  //       // 🎯 CRUCIAL FIX: Bring down the core attribute ID that matches your backend fingerprintId
-  //       attributeValueId: val.attributeValue?.id || "", 
-  //       value: val.attributeValue?.value || ""
-  //     }))
-  //   );
-
-  //   // Classic Cartesian Product calculation function
-  //   const getCartesian = (arrays: any[][]): any[][] => {
-  //     return arrays.reduce((acc, curr) => acc.flatMap(d => curr.map(e => [...d, e])), [[]]);
-  //   };
-
-  //   const intersections = getCartesian(arraysToCombine);
-
-  //   return intersections.map((combination: any[]) => {
-  //     // 🎯 CRUCIAL FIX: Build signature matching the backend sorted attributeValue.id architecture
-  //     const signature = combination.map(c => c.attributeValueId).sort().join("-");
-  //     const labelString = combination.map(c => c.value).join(" / ");
-
-  //     // Now this exact lookup will find your DB variant records seamlessly!
-  //     const matchedDbVariant = selectedGroupDetails.variants?.find(v => v.signature === signature);
-
-  //     return {
-  //       signature,
-  //       labelString,
-  //       productId: matchedDbVariant?.productId || null,
-  //       product: matchedDbVariant?.product || null,
-  //       selections: combination.map(c => ({
-  //         optionId: c.optionId,
-  //         optionValueId: c.optionValueId,
-  //         optionValue: { attributeValue: { value: c.value } }
-  //       }))
-  //     };
-  //   });
-  // }, [selectedGroupDetails]);
 
    const currentSelectionBreakdown = useMemo(() => {
     if (!watchedVariantSignature || !computedVariantSlotsFromOptions) return [];
@@ -750,7 +714,6 @@ export function ProductForm({  brands, uoms, groups: productGroups, pricingSchem
           </FieldSet>
         )}
 
-        {/* 🏢 Financial Valuations Cost & Multi-Scheme Matrix Controls */}
         {/* 🏢 Dynamic Multi-Tier Pricing Matrix Section */}
         <FieldSet className="border-t pt-4 space-y-4">
           <div className="flex items-center justify-between border-b pb-2">
@@ -811,55 +774,56 @@ export function ProductForm({  brands, uoms, groups: productGroups, pricingSchem
                       className="w-full text-xs h-8 rounded-md border border-input bg-background px-2 py-1 focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-ring"
                       {...register(`prices.${idx}.priceType` as const)}
                     >
-              <option value="Normal">Normal</option>
-              <option value="Wholesale">Wholesale</option>
-              <option value="Promo">Promo</option>
-            </select>
-          </div>
+                      <option value="Normal">Normal</option>
+                      <option value="Wholesale">Wholesale</option>
+                      <option value="Promo">Promo</option>
+                    </select>
+                  </div>
 
-          {/* Value Inputs Group */}
-          <div className="sm:col-span-2">
-            <Input 
-              type="number" 
-              step="0.00001" 
-              placeholder="Price ($)"
-              className="h-8 text-xs text-right"
-              {...register(`prices.${idx}.unitPrice` as const, { valueAsNumber: true })} 
-            />
-            {errors.prices?.[idx]?.unitPrice && (
-              <span className="text-[10px] text-destructive block mt-0.5">{errors.prices[idx].unitPrice?.message}</span>
-            )}
-          </div>
+                  {/* Value Inputs Group */}
+                  <div className="sm:col-span-2">
+                    <Input 
+                      type="number" 
+                      step="0.00001" 
+                      placeholder="Price ($)"
+                      className="h-8 text-xs text-right"
+                      {...register(`prices.${idx}.unitPrice` as const, { valueAsNumber: true })} 
+                    />
+                    {errors.prices?.[idx]?.unitPrice && (
+                      <span className="text-[10px] text-destructive block mt-0.5">{errors.prices[idx].unitPrice?.message}</span>
+                    )}
+                  </div>
 
-          <div className="sm:col-span-2">
-            <Input 
-              type="number" 
-              step="0.00001" 
-              placeholder="Markup ($)"
-              className="h-8 text-xs text-right"
-              {...register(`prices.${idx}.fixedMarkup` as const, { valueAsNumber: true })} 
-            />
-          </div>
+                  <div className="sm:col-span-2">
+                    <Input 
+                      type="number" 
+                      step="0.00001" 
+                      placeholder="Markup ($)"
+                      className="h-8 text-xs text-right"
+                      {...register(`prices.${idx}.fixedMarkup` as const, { valueAsNumber: true })} 
+                    />
+                  </div>
 
-          {/* Action Delete Trigger Button */}
-          <div className="sm:col-span-1 flex justify-center">
-            <Button 
-              type="button" 
-              variant="ghost" 
-              size="icon" 
-              disabled={priceFields.length <= 1}
-              onClick={() => removePrice(idx)} 
-              className="h-8 w-8 text-muted-foreground hover:text-destructive disabled:opacity-30 shrink-0"
-            >
-              <Trash2 className="w-3.5 h-3.5" />
-            </Button>
+                  {/* Action Delete Trigger Button */}
+                  <div className="sm:col-span-1 flex justify-center">
+                    <Button 
+                      type="button" 
+                      variant="ghost" 
+                      size="icon" 
+                      disabled={priceFields.length <= 1}
+                      onClick={() => removePrice(idx)} 
+                      className="h-8 w-8 text-muted-foreground hover:text-destructive disabled:opacity-30 shrink-0"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </Button>
+                  </div>
+                  
+                </div>
+              ))}
+            </div>
           </div>
-          
-        </div>
-      ))}
-    </div>
-  </div>
-</FieldSet>
+        </FieldSet>
+    
 
         {/* Internal Administration Remarks */}
         <FieldSet className="border-t pt-4">

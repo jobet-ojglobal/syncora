@@ -23,8 +23,8 @@ export class CustomerSyncMapService {
 
     if (selectedRecords && selectedRecords.length > 0) {
       const allowedIds = selectedRecords.map(item => String(item.id));
-      incomingCustomers = incomingCustomers.filter((scheme: any) => 
-        allowedIds.includes(String(scheme.customerId))
+      incomingCustomers = incomingCustomers.filter((data: any) => 
+        allowedIds.includes(String(data.customerId))
       );
     }
 

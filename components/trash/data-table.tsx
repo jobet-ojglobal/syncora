@@ -30,14 +30,15 @@ import {
 import { SlidersHorizontal, RefreshCw, Trash2 } from "lucide-react"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { DataTablePagination } from "@/components/shared/data-table-pagination"
+import { TrashItem } from "@/actions/trash"
 
 // Define the expected shape of your Trash items
-interface TrashItem {
-  id: string;
-  title: string;
-  modelType: string;
-  deletedAt: Date;
-}
+// interface TrashItem {
+//   id: string;
+//   title: string;
+//   modelType: TrashItem["modelType"];
+//   deletedAt: Date;
+// }
 
 interface TrashDataTableProps<TData extends TrashItem, TValue> {
   columns: ColumnDef<TData, TValue>[]
@@ -57,10 +58,10 @@ interface TrashDataTableProps<TData extends TrashItem, TValue> {
   onPaginationChange: React.Dispatch<React.SetStateAction<{ pageIndex: number; pageSize: number }>>
 
   // Row & Bulk mutation bubbles
-  onRowRestore?: (id: string, modelType: string) => void
-  onRowPurge?: (id: string, modelType: string) => void
-  onBulkRestore?: (items: {id: string, modelType: string}[]) => void
-  onBulkPurge?: (items: {id: string, modelType: string}[]) => void
+  onRowRestore?: (id: string, modelType: TrashItem["modelType"]) => void
+  onRowPurge?: (id: string, modelType: TrashItem["modelType"]) => void
+  onBulkRestore?: (items: {id: string, modelType: TrashItem["modelType"]}[]) => void
+  onBulkPurge?: (items: {id: string, modelType: TrashItem["modelType"]}[]) => void
 }
 
 export function TrashDataTable<TData extends TrashItem, TValue>({
@@ -107,10 +108,10 @@ export function TrashDataTable<TData extends TrashItem, TValue>({
       rowSelection,
     },
     meta: {
-      restoreRow: (id: string, modelType: string) => {
+      restoreRow: (id: string, modelType: TrashItem["modelType"]) => {
         if (onRowRestore) onRowRestore(id, modelType)
       },
-      purgeRow: (id: string, modelType: string) => {
+      purgeRow: (id: string, modelType: TrashItem["modelType"]) => {
         if (onRowPurge) onRowPurge(id, modelType)
       }
     },

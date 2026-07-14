@@ -14,10 +14,19 @@ export class CurrencySyncMapService {
       name: string;
       url: string;
     },
-    options: SyncOptions
+    options: SyncOptions,
+    selectedRecords?: any[]
   ) {
     const { onProgress } = options;
-    const currencies = await getCurrencies(location.url);
+    let currencies = await getCurrencies(location.url);
+
+    if (selectedRecords && selectedRecords.length > 0) {
+      const allowedIds = selectedRecords.map(item => String(item.id));
+      currencies = currencies.filter((data: any) => 
+        allowedIds.includes(String(data.currencyId))
+      );
+    }
+
     let processed = 0;
 
     const syncResults: Array<{

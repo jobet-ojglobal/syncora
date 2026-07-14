@@ -1,14 +1,15 @@
-import { prisma } from "@/lib/prisma";
 import { InflowPricingScheme } from "../types";
-import type { ExtendedPrismaTransaction } from "@/lib/prisma";
+import { Prisma } from "@/generated/prisma/client";
+import { prisma } from "@/lib/prisma";
 
+type Tx = Prisma.TransactionClient;
 
 /**
  * Executes a single atomic database upsert for an inFlow Pricing Scheme.
  * Accepts an optional transaction client context to stay within existing sync blocks.
  */
 export async function upsertPricingScheme(
-  txOrPrisma: typeof prisma | ExtendedPrismaTransaction,
+  txOrPrisma: typeof prisma | Tx,
   scheme: InflowPricingScheme
 ) {
   return await txOrPrisma.pricingScheme.upsert({

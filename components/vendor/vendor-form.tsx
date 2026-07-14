@@ -771,7 +771,7 @@ export function VendorForm({ initialData, catalogs }: VendorFormProps) {
                     render={({ field, fieldState }) => (
                       <Field data-invalid={fieldState.invalid}>
                         <FieldLabel htmlFor="form-addressType">
-                          Address Type <b className="text-red-500">*</b>
+                          Address Type 
                         </FieldLabel>
                         <FieldContent className="relative">
                           <Select
@@ -799,7 +799,6 @@ export function VendorForm({ initialData, catalogs }: VendorFormProps) {
                       </Field>
                     )}
                   />
-                  
                 </FieldGroup>
 
                 <Controller

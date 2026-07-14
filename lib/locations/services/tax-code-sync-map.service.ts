@@ -15,12 +15,21 @@ export class TaxCodeSyncMapService {
       name: string;
       url: string;
     },
-    options: SyncOptions
+    options: SyncOptions,
+    selectedRecords?: any[]
   ) {
     const { onProgress } = options;
     
     // Fetch tax codes from your source location endpoint
-    const taxCodes = await getTaxCodes(location.url);
+    let taxCodes = await getTaxCodes(location.url);
+
+    if (selectedRecords && selectedRecords.length > 0) {
+      const allowedIds = selectedRecords.map(item => String(item.id));
+      taxCodes = taxCodes.filter((data: any) => 
+        allowedIds.includes(String(data.taxCodeId))
+      );
+    }
+
     let processed = 0;
 
     const syncResults: Array<{

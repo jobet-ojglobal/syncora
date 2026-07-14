@@ -25,8 +25,8 @@ export class TaxingSchemeSyncMapService {
 
     if (selectedRecords && selectedRecords.length > 0) {
       const allowedIds = selectedRecords.map(item => String(item.id));
-      taxingSchemes = taxingSchemes.filter((scheme: any) => 
-        allowedIds.includes(String(scheme.taxingSchemeId))
+      taxingSchemes = taxingSchemes.filter((data: any) => 
+        allowedIds.includes(String(data.taxingSchemeId))
       );
     }
 

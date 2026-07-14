@@ -1,8 +1,11 @@
+
 import { Prisma, UomCategory } from "@/generated/prisma/client";
-import type { ExtendedPrismaTransaction, prisma } from "@/lib/prisma";
+import { prisma } from "@/lib/prisma";
+
+type Tx = Prisma.TransactionClient;
 
 export async function syncUom(
-  tx: typeof prisma | ExtendedPrismaTransaction,
+  tx: typeof prisma | Tx,
   code: string,
   name: string,
   category: UomCategory = "COUNT",

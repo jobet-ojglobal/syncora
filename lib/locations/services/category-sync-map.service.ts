@@ -15,11 +15,21 @@ export class CategorySyncMapService {
       name: string;
       url: string;
     },
-    options: SyncOptions
+    options: SyncOptions,
+    selectedRecords?: any[]
   ) {
     const { onProgress } = options;
     
-    const categories = await getCategories(location.url);
+    let categories = await getCategories(location.url);
+
+    if (selectedRecords && selectedRecords.length > 0) {
+      const allowedIds = selectedRecords.map(item => String(item.id));
+      categories = categories.filter((data: any) => 
+        allowedIds.includes(String(data.categoryId))
+      );
+    }
+
+
     let processed = 0;
 
     const syncResults: Array<{

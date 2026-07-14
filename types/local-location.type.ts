@@ -26,3 +26,4 @@ export const ADDRESS_TYPE_MAP: Record<string, number> = {
   "Commercial": 1,
   "Residential": 2,
 };
+

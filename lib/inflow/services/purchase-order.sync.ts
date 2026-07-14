@@ -6,6 +6,7 @@ import { getVendor } from "../data/vendors";
 import { syncVendor } from "./vendor.sync";
 import { InflowPurchaseOrder } from "../types";
 
+
 export interface PurchaseOrderSyncValidationSets {
   validLocations: Set<string>;
   validTeamMembers: Set<string>;

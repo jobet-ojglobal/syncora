@@ -6,7 +6,8 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { 
   Building2, User, Mail, Phone, MapPin, Landmark, 
   Save, ArrowLeft, Loader2, Globe, Briefcase, Percent, Edit3,
-  AlertCircle
+  AlertCircle,
+  Hash
 } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
@@ -73,7 +74,7 @@ export default function UnifiedCustomerForm({ initialData, catalogs }: UnifiedCu
         state: "", // Critical schema fix: ensure this is present
         country: "Philippines",
         postalCode: "",
-        addressType: "Commercial",
+        addressType: null,
         isDefaultBilling: true,
         isDefaultShipping: true,
         remarks: ""
@@ -129,10 +130,6 @@ export default function UnifiedCustomerForm({ initialData, catalogs }: UnifiedCu
     });
   };
 
-  const getAddressError = (index: number, fieldName: keyof z.infer<typeof addressFormSchema>) => {
-    return errors.addresses?.[index]?.[fieldName]?.message;
-  };
-
   return ( 
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-6 ">
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -144,90 +141,151 @@ export default function UnifiedCustomerForm({ initialData, catalogs }: UnifiedCu
             <h2 className="text-sm font-bold border-b pb-2 text-foreground flex items-center gap-1.5">
               <Building2 className="w-4 h-4 text-primary" /> Corporate Entity Information
             </h2>
-
-            <Controller 
-              control={control} 
-              name="name" 
+            <Controller
+              name="name"
+              control={control}
               render={({ field, fieldState }) => (
-                <Field className="space-y-1.5">
-                  <FieldLabel>Registered Business Legal Name <b className="text-red-500">*</b></FieldLabel>
-                  <FieldContent><Input {...field} className="h-9 text-xs" /></FieldContent>
-                  {fieldState.error && <FieldError>{fieldState.error.message}</FieldError>}
+                <Field data-invalid={fieldState.invalid}>
+                  <FieldLabel htmlFor="form-name">
+                    Registered Business Legal Name <b className="text-red-500">*</b>
+                  </FieldLabel>
+                  <Input
+                    {...field}
+                    id="form-name"
+                    aria-invalid={fieldState.invalid}
+                    placeholder=""
+                  />
+                  {fieldState.invalid && (
+                    <FieldError errors={[fieldState.error]} />
+                  )}
                 </Field>
               )}
             />
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <Controller 
-                control={control} 
-                name="contactName" 
+            <FieldGroup className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <Controller
+                name="contactName"
+                control={control}
                 render={({ field, fieldState }) => (
-                  <Field className="space-y-1.5">
-                    <FieldLabel>Primary Contact <b className="text-red-500">*</b></FieldLabel>
-                    <FieldContent>
-                      <div className="relative">
-                        <User className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground/60" />
-                        <Input {...field} className="pl-9 h-9 text-xs" />
-                      </div>
+                  <Field data-invalid={fieldState.invalid}>
+                    <FieldLabel htmlFor="form-contactName">
+                      Primary Contact <b className="text-red-500">*</b>
+                    </FieldLabel>
+                    <FieldContent className="relative">
+                      <User className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground/60" />
+                      <Input
+                        {...field}
+                        id="form-contactName"
+                        aria-invalid={fieldState.invalid}
+                        placeholder=""
+                        className="pl-9 h-9 text-xs" 
+                      />
                     </FieldContent>
-                    {fieldState.error && <FieldError>{fieldState.error.message}</FieldError>}
+                    {fieldState.invalid && (
+                      <FieldError errors={[fieldState.error]} />
+                    )}
                   </Field>
                 )}
               />
-              <Controller 
-                control={control} 
-                name="website" 
+              <Controller
+                name="website"
+                control={control}
                 render={({ field, fieldState }) => (
-                  <Field className="space-y-1.5">
-                    <FieldLabel>Corporate Website</FieldLabel>
-                    <FieldContent>
-                      <div className="relative">
-                        <Globe className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground/60" />
-                        <Input {...field} type="url" placeholder="https://" className="pl-9 h-9 text-xs" />
-                      </div>
+                  <Field data-invalid={fieldState.invalid}>
+                    <FieldLabel htmlFor="form-website">
+                      Corporate Website 
+                    </FieldLabel>
+                    <FieldContent className="relative">
+                      <Globe className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground/60" />
+                      <Input
+                        {...field}
+                        id="form-website"
+                        aria-invalid={fieldState.invalid}
+                        placeholder="https://"
+                        className="pl-9 h-9 text-xs" 
+                      />
                     </FieldContent>
-                    {fieldState.error && <FieldError>{fieldState.error.message}</FieldError>}
+                    {fieldState.invalid && (
+                      <FieldError errors={[fieldState.error]} />
+                    )}
                   </Field>
                 )}
               />
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
-              <Field className="space-y-1.5">
-                <FieldLabel>Billing Email</FieldLabel>
-                <FieldContent>
-                  <div className="relative">
-                    <Mail className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground/60" />
-                    <Input type="email" className="pl-9 h-9 text-xs lowercase" {...register("email")} />
-                  </div>
-                </FieldContent>
-                {errors.email && <FieldError>{errors.email.message}</FieldError>}
-              </Field>
-
-              <Field className="space-y-1.5">
-                <FieldLabel>Phone Number <b className="text-red-500">*</b></FieldLabel>
-                <FieldContent>
-                  <div className="relative">
-                    <Phone className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground/60" />
-                    <Input className="pl-9 h-9 text-xs" {...register("phone")} />
-                  </div>
-                </FieldContent>
-                {errors.phone && <FieldError>{errors.phone.message}</FieldError>}
-              </Field>
-
-              <Field className="space-y-1.5">
-                <FieldLabel>Fax Number</FieldLabel>
-                <FieldContent>
-                  <div className="relative">
-                    <Phone className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground/60" />
-                    <Input className="pl-9 h-9 text-xs" {...register("fax")} />
-                  </div>
-                </FieldContent>
-                {errors.fax && <FieldError>{errors.fax.message}</FieldError>}
-              </Field>
-            </div>
-
-            <Field className="lg:col-span-3 h-full">
+            </FieldGroup>
+            <FieldGroup className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <Controller
+                name="email"
+                control={control}
+                render={({ field, fieldState }) => (
+                  <Field data-invalid={fieldState.invalid}>
+                    <FieldLabel htmlFor="form-email">
+                      Billing Email 
+                    </FieldLabel>
+                    <FieldContent className="relative">
+                      <Mail className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground/60" />
+                      <Input
+                        {...field}
+                        id="form-email"
+                        aria-invalid={fieldState.invalid}
+                        placeholder=""
+                        className="pl-9 h-9 text-xs" 
+                      />
+                    </FieldContent>
+                    {fieldState.invalid && (
+                      <FieldError errors={[fieldState.error]} />
+                    )}
+                  </Field>
+                )}
+              />
+              <Controller
+                name="phone"
+                control={control}
+                render={({ field, fieldState }) => (
+                  <Field data-invalid={fieldState.invalid}>
+                    <FieldLabel htmlFor="form-phone">
+                      Phone Number <b className="text-red-500">*</b>
+                    </FieldLabel>
+                    <FieldContent className="relative">
+                      <Phone className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground/60" />
+                      <Input
+                        {...field}
+                        id="form-phone"
+                        aria-invalid={fieldState.invalid}
+                        placeholder=""
+                        className="pl-9 h-9 text-xs" 
+                      />
+                    </FieldContent>
+                    {fieldState.invalid && (
+                      <FieldError errors={[fieldState.error]} />
+                    )}
+                  </Field>
+                )}
+              />
+              <Controller
+                name="fax"
+                control={control}
+                render={({ field, fieldState }) => (
+                  <Field data-invalid={fieldState.invalid}>
+                    <FieldLabel htmlFor="form-fax">
+                      Fax Number 
+                    </FieldLabel>
+                      <FieldContent className="relative">
+                      <Hash className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground/60" />
+                      <Input
+                        {...field}
+                        id="form-fax"
+                        aria-invalid={fieldState.invalid}
+                        placeholder=""
+                        className="pl-9 h-9 text-xs" 
+                      />
+                    </FieldContent>
+                    {fieldState.invalid && (
+                      <FieldError errors={[fieldState.error]} />
+                    )}
+                  </Field>
+                )}
+              />
+            </FieldGroup>
+            <Field className="lg:col-span-3">
               <div className="border rounded-lg bg-muted/20 p-4 min-h-[74px] flex justify-between items-center gap-4">
                 <div className="space-y-0.5">
                   <p className="text-sm font-semibold text-foreground">Account Status</p>
@@ -348,111 +406,165 @@ export default function UnifiedCustomerForm({ initialData, catalogs }: UnifiedCu
             </h2>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <Field>
-                <FieldLabel>Pricing Matrix <b className="text-red-500">*</b></FieldLabel>
-                <Controller
-                  control={control}
-                  name="pricingSchemeId"
-                  render={({ field, fieldState }) => (
-                    <>
-                      <Select onValueChange={field.onChange} value={field.value}>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select Pricing Matrix" />
+              <Controller
+                name="pricingSchemeId"
+                control={control}
+                render={({ field, fieldState }) => (
+                  <Field data-invalid={fieldState.invalid}>
+                    <FieldLabel htmlFor="form-pricingScheme">
+                      Pricing Scheme <b className="text-red-500">*</b>
+                    </FieldLabel>
+                    <FieldContent className="relative">
+                      <Select
+                        name={field.name}
+                        value={field.value ?? ""}
+                        onValueChange={(val) => field.onChange(val === "null" ? "" : val)} 
+                      >
+                        <SelectTrigger
+                          id="form-pricingScheme"
+                          aria-invalid={fieldState.invalid}
+                          className="w-full"
+                        >
+                          <SelectValue placeholder="Select" />
                         </SelectTrigger>
-                        <SelectContent>
-                          {catalogs.pricing.length > 0 ? (
-                            catalogs.pricing.map((cat) => (
-                              <SelectItem key={cat.id} value={cat.id}>{cat.name}</SelectItem>
-                            ))
-                          ) : (
-                            <SelectItem value="0" disabled>No pricing matrices available</SelectItem>
+                        <SelectContent position="item-aligned">
+                          { catalogs.pricing.length > 0 ? (
+                            catalogs.pricing.map((val) => (
+                              <SelectItem key={val.id} value={val.id}>
+                                {val.name}
+                              </SelectItem>
+                            )))
+                          : (
+                            <SelectItem value="null">No pricing scheme available</SelectItem>
                           )}
                         </SelectContent>
                       </Select>
-                      {fieldState.error && <FieldError>{fieldState.error.message}</FieldError>}
-                    </>
-                  )}
-                />
-              </Field>
+                    </FieldContent>
+                    {fieldState.invalid && (
+                      <FieldError errors={[fieldState.error]} />
+                    )}
+                  </Field>
+                )}
+              />
 
-              <Field>
-                <FieldLabel>Taxing Policy <b className="text-red-500">*</b></FieldLabel>
-                <Controller
-                  control={control}
-                  name="taxingSchemeId"
-                  render={({ field, fieldState }) => (
-                    <>
-                      <Select onValueChange={field.onChange} value={field.value}>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select Taxing Policy" />
+              <Controller
+                name="taxingSchemeId"
+                control={control}
+                render={({ field, fieldState }) => (
+                  <Field data-invalid={fieldState.invalid}>
+                    <FieldLabel htmlFor="form-taxingScheme">
+                      Taxing Scheme <b className="text-red-500">*</b>
+                    </FieldLabel>
+                    <FieldContent className="relative">
+                      <Select
+                        name={field.name}
+                        value={field.value ?? ""}
+                        onValueChange={(val) => field.onChange(val === "null" ? "" : val)} 
+                      >
+                        <SelectTrigger
+                          id="form-taxingScheme"
+                          aria-invalid={fieldState.invalid}
+                          className="w-full"
+                        >
+                          <SelectValue placeholder="Select" />
                         </SelectTrigger>
-                        <SelectContent>
-                          {catalogs.taxing.length > 0 ? (
-                            catalogs.taxing.map((cat) => (
-                              <SelectItem key={cat.id} value={cat.id}>{cat.name}</SelectItem>
-                            ))
-                          ) : (
-                            <SelectItem value="0" disabled>No taxing policies available</SelectItem>
+                        <SelectContent position="item-aligned">
+                          { catalogs.taxing.length > 0 ? (
+                            catalogs.taxing.map((val) => (
+                              <SelectItem key={val.id} value={val.id}>
+                                {val.name}
+                              </SelectItem>
+                            )))
+                          : (
+                            <SelectItem value="null">No taxing scheme available</SelectItem>
                           )}
                         </SelectContent>
                       </Select>
-                      {fieldState.error && <FieldError>{fieldState.error.message}</FieldError>}
-                    </>
-                  )}
-                />
-              </Field>
+                    </FieldContent>
+                    {fieldState.invalid && (
+                      <FieldError errors={[fieldState.error]} />
+                    )}
+                  </Field>
+                )}
+              />
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <Field>
-                <FieldLabel>Payment Terms</FieldLabel>
-                <Controller
-                  control={control}
-                  name="defaultPaymentTermsId"
-                  render={({ field, fieldState }) => (
-                    <>
-                      <Select onValueChange={field.onChange} value={field.value}>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select Payment Terms" />
+              <Controller
+                name="defaultPaymentTermsId"
+                control={control}
+                render={({ field, fieldState }) => (
+                  <Field data-invalid={fieldState.invalid}>
+                    <FieldLabel htmlFor="form-defaultPaymentTerms">
+                      Payment Term 
+                    </FieldLabel>
+                    <FieldContent className="relative">
+                      <Select
+                        name={field.name}
+                        value={field.value ?? ""}
+                        onValueChange={(val) => field.onChange(val === "null" ? "" : val)} 
+                      >
+                        <SelectTrigger
+                          id="form-defaultPaymentTerms"
+                          aria-invalid={fieldState.invalid}
+                          className="w-full"
+                        >
+                          <SelectValue placeholder="Select" />
                         </SelectTrigger>
-                        <SelectContent>
-                          {catalogs.terms.length > 0 ? (
-                            catalogs.terms.map((cat) => (
-                              <SelectItem key={cat.id} value={cat.id}>{cat.name}</SelectItem>
-                            ))
-                          ) : (
-                            <SelectItem value="0" disabled>No payment terms available</SelectItem>
+                        <SelectContent position="item-aligned">
+                          { catalogs.terms.length > 0 ? (
+                            catalogs.terms.map((val) => (
+                              <SelectItem key={val.id} value={val.id}>
+                                {val.name}
+                              </SelectItem>
+                            )))
+                          : (
+                            <SelectItem value="null">No payment term available</SelectItem>
                           )}
                         </SelectContent>
                       </Select>
-                      {fieldState.error && <FieldError>{fieldState.error.message}</FieldError>}
-                    </>
-                  )}
-                />
-              </Field>
+                    </FieldContent>
+                    {fieldState.invalid && (
+                      <FieldError errors={[fieldState.error]} />
+                    )}
+                  </Field>
+                )}
+              />
 
-              <Field>
-                <FieldLabel>Payment Method</FieldLabel>
-                <Controller
-                  control={control}
-                  name="defaultPaymentMethod"
-                  render={({ field, fieldState }) => (
-                    <>
-                      <Select onValueChange={field.onChange} value={field.value}>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select Payment Method" />
+              <Controller
+                name="defaultPaymentMethod"
+                control={control}
+                render={({ field, fieldState }) => (
+                  <Field data-invalid={fieldState.invalid}>
+                    <FieldLabel htmlFor="form-defaultPaymentMethod">
+                      Payment Method <b className="text-red-500">*</b>
+                    </FieldLabel>
+                    <FieldContent className="relative">
+                      <Select
+                        name={field.name}
+                        value={field.value ?? ""}
+                        onValueChange={(val) => field.onChange(val === "null" ? "" : val)} 
+                      >
+                        <SelectTrigger
+                          id="form-defaultPaymentMethod"
+                          aria-invalid={fieldState.invalid}
+                          className="w-full"
+                        >
+                          <SelectValue placeholder="Select" />
                         </SelectTrigger>
-                        <SelectContent>
+                        <SelectContent position="item-aligned">
                           {["Cash", "Online Payment", "Cheque", "Master Card", "VISA"].map((method) => (
                             <SelectItem key={method} value={method} className="text-xs">{method}</SelectItem>
                           ))}
                         </SelectContent>
                       </Select>
-                      {fieldState.error && <FieldError>{fieldState.error.message}</FieldError>}
-                    </>
-                  )}
-                />
-              </Field>
+                    </FieldContent>
+                    {fieldState.invalid && (
+                      <FieldError errors={[fieldState.error]} />
+                    )}
+                  </Field>
+                )}
+              />
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -644,7 +756,7 @@ export default function UnifiedCustomerForm({ initialData, catalogs }: UnifiedCu
                     render={({ field, fieldState }) => (
                       <Field data-invalid={fieldState.invalid}>
                         <FieldLabel htmlFor="form-addressType">
-                          Address Type <b className="text-red-500">*</b>
+                          Address Type 
                         </FieldLabel>
                         <FieldContent className="relative">
                           <Select
@@ -737,7 +849,7 @@ export default function UnifiedCustomerForm({ initialData, catalogs }: UnifiedCu
                 className="w-full"
                 onClick={() => append({ 
                     name: "", address1: "", address2: "", city: "", state: "", 
-                    country: "Philippines", postalCode: "", addressType: "Commercial", 
+                    country: "Philippines", postalCode: "", addressType: null, 
                     isDefaultBilling: false, isDefaultShipping: false, remarks: ""
                   })}
                 disabled={fields.length >= 5}
@@ -776,7 +888,7 @@ export default function UnifiedCustomerForm({ initialData, catalogs }: UnifiedCu
       <div className="flex items-center justify-between border-t pt-5 mt-6">
         <Button asChild variant="outline" size="sm" className="gap-1 text-xs">
           <Link href="/dashboard/customers">
-            <ArrowLeft className="w-3.5 h-3.5" /> Return to Customer Index
+            <ArrowLeft className="w-3.5 h-3.5" /> Return to Customer Directory
           </Link>
         </Button>
 

@@ -10,6 +10,9 @@ import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { DeleteButton } from "@/components/shared/delete-button";
+import PageHeader from "@/components/layout/dashboard/PageHeader";
+import { DataTablePagination } from "@/components/shared/data-table-pagination";
+import useSWR from "swr";
 
 interface TaxCodeNode {
   inflowId: string;
@@ -35,54 +38,64 @@ interface SchemeRow {
   taxCodes: TaxCodeNode[];
 }
 
+const fetcher = (url: string) => fetch(url).then((res) => {
+  if (!res.ok) throw new Error("Failed to resolve fiscal system records maps.");
+  return res.json();
+});
+
 export default function TaxingSchemesListPage() {
-  const [schemes, setSchemes] = useState<SchemeRow[]>([]);
+  // 1. Double-state setup for instantaneous typing vs debounced network execution
   const [searchQuery, setSearchQuery] = useState("");
-  const [isLoading, setIsLoading] = useState(true);
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  
+  const [pageIndex, setPageIndex] = useState(0);
+  const PAGE_SIZE = 10;
 
-  const fetchSchemes = async () => {
-    try {
-      setIsLoading(true);
-      const res = await fetch("/api/admin/taxing-scheme/list");
-      if (res.ok) {
-        const payload = await res.json();
-        setSchemes(payload);
-      }
-    } catch (err) {
-      toast.error("Hydration Failure", { description: "Could not parse fiscal system records maps." });
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
+  // 2. Automatically sync typing input to debounced state with a 300ms window delay
   useEffect(() => {
-    fetchSchemes();
-  }, []);
+    const timer = setTimeout(() => {
+      setDebouncedSearch(searchQuery);
+      setPageIndex(0); // Safely reset page baseline whenever search boundaries finish mutating
+    }, 300);
 
-  const filteredSchemes = schemes.filter((s) => {
-    const term = searchQuery.toLowerCase().trim();
-    return s.name.toLowerCase().includes(term) || s.inflowId.toLowerCase().includes(term);
-  });
+    return () => clearTimeout(timer); // Clean up timeout frame if the user types again before 300ms
+  }, [searchQuery]);
+
+  // 3. SWR list key hook binds directly onto debounced search value variable
+  // Adjusted endpoint pattern to support API-driven filtering and pagination
+  const { data: payload, error, isLoading, mutate } = useSWR(
+    `/api/admin/taxing-scheme/filtered?search=${debouncedSearch}&page=${pageIndex}&limit=${PAGE_SIZE}`,
+    fetcher,
+    { keepPreviousData: true }
+  );
+
+  const schemes: SchemeRow[] = payload?.data || [];
+  const totalRecords = payload?.totalRecords || 0;
+  const pageCount = payload?.pageCount || 0;
+
+  if (error) {
+    return (
+      <div className="p-6 text-center text-xs text-red-500 bg-destructive/10 border border-destructive/20 rounded-xl font-medium">
+        Hydration Failure: Failed resolving fiscal system structural records maps.
+      </div>
+    );
+  }
 
   return (
     <div className="w-full max-w-7xl mx-auto p-6 space-y-6 text-xs">
-      
-      {/* Header Controls Block */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b pb-5">
-        <div>
-          <h1 className="text-xl font-bold tracking-tight text-foreground flex items-center gap-2">
-            <Receipt className="w-5 h-5 text-primary" /> Taxing Schemes Matrix
-          </h1>
-          <p className="text-xs text-muted-foreground mt-0.5">
-            Configure multi-tier regional tax calculation rules, handle cascading or compounding rates ($Tax2 \times [Subtotal + Tax1]$), and structure delivery freight tax criteria.
-          </p>
-        </div>
+
+      {/* Upper Heading Action Block */}
+      <PageHeader 
+        className=" border-b pb-5" 
+        title="Taxing Schemes Matrix" 
+        description="Configure multi-tier regional tax calculation rules, handle cascading or compounding rates ($Tax2 \times [Subtotal + Tax1]$), and structure delivery freight tax criteria." 
+        >
         <Button asChild size="sm" className="gap-1.5 shrink-0 text-xs">
           <Link href="/dashboard/taxing-scheme/create">
             <Plus className="w-4 h-4" /> Register Tax Scheme
           </Link>
         </Button>
-      </div>
+      </PageHeader>
 
       {/* Utilities bar */}
       <div className="w-full sm:max-w-xs relative">
@@ -100,7 +113,7 @@ export default function TaxingSchemesListPage() {
         <div className="p-20 text-center text-xs text-muted-foreground bg-card border rounded-xl italic animate-pulse">
           Parsing systemic fiscal matrices structures and taxation calculation parameters...
         </div>
-      ) : filteredSchemes.length === 0 ? (
+      ) : schemes.length === 0 ? (
         <div className="p-20 text-center text-xs text-muted-foreground border-dashed border-2 rounded-xl bg-card">
           No taxing schemes tracked matching specified criteria parameters.
         </div>
@@ -119,7 +132,7 @@ export default function TaxingSchemesListPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-border/60 text-xs">
-                {filteredSchemes.map((scheme) => (
+                {schemes.map((scheme) => (
                   <tr key={scheme.id} className="hover:bg-muted/5 transition-colors items-start">
                     
                     {/* Identity Profile Name */}
@@ -226,9 +239,7 @@ export default function TaxingSchemesListPage() {
                           itemId={scheme.id} 
                           itemName={scheme.name} 
                           endpointUrl={`/api/admin/taxing-scheme/${scheme.id}/`}
-                          onSuccess={(id) => {
-                            setSchemes((prev) => prev.filter((s) => s.id !== id));
-                          }} 
+                          onSuccess={() => mutate()} 
                           variant="icon"
                         />
                       </div>
@@ -239,6 +250,15 @@ export default function TaxingSchemesListPage() {
               </tbody>
             </table>
           </div>
+
+          <DataTablePagination
+            pageIndex={pageIndex}
+            pageSize={PAGE_SIZE}
+            pageCount={pageCount}
+            totalRecords={totalRecords}
+            loading={isLoading}
+            onPageChange={(nextIndex: number) => setPageIndex(nextIndex)}
+          />
         </div>
       )}
 

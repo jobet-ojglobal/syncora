@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { SoftDeleteRepository } from "@/lib/softDeleteRepository";
 import { BrandService } from "@/services/brand.service";
 import { NextRequest, NextResponse } from "next/server";
 
@@ -64,7 +65,7 @@ export async function DELETE(
   try {
     const { id } = await params;
 
-    await BrandService.deleteBrand(id);
+    await SoftDeleteRepository.softDelete('brand', id);
 
     return NextResponse.json({
       success: true

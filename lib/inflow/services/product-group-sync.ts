@@ -2,10 +2,13 @@
 import { InflowProduct, InflowProductGroup } from "../types";
 import { syncBrand, syncGroupFeatures, syncGroupImages, syncGroupTags } from "./helpers";
 import { genInflowUniqueSlug } from "@/helpers/genUniqueSlug";
-import type { ExtendedPrismaTransaction, prisma } from "@/lib/prisma";
+import { Prisma } from "@/generated/prisma/client";
+import { prisma } from "@/lib/prisma";
+
+type Tx = Prisma.TransactionClient;
 
 export async function syncProductGroup(
-  tx: typeof prisma | ExtendedPrismaTransaction,
+  tx: typeof prisma | Tx,
   group: InflowProductGroup,
   firstProductInGroup?: InflowProduct 
 ) {

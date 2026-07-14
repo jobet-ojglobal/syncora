@@ -1,5 +1,5 @@
 // services/customer.metadata.ts
-import { prisma } from "@/lib/prisma";
+import { SoftDeleteRepository } from "@/lib/softDeleteRepository";
 
 export async function getCustomerMetadata() {
   try {
@@ -11,11 +11,11 @@ export async function getCustomerMetadata() {
       locationsRaw,
       repsRaw
     ] = await Promise.all([
-      prisma.pricingScheme.findMany({ select: { inflowId: true, name: true }, orderBy: { name: "asc" } }),
-      prisma.taxingScheme.findMany({ select: { inflowId: true, name: true }, orderBy: { name: "asc" } }),
-      prisma.paymentTerm.findMany({ select: { inflowId: true, name: true }, orderBy: { name: "asc" } }),
-      prisma.location.findMany({ select: { inflowId: true, name: true }, orderBy: { name: "asc" } }),
-      prisma.teamMember.findMany({
+      SoftDeleteRepository.findMany("pricingScheme", { select: { inflowId: true, name: true }, orderBy: { name: "asc" } }),
+      SoftDeleteRepository.findMany("taxingScheme",{ select: { inflowId: true, name: true }, orderBy: { name: "asc" } }),
+      SoftDeleteRepository.findMany("paymentTerm",{ select: { inflowId: true, name: true }, orderBy: { name: "asc" } }),
+      SoftDeleteRepository.findMany("location",{ select: { inflowId: true, name: true }, orderBy: { name: "asc" } }),
+      SoftDeleteRepository.findMany("teamMember", {
         where: { canBeSalesRep: true },
         select: { inflowId: true, name: true },
         orderBy: { name: "asc" },

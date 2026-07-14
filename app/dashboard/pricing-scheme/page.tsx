@@ -10,6 +10,7 @@ import { TooltipTrigger, Tooltip, TooltipContent } from "@/components/ui/tooltip
 import { DeleteButton } from "@/components/shared/delete-button";
 import { DataTablePagination } from "@/components/shared/data-table-pagination";
 import useSWR from "swr";
+import PageHeader from "@/components/layout/dashboard/PageHeader";
 
 interface PricingSchemeRow {
   id: string;
@@ -68,24 +69,20 @@ export default function PricingSchemesListPage() {
 
   return (
     <div className="w-full max-w-7xl mx-auto p-6 space-y-6 text-xs">
-      
-      {/* Structural view title strip banner component */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b pb-5">
-        <div>
-          <h1 className="text-xl font-bold tracking-tight text-foreground flex items-center gap-2">
-            <Tags className="w-5 h-5 text-primary" /> Pricing Strategies Directory
-          </h1>
-          <p className="text-xs text-muted-foreground mt-0.5">
-            Structure unique customer catalogs matrices tier channels, regulate tax pricing calculations thresholds rules variables, and map international trade settlement indices currencies fields.
-          </p>
-        </div>
+
+      {/* Upper Heading Action Block */}
+      <PageHeader 
+        className=" border-b pb-5" 
+        title="Pricing Strategies Directory" 
+        description="Structure unique customer catalogs matrices tier channels, regulate tax pricing calculations thresholds rules variables, and map international trade settlement indices currencies fields." 
+        >
         <Button asChild size="sm" className="gap-1.5 shrink-0 text-xs">
           <Link href="/dashboard/pricing-scheme/create">
             <Plus className="w-4 h-4" /> Provision Strategy Tier
           </Link>
         </Button>
-      </div>
-
+      </PageHeader>
+     
       {/* Lookup search component utility filter toolbar segment */}
       <div className="w-full sm:max-w-xs relative">
         <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground/70" />

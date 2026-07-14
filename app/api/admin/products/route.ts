@@ -238,6 +238,13 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Missing required core SKU identity attributes entries." }, { status: 400 });
     }
 
+    const uniqueSchemeTypePairs = new Set(prices.map((p: any) => `${p.pricingSchemeId}-${p.priceType}`));
+    if (uniqueSchemeTypePairs.size !== prices.length) {
+      return NextResponse.json({ 
+        error: "Each matrix row must have a unique Pricing Scheme and Price Type combination." 
+      }, { status: 400 });
+    }
+
     // 2. Pre-fetch target UOM IDs using the incoming Frontend Code Tokens
     const codeLookups = Array.from(new Set([
       purchasingUom?.name,

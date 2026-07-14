@@ -135,25 +135,25 @@ const worker = new Worker<SyncWebhookJobData>(
           if (!locationUrl) {
             throw new Error(`Cannot sync category: No location URL found for location ${location?.name}`);
           }
-          result = await categoryServiceLocal.sync(location, syncOptions);
+          result = await categoryServiceLocal.sync(location, syncOptions, selectedRecords);
           break;
         case "currencies_local":
           if (!locationUrl) {
             throw new Error(`Cannot sync currency: No location URL found for location ${location?.name}`);
           }
-          result = await currencyServiceLocal.sync(location, syncOptions);
+          result = await currencyServiceLocal.sync(location, syncOptions, selectedRecords);
           break;
         case "payment_terms_local":
           if (!locationUrl) {
             throw new Error(`Cannot sync payment term: No location URL found for location ${location?.name}`);
           }
-          result = await paymentServiceLocal.sync(location, syncOptions);
+          result = await paymentServiceLocal.sync(location, syncOptions, selectedRecords);
           break;
         case "pricing_schemes_local":
           if (!locationUrl) {
             throw new Error(`Cannot sync pricing scheme: No location URL found for location ${location?.name}`);
           }
-          result = await pricingServiceLocal.sync(location, syncOptions);
+          result = await pricingServiceLocal.sync(location, syncOptions, selectedRecords);
           break;
         case "taxing_schemes_local":
           if (!locationUrl) {
@@ -165,7 +165,7 @@ const worker = new Worker<SyncWebhookJobData>(
           if (!locationUrl) {
             throw new Error(`Cannot sync customer: No location URL found for location ${location?.name}`);
           }
-          result = await customerServiceLocal.sync(location, syncOptions);
+          result = await customerServiceLocal.sync(location, syncOptions, selectedRecords);
           break;
 
         // Cloud Sync

@@ -393,7 +393,7 @@ model ProductLocationMap {
 }
 
 enum ProductPriceType {
-  fixedPrice
+  FixedPrice
   markup
   margin
 }

@@ -95,7 +95,7 @@ export function DeleteButton({
       </AlertDialogTrigger>
 
       <AlertDialogContent className="max-w-md rounded-xl">
-        <AlertDialogHeader>
+        <AlertDialogHeader >
           <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-full bg-destructive/10 text-destructive sm:mx-0 mb-2">
             <AlertTriangle className="h-5 w-5" />
           </div>

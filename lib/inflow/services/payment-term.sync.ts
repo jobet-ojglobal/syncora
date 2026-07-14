@@ -1,5 +1,7 @@
+import { Prisma } from "@/generated/prisma/client";
 import { prisma } from "@/lib/prisma";
-import type { ExtendedPrismaTransaction } from "@/lib/prisma";
+
+type Tx = Prisma.TransactionClient;
 
 export type InflowPaymentTermInput = {
   paymentTermsId: string;
@@ -13,7 +15,7 @@ export type InflowPaymentTermInput = {
  * Accepts an optional transaction client context to stay within existing sync blocks.
  */
 export async function upsertPaymentTerm(
-  txOrPrisma: typeof prisma | ExtendedPrismaTransaction,
+  txOrPrisma: typeof prisma | Tx,
   term: InflowPaymentTermInput
 ) {
   // Use 'any' type conversion conditionally if the underlying runtime throws an internal matching issue,
