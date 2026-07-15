@@ -39,7 +39,7 @@ export async function getProductGroupMetadata() {
 
 export async function getProductMetadata() {
   try {
-    const [uoms, brands, groupsRaw] = await Promise.all([
+    const [uoms, brands, groupsRaw, pricingSchemes] = await Promise.all([
       prisma.unitOfMeasure.findMany({ where: { isActive: true }, select: { id: true, code: true, name: true, category: true, }, orderBy: { code: "asc" } }),
       prisma.brand.findMany({ select: { id: true, name: true }, orderBy: { name: "asc" } }),
       prisma.productGroup.findMany({
@@ -145,10 +145,10 @@ export async function getProductMetadata() {
       })),
     }));
 
-    return { uoms, brands, groups };
+    return { uoms, brands, groups, pricingSchemes };
   } catch (error) {
     // If the database is missing during a Docker build step, fail gracefully
     console.warn("⚠️ Database unavailable during generation sequence. Falling back to empty arrays.");
-    return { uoms: [], brands: [], groups: [] };
+    return { uoms: [], brands: [], groups: [], pricingSchemes: [] };
   }
 }

@@ -8,6 +8,7 @@ import { upsertCustomer as upsertLocalCustomer } from "../locations/data/custome
 import { upsertCategory as upsertLocalCategory } from "../locations/data/category";
 import { upsertTaxingScheme as upsertLocalTaxingScheme } from "../locations/data/taxing-scheme";
 import { upsertPricingScheme as upsertLocalPricingScheme } from "../locations/data/pricing-scheme";
+import { upsertPricingScheme as upsertLocalPricingScheme } from "../locations/data/produc";
 
 interface MidWebhookJobData {
   source: string;
@@ -58,6 +59,12 @@ const midWorker = new Worker<MidWebhookJobData>(
         case "CATEGORY_UPSERT_LOCAL": 
           if (!locationUrl) {
             throw new Error(`Cannot sync category: No location URL found for location ${location?.name}`);
+          }
+          result = await upsertLocalCategory(payload, locationUrl);
+          break;
+         case "PRODUCT_UPSERT_LOCAL": 
+          if (!locationUrl) {
+            throw new Error(`Cannot sync product: No location URL found for location ${location?.name}`);
           }
           result = await upsertLocalCategory(payload, locationUrl);
           break;

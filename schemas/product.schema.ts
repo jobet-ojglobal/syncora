@@ -8,7 +8,7 @@ export const productSchema = z.object({
   sku: z.string().min(1, "SKU reference identifier is required").max(100),
   name: z.string().min(1, "Product name is required").max(255),
   description: z.string().nullable().optional(),
-  itemType: z.string(),
+  itemType: z.string().nullable().optional(),
   brandId: z.string().nullable().optional().or(z.literal("")),
   categoryId: z.string().nullable().optional().or(z.literal("")),
   
@@ -36,7 +36,7 @@ export const productSchema = z.object({
   originCountry: z.string().nullable().optional(),
   hsTariffNumber: z.string().nullable().optional(),
   remarks: z.string().nullable().optional(),
-  standardUomName: z.string(),
+  standardUomName: z.string().nullable().optional(),
 
   // 💰 Financial Costing & Pricing Elements
   initialCost: z.number().min(0, "Cost basis cannot be negative"),
@@ -44,25 +44,50 @@ export const productSchema = z.object({
     z.object({
       inflowId: z.string().optional(),
       pricingSchemeId: z.string().min(1, "Target execution pricing scheme is required"),
-      priceType: z.enum(["Normal", "Promo", "Wholesale"]),
-      unitPrice: z.number().min(0, "Base unit retail price cannot be negative"),
-      fixedMarkup: z.number().min(0).optional(),
+      priceType: z.enum(["FixedPrice", "FixedMarkup", "Dynamic", "Tiered"]),
+      unitPrice: z.number("Unit price is required").min(0, "Base unit retail price cannot be negative"),
+      fixedMarkup: z.number("fixed markup is required").min(0).optional(),
     })
-  ).min(1, "At least one default pricing matrix line is required"),
+  ).min(1, "At least one default pricing matrix line is required")
+  .superRefine((val, ctx) => {
+    const seen = new Set<string>();
+
+    val.forEach((item, index) => {
+      if (!item.pricingSchemeId) return;
+
+      // Option A: Strict DB Match (Recommended)
+      // Ensures a pricing scheme is only configured ONCE per product.
+      const key = item.pricingSchemeId;
+
+      // Option B: Unique Scheme + Type Pairs
+      // Uncomment this line if your DB supports multiple price types per scheme:
+      // const key = `${item.pricingSchemeId}-${item.priceType}`;
+
+      if (seen.has(key)) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "This pricing scheme is already assigned to this product.",
+          path: [index, "pricingSchemeId"], // Targets the specific dropdown index in your FieldArray
+        });
+      } else {
+        seen.add(key);
+      }
+    });
+  }),
 
   // 📥 1:1 Purchasing UOM Object Relation
   purchasingUom: z.object({
     name: z.string().min(1, "Purchasing unit name is required (e.g. Box, Case)"),
     standardQuantity: z.number().min(0.0001, "Must be greater than 0"),
     uomQuantity: z.number().min(0.0001, "Must be greater than 0"),
-  }),
+  }).nullable().optional(),
 
   // 📤 1:1 Sales UOM Object Relation
   salesUom: z.object({
     name: z.string().min(1, "Sales unit name is required (e.g. Pack, Each)"),
     standardQuantity: z.number().min(0.0001, "Must be greater than 0"),
     uomQuantity: z.number().min(0.0001, "Must be greater than 0"),
-  }),
+  }).nullable().optional(),
 
   // 🏷️ 1:Many Nested Barcodes Array Matrix
   barcodes: z.array(
@@ -76,9 +101,14 @@ export const productSchema = z.object({
   images: z.array(
     z.object({
       id: z.string().optional(),
-      originalUrl: z.string().url("Must be valid asset media CDN source URL"),
+      originalUrl: z.string().min(1, "Original image link is required").url("Must be valid asset media CDN source URL"),
+      largeUrl: z.union([z.literal(""), z.string().url("Must be valid asset media CDN source URL")]).nullable().optional(),
+      mediumUncroppedUrl: z.union([z.literal(""), z.string().url("Must be valid asset media CDN source URL")]).nullable().optional(),
+      mediumUrl: z.union([z.literal(""), z.string().url("Must be valid asset media CDN source URL")]).nullable().optional(),
+      smallUrl: z.union([z.literal(""), z.string().url("Must be valid asset media CDN source URL")]).nullable().optional(),
+      thumbUrl: z.union([z.literal(""), z.string().url("Must be valid asset media CDN source URL")]).nullable().optional(),
     })
-  ),
+  ).min(1, "At least one product image is required"),
 });
 
 export type ProductInput = z.infer<typeof productSchema>;

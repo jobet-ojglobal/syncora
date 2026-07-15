@@ -1,10 +1,9 @@
-// app/api/products/[inflowId]/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 
 interface Props {
   params: Promise<{
-    id: string;
+    id: string; // Matches dynamic route folder name [id]
   }>;
 }
 
@@ -13,8 +12,7 @@ export async function GET(
   { params }: Props
 ) {
   try {
-    const { id } =
-      await params;
+    const { id } = await params;
 
     if (!id) {
       return NextResponse.json(
@@ -23,7 +21,7 @@ export async function GET(
       );
     }
 
-    // Query product data with all related tables needed for the editing form schema
+    // Query product data using its unique global id
     const productProfile = await prisma.product.findFirst({
       where: { 
         id,
@@ -53,6 +51,19 @@ export async function GET(
           },
           orderBy: { lineNum: "asc" }
         },
+        prices: {
+          select: {
+            inflowId: true,
+            priceLevelId: true, // Matches relational schemas used in the bulk matrix writes
+            price: true         // Matches Decimal/Float naming context
+          }
+        },
+        cost: {
+          select: {
+            inflowId: true,
+            cost: true          // Matches standard ProductCost schema field
+          },
+        },
         images: {
           select: {
             id: true,
@@ -79,6 +90,12 @@ export async function GET(
       width: productProfile.width ? Number(productProfile.width) : null,
       height: productProfile.height ? Number(productProfile.height) : null,
       length: productProfile.length ? Number(productProfile.length) : null,
+      initialCost: productProfile.cost?.cost ? Number(productProfile.cost.cost) : null,
+      prices: productProfile.prices.map((p) => ({
+        inflowId: p.inflowId,
+        priceLevelId: p.priceLevelId,
+        price: Number(p.price) || 0.00
+      })),
       purchasingUom: productProfile.purchasingUom ? {
         name: productProfile.purchasingUom.uom?.code || productProfile.purchasingUom.uom?.name || "",
         standardQuantity: Number(productProfile.purchasingUom.standardQuantity),

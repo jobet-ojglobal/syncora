@@ -298,7 +298,7 @@ model ProductVariantLocationMap {
 model Product {
   id                      String   @id @default(cuid())
   inflowId                String   @unique
-  sku                     String?
+  sku                     String
   name                    String
   slug                    String   @unique 
   description             String?
@@ -393,9 +393,8 @@ model ProductLocationMap {
 }
 
 enum ProductPriceType {
-  FixedPrice
-  markup
-  margin
+  FixedPrice  
+  FixedMarkup  
 }
 
 model ProductPrice {
@@ -410,13 +409,14 @@ model ProductPrice {
   pricingScheme     PricingScheme @relation(fields: [pricingSchemeId], references: [inflowId], onDelete: Cascade)
   product           Product @relation(fields: [productId],references: [inflowId], onDelete: Cascade)
 
+  priceTiers        ProductPriceTier[]
   localMappings     ProductPriceLocationMap[]
 
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
   deletedAt         DateTime?
 
-  @@unique([pricingSchemeId, productId])
+  @@unique([pricingSchemeId, productId, priceType])
 
   @@index([pricingSchemeId])
   @@index([productId])
@@ -436,6 +436,18 @@ model ProductPriceLocationMap {
   @@unique([productPriceId, locationId])
   @@index([locationId, localId])
   @@map("product_price_location_map")
+}
+
+model ProductPriceTier {
+  id             String       @id @default(cuid())
+  productPriceId String
+  minQuantity    Decimal      @db.Decimal(18,4) // e.g., 10.0000 units
+  unitPrice      Decimal      @db.Decimal(18,5)
+  
+  productPrice   ProductPrice @relation(fields: [productPriceId], references: [id], onDelete: Cascade)
+
+  @@index([productPriceId])
+  @@map("product_price_tier")
 }
 
 model ProductCostAdjustment {
@@ -652,7 +664,7 @@ model ProductCost {
 
   product       Product  @relation(fields: [productId], references: [inflowId], onDelete: Cascade)
 
-  locapMappings     ProductCostLocationMap[]
+  localMappings     ProductCostLocationMap[]
 
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
@@ -1136,6 +1148,7 @@ model Location {
   localVendorCreditMappings  VendorCreditLocationMap[]
   localSalesOrderMappings    SalesOrderLocationMap[]
   localPurchaseOrderMappings PurchaseOrderLocationMap[]
+  sublocationLocalMappings SublocationLocationMap[]
   
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
@@ -1171,6 +1184,7 @@ model Sublocation {
   targetTransferLines TransferOrderLine[] @relation("TransferTargetSublocation")
   
   adjustmentLines     InventoryAdjustmentLine[]
+  localMappings            SublocationLocationMap[]
 
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
@@ -1181,38 +1195,21 @@ model Sublocation {
   @@map("sublocation")
 }
 
+model SublocationLocationMap {
+  id            String      @id @default(cuid())
+  sublocationId String      // References Mid-Server Sublocation.id (or inflowId/name depending on keys)
+  locationId    String      // References parent Mid-Server Location.inflowId
+  localId       Int         // The flat locationId (Int) on the Local Server database
 
-// model LocationServer {
-//   id         String   @id @default(cuid())
-//   name       String   // e.g., "Warehouse A Server", "Manila Hub Server"
-//   ipAddress  String?  // Connection metadata for your sync engine
-//   locationId String   @unique // The one-to-one link: One Server per Main Location
-  
-//   location   Location @relation(fields: [locationId], references: [inflowId], onDelete: Cascade)
-//   mappings   LocalSublocationMap[]
+  // Relations
+  location      Location    @relation(fields: [locationId], references: [inflowId], onDelete: Cascade)
+  sublocation   Sublocation @relation(fields: [sublocationId], references: [id], onDelete: Cascade)
 
-//   createdAt  DateTime @default(now())
-//   updatedAt  DateTime @updatedAt
-
-//   @@map("location_server")
-// }
-
-// model LocalSublocationMap {
-//   id               String   @id @default(cuid())
-//   serverId         String   // References LocationServer
-//   localId          Int      // The flat ID assigned by that local database (e.g. 1, 2)
-//   sublocationId    String   // References your actual Sublocation table CUID
-
-//   server           LocationServer @relation(fields: [serverId], references: [id], onDelete: Cascade)
-//   sublocation      Sublocation    @relation(fields: [sublocationId], references: [id], onDelete: Cascade)
-
-//   // A local database ID on a specific server can only map to exactly one of your sublocations
-//   @@unique([serverId, localId])
-//   // Prevent mapping the same application sublocation twice on the same local server
-//   @@unique([serverId, sublocationId])
-  
-//   @@map("local_sublocation_map")
-// }
+  // Enforce that a mid-server sublocation maps to exactly one local flat location ID
+  @@unique([sublocationId, locationId])
+  @@index([locationId, localId])
+  @@map("sublocation_location_map")
+}
 
 model Inventory {
   id             String @id @default(cuid())
@@ -1250,9 +1247,9 @@ model InventoryBin {
   sublocationId  String
   quantity       Decimal @db.Decimal(18,4)
 
-  inventory           Inventory @relation(fields: [inventoryId],references: [id], onDelete: Cascade)
-  product             Product @relation(fields: [productId],references: [inflowId], onDelete: Cascade)
-  sublocation         Sublocation @relation(fields: [sublocationId],references: [id], onDelete: Cascade)
+  inventory           Inventory @relation(fields: [inventoryId], references: [id], onDelete: Cascade)
+  product             Product @relation(fields: [productId], references: [inflowId], onDelete: Cascade)
+  sublocation         Sublocation @relation(fields: [sublocationId], references: [id], onDelete: Cascade)
 
   createdAt           DateTime @default(now())
   updatedAt           DateTime @updatedAt

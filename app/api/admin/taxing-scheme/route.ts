@@ -136,10 +136,19 @@ export async function POST(request: NextRequest) {
     // ==========================================
     const validWebhooks = await WebhookService.getLocationWebhookURLs("taxingSchemeLocal");
 
+    const existingDefaultTaxCodeMaps = await prisma.taxCodeLocationMap.findMany({
+        where: { taxCodeId: cleanInflowPayload.defaultTaxCodeId || undefined },
+        select: { taxCodeId: true, locationId: true, localId: true }
+      });
+
     if (validWebhooks.length > 0) {
       const jobsToQueue = validWebhooks
       .filter(webhook => webhook.location.url && webhook.location.url.trim() !== "")
-      .map((webhook) => ({
+      .map((webhook) => {
+
+        const matchDefaultTaxCode = existingDefaultTaxCodeMaps.find(m => m.locationId === webhook.locationId);
+        
+        return {
         name: "taxing_scheme_localsync_job",
         data: {
           source: "TAXING_SCHEME_UPSERT_LOCAL",
@@ -147,6 +156,7 @@ export async function POST(request: NextRequest) {
           payload: {
               ...cleanInflowPayload,
               taxingSchemeId: cloudId,
+              defaultTaxCodeId: matchDefaultTaxCode?.localId || null,
               localId: null,
               
               // 💡 MAP CHILD TAX CODES
@@ -170,7 +180,7 @@ export async function POST(request: NextRequest) {
           backoff: { type: "exponential", delay: 2000 },
           removeOnComplete: true
         }
-      }));
+      }});
 
       await getMidSyncQueue().addBulk(jobsToQueue);
       console.log(`[Queue] Successfully broadcasted sync jobs to ${jobsToQueue.length} locations.`);
@@ -344,11 +354,17 @@ export async function PATCH(request: NextRequest) {
         select: { taxCodeId: true, locationId: true, localId: true }
       });
 
+      const existingDefaultTaxCodeMaps = await prisma.taxCodeLocationMap.findMany({
+        where: { taxCodeId: cleanInflowPayload.defaultTaxCodeId || undefined },
+        select: { taxCodeId: true, locationId: true, localId: true }
+      });
+
       const jobsToQueue = validWebhooks
         .filter(webhook => webhook.location.url && webhook.location.url.trim() !== "")
         .map((webhook) => {
           
         const match = existingMappings.find(m => m.locationId === webhook.locationId);
+        const matchDefaultTaxCode = existingDefaultTaxCodeMaps.find(m => m.locationId === webhook.locationId);
 
         return {
           name: "taxing_scheme_localsync_job",
@@ -357,6 +373,7 @@ export async function PATCH(request: NextRequest) {
             model: "TaxingScheme",
             payload: {
               ...cleanInflowPayload,
+              defaultTaxCodeId: matchDefaultTaxCode?.localId || null,
               taxingSchemeId: cloudId,
               localId: match ? match.localId : null,
               

@@ -19,15 +19,23 @@ import {
   Link2, 
   Settings, 
   Hourglass, 
-  DollarSign
+  DollarSign,
+  LinkIcon,
+  ChevronUp,
+  ChevronDown,
+  XIcon
 } from "lucide-react";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
-import { Field, FieldGroup, FieldLabel, FieldLegend, FieldSet } from "@/components/ui/field";
+import { Field, FieldContent, FieldError, FieldGroup, FieldLabel, FieldLegend, FieldSet } from "@/components/ui/field";
 import { generateSku2Variant2 } from "@/helpers/genSKU";
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { BrandSelect } from "../shared/brand-select";
 import { CategorySelect } from "../shared/category-select";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../ui/select";
+import { cn } from "@/lib/utils";
+import Image from "next/image";
+import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from "../ui/input-group";
 
 interface BrandLookupOption {
   id: string;
@@ -96,6 +104,7 @@ export interface ProductGroupLookupDetail {
   brandId: string | null;
   categoryId: string | null;
   brand?: BrandLookupOption | null;
+
   category?: {
     inflowId: string;
     name: string;
@@ -106,28 +115,33 @@ export interface ProductGroupLookupDetail {
 
 interface ProductFormProps {
   brands: BrandLookupOption[];
-  uoms: UomLookupReference[]; // 🟢 Added global metrics dependency array
+  uoms: UomLookupReference[]; 
   groups: ProductGroupLookupDetail[];
   pricingSchemes: {
     inflowId: string;
     name: string;
   }[];
-  initialData?: any | null;
+  initialData?: ProductInput | null;
 }
 
 export function ProductForm({  brands, uoms, groups: productGroups, pricingSchemes = [], initialData }: ProductFormProps) {
   const router = useRouter();
   const isEditMode = !!initialData;
+  // Place inside your component:
+  const [expandedIndex, setExpandedIndex] = useState<number | null>(null);
+
+  const toggleExpand = (idx: number) => {
+    setExpandedIndex(expandedIndex === idx ? null : idx);
+  };
 
   // 1. Pre-calculate all pricing schemes mapped over initial values
   const initialPrices = useMemo(() => {
     // If we have existing data rows, group them by scheme to preserve them
     if (initialData?.prices && initialData.prices.length > 0) {
       return initialData.prices.map((p: any) => ({
-        id: p.id,
         inflowId: p.inflowId,
         pricingSchemeId: p.pricingSchemeId,
-        priceType: p.priceType || "Normal",
+        priceType: p.priceType || "FixedPrice",
         unitPrice: p.unitPrice ? Number(p.unitPrice) : 0,
         fixedMarkup: p.fixedMarkup ? Number(p.fixedMarkup) : 0,
       }));
@@ -138,14 +152,14 @@ export function ProductForm({  brands, uoms, groups: productGroups, pricingSchem
     if (pricingSchemes && pricingSchemes.length > 0) {
       return pricingSchemes.map((scheme) => ({
         pricingSchemeId: scheme.inflowId,
-        priceType: "Normal",
+        priceType: "FixedPrice" as "FixedPrice" | "FixedMarkup" | "Dynamic" | "Tiered",
         unitPrice: 0,
         fixedMarkup: 0,
       }));
     }
 
     // Bare minimum fallback array structure
-    return [{ pricingSchemeId: "", priceType: "Normal", unitPrice: 0, fixedMarkup: 0 }];
+    return [{ pricingSchemeId: "", priceType: "FixedPrice" as "FixedPrice" | "FixedMarkup" | "Dynamic" | "Tiered", unitPrice: 0, fixedMarkup: 0 }];
   }, [initialData, pricingSchemes]);
 
   const form = useForm<ProductInput>({
@@ -176,7 +190,7 @@ export function ProductForm({  brands, uoms, groups: productGroups, pricingSchem
       length: initialData?.length ? Number(initialData.length) : 0,
 
       // Seed extended valuation allocations
-      initialCost: initialData?.cost?.cost ? Number(initialData.cost.cost) : 0,
+      initialCost: initialData?.initialCost ? Number(initialData.initialCost) : 0,
       // 2. Pass our clean computed matrix here 🌟
       prices: initialPrices,
 
@@ -195,7 +209,14 @@ export function ProductForm({  brands, uoms, groups: productGroups, pricingSchem
         uomQuantity: initialData?.salesUom?.uomQuantity ? Number(initialData.salesUom.uomQuantity) : 1,
       },
       barcodes: initialData?.barcodes?.map((b: any) => ({ id: b.id, barcode: b.barcode })) || [],
-      images: initialData?.images?.map((img: any) => ({ id: img.id, originalUrl: img.originalUrl })) || [],
+      images: initialData?.images?.map((img: any) => ({ 
+        id: img.id, 
+        originalUrl: img.originalUrl || "",
+        thumbUrl: img.thumbUrl || "",
+        smallUrl: img.smallUrl || "",
+        mediumUrl: img.mediumUrl || "",
+        largeUrl: img.largeUrl || "",
+      })) || [],
     },
   });
 
@@ -204,9 +225,19 @@ export function ProductForm({  brands, uoms, groups: productGroups, pricingSchem
     control,
     name: "prices"
   });
+  const { fields: imageFields, append: appendImage, remove: removeImage } = useFieldArray({
+    control,
+    name: "images"
+  });
+   const { fields: barcodeFields, append: appendBarcode, remove: removeBarcode } = useFieldArray({
+    control,
+    name: "barcodes"
+  });
+  
   // Watch the matrix relationship variables
   const watchedGroupId = useWatch({ control, name: "productGroupId" });
   const watchedVariantSignature = useWatch({ control, name: "variantSignature" });
+  const watchedImages = useWatch({ control, name: "images" });
 
   const selectedGroupDetails = useMemo(() => {
     if (!watchedGroupId || !productGroups) return null;
@@ -301,9 +332,6 @@ export function ProductForm({  brands, uoms, groups: productGroups, pricingSchem
       ? `${baseLabel} (Occupied by SKU: ${variant.product.sku})`
       : `${baseLabel} (Available Connection)`;
   };
-
-  const barcodeArray = useFieldArray({ control, name: "barcodes" });
-  const imageArray = useFieldArray({ control, name: "images" });
 
   const watchedName = useWatch({ control, name: "name" });
   const watchedBrandId = useWatch({ control, name: "brandId" });
@@ -724,7 +752,7 @@ export function ProductForm({  brands, uoms, groups: productGroups, pricingSchem
               type="button" 
               variant="outline" 
               size="sm" 
-              onClick={() => appendPrice({ pricingSchemeId: pricingSchemes[0]?.inflowId || "", priceType: "Normal", unitPrice: 0, fixedMarkup: 0 })} 
+              onClick={() => appendPrice({ pricingSchemeId: pricingSchemes[0]?.inflowId || "", priceType: "FixedPrice", unitPrice: 0, fixedMarkup: 0 })} 
               className="h-7 text-xs gap-1"
             >
               <Plus className="w-3 h-3" /> Append Price Tier
@@ -733,76 +761,136 @@ export function ProductForm({  brands, uoms, groups: productGroups, pricingSchem
 
           {/* Standard Base Cost input row */}
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4 bg-muted/20 p-4 rounded-xl border">
-            <Field className="md:col-span-1">
-              <FieldLabel>Standard Base Cost ($) *</FieldLabel>
-              <Input 
-                type="number" 
-                step="0.00001" 
-                placeholder="0.00" 
-                {...register("initialCost", { valueAsNumber: true })} 
-              />
-              {errors.initialCost && <span className="text-xs text-destructive">{errors.initialCost.message}</span>}
-            </Field>
+            <Controller 
+              control={control} 
+              name="initialCost" 
+              render={({ field, fieldState }) => (
+                <Field className="md:col-span-1">
+                  <FieldLabel htmlFor="initialCost">Standard Base Cost ($) <b className="text-red-500">*</b></FieldLabel>
+                  <FieldContent>
+                    <Input
+                      {...field}
+                      {...register("initialCost", { valueAsNumber: true })} 
+                      id="initialCost"
+                      type="number" 
+                      step="0.00001" 
+                      placeholder="0.00"
+                      aria-invalid={fieldState.invalid}
+                    />
+                    {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
+                  </FieldContent>
+                </Field>
+              )}
+            />
 
             {/* Multiple Pricing Rows Box Container */}
             <div className="md:col-span-3 space-y-2">
               <FieldLabel>Price Matrix Lines Mapping</FieldLabel>
               
               {priceFields.map((field, idx) => (
-                <div key={field.id} className="grid grid-cols-1 sm:grid-cols-12 gap-2 items-center border p-2.5 rounded-xl bg-background shadow-2xs">
+                <div key={field.id} className="grid grid-cols-1 sm:grid-cols-12 gap-2  items-start border p-2.5 rounded-xl bg-background shadow-2xs">
                   
                   {/* Target Scheme Dropdown Selection */}
                   <div className="sm:col-span-4">
-                    <select
-                      className="w-full text-xs h-8 rounded-md border border-input bg-background px-2 py-1 focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-ring"
-                      {...register(`prices.${idx}.pricingSchemeId` as const)}
-                    >
-                      {pricingSchemes.map((scheme) => (
-                        <option key={scheme.inflowId} value={scheme.inflowId}>
-                          {scheme.name}
-                        </option>
-                      ))}
-                    </select>
-                    {errors.prices?.[idx]?.pricingSchemeId && (
-                      <span className="text-[10px] text-destructive block mt-0.5">{errors.prices[idx].pricingSchemeId?.message}</span>
-                    )}
+                    <Controller
+                      control={control}
+                      name={`prices.${idx}.pricingSchemeId`} 
+                      render={({ field, fieldState }) => (
+                        <Field>
+                          <Select onValueChange={field.onChange} value={field.value}>
+                            <SelectTrigger className="w-full">
+                              <SelectValue placeholder="Pricing Scheme" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {pricingSchemes.length > 0 ? (
+                               pricingSchemes.map((cat) => (
+                                  <SelectItem key={cat.inflowId} value={cat.inflowId}>{cat.name}</SelectItem>
+                                ))
+                              ) : (
+                                <SelectItem value="0" disabled>No pricing scheme available</SelectItem>
+                              )}
+                            </SelectContent>
+                          </Select>
+                          {fieldState.error && <FieldError>{fieldState.error.message}</FieldError>}
+                        </Field>
+                      )}
+                    />
                   </div>
 
                   {/* Price Type Assignment Selection */}
                   <div className="sm:col-span-3">
-                    <select
-                      className="w-full text-xs h-8 rounded-md border border-input bg-background px-2 py-1 focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-ring"
-                      {...register(`prices.${idx}.priceType` as const)}
-                    >
-                      <option value="Normal">Normal</option>
-                      <option value="Wholesale">Wholesale</option>
-                      <option value="Promo">Promo</option>
-                    </select>
+                    <Controller
+                      control={control}
+                      name={`prices.${idx}.priceType`} 
+                      render={({ field, fieldState }) => (
+                        <Field>
+                          <Select onValueChange={field.onChange} value={field.value}>
+                            <SelectTrigger 
+                              aria-invalid={fieldState.invalid}
+                              className="w-full"
+                            >
+                              <SelectValue placeholder="Price Type" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="FixedPrice">Fixed Price</SelectItem>
+                              <SelectItem value="FixedMarkup">Fixed Markup</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          {fieldState.error && <FieldError>{fieldState.error.message}</FieldError>}
+                        </Field>
+                      )}
+                    />
                   </div>
 
-                  {/* Value Inputs Group */}
-                  <div className="sm:col-span-2">
-                    <Input 
-                      type="number" 
-                      step="0.00001" 
-                      placeholder="Price ($)"
-                      className="h-8 text-xs text-right"
-                      {...register(`prices.${idx}.unitPrice` as const, { valueAsNumber: true })} 
-                    />
-                    {errors.prices?.[idx]?.unitPrice && (
-                      <span className="text-[10px] text-destructive block mt-0.5">{errors.prices[idx].unitPrice?.message}</span>
+                  <Controller 
+                    control={control} 
+                    name={`prices.${idx}.unitPrice`} 
+                    render={({ field, fieldState }) => (
+                      <Field className="sm:col-span-2">
+                        <Input
+                          // Extract value and onChange to control them explicitly
+                          value={field.value}
+                          onBlur={field.onBlur}
+                          ref={field.ref}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            field.onChange(val === "" ? "" : Number(val));
+                          }}
+                          id={`form-prices.${idx}.unitPrice`}
+                          type="number" 
+                          step="0.00001" 
+                          placeholder="Price ($)"
+                          aria-invalid={fieldState.invalid}
+                        />
+                        {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
+                      </Field>
                     )}
-                  </div>
+                  />
 
-                  <div className="sm:col-span-2">
-                    <Input 
-                      type="number" 
-                      step="0.00001" 
-                      placeholder="Markup ($)"
-                      className="h-8 text-xs text-right"
-                      {...register(`prices.${idx}.fixedMarkup` as const, { valueAsNumber: true })} 
-                    />
-                  </div>
+                  <Controller 
+                    control={control} 
+                    name={`prices.${idx}.fixedMarkup`} 
+                    render={({ field, fieldState }) => (
+                      <Field className="sm:col-span-2">
+                         <Input
+                          // Extract value and onChange to control them explicitly
+                          value={field.value}
+                          onBlur={field.onBlur}
+                          ref={field.ref}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            field.onChange(val === "" ? "" : Number(val));
+                          }}
+                          id={`form-prices.${idx}.fixedMarkup`}
+                          type="number" 
+                          step="0.00001" 
+                          placeholder="Markup ($)"
+                          aria-invalid={fieldState.invalid}
+                        />
+                        {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
+                      </Field>
+                    )}
+                  />
 
                   {/* Action Delete Trigger Button */}
                   <div className="sm:col-span-1 flex justify-center">
@@ -837,37 +925,299 @@ export function ProductForm({  brands, uoms, groups: productGroups, pricingSchem
         <FieldSet className="border-t pt-4">
           <div className="flex items-center justify-between border-b pb-2">
             <FieldLegend className="flex items-center gap-2"><Barcode className="w-4 h-4 text-muted-foreground" /> Global Trade Barcode Identifiers Mapping</FieldLegend>
-            <Button type="button" variant="outline" size="sm" onClick={() => barcodeArray.append({ barcode: "" })} className="h-7 text-xs gap-1"><Plus className="w-3 h-3" /> Append Barcode</Button>
+            <Button type="button" variant="outline" size="sm" onClick={() => appendBarcode({ barcode: "" })} className="h-7 text-xs gap-1"><Plus className="w-3 h-3" /> Append Barcode</Button>
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-3">
-            {barcodeArray.fields.map((field, idx) => (
-              <div key={field.id} className="flex flex-col gap-1 border p-2 rounded-xl bg-background shadow-2xs">
-                <div className="flex items-center gap-2">
-                  <Input placeholder="GTIN-13, EAN, or UPC value string" className="text-xs h-8 flex-1" {...register(`barcodes.${idx}.barcode` as const)} />
-                  <Button type="button" variant="ghost" size="icon" onClick={() => barcodeArray.remove(idx)} className="h-8 w-8 text-muted-foreground hover:text-destructive shrink-0"><Trash2 className="w-3.5 h-3.5" /></Button>
-                </div>
-                {errors.barcodes?.[idx]?.barcode && <span className="text-[10px] text-destructive px-1">{errors.barcodes[idx].barcode?.message}</span>}
-              </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3">
+            {barcodeFields.map((field, index) => (
+              <Controller
+                key={field.id}
+                name={`barcodes.${index}.barcode`}
+                control={form.control}
+                render={({ field: controllerField, fieldState }) => (
+                  <Field
+                    orientation="horizontal"
+                    data-invalid={fieldState.invalid}
+                  >
+                    <FieldContent className="space-y-1">
+                      <InputGroup>
+                        <InputGroupInput
+                          {...controllerField}
+                          id={`form-rhf-array-email-${index}`}
+                          aria-invalid={fieldState.invalid}
+                          placeholder="GTIN-13, EAN, or UPC value string"
+                          className="h-7 text-xs"
+                        />
+                        {barcodeFields.length > 1 && (
+                          <InputGroupAddon align="inline-end">
+                            <InputGroupButton
+                              type="button"
+                              variant="ghost"
+                              size="icon-xs"
+                              onClick={() => removeBarcode(index)}
+                              aria-label={`Remove barcode ${index + 1}`}
+                            >
+                              <XIcon />
+                            </InputGroupButton>
+                          </InputGroupAddon>
+                        )}
+                      </InputGroup>
+                      {fieldState.invalid && (
+                        <FieldError errors={[fieldState.error]} className="text-[12px] px-1" />
+                      )}
+                    </FieldContent>
+                  </Field>
+                )}
+              />
             ))}
           </div>
         </FieldSet>
 
         {/* Dynamic CDN Image Url Asset Links Array Mapping Block */}
-        <FieldSet className="border-t pt-4">
-          <div className="flex items-center justify-between border-b pb-2">
-            <FieldLegend className="flex items-center gap-2"><ImageIcon className="w-4 h-4 text-muted-foreground" /> Media Asset Resource link Registries</FieldLegend>
-            <Button type="button" variant="outline" size="sm" onClick={() => imageArray.append({ originalUrl: "" })} className="h-7 text-xs gap-1"><Plus className="w-3 h-3" /> Bind Image URL</Button>
+        <FieldSet className="border-t pt-6">
+          <div className="flex items-center justify-between border-b pb-3 mb-4">
+            <div className="space-y-0.5">
+              <FieldLegend className="flex items-center gap-2 text-sm font-semibold">
+                <ImageIcon className="w-4 h-4 text-primary" /> 
+                Media Asset Resource Link Registries
+              </FieldLegend>
+              <p className="text-xs text-muted-foreground">
+                Register and configure responsive CDN image URLs for this product.
+              </p>
+            </div>
+            <Button 
+              type="button" 
+              variant="outline" 
+              size="sm" 
+              onClick={() => {
+                appendImage({ 
+                  originalUrl: "",
+                  thumbUrl: "",
+                  smallUrl: "",
+                  mediumUrl: "",
+                  largeUrl: "",
+                });
+                // Auto-expand the newly created item
+                setExpandedIndex(imageFields.length);
+              }} 
+              className="h-8 text-xs gap-1.5 shadow-xs"
+            >
+              <Plus className="w-3.5 h-3.5" /> Bind Image URL
+            </Button>
           </div>
-          <div className="space-y-2 mt-3">
-            {imageArray.fields.map((field, index) => (
-              <div key={field.id} className="flex flex-col gap-1 bg-muted/10 p-2 border rounded-xl">
-                <div className="flex items-center gap-3">
-                  <Input placeholder="https://cdn.yourstore.com/..." className="text-xs h-8 flex-1 bg-background" {...register(`images.${index}.originalUrl` as const)} />
-                  <Button type="button" variant="ghost" size="icon" onClick={() => imageArray.remove(index)} className="h-8 w-8 text-muted-foreground hover:text-destructive shrink-0"><Trash2 className="w-3.5 h-3.5" /></Button>
-                </div>
-                {errors.images?.[index]?.originalUrl && <span className="text-[10px] text-destructive px-1">{errors.images[index].originalUrl?.message}</span>}
+
+          <div className="space-y-3">
+            {imageFields.length === 0 ? (
+              <div className="flex flex-col items-center justify-center p-8 border border-dashed rounded-xl bg-muted/5 text-muted-foreground text-center">
+                <ImageIcon className="w-8 h-8 mb-2 opacity-40" />
+                <p className="text-xs font-medium">No images registered yet</p>
+                <p className="text-[11px] opacity-75 mt-0.5">Click &nsquo;Bind Image URL&nsquo; to add your first asset link.</p>
               </div>
-            ))}
+            ) : (
+              imageFields.map((field, index) => {
+                const hasError = !!errors.images?.[index]?.originalUrl;
+                const currentUrl = watchedImages[index]?.originalUrl;
+                const isValidUrl = currentUrl && /^https?:\/\/.+/i.test(currentUrl);
+
+                return (
+                  <div 
+                    key={field.id} 
+                    className={cn(
+                      "flex flex-col gap-2 bg-card p-3 border rounded-xl shadow-xs transition-colors",
+                      hasError ? "border-destructive/40 bg-destructive/5" : "hover:border-accent-foreground/10"
+                    )}
+                  >
+                    {/* Primary Link Row with Preview */}
+                    <div className="flex items-center gap-3">
+                      {/* Interactive Thumbnail Preview */}
+                      <div className="w-12 h-12 rounded-lg border bg-muted flex items-center justify-center overflow-hidden shrink-0 shadow-inner">
+                        {isValidUrl ? (
+                          <Image 
+                            src={currentUrl} 
+                            alt="Preview" 
+                            className="w-full h-full object-cover"
+                            onError={(e) => {
+                              // Fallback if URL is structurally valid but doesn't resolve to an image
+                              (e.target as HTMLImageElement).src = "";
+                              (e.target as HTMLImageElement).classList.add("hidden");
+                            }}
+                            height={500}
+                            width={500}
+                          />
+                        ) : (
+                          <ImageIcon className="w-5 h-5 text-muted-foreground/40" />
+                        )}
+                      </div>
+
+                      {/* Main CDN Link Input */}
+                      <div className="flex-1 space-y-1">
+                        <Controller
+                          name={`images.${index}.originalUrl`}
+                          control={control}
+                          render={({ field, fieldState }) => (
+                            <Field data-invalid={fieldState.invalid}>
+                              <FieldContent className="relative">
+                                <LinkIcon className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-muted-foreground/60" />
+                                <Input
+                                  {...field}
+                                  id={`form-images.${index}.originalUrl`}
+                                  aria-invalid={fieldState.invalid}
+                                  placeholder="https://cdn.yourstore.com/images/product-main.jpg"
+                                  className="pl-9 h-9 text-xs" 
+                                />
+                              </FieldContent>
+                            </Field>
+                          )}
+                        />
+                      </div>
+
+                      {/* Row Controls */}
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        {/* Advanced Dimensions Toggle */}
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-muted-foreground hover:bg-muted"
+                          onClick={() => toggleExpand(index)}
+                          title="Configure responsive sizes"
+                        >
+                          {expandedIndex === index ? (
+                            <ChevronUp className="w-4 h-4" />
+                          ) : (
+                            <ChevronDown className="w-4 h-4" />
+                          )}
+                        </Button>
+
+                        {/* Remove button */}
+                        <Button 
+                          type="button" 
+                          variant="ghost" 
+                          size="icon" 
+                          onClick={() => removeImage(index)} 
+                          className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    </div>
+
+                    {/* Error Message */}
+                    {hasError && (
+                      <span className="text-[11px] font-medium text-destructive px-1.5 flex items-center gap-1">
+                        ⚠️ {errors.images?.[index]?.originalUrl?.message}
+                      </span>
+                    )}
+
+                    {/* Advanced Responsive Sizes Panel (Expanded state) */}
+                    {expandedIndex === index && (
+                      <div className="mt-2 pt-3 border-t border-dashed grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                        
+                        <Controller
+                          name={`images.${index}.thumbUrl`}
+                          control={control}
+                          render={({ field, fieldState }) => (
+                            <Field data-invalid={fieldState.invalid} className="space-y-1">
+                              <FieldContent className="relative">
+                                <Input
+                                  value={field.value ?? ""} // ✅ Safely fall back to "" if value is null
+                                  onBlur={field.onBlur}
+                                  ref={field.ref}
+                                  onChange={(e) => {
+                                    const val = e.target.value;
+                                    field.onChange(val === "" ? null : val); // ✅ Sets null in state if empty, instead of breaking types
+                                  }}
+                                  id={`form-images.${index}.thumbUrl`}
+                                  aria-invalid={fieldState.invalid}
+                                  placeholder="Thumb URL"
+                                  className="h-7 text-xs bg-background" 
+                                />
+                              </FieldContent>
+                              {fieldState.invalid && <FieldError errors={[fieldState.error]} className="text-[11px] font-medium px-1.5 flex items-center gap-1" />}
+                            </Field>
+                          )}
+                        />
+
+                        <Controller
+                          name={`images.${index}.smallUrl`}
+                          control={control}
+                          render={({ field, fieldState }) => (
+                            <Field data-invalid={fieldState.invalid} className="space-y-1">
+                              <FieldContent className="relative">
+                                <Input
+                                  value={field.value ?? ""} // ✅ Safely fall back to "" if value is null
+                                  onBlur={field.onBlur}
+                                  ref={field.ref}
+                                  onChange={(e) => {
+                                    const val = e.target.value;
+                                    field.onChange(val === "" ? null : val); // ✅ Sets null in state if empty
+                                  }}
+                                  id={`form-images.${index}.smallUrl`}
+                                  aria-invalid={fieldState.invalid}
+                                  placeholder="Small URL"
+                                  className="h-7 text-xs bg-background" 
+                                />
+                              </FieldContent>
+                              {fieldState.invalid && <FieldError errors={[fieldState.error]} className="text-[11px] font-medium px-1.5 flex items-center gap-1" />}
+                            </Field>
+                          )}
+                        />
+
+                        <Controller
+                          name={`images.${index}.mediumUrl`}
+                          control={control}
+                          render={({ field, fieldState }) => (
+                            <Field data-invalid={fieldState.invalid} className="space-y-1">
+                              <FieldContent className="relative">
+                                <Input
+                                  value={field.value ?? ""} // ✅ Safely fall back to "" if value is null
+                                  onBlur={field.onBlur}
+                                  ref={field.ref}
+                                  onChange={(e) => {
+                                    const val = e.target.value;
+                                    field.onChange(val === "" ? null : val); // ✅ Sets null in state if empty
+                                  }}
+                                  id={`form-images.${index}.mediumUrl`}
+                                  aria-invalid={fieldState.invalid}
+                                  placeholder="Medium URL"
+                                  className="h-7 text-xs bg-background" 
+                                />
+                              </FieldContent>
+                              {fieldState.invalid && <FieldError errors={[fieldState.error]} className="text-[11px] font-medium px-1.5 flex items-center gap-1" />}
+                            </Field>
+                          )}
+                        />
+
+                        <Controller
+                          name={`images.${index}.largeUrl`}
+                          control={control}
+                          render={({ field, fieldState }) => (
+                            <Field data-invalid={fieldState.invalid} className="space-y-1">
+                              <FieldContent className="relative">
+                                <Input
+                                  value={field.value ?? ""} // ✅ Safely fall back to "" if value is null
+                                  onBlur={field.onBlur}
+                                  ref={field.ref}
+                                  onChange={(e) => {
+                                    const val = e.target.value;
+                                    field.onChange(val === "" ? null : val); // ✅ Sets null in state if empty
+                                  }}
+                                  id={`form-images.${index}.largeUrl`}
+                                  aria-invalid={fieldState.invalid}
+                                  placeholder="Large URL"
+                                  className="h-7 text-xs bg-background" 
+                                />
+                              </FieldContent>
+                              {fieldState.invalid && <FieldError errors={[fieldState.error]} className="text-[11px] font-medium px-1.5 flex items-center gap-1" />}
+                            </Field>
+                          )}
+                        />
+                        
+                      </div>
+                    )}
+                  </div>
+                );
+              })
+            )}
           </div>
         </FieldSet>
 
