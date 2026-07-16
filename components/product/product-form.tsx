@@ -23,7 +23,12 @@ import {
   LinkIcon,
   ChevronUp,
   ChevronDown,
-  XIcon
+  XIcon,
+  Loader2,
+  Save,
+  AlertCircle,
+  Edit3,
+  FolderTree
 } from "lucide-react";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
@@ -36,6 +41,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from ".
 import { cn } from "@/lib/utils";
 import Image from "next/image";
 import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from "../ui/input-group";
+import { DynamicAlert } from "../shared/alert";
 
 interface BrandLookupOption {
   id: string;
@@ -220,7 +226,7 @@ export function ProductForm({  brands, uoms, groups: productGroups, pricingSchem
     },
   });
 
-  const { register, control, handleSubmit, setValue, formState: { errors, isSubmitting } } = form;
+  const { register, control, handleSubmit, setValue, watch, formState: { errors, isSubmitting } } = form;
   const { fields: priceFields, append: appendPrice, remove: removePrice } = useFieldArray({
     control,
     name: "prices"
@@ -379,431 +385,722 @@ export function ProductForm({  brands, uoms, groups: productGroups, pricingSchem
   };
 
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className="w-full max-w-5xl mx-auto p-6 bg-card border rounded-xl shadow-xs space-y-6">
-      
-      <FieldGroup className="gap-6">
-
-        {/* Core Properties Row */}
-        <FieldSet className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <FieldLegend className="col-span-1 md:col-span-3 flex items-center gap-2 border-b pb-2">
-            <Package className="w-4 h-4 text-primary" /> Master SKU Core Identification
-          </FieldLegend>
-
-          <Field className="md:col-span-2">
-            <FieldLabel>Product Master Display Title *</FieldLabel>
-            <Input placeholder="e.g. Premium Ergonomic Office Chair" {...register("name")} />
-            {errors.name && <span className="text-xs text-destructive">{errors.name.message as string}</span>}
-          </Field>
-
-          <Field className="col-span-1">
-            <FieldLabel>SKU / Custom Identity *</FieldLabel>
-            <Input placeholder="PROD-CHAIR-001" disabled={isEditMode} {...register("sku")} />
-            {errors.sku && <span className="text-xs text-destructive">{errors.sku.message as string}</span>}
-          </Field>
-
-          <FieldSet className="grid grid-cols-1 md:grid-cols-2 gap-4 border-t pt-4 md:col-span-3">
-            <FieldLegend className="col-span-1 md:col-span-2 flex items-center gap-2 border-b pb-2">
-              Matrix Relationship Binding
-            </FieldLegend>
-
-            {/* 1. Select the Product Group cluster */}
-            <Field>
-              <FieldLabel>Product Group Cluster</FieldLabel>
-              <select 
-                className="w-full text-xs h-9 rounded-md border border-input bg-background px-3"
-                {...register("productGroupId")}
-                onChange={(e) => {
-                  register("productGroupId").onChange(e);
-                  setValue("variantSignature", ""); 
-                }}
-              >
-                <option value="">-- No Group (Standalone Product) --</option>
-                {productGroups?.map((group) => (
-                  <option key={group.inflowId} value={group.inflowId}>{group.name}</option>
-                ))}
-              </select>
-            </Field>
-
-            {/* 2. Select the specific Variant Intersection slot */}
-            {selectedGroupDetails && (
-              <Field>
-                <FieldLabel>Target Matrix Attribute Configuration Slot</FieldLabel>
-                <select 
-                  className="w-full text-xs h-9 rounded-md border border-input bg-background px-3 animate-in fade-in duration-200 focus:ring-1 focus:ring-primary"
-                  {...register("variantSignature")}
-                >
-                  <option value="">-- Assign to New Custom Variant Slot --</option>
-                  {computedVariantSlotsFromOptions.map((v) => {
-                    // A slot is marked as occupied if a productId exists, unless matched to our active entity frame
-                    const isOccupiedByOther = v.productId && v.productId !== form.getValues("inflowId");
-
-                    return (
-                      <option 
-                        key={v.signature} 
-                        value={v.signature}
-                        disabled={!!isOccupiedByOther} // Locks out slots belonging to alternate products
-                      >
-                        {getVariantLabel(v)}
-                      </option>
-                    );
-                  })}
-                </select>
-                {errors.variantSignature && (
-                  <span className="text-xs text-destructive">{errors.variantSignature.message as string}</span>
-                )}
-              </Field>
-            )}
-          </FieldSet>
-
-          {/* 📊 Active Matrix Attribute Configuration Dashboard Block */}
-          {selectedGroupDetails && (
-            <div className="col-span-1 md:col-span-3 rounded-lg border border-dashed p-4 bg-muted/30 space-y-3 animate-in fade-in duration-200">
-              <div>
-                <h4 className="text-xs font-semibold tracking-wide uppercase text-muted-foreground">
-                  Active Group Matrix Metadata View: <span className="text-foreground normal-case font-medium">{selectedGroupDetails.name}</span>
-                </h4>
-              </div>
-
-              {/* 🎯 FIX 1: Alerts placed outside the badge flexbox wrapper for proper structural layout */}
-              {(() => {
-                const activeSlot = computedVariantSlotsFromOptions.find(s => s.signature === watchedVariantSignature);
-                const currentProductId = initialData?.inflowId || form.getValues("inflowId");
-                
-                if (activeSlot?.productId && activeSlot.productId !== currentProductId) {
-                  return (
-                    <div className="text-xs bg-destructive/10 border border-destructive/20 text-destructive px-3 py-2 rounded-md font-medium animate-pulse w-full">
-                      ⚠️ Warning: This exact variant selection is currently locked by SKU: {activeSlot.product?.sku || "Another Product"}
-                    </div>
-                  );
-                }
-                if (activeSlot?.productId && activeSlot.productId === currentProductId) {
-                  return (
-                    <div className="text-xs bg-green-500/10 border border-green-500/20 text-green-600 px-3 py-2 rounded-md font-medium w-full">
-                      ✓ Current Selection: This slot is already bound to this active item document.
-                    </div>
-                  );
-                }
-                return null;
-              })()}
-
-              {/* 🟢 Badges Display Layer */}
-              {currentSelectionBreakdown.length > 0 ? (
-                <div className="flex flex-wrap gap-2 pt-1">
-                  {currentSelectionBreakdown.map((item, idx) => (
-                    <div 
-                      key={idx} 
-                      className="flex items-center gap-1.5 text-xs bg-primary/10 border border-primary/20 text-primary px-2.5 py-1 rounded-md"
-                    >
-                      <span className="font-semibold text-muted-foreground/70">{item.attributeName}:</span>
-                      <span className="font-medium font-mono">{item.valueText}</span>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="text-xs text-muted-foreground italic pt-1">
-                  No concrete variant configuration node matched yet. Select a slot above or configure custom matrix values.
-                </div>
-              )}
-
-              {/* Fallback layout mapping to show all total options assigned to the base group structure */}
-              <div className="pt-2 border-t border-dashed grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px]">
-                <span className="col-span-1 sm:col-span-2 text-muted-foreground/60 font-medium">Available Core Options Matrix Parameters:</span>
-                {selectedGroupDetails.options?.map((opt) => (
-                  <div key={opt.inflowId} className="bg-background border rounded px-2 py-1 flex items-center justify-between">
-                    <span className="font-medium text-muted-foreground">{opt.attribute.name}</span>
-                    <span className="text-foreground font-mono truncate max-w-[180px]">
-                      {opt.values.map(v => v.attributeValue?.value).join(", ")}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          <Field className="md:col-span-1">
-            <FieldLabel>Manufacturer / Brand Assignment</FieldLabel>
-            <Controller
-              name="brandId"
-              control={control}
-              render={({ field }) => <BrandSelect value={field.value ?? undefined} onChange={field.onChange} />}
-            />
-          </Field>
-
-          <Field className="md:col-span-1">
-            <FieldLabel>Master Catalog Department Category</FieldLabel>
-            <Controller
-              name="categoryId"
-              control={control}
-              render={({ field }) => <CategorySelect value={field.value ?? undefined} onChange={field.onChange} />}
-            />
-          </Field>
-
-          {/* 🟢 MODIFIED: Base System UOM is now a clean drop-down selection list */}
-          <Field className="col-span-1">
-            <FieldLabel>Base System UOM *</FieldLabel>
-            <select 
-              className="w-full text-xs h-9 rounded-md border border-input bg-background px-3 shadow-2xs focus:ring-1 focus:ring-primary focus:outline-hidden"
-              {...register("standardUomName")}
-            >
-              <option value="">-- Choose Base Unit --</option>
-              {uoms.map((u) => (
-                <option key={u.id} value={u.code}>{u.name} ({u.code})</option>
-              ))}
-            </select>
-            {errors.standardUomName && <span className="text-xs text-destructive">{errors.standardUomName.message as string}</span>}
-          </Field>
-
-          <Field className="md:col-span-3">
-            <FieldLabel>Public Summary Description</FieldLabel>
-            <Textarea placeholder="Provide descriptive high-fidelity characteristics detailing materials..." rows={3} {...register("description")} />
-          </Field>
-        </FieldSet>
-
-
+    <form onSubmit={handleSubmit(onSubmit)} className="space-y-6 ">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         
-
-        {/* Operational Flow Settings */}
-        <FieldSet className="grid grid-cols-1 md:grid-cols-3 gap-6 border-t pt-4">
-          <FieldLegend className="col-span-1 md:col-span-3 flex items-center gap-2 border-b pb-2">
-            <Settings className="w-4 h-4 text-muted-foreground" /> Operational Configurations & Strategy
-          </FieldLegend>
-
-          <Field className="col-span-1">
-            <FieldLabel>Item Classification Type</FieldLabel>
-            <select className="w-full text-xs h-9 rounded-md border border-input bg-background px-3" {...register("itemType")}>
-              <option value="Stock">Stock Item</option>
-              <option value="NonStock">Non-Stock Service</option>
-              <option value="Serialized">Unique Serialized Asset</option>
-            </select>
-          </Field>
-
-          <div className="md:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-4 bg-muted/10 p-4 border rounded-xl">
-            <div className="flex items-center justify-between gap-4">
-              <FieldLabel className="mb-0 text-xs font-semibold">Catalog Visibility Active</FieldLabel>
-              <Controller control={control} name="isActive" render={({ field }) => <Switch checked={field.value} onCheckedChange={field.onChange} />} />
+        {/* Left Column */}
+        <div className="space-y-6">
+          {/* Core Profile */}
+          <div className="bg-card border rounded-xl p-5 space-y-4 shadow-xs">
+            <div className="space-y-0.5 border-b pb-2">
+              <FieldLegend className="flex items-center gap-2 text-sm font-semibold ">
+                <Package className="w-4 h-4 text-primary" /> 
+                Master SKU Core Identification
+              </FieldLegend>
             </div>
-            <div className="flex items-center justify-between gap-4">
-              <FieldLabel className="mb-0 text-xs font-semibold">Is Manufacturable</FieldLabel>
-              <Controller control={control} name="isManufacturable" render={({ field }) => <Switch checked={field.value} onCheckedChange={field.onChange} />} />
-            </div>
-            <div className="flex items-center justify-between gap-4">
-              <FieldLabel className="mb-0 text-xs font-semibold">Auto-Assemble Bundles</FieldLabel>
-              <Controller control={control} name="autoAssemble" render={({ field }) => <Switch checked={field.value} onCheckedChange={field.onChange} />} />
-            </div>
-            <div className="flex items-center justify-between gap-4">
-              <FieldLabel className="mb-0 text-xs font-semibold">Include Buildable Qty</FieldLabel>
-              <Controller control={control} name="includeQuantityBuildable" render={({ field }) => <Switch checked={field.value} onCheckedChange={field.onChange} />} />
-            </div>
-          </div>
-        </FieldSet>
 
-        {/* Dimensions & Logistics Metrics Section */}
-        <FieldSet className="grid grid-cols-2 md:grid-cols-4 gap-4 border-t pt-4">
-          <FieldLegend className="col-span-2 md:col-span-4 flex items-center gap-2 border-b pb-2">
-            <Scale className="w-4 h-4 text-muted-foreground" /> Dimensional Logistics & Compliance
-          </FieldLegend>
-
-          <Field>
-            <FieldLabel>Absolute Weight (kg)</FieldLabel>
-            <Input type="number" step="0.0001" placeholder="0.0000" {...register("weight", { valueAsNumber: true })} />
-          </Field>
-          <Field>
-            <FieldLabel>Width (cm)</FieldLabel>
-            <Input type="number" step="0.0001" placeholder="0.0" {...register("width", { valueAsNumber: true })} />
-          </Field>
-          <Field>
-            <FieldLabel>Height (cm)</FieldLabel>
-            <Input type="number" step="0.0001" placeholder="0.0" {...register("height", { valueAsNumber: true })} />
-          </Field>
-          <Field>
-            <FieldLabel>Length (cm)</FieldLabel>
-            <Input type="number" step="0.0001" placeholder="0.0" {...register("length", { valueAsNumber: true })} />
-          </Field>
-
-          <Field className="col-span-2">
-            <FieldLabel>Country of Origin</FieldLabel>
-            <Input placeholder="e.g. United States, Germany" {...register("originCountry")} />
-          </Field>
-          <Field className="col-span-2">
-            <FieldLabel>HS Code (International Tariff)</FieldLabel>
-            <Input placeholder="e.g. 9401.30.0000" {...register("hsTariffNumber")} />
-          </Field>
-        </FieldSet>
-
-        {/* Operational Multi-tier UOM Calculations */}
-        <FieldSet className="grid grid-cols-1 md:grid-cols-2 gap-6 border-t pt-4">
-          <FieldLegend className="col-span-1 md:col-span-2 flex items-center gap-2 border-b pb-2">
-            <Link2 className="w-4 h-4 text-muted-foreground" /> Operational Multi-tier UOM Calculations
-          </FieldLegend>
-
-          {/* Purchasing Mapping Block */}
-          <div className="p-4 bg-muted/20 border rounded-xl space-y-3">
-            <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Inbound Supply / Purchasing Conversion</h4>
-            <Field>
-              <FieldLabel>Inbound UOM Unit Tag</FieldLabel>
-              {/* 🟢 MODIFIED: Input text field replaced with dynamic UOM Selector */}
-              <select 
-                className="w-full text-xs h-9 rounded-md border border-input bg-background px-3 shadow-2xs focus:ring-1 focus:ring-primary focus:outline-hidden"
-                {...register("purchasingUom.name")}
-              >
-                <option value="">-- Select Inbound Unit --</option>
-                {uoms.map((u) => (
-                  <option key={u.id} value={u.code}>{u.name} ({u.code})</option>
-                ))}
-              </select>
-              {errors.purchasingUom?.name && <span className="text-xs text-destructive">{(errors.purchasingUom as any).name.message}</span>}
-            </Field>
-            <div className="grid grid-cols-2 gap-2">
-              <Field>
-                <FieldLabel>Standard Base Qty</FieldLabel>
-                <Input type="number" step="0.0001" {...register("purchasingUom.standardQuantity", { valueAsNumber: true })} />
-                {errors.purchasingUom?.standardQuantity && <span className="text-xs text-destructive">{(errors.purchasingUom as any).standardQuantity.message}</span>}
-              </Field>
-              <Field>
-                <FieldLabel>Equal to Pack Volume</FieldLabel>
-                <Input type="number" step="0.0001" {...register("purchasingUom.uomQuantity", { valueAsNumber: true })} />
-                {errors.purchasingUom?.uomQuantity && <span className="text-xs text-destructive">{(errors.purchasingUom as any).uomQuantity.message}</span>}
-              </Field>
-            </div>
-          </div>
-
-          {/* Sales Conversion Mapping Block */}
-          <div className="p-4 bg-muted/20 border rounded-xl space-y-3">
-            <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Outbound / Sales Channels Conversion</h4>
-            <Field>
-              <FieldLabel>Outbound UOM Unit Tag</FieldLabel>
-              {/* 🟢 MODIFIED: Input text field replaced with dynamic UOM Selector */}
-              <select 
-                className="w-full text-xs h-9 rounded-md border border-input bg-background px-3 shadow-2xs focus:ring-1 focus:ring-primary focus:outline-hidden"
-                {...register("salesUom.name")}
-              >
-                <option value="">-- Select Outbound Unit --</option>
-                {uoms.map((u) => (
-                  <option key={u.id} value={u.code}>{u.name} ({u.code})</option>
-                ))}
-              </select>
-              {errors.salesUom?.name && <span className="text-xs text-destructive">{(errors.salesUom as any).name.message}</span>}
-            </Field>
-            <div className="grid grid-cols-2 gap-2">
-              <Field>
-                <FieldLabel>Standard Base Qty</FieldLabel>
-                <Input type="number" step="0.0001" {...register("salesUom.standardQuantity", { valueAsNumber: true })} />
-                {errors.salesUom?.standardQuantity && <span className="text-xs text-destructive">{(errors.salesUom as any).standardQuantity.message}</span>}
-              </Field>
-              <Field>
-                <FieldLabel>Equal to Pack Volume</FieldLabel>
-                <Input type="number" step="0.0001" {...register("salesUom.uomQuantity", { valueAsNumber: true })} />
-                {errors.salesUom?.uomQuantity && <span className="text-xs text-destructive">{(errors.salesUom as any).uomQuantity.message}</span>}
-              </Field>
-            </div>
-          </div>
-        </FieldSet>
-
-        {/* Traceability Control Flags */}
-        <FieldSet className="border-t pt-4">
-          <FieldLegend className="flex items-center gap-2 border-b pb-2">
-            <Calendar className="w-4 h-4 text-muted-foreground" /> Traceability Control Flags
-          </FieldLegend>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-3">
-            <div className="flex items-center justify-between border p-3 rounded-xl bg-muted/10 gap-4">
-              <div><FieldLabel className="mb-0 text-xs font-semibold">Lot Tracking</FieldLabel></div>
-              <Controller control={control} name="trackLots" render={({ field }) => <Switch checked={field.value} onCheckedChange={field.onChange} />} />
-            </div>
-            <div className="flex items-center justify-between border p-3 rounded-xl bg-muted/10 gap-4">
-              <div><FieldLabel className="mb-0 text-xs font-semibold">Serial Tracking</FieldLabel></div>
-              <Controller control={control} name="trackSerials" render={({ field }) => <Switch checked={field.value} onCheckedChange={field.onChange} />} />
-            </div>
-            <div className="flex items-center justify-between border p-3 rounded-xl bg-muted/10 gap-4">
-              <div><FieldLabel className="mb-0 text-xs font-semibold">Expiry Tracking</FieldLabel></div>
-              <Controller control={control} name="trackExpiry" render={({ field }) => <Switch checked={field.value} onCheckedChange={field.onChange} />} />
-            </div>
-          </div>
-        </FieldSet>
-
-        {/* Lifespan Variables Block */}
-        {watchedTrackExpiry && (
-          <FieldSet className="grid grid-cols-1 sm:grid-cols-3 gap-4 border p-4 rounded-xl bg-amber-50/20 border-amber-200/60 transition-all">
-            <FieldLegend className="col-span-1 sm:col-span-3 flex items-center gap-2 text-amber-800 font-medium text-xs uppercase tracking-wider">
-              <Hourglass className="w-3.5 h-3.5 text-amber-600" /> Shelf Life & Expiration Offsets
-            </FieldLegend>
-            <Field>
-              <FieldLabel>Total Shelf Life (Days)</FieldLabel>
-              <Input type="number" placeholder="0" {...register("shelfLifeDays", { valueAsNumber: true })} />
-            </Field>
-            <Field>
-              <FieldLabel>Sell Before Offset (Days)</FieldLabel>
-              <Input type="number" placeholder="0" {...register("sellBeforeExpiryDays", { valueAsNumber: true })} />
-            </Field>
-            <Field>
-              <FieldLabel>Notification Alert (Days)</FieldLabel>
-              <Input type="number" placeholder="0" {...register("expiryNotificationDays", { valueAsNumber: true })} />
-            </Field>
-          </FieldSet>
-        )}
-
-        {/* 🏢 Dynamic Multi-Tier Pricing Matrix Section */}
-        <FieldSet className="border-t pt-4 space-y-4">
-          <div className="flex items-center justify-between border-b pb-2">
-            <FieldLegend className="flex items-center gap-2">
-              <DollarSign className="w-4 h-4 text-primary" /> Multi-Scheme Pricing Matrix
-            </FieldLegend>
-            <Button 
-              type="button" 
-              variant="outline" 
-              size="sm" 
-              onClick={() => appendPrice({ pricingSchemeId: pricingSchemes[0]?.inflowId || "", priceType: "FixedPrice", unitPrice: 0, fixedMarkup: 0 })} 
-              className="h-7 text-xs gap-1"
-            >
-              <Plus className="w-3 h-3" /> Append Price Tier
-            </Button>
-          </div>
-
-          {/* Standard Base Cost input row */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 bg-muted/20 p-4 rounded-xl border">
-            <Controller 
-              control={control} 
-              name="initialCost" 
-              render={({ field, fieldState }) => (
-                <Field className="md:col-span-1">
-                  <FieldLabel htmlFor="initialCost">Standard Base Cost ($) <b className="text-red-500">*</b></FieldLabel>
-                  <FieldContent>
+            <FieldSet className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <Controller 
+                control={control} 
+                name="name"
+                render={({ field, fieldState }) => (
+                  <Field className="md:col-span-2">
+                    <FieldLabel htmlFor="form-name">
+                      Product Master Display Title <b className="text-red-500">*</b>
+                    </FieldLabel>
                     <Input
                       {...field}
-                      {...register("initialCost", { valueAsNumber: true })} 
-                      id="initialCost"
-                      type="number" 
-                      step="0.00001" 
-                      placeholder="0.00"
+                      placeholder="e.g. Premium Ergonomic Office Chair"
+                      id="form-name"
                       aria-invalid={fieldState.invalid}
                     />
-                    {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
-                  </FieldContent>
+                    {fieldState.invalid && <FieldError className="text-xs" errors={[fieldState.error]} />}
+                  </Field>
+                )}
+              />
+              <Controller 
+                control={control} 
+                name="sku"
+                render={({ field, fieldState }) => (
+                  <Field className="md:col-span-1">
+                    <FieldLabel htmlFor="form-sku">
+                      SKU / Custom Identity <b className="text-red-500">*</b>
+                    </FieldLabel>
+                    <Input
+                      {...field}
+                      placeholder="PROD-CHAIR-001"
+                      id="form-sku"
+                      aria-invalid={fieldState.invalid}
+                    />
+                    {fieldState.invalid && <FieldError className="text-xs" errors={[fieldState.error]} />}
+                  </Field>
+                )}
+              />
+
+            </FieldSet>
+
+            <FieldSet className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <Field className="md:col-span-1">
+                <FieldLabel>Brand</FieldLabel>
+                <Controller
+                  name="brandId"
+                  control={control}
+                  render={({ field }) => 
+                    <BrandSelect value={field.value ?? undefined} onChange={field.onChange} className="h-8" />}
+                />
+              </Field>
+
+              <Field className="md:col-span-1">
+                <FieldLabel>Category</FieldLabel>
+                <Controller
+                  name="categoryId"
+                  control={control}
+                  render={({ field }) => <CategorySelect value={field.value ?? undefined} onChange={field.onChange} className="h-8" />}
+                />
+              </Field>
+
+              <Controller
+                control={control}
+                name="standardUomName"
+                render={({ field, fieldState }) => (
+                  <Field className="col-span-1">
+                    <FieldLabel htmlFor="form-groupId">Base System UOM <b className="text-red-500">*</b></FieldLabel>
+                    <Select 
+                      onValueChange={field.onChange}
+                      value={field.value ?? ""}>
+                      <SelectTrigger id="form-groupId" className="w-full">
+                        <SelectValue placeholder="Select Product Group" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        { uoms.length === 0 ? (
+                          <SelectItem value="">No base unit available</SelectItem>
+                        ) : (
+                          uoms.map((u) => (
+                            <SelectItem key={u.id} value={u.code}>{u.name} ({u.code})</SelectItem>
+                          ))
+                        )}
+                      </SelectContent>
+                    </Select>
+                    {fieldState.error && <FieldError className="text-xs">{fieldState.error.message}</FieldError>}
+                  </Field>
+                )}
+              />
+              
+            </FieldSet>
+
+            <Controller
+              name="description"
+              control={control}
+              render={({ field, fieldState }) => (
+                <Field data-invalid={fieldState.invalid} className="md:col-span-3">
+                  <FieldLabel htmlFor="form-prod-description">Public Summary Description</FieldLabel>
+                  <Textarea
+                    value={field.value ?? ""}
+                    onBlur={field.onBlur}
+                    ref={field.ref}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      field.onChange(val === "" ? null : val); 
+                    }}
+                    id="form-prod-description"
+                    aria-invalid={fieldState.invalid}
+                    placeholder="Provide descriptive high-fidelity characteristics detailing materials..." 
+                    rows={3}
+                  />
+                  {fieldState.invalid && <FieldError className="text-xs" errors={[fieldState.error]} />}
                 </Field>
               )}
             />
+          </div>
 
-            {/* Multiple Pricing Rows Box Container */}
-            <div className="md:col-span-3 space-y-2">
+          {/* Matrix Relationship Binding Section */}
+          <div className="bg-card border rounded-xl p-5 space-y-4 shadow-xs">
+            <div className="space-y-0.5 flex items-center justify-between border-b pb-2">
+              <FieldLegend className="flex items-center gap-2 text-sm font-semibold ">
+                <FolderTree className="w-4 h-4 text-primary" /> 
+                Matrix Relationship Binding
+              </FieldLegend>
+            </div>
+
+            <FieldSet className="grid grid-cols-1 md:grid-cols-2 gap-4 ">
+              <Controller
+                control={control}
+                name="productGroupId"
+                render={({ field, fieldState }) => (
+                  <Field className="col-span-1">
+                    <FieldLabel htmlFor="form-groupId">Product Group Cluster</FieldLabel>
+                    <Select 
+                      onValueChange={(e) => {
+                        field.onChange(e)
+                        setValue("variantSignature", ""); 
+                      }}
+                      value={field.value ?? ""}>
+                      <SelectTrigger id="form-groupId" className="w-full">
+                        <SelectValue placeholder="Select Product Group" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        { productGroups.length === 0 ? (
+                          <SelectItem value="">No product group available</SelectItem>
+                        ) : (
+                          productGroups?.map((group) => (
+                            <SelectItem key={group.inflowId} value={group.inflowId}>{group.name}</SelectItem>
+                          ))
+                        )}
+                      </SelectContent>
+                    </Select>
+                    {fieldState.error && <FieldError className="text-xs">{fieldState.error.message}</FieldError>}
+                  </Field>
+                )}
+              />
+
+              {/* 2. Select the specific Variant Intersection slot */}
+              {selectedGroupDetails && (
+                <Controller
+                  control={control}
+                  name="variantSignature"
+                  render={({ field, fieldState }) => (
+                    <Field className="col-span-1">
+                      <FieldLabel >Target Matrix Attribute Configuration Slot</FieldLabel>
+                      <Select onValueChange={field.onChange} >
+                        <SelectTrigger className="w-full">
+                          <SelectValue placeholder="Select Variant Slot" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          { productGroups.length === 0 ? (
+                            <SelectItem value="">No attribute slot available</SelectItem>
+                          ) : (
+                            computedVariantSlotsFromOptions.map((v) => {
+                              const isOccupiedByOther = v.productId && v.productId !== form.getValues("inflowId");
+                              return (
+                                <SelectItem 
+                                  key={v.signature} 
+                                  value={v.signature}
+                                  disabled={!!isOccupiedByOther} // Locks out slots belonging to alternate products
+                                >
+                                  {getVariantLabel(v)}
+                                </SelectItem>
+                              );
+                            })
+                          )}
+                        </SelectContent>
+                      </Select>
+                      {fieldState.error && <FieldError className="text-xs">{fieldState.error.message}</FieldError>}
+                    </Field>
+                  )}
+                />
+              )}
+
+              {/* 📊 Active Matrix Attribute Configuration Dashboard Block */}
+              {selectedGroupDetails && (
+                <div className="col-span-1 md:col-span-3 rounded-lg border border-dashed p-4 bg-muted/30 space-y-3 animate-in fade-in duration-200">
+                  <div>
+                    <h4 className="text-xs font-semibold tracking-wide uppercase text-muted-foreground">
+                      Active Group Matrix Metadata View: <span className="text-foreground normal-case font-medium">{selectedGroupDetails.name}</span>
+                    </h4>
+                  </div>
+
+                  {/* 🎯 FIX 1: Alerts placed outside the badge flexbox wrapper for proper structural layout */}
+                  {(() => {
+                    const activeSlot = computedVariantSlotsFromOptions.find(s => s.signature === watchedVariantSignature);
+                    const currentProductId = initialData?.inflowId || form.getValues("inflowId");
+                    
+                    if (activeSlot?.productId && activeSlot.productId !== currentProductId) {
+                      return (
+                        <div className="text-xs bg-destructive/10 border border-destructive/20 text-destructive px-3 py-2 rounded-md font-medium animate-pulse w-full">
+                          ⚠️ Warning: This exact variant selection is currently locked by SKU: {activeSlot.product?.sku || "Another Product"}
+                        </div>
+                      );
+                    }
+                    if (activeSlot?.productId && activeSlot.productId === currentProductId) {
+                      return (
+                        <div className="text-xs bg-green-500/10 border border-green-500/20 text-green-600 px-3 py-2 rounded-md font-medium w-full">
+                          ✓ Current Selection: This slot is already bound to this active item document.
+                        </div>
+                      );
+                    }
+                    return null;
+                  })()}
+
+                  {/* 🟢 Badges Display Layer */}
+                  {currentSelectionBreakdown.length > 0 ? (
+                    <div className="flex flex-wrap gap-2 pt-1">
+                      {currentSelectionBreakdown.map((item, idx) => (
+                        <div 
+                          key={idx} 
+                          className="flex items-center gap-1.5 text-xs bg-primary/10 border border-primary/20 text-primary px-2.5 py-1 rounded-md"
+                        >
+                          <span className="font-semibold text-muted-foreground/70">{item.attributeName}:</span>
+                          <span className="font-medium font-mono">{item.valueText}</span>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="text-xs text-muted-foreground italic pt-1">
+                      No concrete variant configuration node matched yet. Select a slot above or configure custom matrix values.
+                    </div>
+                  )}
+
+                  {/* Fallback layout mapping to show all total options assigned to the base group structure */}
+                  <div className="pt-2 border-t border-dashed grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px]">
+                    <span className="col-span-1 sm:col-span-2 text-muted-foreground/60 font-medium">Available Core Options Matrix Parameters:</span>
+                    {selectedGroupDetails.options?.map((opt) => (
+                      <div key={opt.inflowId} className="bg-background border rounded px-2 py-1 flex items-center justify-between">
+                        <span className="font-medium text-muted-foreground">{opt.attribute.name}</span>
+                        <span className="text-foreground font-mono truncate max-w-[180px]">
+                          {opt.values.map(v => v.attributeValue?.value).join(", ")}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </FieldSet>
+
+          </div>
+
+          {/* Operational Flow Settings */}
+          <div className="bg-card border rounded-xl p-5 space-y-4 shadow-xs">
+            <div className="space-y-0.5 border-b pb-2">
+              <FieldLegend className="flex items-center gap-2 text-sm font-semibold ">
+                <Settings className="w-4 h-4 text-primary" /> 
+                Operational Configurations & Strategy
+              </FieldLegend>
+            </div>
+
+            <FieldSet className="grid grid-cols-1 md:grid-cols-3 gap-6 ">
+              <Controller
+                control={control}
+                name="itemType"
+                render={({ field, fieldState }) => (
+                  <Field className="col-span-1">
+                    <FieldLabel>Item Classification Type</FieldLabel>
+                    <Select onValueChange={field.onChange} value={field.value ?? ""}>
+                      <SelectTrigger className="w-full">
+                        <SelectValue placeholder="Select Item Type" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="Stock">Stock Product</SelectItem>
+                        <SelectItem value="Serialized">Unique Serialized Asset</SelectItem>
+                        <SelectItem value="NonStock">Non-Stock Product</SelectItem>
+                        <SelectItem value="Service">Service</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    {fieldState.error && <FieldError>{fieldState.error.message}</FieldError>}
+                  </Field>
+                )}
+              />
+
+              <div className="md:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-4 bg-muted/10 p-4 border rounded-xl">
+                <div className="flex items-center justify-between gap-4">
+                  <FieldLabel className="mb-0 text-xs font-semibold">Catalog Visibility Active</FieldLabel>
+                  <Controller control={control} name="isActive" render={({ field }) => <Switch checked={field.value} onCheckedChange={field.onChange} />} />
+                </div>
+                <div className="flex items-center justify-between gap-4">
+                  <FieldLabel className="mb-0 text-xs font-semibold">Is Manufacturable</FieldLabel>
+                  <Controller control={control} name="isManufacturable" render={({ field }) => <Switch checked={field.value} onCheckedChange={field.onChange} />} />
+                </div>
+                <div className="flex items-center justify-between gap-4">
+                  <FieldLabel className="mb-0 text-xs font-semibold">Auto-Assemble Bundles</FieldLabel>
+                  <Controller control={control} name="autoAssemble" render={({ field }) => <Switch checked={field.value} onCheckedChange={field.onChange} />} />
+                </div>
+                <div className="flex items-center justify-between gap-4">
+                  <FieldLabel className="mb-0 text-xs font-semibold">Include Buildable Qty</FieldLabel>
+                  <Controller control={control} name="includeQuantityBuildable" render={({ field }) => <Switch checked={field.value} onCheckedChange={field.onChange} />} />
+                </div>
+              </div>
+            </FieldSet>
+
+          </div>
+          
+          {/* Dimensions & Logistics Metrics Section */}
+          <div className="bg-card border rounded-xl p-5 space-y-4 shadow-xs">
+            <div className="space-y-0.5 flex items-center justify-between border-b pb-2">
+              <FieldLegend className="flex items-center gap-2 text-sm font-semibold ">
+                <Scale className="w-4 h-4 text-primary" /> 
+                Dimensional Logistics & Compliance
+              </FieldLegend>
+            </div>
+
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <Field>
+                <FieldLabel>Weight (kg)</FieldLabel>
+                <Input type="number" step="0.0001" placeholder="0.0000" {...register("weight", { valueAsNumber: true })} />
+              </Field>
+              <Field>
+                <FieldLabel>Width (cm)</FieldLabel>
+                <Input type="number" step="0.0001" placeholder="0.0" {...register("width", { valueAsNumber: true })} />
+              </Field>
+              <Field>
+                <FieldLabel>Height (cm)</FieldLabel>
+                <Input type="number" step="0.0001" placeholder="0.0" {...register("height", { valueAsNumber: true })} />
+              </Field>
+              <Field>
+                <FieldLabel>Length (cm)</FieldLabel>
+                <Input type="number" step="0.0001" placeholder="0.0" {...register("length", { valueAsNumber: true })} />
+              </Field>
+
+              <Field className="col-span-2">
+                <FieldLabel>Country of Origin</FieldLabel>
+                <Input placeholder="e.g. United States, Germany" {...register("originCountry")} />
+              </Field>
+              <Field className="col-span-2">
+                <FieldLabel>HS Code (International Tariff)</FieldLabel>
+                <Input placeholder="e.g. 9401.30.0000" {...register("hsTariffNumber")} />
+              </Field>
+            </div>
+          </div>
+
+          {/* Traceability Control Flags */}
+          <div className="bg-card border rounded-xl p-5 space-y-4 shadow-xs">
+            <div className="space-y-0.5 flex items-center justify-between border-b pb-2">
+              <FieldLegend className="flex items-center gap-2 text-sm font-semibold ">
+                <Calendar className="w-4 h-4 text-primary" /> 
+                Traceability Control Flags
+              </FieldLegend>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-3">
+              <div className="flex items-center justify-between border p-3 rounded-xl bg-muted/10 gap-4">
+                <div><FieldLabel className="mb-0 text-xs font-semibold">Lot Tracking</FieldLabel></div>
+                <Controller control={control} name="trackLots" render={({ field }) => <Switch checked={field.value} onCheckedChange={field.onChange} />} />
+              </div>
+              <div className="flex items-center justify-between border p-3 rounded-xl bg-muted/10 gap-4">
+                <div><FieldLabel className="mb-0 text-xs font-semibold">Serial Tracking</FieldLabel></div>
+                <Controller control={control} name="trackSerials" render={({ field }) => <Switch checked={field.value} onCheckedChange={field.onChange} />} />
+              </div>
+              <div className="flex items-center justify-between border p-3 rounded-xl bg-muted/10 gap-4">
+                <div><FieldLabel className="mb-0 text-xs font-semibold">Expiry Tracking</FieldLabel></div>
+                <Controller control={control} name="trackExpiry" render={({ field }) => <Switch checked={field.value} onCheckedChange={field.onChange} />} />
+              </div>
+            </div>
+
+            {watchedTrackExpiry && (
+              <FieldSet className="grid grid-cols-1 sm:grid-cols-3 gap-4 border p-4 rounded-xl bg-amber-50/20 border-amber-200/60 transition-all">
+                <FieldLegend className="col-span-1 sm:col-span-3 flex items-center gap-2 text-amber-800 font-medium text-xs uppercase tracking-wider">
+                  <Hourglass className="w-3.5 h-3.5 text-amber-600" /> Shelf Life & Expiration Offsets
+                </FieldLegend>
+                <Field>
+                  <FieldLabel>Total Shelf Life (Days)</FieldLabel>
+                  <Input type="number" placeholder="0" {...register("shelfLifeDays", { valueAsNumber: true })} />
+                </Field>
+                <Field>
+                  <FieldLabel>Sell Before Offset (Days)</FieldLabel>
+                  <Input type="number" placeholder="0" {...register("sellBeforeExpiryDays", { valueAsNumber: true })} />
+                </Field>
+                <Field>
+                  <FieldLabel>Notification Alert (Days)</FieldLabel>
+                  <Input type="number" placeholder="0" {...register("expiryNotificationDays", { valueAsNumber: true })} />
+                </Field>
+              </FieldSet>
+            )}
+          </div>
+
+          {/* Operational Multi-tier */}
+          <div className="bg-card border rounded-xl p-5 space-y-4 shadow-xs">
+            <div className="space-y-0.5 flex items-center justify-between  border-b pb-2">
+              <FieldLegend className="flex items-center gap-2 text-sm font-semibold">
+                <Link2 className="w-4 h-4 text-primary" /> 
+                Operational Multi-tier UOM Calculations
+              </FieldLegend>
+            </div>
+
+            {/* Purchasing Mapping Block */}
+            <div className="p-4 bg-muted/20 border rounded-xl space-y-3">
+              <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                Inbound Supply / Purchasing Conversion
+              </h4>
+              <Controller
+                name="purchasingUom.name"
+                control={control}
+                render={({ field, fieldState }) => (
+                  <Field data-invalid={fieldState.invalid}>
+                    <FieldLabel htmlFor="form-inbound-uom">
+                      Inbound UOM Unit Tag <b className="text-red-500">*</b>
+                    </FieldLabel>
+                    <FieldContent className="relative">
+                      <Select
+                        name={field.name}
+                        value={field.value ?? ""}
+                        onValueChange={(val) => field.onChange(val === "null" ? "" : val)} 
+                      >
+                        <SelectTrigger
+                          id="form-inbound-uom"
+                          aria-invalid={fieldState.invalid}
+                          className="w-full"
+                        >
+                          <SelectValue placeholder="Select Inbound Unit" />
+                        </SelectTrigger>
+                        <SelectContent position="item-aligned">
+                          { uoms.length > 0 ? (
+                            uoms.map((u) => (
+                            <SelectItem key={u.id} value={u.code}>{u.name} ({u.code})</SelectItem>
+                          ))) : (
+                            <SelectItem value="null">No unit of measure available</SelectItem>
+                          )}
+                        </SelectContent>
+                      </Select>
+                    </FieldContent>
+                    {fieldState.invalid && (
+                      <FieldError errors={[fieldState.error]} />
+                    )}
+                  </Field>
+                )}
+              />
+             
+              <div className="grid grid-cols-2 gap-2">
+                <Controller 
+                  control={control} 
+                  name="purchasingUom.standardQuantity"
+                  render={({ field, fieldState }) => (
+                    <Field>
+                      <FieldLabel htmlFor="form-inbound-standqty">
+                        Standard Base Qty
+                      </FieldLabel>
+                        <Input
+                        // Extract value and onChange to control them explicitly
+                        value={field.value}
+                        onBlur={field.onBlur}
+                        ref={field.ref}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          field.onChange(val === "" ? "" : Number(val));
+                        }}
+                        id="form-inbound-standqty"
+                        type="number" 
+                        step="0.0001" 
+                        aria-invalid={fieldState.invalid}
+                      />
+                      {fieldState.invalid && <FieldError className="text-xs" errors={[fieldState.error]} />}
+                    </Field>
+                  )}
+                />
+                <Controller 
+                  control={control} 
+                  name="purchasingUom.uomQuantity"
+                  render={({ field, fieldState }) => (
+                    <Field>
+                      <FieldLabel htmlFor="form-inbound-packqty">
+                        Equal to Pack Volume
+                      </FieldLabel>
+                        <Input
+                        // Extract value and onChange to control them explicitly
+                        value={field.value}
+                        onBlur={field.onBlur}
+                        ref={field.ref}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          field.onChange(val === "" ? "" : Number(val));
+                        }}
+                        id="form-inbound-packqty"
+                        type="number" 
+                        step="0.0001" 
+                        aria-invalid={fieldState.invalid}
+                      />
+                      {fieldState.invalid && <FieldError className="text-xs" errors={[fieldState.error]} />}
+                    </Field>
+                  )}
+                />
+              </div>
+            </div>
+
+            {/* Sales Conversion Mapping Block */}
+            <div className="p-4 bg-muted/20 border rounded-xl space-y-3">
+              <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                Outbound / Sales Channels Conversion
+              </h4>
+              <Controller
+                name="salesUom.name"
+                control={control}
+                render={({ field, fieldState }) => (
+                  <Field data-invalid={fieldState.invalid}>
+                    <FieldLabel htmlFor="form-outbound-uom">
+                      Outbound UOM Unit Tag <b className="text-red-500">*</b>
+                    </FieldLabel>
+                    <FieldContent className="relative">
+                      <Select
+                        name={field.name}
+                        value={field.value ?? ""}
+                        onValueChange={(val) => field.onChange(val === "null" ? "" : val)} 
+                      >
+                        <SelectTrigger
+                          id="form-outbound-uom"
+                          aria-invalid={fieldState.invalid}
+                          className="w-full"
+                        >
+                          <SelectValue placeholder="Select Outbound Unit" />
+                        </SelectTrigger>
+                        <SelectContent position="item-aligned">
+                          { uoms.length > 0 ? (
+                            uoms.map((u) => (
+                            <SelectItem key={u.id} value={u.code}>{u.name} ({u.code})</SelectItem>
+                          ))) : (
+                            <SelectItem value="null">No unit of measure available</SelectItem>
+                          )}
+                        </SelectContent>
+                      </Select>
+                    </FieldContent>
+                    {fieldState.invalid && (
+                      <FieldError errors={[fieldState.error]} />
+                    )}
+                  </Field>
+                )}
+              />
+             
+              <div className="grid grid-cols-2 gap-2">
+                <Controller 
+                  control={control} 
+                  name="salesUom.standardQuantity"
+                  render={({ field, fieldState }) => (
+                    <Field>
+                      <FieldLabel htmlFor="form-outbound-standqty">
+                        Standard Base Qty
+                      </FieldLabel>
+                        <Input
+                        // Extract value and onChange to control them explicitly
+                        value={field.value}
+                        onBlur={field.onBlur}
+                        ref={field.ref}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          field.onChange(val === "" ? "" : Number(val));
+                        }}
+                        id="form-outbound-standqty"
+                        type="number" 
+                        step="0.0001" 
+                        aria-invalid={fieldState.invalid}
+                      />
+                      {fieldState.invalid && <FieldError className="text-xs" errors={[fieldState.error]} />}
+                    </Field>
+                  )}
+                />
+                <Controller 
+                  control={control} 
+                  name="salesUom.uomQuantity"
+                  render={({ field, fieldState }) => (
+                    <Field>
+                      <FieldLabel htmlFor="form-outbound-packqty">
+                        Equal to Pack Volume
+                      </FieldLabel>
+                        <Input
+                        // Extract value and onChange to control them explicitly
+                        value={field.value}
+                        onBlur={field.onBlur}
+                        ref={field.ref}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          field.onChange(val === "" ? "" : Number(val));
+                        }}
+                        id="form-outbound-packqty"
+                        type="number" 
+                        step="0.0001" 
+                        aria-invalid={fieldState.invalid}
+                      />
+                      {fieldState.invalid && <FieldError className="text-xs" errors={[fieldState.error]} />}
+                    </Field>
+                  )}
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Additional Remarks */}
+          <div className="bg-card border rounded-xl p-5 space-y-4 shadow-xs hidden sm:block">
+            <div className="space-y-0.5 flex items-center justify-between">
+              <FieldLegend className="flex items-center gap-2 text-sm font-semibold">
+                <Edit3 className="w-4 h-4 text-primary" /> 
+                Internal System Administrative Remarks
+              </FieldLegend>
+            </div>
+
+            <Controller
+              name="remarks"
+              control={control}
+              render={({ field, fieldState }) => (
+                <Field data-invalid={fieldState.invalid}>
+                  <Textarea
+                    value={field.value ?? ""}
+                    onBlur={field.onBlur}
+                    ref={field.ref}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      field.onChange(val === "" ? null : val); 
+                    }}
+                    id="form-remarks"
+                    aria-invalid={fieldState.invalid}
+                    placeholder="Add internal operational notices..."
+                    className="min-h-[120px]"
+                  />
+                  {fieldState.invalid && <FieldError className="text-xs" errors={[fieldState.error]} />}
+                </Field>
+              )}
+            />
+          </div>
+
+        </div>
+
+        {/* right Column */}
+        <div className="space-y-6">
+          {/* 🏢 Dynamic Multi-Tier Pricing Matrix Section */}
+          <div className="bg-card border rounded-xl p-5 space-y-4 shadow-xs ">
+            <div className="space-y-0.5 border-b pb-2">
+              <FieldLegend className="flex items-center gap-2 text-sm font-semibold">
+                <DollarSign className="w-4 h-4 text-primary" /> 
+                Multi-Scheme Pricing Matrix
+              </FieldLegend>
+            </div>
+
+            {/* CUSTOM ERROR ALERT FOR Image ARRAY */}
+            {errors.prices?.message && !Array.isArray(errors.prices) && priceFields.length === 0 && (
+              <DynamicAlert title="Missing Information" description={errors.prices.message} variant="destructive" />
+            )}
+            
+            {/* Pricing Items */}
+            <div className="space-y-3">
+              <Controller 
+                control={control} 
+                name="initialCost" 
+                render={({ field, fieldState }) => (
+                  <Field className="md:col-span-1">
+                    <FieldLabel htmlFor="initialCost">Standard Base Cost ($) <b className="text-red-500">*</b></FieldLabel>
+                    <FieldContent>
+                      <Input
+                        {...field}
+                        {...register("initialCost", { valueAsNumber: true })} 
+                        id="initialCost"
+                        type="number" 
+                        step="0.00001" 
+                        placeholder="0.00"
+                        aria-invalid={fieldState.invalid}
+                      />
+                      {fieldState.invalid && <FieldError className="text-xs" errors={[fieldState.error]} />}
+                    </FieldContent>
+                  </Field>
+                )}
+              />
               <FieldLabel>Price Matrix Lines Mapping</FieldLabel>
-              
-              {priceFields.map((field, idx) => (
-                <div key={field.id} className="grid grid-cols-1 sm:grid-cols-12 gap-2  items-start border p-2.5 rounded-xl bg-background shadow-2xs">
-                  
-                  {/* Target Scheme Dropdown Selection */}
-                  <div className="sm:col-span-4">
+              {priceFields.length === 0 ? (
+                <div className="flex flex-col items-center justify-center p-8 border border-dashed rounded-xl bg-muted/5 text-muted-foreground text-center">
+                  <DollarSign className="w-8 h-8 mb-2 opacity-40" />
+                  <p className="text-xs font-medium">No prices registered yet</p>
+                  <p className="text-[11px] opacity-75 mt-0.5">Click &quot;Append Price Tier&quot; to add your first price.</p>
+                </div>
+              ) : (
+                priceFields.map((field, idx) => (
+                  <div key={field.id} className="grid grid-cols-1 sm:grid-cols-12 gap-2  items-start border p-2.5 rounded-xl bg-background shadow-2xs">
+                    
+                    {/* Target Scheme Dropdown Selection */}
                     <Controller
                       control={control}
                       name={`prices.${idx}.pricingSchemeId`} 
                       render={({ field, fieldState }) => (
-                        <Field>
+                        <Field className="sm:col-span-4">
                           <Select onValueChange={field.onChange} value={field.value}>
                             <SelectTrigger className="w-full">
                               <SelectValue placeholder="Pricing Scheme" />
                             </SelectTrigger>
                             <SelectContent>
                               {pricingSchemes.length > 0 ? (
-                               pricingSchemes.map((cat) => (
+                                pricingSchemes.map((cat) => (
                                   <SelectItem key={cat.inflowId} value={cat.inflowId}>{cat.name}</SelectItem>
                                 ))
                               ) : (
@@ -815,15 +1112,13 @@ export function ProductForm({  brands, uoms, groups: productGroups, pricingSchem
                         </Field>
                       )}
                     />
-                  </div>
 
-                  {/* Price Type Assignment Selection */}
-                  <div className="sm:col-span-3">
+                    {/* Price Type Assignment Selection */}
                     <Controller
                       control={control}
                       name={`prices.${idx}.priceType`} 
                       render={({ field, fieldState }) => (
-                        <Field>
+                        <Field className={ priceFields.length > 1 ? "sm:col-span-3" : "sm:col-span-4"} >
                           <Select onValueChange={field.onChange} value={field.value}>
                             <SelectTrigger 
                               aria-invalid={fieldState.invalid}
@@ -840,142 +1135,163 @@ export function ProductForm({  brands, uoms, groups: productGroups, pricingSchem
                         </Field>
                       )}
                     />
-                  </div>
 
-                  <Controller 
-                    control={control} 
-                    name={`prices.${idx}.unitPrice`} 
-                    render={({ field, fieldState }) => (
-                      <Field className="sm:col-span-2">
-                        <Input
-                          // Extract value and onChange to control them explicitly
-                          value={field.value}
-                          onBlur={field.onBlur}
-                          ref={field.ref}
-                          onChange={(e) => {
-                            const val = e.target.value;
-                            field.onChange(val === "" ? "" : Number(val));
-                          }}
-                          id={`form-prices.${idx}.unitPrice`}
-                          type="number" 
-                          step="0.00001" 
-                          placeholder="Price ($)"
-                          aria-invalid={fieldState.invalid}
-                        />
-                        {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
-                      </Field>
-                    )}
-                  />
-
-                  <Controller 
-                    control={control} 
-                    name={`prices.${idx}.fixedMarkup`} 
-                    render={({ field, fieldState }) => (
-                      <Field className="sm:col-span-2">
-                         <Input
-                          // Extract value and onChange to control them explicitly
-                          value={field.value}
-                          onBlur={field.onBlur}
-                          ref={field.ref}
-                          onChange={(e) => {
-                            const val = e.target.value;
-                            field.onChange(val === "" ? "" : Number(val));
-                          }}
-                          id={`form-prices.${idx}.fixedMarkup`}
-                          type="number" 
-                          step="0.00001" 
-                          placeholder="Markup ($)"
-                          aria-invalid={fieldState.invalid}
-                        />
-                        {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
-                      </Field>
-                    )}
-                  />
-
-                  {/* Action Delete Trigger Button */}
-                  <div className="sm:col-span-1 flex justify-center">
-                    <Button 
-                      type="button" 
-                      variant="ghost" 
-                      size="icon" 
-                      disabled={priceFields.length <= 1}
-                      onClick={() => removePrice(idx)} 
-                      className="h-8 w-8 text-muted-foreground hover:text-destructive disabled:opacity-30 shrink-0"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </Button>
-                  </div>
-                  
-                </div>
-              ))}
-            </div>
-          </div>
-        </FieldSet>
-    
-
-        {/* Internal Administration Remarks */}
-        <FieldSet className="border-t pt-4">
-          <Field>
-            <FieldLabel>Internal System Administrative Remarks</FieldLabel>
-            <Textarea placeholder="Add internal operational notices..." rows={2} {...register("remarks")} />
-          </Field>
-        </FieldSet>
-
-        {/* Dynamic 1:Many Barcodes Registry Rows */}
-        <FieldSet className="border-t pt-4">
-          <div className="flex items-center justify-between border-b pb-2">
-            <FieldLegend className="flex items-center gap-2"><Barcode className="w-4 h-4 text-muted-foreground" /> Global Trade Barcode Identifiers Mapping</FieldLegend>
-            <Button type="button" variant="outline" size="sm" onClick={() => appendBarcode({ barcode: "" })} className="h-7 text-xs gap-1"><Plus className="w-3 h-3" /> Append Barcode</Button>
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3">
-            {barcodeFields.map((field, index) => (
-              <Controller
-                key={field.id}
-                name={`barcodes.${index}.barcode`}
-                control={form.control}
-                render={({ field: controllerField, fieldState }) => (
-                  <Field
-                    orientation="horizontal"
-                    data-invalid={fieldState.invalid}
-                  >
-                    <FieldContent className="space-y-1">
-                      <InputGroup>
-                        <InputGroupInput
-                          {...controllerField}
-                          id={`form-rhf-array-email-${index}`}
-                          aria-invalid={fieldState.invalid}
-                          placeholder="GTIN-13, EAN, or UPC value string"
-                          className="h-7 text-xs"
-                        />
-                        {barcodeFields.length > 1 && (
-                          <InputGroupAddon align="inline-end">
-                            <InputGroupButton
-                              type="button"
-                              variant="ghost"
-                              size="icon-xs"
-                              onClick={() => removeBarcode(index)}
-                              aria-label={`Remove barcode ${index + 1}`}
-                            >
-                              <XIcon />
-                            </InputGroupButton>
-                          </InputGroupAddon>
-                        )}
-                      </InputGroup>
-                      {fieldState.invalid && (
-                        <FieldError errors={[fieldState.error]} className="text-[12px] px-1" />
+                    <Controller 
+                      control={control} 
+                      name={`prices.${idx}.unitPrice`} 
+                      render={({ field, fieldState }) => (
+                        <Field className="sm:col-span-2">
+                          <Input
+                            // Extract value and onChange to control them explicitly
+                            value={field.value}
+                            onBlur={field.onBlur}
+                            ref={field.ref}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              field.onChange(val === "" ? "" : Number(val));
+                            }}
+                            id={`form-prices.${idx}.unitPrice`}
+                            type="number" 
+                            step="0.00001" 
+                            placeholder="Price ($)"
+                            aria-invalid={fieldState.invalid}
+                          />
+                          {fieldState.invalid && <FieldError className="text-xs" errors={[fieldState.error]} />}
+                        </Field>
                       )}
-                    </FieldContent>
-                  </Field>
-                )}
-              />
-            ))}
-          </div>
-        </FieldSet>
+                    />
 
-        {/* Dynamic CDN Image Url Asset Links Array Mapping Block */}
-        <FieldSet className="border-t pt-6">
-          <div className="flex items-center justify-between border-b pb-3 mb-4">
-            <div className="space-y-0.5">
+                    <Controller 
+                      control={control} 
+                      name={`prices.${idx}.fixedMarkup`} 
+                      render={({ field, fieldState }) => (
+                        <Field className="sm:col-span-2">
+                          <Input
+                            // Extract value and onChange to control them explicitly
+                            value={field.value}
+                            onBlur={field.onBlur}
+                            ref={field.ref}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              field.onChange(val === "" ? "" : Number(val));
+                            }}
+                            id={`form-prices.${idx}.fixedMarkup`}
+                            type="number" 
+                            step="0.00001" 
+                            placeholder="Markup ($)"
+                            aria-invalid={fieldState.invalid}
+                          />
+                          {fieldState.invalid && <FieldError className="text-xs" errors={[fieldState.error]} />}
+                        </Field>
+                      )}
+                    />
+
+                    {/* Action Delete Trigger Button */}
+                    { priceFields.length > 1 && (
+                      <div className="sm:col-span-1 flex justify-center">
+                        <Button 
+                          type="button" 
+                          variant="ghost" 
+                          size="icon" 
+                          onClick={() => removePrice(idx)} 
+                          className="h-8 w-8 text-muted-foreground hover:text-destructive disabled:opacity-30 shrink-0"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                ))
+              )}
+            </div>
+            <Button 
+                type="button" 
+                variant="outline" 
+                size="sm" 
+                onClick={() => {
+                  appendPrice({ pricingSchemeId: pricingSchemes[0]?.inflowId || "", priceType: "FixedPrice", unitPrice: 0, fixedMarkup: 0 })
+                }} 
+                disabled={priceFields.length >= pricingSchemes.length}
+                className="h-8 text-xs gap-1.5 shadow-xs w-full" 
+              >
+              <Plus className="w-3.5 h-3.5" /> Append Price Tier
+            </Button>
+
+          </div>
+
+          {/* Barcode Identifiers */}
+          <div className="bg-card border rounded-xl p-5 space-y-4 shadow-xs">
+            <div className="space-y-0.5 flex items-center justify-between  border-b pb-2">
+              <FieldLegend className="flex items-center gap-2 text-sm font-semibold">
+                <Barcode className="w-4 h-4 text-primary" /> 
+                Global Trade Barcode Identifiers Mapping
+              </FieldLegend>
+              <Button type="button" variant="outline" size="sm" disabled={barcodeFields.length >= 10} onClick={() => appendBarcode({ barcode: "" })} className="h-7 text-xs gap-1"><Plus className="w-3 h-3" /> Append Barcode</Button>
+            </div>
+            
+            {/* CUSTOM ERROR ALERT FOR Barcode ARRAY */}
+            {errors.barcodes?.message && !Array.isArray(errors.barcodes) && imageFields.length === 0 && (
+              <DynamicAlert title="Missing Information" description={errors.barcodes.message} variant="destructive" />
+            )}
+            
+            {/* barcode Items */}
+            { barcodeFields.length === 0 ? (
+              <div className="flex flex-col items-center justify-center p-8 border border-dashed rounded-xl bg-muted/5 text-muted-foreground text-center">
+                <Barcode className="w-8 h-8 mb-2 opacity-40" />
+                <p className="text-xs font-medium">No barcodes registered yet</p>
+                <p className="text-[11px] opacity-75 mt-0.5">Click &quot;Append Barcode&quot; to add your first identifier mapping.</p>
+              </div>
+              ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3">
+                {barcodeFields.map((field, index) => (
+                  <Controller
+                    key={field.id}
+                    name={`barcodes.${index}.barcode`}
+                    control={form.control}
+                    render={({ field: controllerField, fieldState }) => (
+                      <Field
+                        orientation="horizontal"
+                        data-invalid={fieldState.invalid}
+                      >
+                        <FieldContent className="space-y-1">
+                          <InputGroup>
+                            <InputGroupInput
+                              {...controllerField}
+                              id={`form-barcode-${index}`}
+                              aria-invalid={fieldState.invalid}
+                              placeholder="GTIN-13, EAN, or UPC value string"
+                              className="h-7 text-xs"
+                            />
+                            {barcodeFields.length > 1 && (
+                              <InputGroupAddon align="inline-end">
+                                <InputGroupButton
+                                  type="button"
+                                  variant="ghost"
+                                  size="icon-xs"
+                                  onClick={() => removeBarcode(index)}
+                                  aria-label={`Remove barcode ${index + 1}`}
+                                >
+                                  <XIcon />
+                                </InputGroupButton>
+                              </InputGroupAddon>
+                            )}
+                          </InputGroup>
+                          {fieldState.invalid && (
+                            <FieldError errors={[fieldState.error]} className="text-[12px] px-1" />
+                          )}
+                        </FieldContent>
+                      </Field>
+                    )}
+                  />
+                ))}
+              </div>
+            )}
+
+          </div>
+          
+          {/* Images Section */}
+          <div className="bg-card border rounded-xl p-5 space-y-4 shadow-xs ">
+            <div className="space-y-0.5 border-b pb-2">
               <FieldLegend className="flex items-center gap-2 text-sm font-semibold">
                 <ImageIcon className="w-4 h-4 text-primary" /> 
                 Media Asset Resource Link Registries
@@ -984,252 +1300,266 @@ export function ProductForm({  brands, uoms, groups: productGroups, pricingSchem
                 Register and configure responsive CDN image URLs for this product.
               </p>
             </div>
-            <Button 
-              type="button" 
-              variant="outline" 
-              size="sm" 
-              onClick={() => {
-                appendImage({ 
-                  originalUrl: "",
-                  thumbUrl: "",
-                  smallUrl: "",
-                  mediumUrl: "",
-                  largeUrl: "",
-                });
-                // Auto-expand the newly created item
-                setExpandedIndex(imageFields.length);
-              }} 
-              className="h-8 text-xs gap-1.5 shadow-xs"
-            >
-              <Plus className="w-3.5 h-3.5" /> Bind Image URL
-            </Button>
-          </div>
 
-          <div className="space-y-3">
-            {imageFields.length === 0 ? (
-              <div className="flex flex-col items-center justify-center p-8 border border-dashed rounded-xl bg-muted/5 text-muted-foreground text-center">
-                <ImageIcon className="w-8 h-8 mb-2 opacity-40" />
-                <p className="text-xs font-medium">No images registered yet</p>
-                <p className="text-[11px] opacity-75 mt-0.5">Click &nsquo;Bind Image URL&nsquo; to add your first asset link.</p>
-              </div>
-            ) : (
-              imageFields.map((field, index) => {
-                const hasError = !!errors.images?.[index]?.originalUrl;
-                const currentUrl = watchedImages[index]?.originalUrl;
-                const isValidUrl = currentUrl && /^https?:\/\/.+/i.test(currentUrl);
-
-                return (
-                  <div 
-                    key={field.id} 
-                    className={cn(
-                      "flex flex-col gap-2 bg-card p-3 border rounded-xl shadow-xs transition-colors",
-                      hasError ? "border-destructive/40 bg-destructive/5" : "hover:border-accent-foreground/10"
-                    )}
-                  >
-                    {/* Primary Link Row with Preview */}
-                    <div className="flex items-center gap-3">
-                      {/* Interactive Thumbnail Preview */}
-                      <div className="w-12 h-12 rounded-lg border bg-muted flex items-center justify-center overflow-hidden shrink-0 shadow-inner">
-                        {isValidUrl ? (
-                          <Image 
-                            src={currentUrl} 
-                            alt="Preview" 
-                            className="w-full h-full object-cover"
-                            onError={(e) => {
-                              // Fallback if URL is structurally valid but doesn't resolve to an image
-                              (e.target as HTMLImageElement).src = "";
-                              (e.target as HTMLImageElement).classList.add("hidden");
-                            }}
-                            height={500}
-                            width={500}
-                          />
-                        ) : (
-                          <ImageIcon className="w-5 h-5 text-muted-foreground/40" />
-                        )}
-                      </div>
-
-                      {/* Main CDN Link Input */}
-                      <div className="flex-1 space-y-1">
-                        <Controller
-                          name={`images.${index}.originalUrl`}
-                          control={control}
-                          render={({ field, fieldState }) => (
-                            <Field data-invalid={fieldState.invalid}>
-                              <FieldContent className="relative">
-                                <LinkIcon className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-muted-foreground/60" />
-                                <Input
-                                  {...field}
-                                  id={`form-images.${index}.originalUrl`}
-                                  aria-invalid={fieldState.invalid}
-                                  placeholder="https://cdn.yourstore.com/images/product-main.jpg"
-                                  className="pl-9 h-9 text-xs" 
-                                />
-                              </FieldContent>
-                            </Field>
-                          )}
-                        />
-                      </div>
-
-                      {/* Row Controls */}
-                      <div className="flex items-center gap-1.5 shrink-0">
-                        {/* Advanced Dimensions Toggle */}
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8 text-muted-foreground hover:bg-muted"
-                          onClick={() => toggleExpand(index)}
-                          title="Configure responsive sizes"
-                        >
-                          {expandedIndex === index ? (
-                            <ChevronUp className="w-4 h-4" />
-                          ) : (
-                            <ChevronDown className="w-4 h-4" />
-                          )}
-                        </Button>
-
-                        {/* Remove button */}
-                        <Button 
-                          type="button" 
-                          variant="ghost" 
-                          size="icon" 
-                          onClick={() => removeImage(index)} 
-                          className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
-                      </div>
-                    </div>
-
-                    {/* Error Message */}
-                    {hasError && (
-                      <span className="text-[11px] font-medium text-destructive px-1.5 flex items-center gap-1">
-                        ⚠️ {errors.images?.[index]?.originalUrl?.message}
-                      </span>
-                    )}
-
-                    {/* Advanced Responsive Sizes Panel (Expanded state) */}
-                    {expandedIndex === index && (
-                      <div className="mt-2 pt-3 border-t border-dashed grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
-                        
-                        <Controller
-                          name={`images.${index}.thumbUrl`}
-                          control={control}
-                          render={({ field, fieldState }) => (
-                            <Field data-invalid={fieldState.invalid} className="space-y-1">
-                              <FieldContent className="relative">
-                                <Input
-                                  value={field.value ?? ""} // ✅ Safely fall back to "" if value is null
-                                  onBlur={field.onBlur}
-                                  ref={field.ref}
-                                  onChange={(e) => {
-                                    const val = e.target.value;
-                                    field.onChange(val === "" ? null : val); // ✅ Sets null in state if empty, instead of breaking types
-                                  }}
-                                  id={`form-images.${index}.thumbUrl`}
-                                  aria-invalid={fieldState.invalid}
-                                  placeholder="Thumb URL"
-                                  className="h-7 text-xs bg-background" 
-                                />
-                              </FieldContent>
-                              {fieldState.invalid && <FieldError errors={[fieldState.error]} className="text-[11px] font-medium px-1.5 flex items-center gap-1" />}
-                            </Field>
-                          )}
-                        />
-
-                        <Controller
-                          name={`images.${index}.smallUrl`}
-                          control={control}
-                          render={({ field, fieldState }) => (
-                            <Field data-invalid={fieldState.invalid} className="space-y-1">
-                              <FieldContent className="relative">
-                                <Input
-                                  value={field.value ?? ""} // ✅ Safely fall back to "" if value is null
-                                  onBlur={field.onBlur}
-                                  ref={field.ref}
-                                  onChange={(e) => {
-                                    const val = e.target.value;
-                                    field.onChange(val === "" ? null : val); // ✅ Sets null in state if empty
-                                  }}
-                                  id={`form-images.${index}.smallUrl`}
-                                  aria-invalid={fieldState.invalid}
-                                  placeholder="Small URL"
-                                  className="h-7 text-xs bg-background" 
-                                />
-                              </FieldContent>
-                              {fieldState.invalid && <FieldError errors={[fieldState.error]} className="text-[11px] font-medium px-1.5 flex items-center gap-1" />}
-                            </Field>
-                          )}
-                        />
-
-                        <Controller
-                          name={`images.${index}.mediumUrl`}
-                          control={control}
-                          render={({ field, fieldState }) => (
-                            <Field data-invalid={fieldState.invalid} className="space-y-1">
-                              <FieldContent className="relative">
-                                <Input
-                                  value={field.value ?? ""} // ✅ Safely fall back to "" if value is null
-                                  onBlur={field.onBlur}
-                                  ref={field.ref}
-                                  onChange={(e) => {
-                                    const val = e.target.value;
-                                    field.onChange(val === "" ? null : val); // ✅ Sets null in state if empty
-                                  }}
-                                  id={`form-images.${index}.mediumUrl`}
-                                  aria-invalid={fieldState.invalid}
-                                  placeholder="Medium URL"
-                                  className="h-7 text-xs bg-background" 
-                                />
-                              </FieldContent>
-                              {fieldState.invalid && <FieldError errors={[fieldState.error]} className="text-[11px] font-medium px-1.5 flex items-center gap-1" />}
-                            </Field>
-                          )}
-                        />
-
-                        <Controller
-                          name={`images.${index}.largeUrl`}
-                          control={control}
-                          render={({ field, fieldState }) => (
-                            <Field data-invalid={fieldState.invalid} className="space-y-1">
-                              <FieldContent className="relative">
-                                <Input
-                                  value={field.value ?? ""} // ✅ Safely fall back to "" if value is null
-                                  onBlur={field.onBlur}
-                                  ref={field.ref}
-                                  onChange={(e) => {
-                                    const val = e.target.value;
-                                    field.onChange(val === "" ? null : val); // ✅ Sets null in state if empty
-                                  }}
-                                  id={`form-images.${index}.largeUrl`}
-                                  aria-invalid={fieldState.invalid}
-                                  placeholder="Large URL"
-                                  className="h-7 text-xs bg-background" 
-                                />
-                              </FieldContent>
-                              {fieldState.invalid && <FieldError errors={[fieldState.error]} className="text-[11px] font-medium px-1.5 flex items-center gap-1" />}
-                            </Field>
-                          )}
-                        />
-                        
-                      </div>
-                    )}
-                  </div>
-                );
-              })
+            {/* CUSTOM ERROR ALERT FOR Image ARRAY */}
+            {errors.images?.message && !Array.isArray(errors.images) && imageFields.length === 0 && (
+              <DynamicAlert title="Missing Information" description={errors.images.message} variant="destructive" />
             )}
+            
+            {/* Image Items */}
+            <div className="space-y-3">
+              {imageFields.length === 0 ? (
+                <div className="flex flex-col items-center justify-center p-8 border border-dashed rounded-xl bg-muted/5 text-muted-foreground text-center">
+                  <ImageIcon className="w-8 h-8 mb-2 opacity-40" />
+                  <p className="text-xs font-medium">No images registered yet</p>
+                  <p className="text-[11px] opacity-75 mt-0.5">Click &quot;Bind Image URL&quot; to add your first asset link.</p>
+                </div>
+              ) : (
+                imageFields.map((field, index) => {
+                  const hasError = !!errors.images?.[index]?.originalUrl;
+                  const currentUrl = watchedImages[index]?.originalUrl;
+                  const isValidUrl = currentUrl && /^https?:\/\/.+/i.test(currentUrl);
+
+                  return (
+                    <div 
+                      key={field.id} 
+                      className={cn(
+                        "flex flex-col gap-2 bg-card p-3 border rounded-xl shadow-xs transition-colors",
+                        hasError ? "border-destructive/40 bg-destructive/5" : "hover:border-accent-foreground/10"
+                      )}
+                    >
+                      {/* Primary Link Row with Preview */}
+                      <div className="flex items-center gap-3">
+                        {/* Interactive Thumbnail Preview */}
+                        <div className="w-12 h-12 rounded-lg border bg-muted flex items-center justify-center overflow-hidden shrink-0 shadow-inner">
+                          { isValidUrl ? (
+                            <Image 
+                              src={currentUrl} 
+                              alt="Preview" 
+                              className="w-full h-full object-cover"
+                              onError={(e) => {
+                                // Fallback if URL is structurally valid but doesn't resolve to an image
+                                (e.target as HTMLImageElement).src = "";
+                                (e.target as HTMLImageElement).classList.add("hidden");
+                              }}
+                              height={500}
+                              width={500}
+                            />
+                          ) : (
+                            <ImageIcon className="w-5 h-5 text-muted-foreground/40" />
+                          )}
+                        </div>
+
+                        {/* Main CDN Link Input */}
+                        <div className="flex-1 space-y-1">
+                          <Controller
+                            name={`images.${index}.originalUrl`}
+                            control={control}
+                            render={({ field, fieldState }) => (
+                              <Field data-invalid={fieldState.invalid}>
+                                <FieldContent className="relative">
+                                  <LinkIcon className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-muted-foreground/60" />
+                                  <Input
+                                    {...field}
+                                    id={`form-images.${index}.originalUrl`}
+                                    aria-invalid={fieldState.invalid}
+                                    placeholder="https://cdn.yourstore.com/images/product-main.jpg"
+                                    className="pl-9 h-9 text-xs" 
+                                  />
+                                </FieldContent>
+                              </Field>
+                            )}
+                          />
+                        </div>
+
+                        {/* Row Controls */}
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          {/* Advanced Dimensions Toggle */}
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 text-muted-foreground hover:bg-muted"
+                            onClick={() => toggleExpand(index)}
+                            title="Configure responsive sizes"
+                          >
+                            {expandedIndex === index ? (
+                              <ChevronUp className="w-4 h-4" />
+                            ) : (
+                              <ChevronDown className="w-4 h-4" />
+                            )}
+                          </Button>
+
+                          {/* Remove button */}
+                          { imageFields.length > 1 && (
+                            <Button 
+                              type="button" 
+                              variant="ghost" 
+                              size="icon" 
+                              onClick={() => removeImage(index)} 
+                              className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Error Message */}
+                      {hasError && (
+                        <span className="text-[11px] font-medium text-destructive px-1.5 flex items-center gap-1">
+                          ⚠️ {errors.images?.[index]?.originalUrl?.message}
+                        </span>
+                      )}
+
+                      {/* Advanced Responsive Sizes Panel (Expanded state) */}
+                      {expandedIndex === index && (
+                        <div className="mt-2 pt-3 border-t border-dashed grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                          
+                          <Controller
+                            name={`images.${index}.thumbUrl`}
+                            control={control}
+                            render={({ field, fieldState }) => (
+                              <Field data-invalid={fieldState.invalid} className="space-y-1">
+                                <FieldContent className="relative">
+                                  <Input
+                                    value={field.value ?? ""} // ✅ Safely fall back to "" if value is null
+                                    onBlur={field.onBlur}
+                                    ref={field.ref}
+                                    onChange={(e) => {
+                                      const val = e.target.value;
+                                      field.onChange(val === "" ? null : val); // ✅ Sets null in state if empty, instead of breaking types
+                                    }}
+                                    id={`form-images.${index}.thumbUrl`}
+                                    aria-invalid={fieldState.invalid}
+                                    placeholder="Thumb URL"
+                                    className="h-7 text-xs bg-background" 
+                                  />
+                                </FieldContent>
+                                {fieldState.invalid && <FieldError errors={[fieldState.error]} className="text-[11px] font-medium px-1.5 flex items-center gap-1" />}
+                              </Field>
+                            )}
+                          />
+
+                          <Controller
+                            name={`images.${index}.smallUrl`}
+                            control={control}
+                            render={({ field, fieldState }) => (
+                              <Field data-invalid={fieldState.invalid} className="space-y-1">
+                                <FieldContent className="relative">
+                                  <Input
+                                    value={field.value ?? ""} // ✅ Safely fall back to "" if value is null
+                                    onBlur={field.onBlur}
+                                    ref={field.ref}
+                                    onChange={(e) => {
+                                      const val = e.target.value;
+                                      field.onChange(val === "" ? null : val); // ✅ Sets null in state if empty
+                                    }}
+                                    id={`form-images.${index}.smallUrl`}
+                                    aria-invalid={fieldState.invalid}
+                                    placeholder="Small URL"
+                                    className="h-7 text-xs bg-background" 
+                                  />
+                                </FieldContent>
+                                {fieldState.invalid && <FieldError errors={[fieldState.error]} className="text-[11px] font-medium px-1.5 flex items-center gap-1" />}
+                              </Field>
+                            )}
+                          />
+
+                          <Controller
+                            name={`images.${index}.mediumUrl`}
+                            control={control}
+                            render={({ field, fieldState }) => (
+                              <Field data-invalid={fieldState.invalid} className="space-y-1">
+                                <FieldContent className="relative">
+                                  <Input
+                                    value={field.value ?? ""} // ✅ Safely fall back to "" if value is null
+                                    onBlur={field.onBlur}
+                                    ref={field.ref}
+                                    onChange={(e) => {
+                                      const val = e.target.value;
+                                      field.onChange(val === "" ? null : val); // ✅ Sets null in state if empty
+                                    }}
+                                    id={`form-images.${index}.mediumUrl`}
+                                    aria-invalid={fieldState.invalid}
+                                    placeholder="Medium URL"
+                                    className="h-7 text-xs bg-background" 
+                                  />
+                                </FieldContent>
+                                {fieldState.invalid && <FieldError errors={[fieldState.error]} className="text-[11px] font-medium px-1.5 flex items-center gap-1" />}
+                              </Field>
+                            )}
+                          />
+
+                          <Controller
+                            name={`images.${index}.largeUrl`}
+                            control={control}
+                            render={({ field, fieldState }) => (
+                              <Field data-invalid={fieldState.invalid} className="space-y-1">
+                                <FieldContent className="relative">
+                                  <Input
+                                    value={field.value ?? ""} // ✅ Safely fall back to "" if value is null
+                                    onBlur={field.onBlur}
+                                    ref={field.ref}
+                                    onChange={(e) => {
+                                      const val = e.target.value;
+                                      field.onChange(val === "" ? null : val); // ✅ Sets null in state if empty
+                                    }}
+                                    id={`form-images.${index}.largeUrl`}
+                                    aria-invalid={fieldState.invalid}
+                                    placeholder="Large URL"
+                                    className="h-7 text-xs bg-background" 
+                                  />
+                                </FieldContent>
+                                {fieldState.invalid && <FieldError errors={[fieldState.error]} className="text-[11px] font-medium px-1.5 flex items-center gap-1" />}
+                              </Field>
+                            )}
+                          />
+                          
+                        </div>
+                      )}
+                    </div>
+                  );
+                })
+              )}
+            </div>
+            <Button 
+                type="button" 
+                variant="outline" 
+                size="sm" 
+                onClick={() => {
+                  appendImage({ 
+                    originalUrl: "",
+                    thumbUrl: "",
+                    smallUrl: "",
+                    mediumUrl: "",
+                    largeUrl: "",
+                  });
+                  // Auto-expand the newly created item
+                  setExpandedIndex(imageFields.length);
+                }} 
+                disabled={imageFields.length >= 5}
+                className="h-8 text-xs gap-1.5 shadow-xs w-full" 
+              >
+                <Plus className="w-3.5 h-3.5" /> Bind Image URL
+              </Button>
           </div>
-        </FieldSet>
-
-        {/* Global Action Bottom Controls Row */}
-        <div className="flex items-center justify-between gap-4 border-t pt-5">
-          <Button type="button" variant="ghost" size="sm" onClick={() => router.back()} className="text-xs gap-1.5"><ArrowLeft className="w-4 h-4" /> Cancel</Button>
-          <Button type="submit" disabled={isSubmitting} size="sm" className="min-w-[150px]">
-            {isSubmitting ? "Writing Product Matrix..." : isEditMode ? "Update Product Record" : "Register Catalog SKU"}
-          </Button>
         </div>
+      </div>
 
-      </FieldGroup>
+      {/* Form Action Controls Bar */}
+      <div className="flex items-center justify-between gap-4 border-t pt-5 mt-6">
+        <Button type="button" variant="ghost" size="sm" onClick={() => router.back()} className="text-xs gap-1.5">
+          <ArrowLeft className="w-4 h-4" /> Cancel
+        </Button>
+        <Button type="submit" size="sm" disabled={isSubmitting} className="gap-1.5 text-xs px-5">
+          {isSubmitting ? (
+            <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Saving Data...</>
+          ) : (
+            <><Save className="w-3.5 h-3.5" /> {isEditMode ? "Commit Modifications" : "Save Product"}</>
+          )}
+        </Button>
+      </div>
     </form>
   );
 }

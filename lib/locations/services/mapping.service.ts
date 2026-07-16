@@ -201,6 +201,38 @@ export class MappingWebhookService {
     return { success: false };
   }
 
+   static async handleProductMap(inflowId: string, localId: string, eventId: string, locationId: string): Promise<SyncResult> {
+    console.log(`[Webhook Service] Processing real-time update for product ID: ${inflowId}`);
+    
+    const result = await prisma.productLocationMap.upsert({
+      where: {
+        productId_locationId: {
+          productId: inflowId, 
+          locationId: locationId,    
+        }
+      },
+      update: {
+        localId: Number(localId)    
+      },
+      create: {
+        productId: inflowId,
+        locationId: locationId,
+        localId: Number(localId)
+      }
+    });
+
+    if (result && eventId) {
+      await prisma.locationWebhookEvent.update({
+        where: { id: eventId },
+        data: { processed: true }
+      });
+
+      return { success: true };
+    }
+
+    return { success: false };
+  }
+
   
 
   

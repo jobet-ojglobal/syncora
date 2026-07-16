@@ -37,9 +37,10 @@ interface Category {
 interface CategorySelectProps {
   value?: string | null;
   onChange: (value: string) => void;
+  className?: string;
 }
 
-export function CategorySelect({ value, onChange }: CategorySelectProps) {
+export function CategorySelect({ value, onChange, className }: CategorySelectProps) {
   const [open, setOpen] = React.useState(false);
   const [dialogOpen, setDialogOpen] = React.useState(false);
   const [categories, setCategories] = React.useState<Category[]>([]);
@@ -126,7 +127,7 @@ export function CategorySelect({ value, onChange }: CategorySelectProps) {
             variant="outline"
             role="combobox"
             aria-expanded={open}
-            className="w-full justify-between font-normal text-sm h-10 shadow-xs"
+            className={`w-full justify-between font-normal text-sm h-10 shadow-xs ${className}`}
             disabled={loading}
           >
             {loading ? (

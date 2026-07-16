@@ -8,7 +8,7 @@ export default async function CreateProductPage() {
   const metadata = await getProductMetadata();
 
   return (
-    <div className="w-full max-w-5xl mx-auto p-6 space-y-6">
+    <div className="w-full max-w-7xl mx-auto p-6 space-y-6">
       {/* NAVIGATION CONTROLS */}
       <Link
         href="/dashboard/products"

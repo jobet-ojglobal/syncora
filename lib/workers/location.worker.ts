@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { connection } from "@/lib/redis";
 import { CustomerSyncResult, InflowCustomerWebhookService } from "../locations/services/customer-upsert.service";
 import { MappingWebhookService } from "../locations/services/mapping.service";
+import { BranchClient } from "../locations/location.client";
 
 // import { locationApi } from "@/lib/location/location.client";
 // import { CustomerSyncResult } from "@/lib/location/webhooks/webhook-customer.service";
@@ -15,15 +16,20 @@ interface LocationWebhookJobData {
   dataId: string;
   locationId: string; 
   loggedEventId: string;
+  source_key?: string;
   data?: any
 }
 
 const locationWorker = new Worker<LocationWebhookJobData>(
   "location_sync", // Ties this worker explicitly to the location_sync queue
   async (job: Job<LocationWebhookJobData>) => {
-    const { source, dataId, loggedEventId, locationId, data } = job.data;
+    const { source, dataId, loggedEventId, locationId, source_key, data } = job.data;
 
     console.log(`[Location Worker] Processing job ${job.id} for source: ${source}`);
+
+    const location = await prisma.location.findUnique({ where: { inflowId: locationId }})
+
+    const locationUrl = (location?.url && location.url.trim() !== "") ? location.url : null;
 
     try {
       let result;
@@ -58,6 +64,10 @@ const locationWorker = new Worker<LocationWebhookJobData>(
         case "customerLocal":
           result = await MappingWebhookService.handleCustomerMap(data.customerId, dataId, loggedEventId, locationId); 
           break;
+        case "productLocal":
+          result = await MappingWebhookService.handleProductMap(data.productId, dataId, loggedEventId, locationId); 
+          break;
+        
         
 
         default:
@@ -84,6 +94,19 @@ const locationWorker = new Worker<LocationWebhookJobData>(
             //     removeOnComplete: true
             //   }
             // );
+          }
+        }
+
+        if(locationUrl && dataId && !source_key) {
+          const apiClient = new BranchClient(locationUrl);
+          try {
+            await apiClient.put("/cloud/ack", {
+              status: "SUCCESS",
+              batch_id: dataId,
+              message: "Processed and queued downstream successfully via partner worker"
+            });
+          } catch (ackError) {
+            console.error(`⚠️ [Location Worker] DB Save/Queue successful, but cloud acknowledgment failed:`, ackError);
           }
         }
       }

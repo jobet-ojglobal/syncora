@@ -199,6 +199,34 @@ export async function POST(request: NextRequest) {
         break;
       }
 
+      case "product":
+      case "productLocal": {
+        const batchID = payload.batch_id || payload.source_key;
+
+        if (batchID) {
+          // Offload the sync processing to the dedicated background worker queue
+          await getLocationSyncQueue().add(
+            "product_sync_job",
+            {
+              source: eventType,
+              loggedEventId: loggedEvent.id,
+              dataId: payload.inflowId || batchID,
+              source_key: payload.source_key || null,
+              locationId, 
+              data: { productId: batchID }
+            },
+            {
+              attempts: 3,
+              backoff: {
+                type: "exponential",
+                delay: 2000, // Wait 2s, then 4s, then 8s on failure
+              },
+            }
+          );
+        }
+        break;
+      }
+
       case "categoryLocal": {
         const batchID = payload.batch_id || payload.source_key;
 

@@ -27,3 +27,18 @@ export const ADDRESS_TYPE_MAP: Record<string, number> = {
   "Residential": 2,
 };
 
+// Maps UI Select values (string) -> API ItemType (number)
+export const UI_TO_API_ITEM_TYPE: Record<string, number> = {
+  Stock: 0,
+  Serialized: 1,
+  NonStock: 2,
+  Service: 3,
+};
+
+// Maps API ItemType (number) -> UI Select values (string)
+export const API_TO_UI_ITEM_TYPE: Record<number, string> = {
+  0: "Stock",
+  1: "Serialized",
+  2: "NonStock",
+  3: "Service",
+};

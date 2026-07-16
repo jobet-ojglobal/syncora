@@ -8,7 +8,8 @@ import { upsertCustomer as upsertLocalCustomer } from "../locations/data/custome
 import { upsertCategory as upsertLocalCategory } from "../locations/data/category";
 import { upsertTaxingScheme as upsertLocalTaxingScheme } from "../locations/data/taxing-scheme";
 import { upsertPricingScheme as upsertLocalPricingScheme } from "../locations/data/pricing-scheme";
-import { upsertPricingScheme as upsertLocalPricingScheme } from "../locations/data/produc";
+import { upsertProduct as upsertLocalProductScheme } from "../locations/data/product";
+import { BranchClient } from "../locations/location.client";
 
 interface MidWebhookJobData {
   source: string;
@@ -66,7 +67,7 @@ const midWorker = new Worker<MidWebhookJobData>(
           if (!locationUrl) {
             throw new Error(`Cannot sync product: No location URL found for location ${location?.name}`);
           }
-          result = await upsertLocalCategory(payload, locationUrl);
+          result = await upsertLocalProductScheme(payload, locationUrl);
           break;
         case "PRICING_SCHEME_UPSERT_LOCAL": // OK
           if (!locationUrl) {
@@ -75,8 +76,7 @@ const midWorker = new Worker<MidWebhookJobData>(
           result = await upsertLocalPricingScheme(payload, locationUrl);
           break;
 
-          
-
+        
         default:
           throw new Error(`Unsupported mid sync source: ${source}`);
       }
@@ -114,6 +114,12 @@ const midWorker = new Worker<MidWebhookJobData>(
           // });
           console.log(`[Mapping Registry] Saved Identity Map: Central String (${payload.taxingSchemeId}) ⇄ Local Int (${newLocalId}) for Location: ${location.name}`);
         }
+
+        // Cloud acknowledgement fallback protection
+
+        
+        
+        
       } else if (result) {
         console.error(`[Mid Worker Sync Warn] API did not return success for ${model}. Message: ${result.message}`);
         throw new Error(`Local Node Sync Refused: ${result.message}`); // Throw to trigger BullMQ auto-retry backoff

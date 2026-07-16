@@ -37,9 +37,10 @@ interface Brand {
 interface BrandSelectProps {
   value?: string | null;
   onChange: (value: string) => void;
+  className?: string;
 }
 
-export function BrandSelect({ value, onChange }: BrandSelectProps) {
+export function BrandSelect({ value, onChange, className }: BrandSelectProps) {
   const [open, setOpen] = React.useState(false);
   const [dialogOpen, setDialogOpen] = React.useState(false);
   const [brands, setBrands] = React.useState<Brand[]>([]);
@@ -124,7 +125,7 @@ export function BrandSelect({ value, onChange }: BrandSelectProps) {
             variant="outline"
             role="combobox"
             aria-expanded={open}
-            className="w-full justify-between font-normal text-sm h-10 shadow-xs"
+            className={`w-full  justify-between font-normal text-sm shadow-xs ${className}`}
             disabled={loading}
           >
             {loading ? (

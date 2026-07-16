@@ -5,6 +5,8 @@ import { genUniqueSlug } from "@/helpers/genUniqueSlug";
 import { Prisma } from "@/generated/prisma/client";
 import { getMidSyncQueue } from "@/lib/queues/sync.queue";
 import { WebhookService } from "@/services/webhook.service";
+import { UI_TO_API_ITEM_TYPE } from "@/types/local-location.type";
+import { BrandService } from "@/services/brand.service";
 
 // export async function GET() {
 //   try {
@@ -271,258 +273,410 @@ export async function POST(request: NextRequest) {
     // 3. Main Operational Database Transaction Chain Loop
     const outputTransaction = await prisma.$transaction(async (tx) => {
       
-      // 🎯 ADDED: Core Matrix Safety Guardrail Check for creating new links
-      if (productGroupId && variantSignature) {
-        const existingBinding = await tx.productVariant.findUnique({
-          where: {
-            productGroupId_signature: {
-              productGroupId,
-              signature: variantSignature
-            }
-          },
-          select: {
-            productId: true,
-            product: { select: { sku: true } }
+    // 🎯 ADDED: Core Matrix Safety Guardrail Check for creating new links
+    if (productGroupId && variantSignature) {
+      const existingBinding = await tx.productVariant.findUnique({
+        where: {
+          productGroupId_signature: {
+            productGroupId,
+            signature: variantSignature
           }
-        });
-
-        // Fail early if slot is occupied by another product node
-        if (existingBinding && existingBinding.productId) {
-          throw new Error(`The selected matrix variant option slot is already assigned to active SKU: ${existingBinding.product?.sku}`);
-        }
-      }
-
-      // A. Create root product document item node
-      const newProduct = await tx.product.create({
-        data: {
-          inflowId: computedInflowId,
-          sku: sku.trim(),
-          name: name.trim(),
-          slug: slug.trim(),
-          description: description?.trim() || null,
-          itemType,
-          brandId: brandId || null,
-          categoryId: categoryId || null,
-          autoAssemble: !!autoAssemble,
-          isActive: !!isActive,
-          isManufacturable: !!isManufacturable,
-          includeQuantityBuildable: !!includeQuantityBuildable,
-          trackExpiry: !!trackExpiry,
-          trackLots: !!trackLots,
-          trackSerials: !!trackSerials,
-          shelfLifeDays: Number(shelfLifeDays) || 0,
-          sellBeforeExpiryDays: Number(sellBeforeExpiryDays) || 0,
-          expiryNotificationDays: Number(expiryNotificationDays) || 0,
-          weight: Number(weight) || 0, 
-          width: Number(width) || 0, 
-          height: Number(height) || 0, 
-          length: Number(length) || 0,
-          originCountry: originCountry?.trim() || null,
-          hsTariffNumber: hsTariffNumber?.trim() || null,
-          remarks: remarks?.trim() || null,
-          standardUomName: standardUomName.trim().toUpperCase(), 
-
-          purchasingUom: purchasingUomId ? {
-            create: {
-              uomId: purchasingUomId,
-              standardQuantity: Number(purchasingUom.standardQuantity) || 1,
-              uomQuantity: Number(purchasingUom.uomQuantity) || 1,
-            }
-          } : undefined,
-
-          salesUom: salesUomId ? {
-            create: {
-              uomId: salesUomId,
-              standardQuantity: Number(salesUom.standardQuantity) || 1,
-              uomQuantity: Number(salesUom.uomQuantity) || 1,
-            }
-          } : undefined,
-
-          // 🪐 Store incoming cost valuation directly
-          cost: typeof initialCost === "number" ? {
-            create: {
-              inflowId: crypto.randomUUID().toLowerCase(),
-              cost: new Prisma.Decimal(initialCost)
-            }
-          } : undefined,
-
-          // 🪐 Iterating through incoming pricing configurations directly
-          prices: {
-            create: validPrices.map((p: any) => ({
-              inflowId: crypto.randomUUID().toLowerCase(),
-              pricingSchemeId: p.pricingSchemeId,
-              priceType: p.priceType || "FixedPrice",
-              unitPrice: new Prisma.Decimal(p.unitPrice || 0),
-              fixedMarkup: new Prisma.Decimal(p.fixedMarkup || 0)
-            }))
-          },
-
-          barcodes: barcodes.length > 0 ? {
-            create: barcodes
-              .filter((b: any) => b?.barcode?.trim())
-              .map((b: any, index: number) => ({
-                inflowId: crypto.randomUUID().toString(),
-                barcode: b.barcode.trim(),
-                lineNum: index + 1,
-              }))
-          } : undefined,
-
-          images: images.length > 0 ? {
-            create: images
-              .filter((img: any) => img?.originalUrl?.trim())
-              .map((img: any, positionIndex: number) => ({
-                inflowId: crypto.randomUUID().toString(),
-                position: positionIndex,
-                originalUrl: img.originalUrl.trim(),
-                largeUrl: img.largeUrl.trim(),
-                mediumUrl: img.mediumUrl.trim(),
-                thumbUrl: img.thumbUrl.trim(),
-              }))
-          } : undefined
         },
-        include: {
-          purchasingUom: true,
-          salesUom: true,
-          cost: true,
-          prices: true,
-          barcodes: true,
-          images: true
+        select: {
+          productId: true,
+          product: { select: { sku: true } }
         }
       });
 
-      // 🎯 RECONCILED: Connect Variant Group Selection Bindings Matrix
-      if (productGroupId && variantSignature) {
-        // 1. Check if the matrix slot generated by the product group setup exists
-        const preGeneratedSlot = await tx.productVariant.findUnique({
-          where: {
-            productGroupId_signature: {
-              productGroupId,
-              signature: variantSignature
-            }
-          }
-        });
-
-        if (preGeneratedSlot) {
-          const oldPlaceholderProductId = preGeneratedSlot.productId;
-
-          // 2. Safe transition: Wipe out the placeholder variant row first to avoid unique constraint collisions
-          await tx.productVariant.delete({ where: { id: preGeneratedSlot.id } });
-
-          // 3. Clear the abandoned auto-generated placeholder product from the database
-          if (oldPlaceholderProductId) {
-            await tx.product.deleteMany({
-              where: { inflowId: oldPlaceholderProductId }
-            });
-          }
-        }
-
-        // 4. Create the clean variant row pointing to your newly configured product
-        await tx.productVariant.create({
-          data: {
-            inflowId: crypto.randomUUID().toLowerCase(),
-            productGroupId: productGroupId,
-            productId: newProduct.inflowId,
-            signature: variantSignature,
-            defaultPrice: 0.00,
-            variantCount: 1,
-            isActive: true
-          }
-        });
+      // Fail early if slot is occupied by another product node
+      if (existingBinding && existingBinding.productId) {
+        throw new Error(`The selected matrix variant option slot is already assigned to active SKU: ${existingBinding.product?.sku}`);
       }
+    }
 
-      // C. Extract structural object tree configuration to safely handle outbound pipeline tasks
-      const inflowPayload = {
-        cloudId: newProduct.inflowId,
-        sku: newProduct.sku,
-        name: newProduct.name,
-        slug: newProduct.slug,
-        description: newProduct.description,
-        itemType: newProduct.itemType,
-        brandId: newProduct.brandId,
-        categoryId: newProduct.categoryId,
-        autoAssemble: newProduct.autoAssemble,
-        isActive: newProduct.isActive,
-        isManufacturable: newProduct.isManufacturable,
-        includeQuantityBuildable: newProduct.includeQuantityBuildable,
-        standardUomName: newProduct.standardUomName,
-        trackExpiry: newProduct.trackExpiry,
-        trackLots: newProduct.trackLots,
-        trackSerials: newProduct.trackSerials,
-        shelfLifeDays: newProduct.shelfLifeDays,
-        sellBeforeExpiryDays: newProduct.sellBeforeExpiryDays,
-        expiryNotificationDays: newProduct.expiryNotificationDays,
-        weight: newProduct.weight?.toString() || null,
-        width: newProduct.width?.toString() || null,
-        height: newProduct.height?.toString() || null,
-        length: newProduct.length?.toString() || null,
-        originCountry: newProduct.originCountry,
-        hsTariffNumber: newProduct.hsTariffNumber,
-        remarks: newProduct.remarks,
+    // 1. Filter and clean the incoming barcodes list first
+    const incomingBarcodes = (barcodes || [])
+      .filter((b: any) => b?.barcode?.trim())
+      .map((b: any) => b.barcode.trim());
 
-        // Subordinate Embedded Framework Elements
-        cost: newProduct.cost ? {
-          inflowId: newProduct.cost.inflowId,
-          cost: newProduct.cost.cost.toString()
-        } : null,
+    let barcodesToCreate: { inflowId: string; barcode: string; lineNum: number }[] = [];
 
-        prices: newProduct.prices.map(p => ({
-          inflowId: p.inflowId,
-          pricingSchemeId: p.pricingSchemeId,
-          priceType: p.priceType,
-          unitPrice: p.unitPrice?.toString() || "0",
-          fixedMarkup: p.fixedMarkup?.toString() || "0"
-        })),
+    if (incomingBarcodes.length > 0) {
+      // 2. Query the DB to check which of these barcodes already exist globally
+      const existingBarcodes = await tx.productBarcode.findMany({
+        where: {
+          barcode: { in: incomingBarcodes }
+        },
+        select: { barcode: true }
+      });
 
-        barcodes: newProduct.barcodes.map(b => ({
-          inflowId: b.inflowId,
-          barcode: b.barcode,
-          lineNum: b.lineNum
-        })),
+      const existingSet = new Set(existingBarcodes.map((eb) => eb.barcode));
 
-        images: newProduct.images.map(img => ({
-          inflowId: img.inflowId,
-          position: img.position,
-          originalUrl: img.originalUrl,
-          largeUrl: img.largeUrl,
-          mediumUrl: img.mediumUrl,
-          thumbUrl: img.thumbUrl
-        }))
-      };
+      // 3. Keep only the ones that don't exist in the database
+      barcodesToCreate = incomingBarcodes
+        .filter((barcode: string) => !existingSet.has(barcode))
+        .map((barcode: string, index: number) => ({
+          inflowId: crypto.randomUUID().toString(),
+          barcode,
+          lineNum: index + 1, // Keep sequential indexing clean
+        }));
+    }
 
-      return { databaseRecord: newProduct, inflowPayload };
+    // A. Create root product document item node
+    const newProduct = await tx.product.create({
+      data: {
+        inflowId: computedInflowId,
+        sku: sku.trim(),
+        name: name.trim(),
+        slug: slug.trim(),
+        description: description?.trim() || null,
+        itemType,
+        brandId: brandId || null,
+        categoryId: categoryId || null,
+        autoAssemble: !!autoAssemble,
+        isActive: !!isActive,
+        isManufacturable: !!isManufacturable,
+        includeQuantityBuildable: !!includeQuantityBuildable,
+        trackExpiry: !!trackExpiry,
+        trackLots: !!trackLots,
+        trackSerials: !!trackSerials,
+        shelfLifeDays: Number(shelfLifeDays) || 0,
+        sellBeforeExpiryDays: Number(sellBeforeExpiryDays) || 0,
+        expiryNotificationDays: Number(expiryNotificationDays) || 0,
+        weight: Number(weight) || 0, 
+        width: Number(width) || 0, 
+        height: Number(height) || 0, 
+        length: Number(length) || 0,
+        originCountry: originCountry?.trim() || null,
+        hsTariffNumber: hsTariffNumber?.trim() || null,
+        remarks: remarks?.trim() || null,
+        standardUomName: standardUomName.trim().toUpperCase(), 
+
+        purchasingUom: purchasingUomId ? {
+          create: {
+            uomId: purchasingUomId,
+            standardQuantity: Number(purchasingUom.standardQuantity) || 1,
+            uomQuantity: Number(purchasingUom.uomQuantity) || 1,
+          }
+        } : undefined,
+
+        salesUom: salesUomId ? {
+          create: {
+            uomId: salesUomId,
+            standardQuantity: Number(salesUom.standardQuantity) || 1,
+            uomQuantity: Number(salesUom.uomQuantity) || 1,
+          }
+        } : undefined,
+
+        // 🪐 Store incoming cost valuation directly
+        cost: typeof initialCost === "number" ? {
+          create: {
+            inflowId: crypto.randomUUID().toLowerCase(),
+            cost: new Prisma.Decimal(initialCost)
+          }
+        } : undefined,
+
+        // 🪐 Iterating through incoming pricing configurations directly
+        prices: {
+          create: validPrices.map((p: any) => ({
+            inflowId: crypto.randomUUID().toLowerCase(),
+            pricingSchemeId: p.pricingSchemeId,
+            priceType: p.priceType || "FixedPrice",
+            unitPrice: new Prisma.Decimal(p.unitPrice || 0),
+            fixedMarkup: new Prisma.Decimal(p.fixedMarkup || 0)
+          }))
+        },
+
+        // barcodes: barcodes.length > 0 ? {
+        //   create: barcodes
+        //     .filter((b: any) => b?.barcode?.trim())
+        //     .map((b: any, index: number) => ({
+        //       inflowId: crypto.randomUUID().toString(),
+        //       barcode: b.barcode.trim(),
+        //       lineNum: index + 1,
+        //     }))
+        // } : undefined,
+
+        // 🪐 Use the filtered unique barcodes list
+        barcodes: barcodesToCreate.length > 0 ? {
+          create: barcodesToCreate
+        } : undefined,
+
+        images: images.length > 0 ? {
+          create: images
+            .filter((img: any) => img?.originalUrl?.trim())
+            .map((img: any, positionIndex: number) => ({
+              inflowId: crypto.randomUUID().toString(),
+              position: positionIndex,
+              originalUrl: img.originalUrl.trim(),
+              largeUrl: img.largeUrl.trim(),
+              mediumUrl: img.mediumUrl.trim(),
+              thumbUrl: img.thumbUrl.trim(),
+            }))
+        } : undefined
+      },
+      include: {
+        purchasingUom: { include: { uom: true }},
+        salesUom: { include: { uom: true }},
+        cost: true,
+        prices: true,
+        barcodes: true,
+        images: true
+      }
     });
 
-    const { databaseRecord, inflowPayload } = outputTransaction;
-
-    // ==========================================
-    // 🏢 STEP 1: DISPATCH CLOUD SYNC JOB
-    // ==========================================
-    const validCloudWebhook = await WebhookService.getCloudWebhookURL("product");
-    if (validCloudWebhook) {
-      await getMidSyncQueue().add(
-        "product_cloudsync_job",
-        {
-          source: "PRODUCT_UPSERT_CLOUD",
-          model: "Product",
-          payload: inflowPayload,
-          timestamp: new Date().toISOString(),
-        },
-        { 
-          attempts: 3, 
-          backoff: { type: "exponential", delay: 2000 },
-          removeOnComplete: true
+    // 🎯 RECONCILED: Connect Variant Group Selection Bindings Matrix
+    if (productGroupId && variantSignature) {
+      // 1. Check if the matrix slot generated by the product group setup exists
+      const preGeneratedSlot = await tx.productVariant.findUnique({
+        where: {
+          productGroupId_signature: {
+            productGroupId,
+            signature: variantSignature
+          }
         }
-      );
+      });
+
+      if (preGeneratedSlot) {
+        const oldPlaceholderProductId = preGeneratedSlot.productId;
+
+        // 2. Safe transition: Wipe out the placeholder variant row first to avoid unique constraint collisions
+        await tx.productVariant.delete({ where: { id: preGeneratedSlot.id } });
+
+        // 3. Clear the abandoned auto-generated placeholder product from the database
+        if (oldPlaceholderProductId) {
+          await tx.product.deleteMany({
+            where: { inflowId: oldPlaceholderProductId }
+          });
+        }
+      }
+
+      // 4. Create the clean variant row pointing to your newly configured product
+      await tx.productVariant.create({
+        data: {
+          inflowId: crypto.randomUUID().toLowerCase(),
+          productGroupId: productGroupId,
+          productId: newProduct.inflowId,
+          signature: variantSignature,
+          defaultPrice: 0.00,
+          variantCount: 1,
+          isActive: true
+        }
+      });
     }
+
+    // C. Extract structural object tree configuration to safely handle outbound pipeline tasks
+    // const inflowPayload = {
+    //   cloudId: newProduct.inflowId,
+    //   sku: newProduct.sku,
+    //   name: newProduct.name,
+    //   slug: newProduct.slug,
+    //   description: newProduct.description,
+    //   itemType: newProduct.itemType,
+    //   brandId: newProduct.brandId,
+    //   categoryId: newProduct.categoryId,
+    //   autoAssemble: newProduct.autoAssemble,
+    //   isActive: newProduct.isActive,
+    //   isManufacturable: newProduct.isManufacturable,
+    //   includeQuantityBuildable: newProduct.includeQuantityBuildable,
+    //   standardUomName: newProduct.standardUomName,
+    //   trackExpiry: newProduct.trackExpiry,
+    //   trackLots: newProduct.trackLots,
+    //   trackSerials: newProduct.trackSerials,
+    //   shelfLifeDays: newProduct.shelfLifeDays,
+    //   sellBeforeExpiryDays: newProduct.sellBeforeExpiryDays,
+    //   expiryNotificationDays: newProduct.expiryNotificationDays,
+    //   weight: newProduct.weight?.toString() || null,
+    //   width: newProduct.width?.toString() || null,
+    //   height: newProduct.height?.toString() || null,
+    //   length: newProduct.length?.toString() || null,
+    //   originCountry: newProduct.originCountry,
+    //   hsTariffNumber: newProduct.hsTariffNumber,
+    //   remarks: newProduct.remarks,
+
+    //   // Subordinate Embedded Framework Elements
+    //   cost: newProduct.cost ? {
+    //     inflowId: newProduct.cost.inflowId,
+    //     cost: newProduct.cost.cost.toString()
+    //   } : null,
+
+    //   prices: newProduct.prices.map(p => ({
+    //     inflowId: p.inflowId,
+    //     pricingSchemeId: p.pricingSchemeId,
+    //     priceType: p.priceType,
+    //     unitPrice: p.unitPrice?.toString() || "0",
+    //     fixedMarkup: p.fixedMarkup?.toString() || "0"
+    //   })),
+
+    //   barcodes: newProduct.barcodes.map(b => ({
+    //     inflowId: b.inflowId,
+    //     barcode: b.barcode,
+    //     lineNum: b.lineNum
+    //   })),
+
+    //   images: newProduct.images.map(img => ({
+    //     inflowId: img.inflowId,
+    //     position: img.position,
+    //     originalUrl: img.originalUrl,
+    //     largeUrl: img.largeUrl,
+    //     mediumUrl: img.mediumUrl,
+    //     thumbUrl: img.thumbUrl
+    //   }))
+    // };
+
+     const inflowPayload = {
+      cloudId: newProduct.inflowId,
+      sku: newProduct.sku,
+      name: newProduct.name,
+      slug: newProduct.slug,
+      description: newProduct.description,
+      itemType: newProduct.itemType,
+      brandId: newProduct.brandId,
+      categoryId: newProduct.categoryId,
+      autoAssemble: newProduct.autoAssemble,
+      isActive: newProduct.isActive,
+      isManufacturable: newProduct.isManufacturable,
+      includeQuantityBuildable: newProduct.includeQuantityBuildable,
+      standardUomName: newProduct.standardUomName,
+      trackExpiry: newProduct.trackExpiry,
+      trackLots: newProduct.trackLots,
+      trackSerials: newProduct.trackSerials,
+      shelfLifeDays: newProduct.shelfLifeDays,
+      sellBeforeExpiryDays: newProduct.sellBeforeExpiryDays,
+      expiryNotificationDays: newProduct.expiryNotificationDays,
+      weight: newProduct.weight?.toString() || null,
+      width: newProduct.width?.toString() || null,
+      height: newProduct.height?.toString() || null,
+      length: newProduct.length?.toString() || null,
+      originCountry: newProduct.originCountry,
+      hsTariffNumber: newProduct.hsTariffNumber,
+      remarks: newProduct.remarks,
+
+      defaultImageId: null,
+      
+      lastModifiedById: null,
+      lastModifiedDateTime: null,
+      lastVendorId: null,
+
+      totalQuantityOnHand: 20,
+
+      salesUom: {
+        name: newProduct.salesUom?.uom.name,
+        conversion: {
+          standardQuantity: newProduct.salesUom?.standardQuantity,
+          uomQuantity: newProduct.salesUom?.uomQuantity
+        }
+      },
+      
+      purchasingUom: {
+        name: newProduct.purchasingUom?.uom.name,
+        conversion: {
+          standardQuantity: newProduct.purchasingUom?.standardQuantity,
+          uomQuantity: newProduct.purchasingUom?.uomQuantity
+        }
+      },
+
+      // Subordinate Embedded Framework Elements
+      cost: newProduct.cost ? {
+        productCostId: newProduct.cost.inflowId,
+        cost: newProduct.cost.cost.toString()
+      } : null,
+
+      prices: newProduct.prices.map(p => ({
+        productPriceId: p.inflowId,
+        pricingSchemeId: p.pricingSchemeId,
+        priceType: p.priceType,
+        unitPrice: p.unitPrice?.toString() || "0",
+        fixedMarkup: p.fixedMarkup?.toString() || "0"
+      })),
+
+      productBarcodes: newProduct.barcodes.map(b => ({
+        productBarcodeId: b.inflowId,
+        barcode: b.barcode,
+        lineNum: b.lineNum
+      })),
+
+      images: newProduct.images.map(img => ({
+        imageId: img.inflowId,
+        position: img.position,
+        originalUrl: img.originalUrl,
+        largeUrl: img.largeUrl,
+        mediumUrl: img.mediumUrl,
+        thumbUrl: img.thumbUrl
+      })),
+    };
+
+    return { databaseRecord: newProduct, inflowPayload };
+  });
+
+  const { cloudId, ...cleanInflowPayload } = outputTransaction.inflowPayload;
+
+  // ==========================================
+  // 🏢 STEP 1: DISPATCH CLOUD SYNC JOB
+  // ==========================================
+  const validCloudWebhook = await WebhookService.getCloudWebhookURL("product");
+  if (validCloudWebhook) {
+    await getMidSyncQueue().add(
+      "product_cloudsync_job",
+      {
+        source: "PRODUCT_UPSERT_CLOUD",
+        model: "Product",
+        payload: cleanInflowPayload,
+        timestamp: new Date().toISOString(),
+      },
+      { 
+        attempts: 3, 
+        backoff: { type: "exponential", delay: 2000 },
+        removeOnComplete: true
+      }
+    );
+  }
 
     // ==========================================
     // 📍 STEP 2: BROADCAST LOCAL SYNC JOBS
     // ==========================================
     const validWebhooks = await WebhookService.getLocationWebhookURLs("productLocal");
 
+    const pricingSchemesInPayload = cleanInflowPayload.prices.map(p => p.pricingSchemeId);
+      const pricesPayload = cleanInflowPayload.prices.map(p => p.productPriceId);
+      const barcodesPayload = cleanInflowPayload.productBarcodes.map(p => p.productBarcodeId);
+      
+      const itemTypeNumber = UI_TO_API_ITEM_TYPE[cleanInflowPayload.itemType || "Stock"] ?? 0;
+
+      const brand = await BrandService.getBasicBrand(cleanInflowPayload.brandId || "");
+      
+      const [
+        existingCategoryMappings,
+        existingProductCostMaps,
+        existingPricesMaps,
+        existingPricingMaps,
+        existingBarcodeMaps,
+        existingImagesMaps
+      ] = await Promise.all([
+        prisma.categoryLocationMap.findMany({ where: { categoryId: cloudId }, select: { locationId: true, localId: true } }),
+        prisma.productCostLocationMap.findMany({ where: { productCostId: cleanInflowPayload.cost?.productCostId }, select: { productCostId: true, locationId: true, localId: true } }),
+        prisma.productPriceLocationMap.findMany({
+          where: { productPriceId: { in: pricesPayload } },
+          select: { productPriceId: true, locationId: true, localId: true }
+        }),
+        prisma.pricingSchemeLocationMap.findMany({
+          where: { pricingSchemeId: { in: pricingSchemesInPayload } },
+          select: { pricingSchemeId: true, locationId: true, localId: true }
+        }),
+        prisma.productBarcodeLocationMap.findMany({
+          where: { productBarcodeId: { in: barcodesPayload } },
+          select: { productBarcodeId: true, locationId: true, localId: true }
+        }),
+        prisma.productImageLocationMap.findMany({
+          // ⚠️ Fixed structural bug: originally queried against barcodesPayload instead of image ids
+          where: { productImageId: { in: cleanInflowPayload.images.map(img => img.imageId) } },
+          select: { productImageId: true, locationId: true, localId: true }
+        }),
+      ]);
+
     if (validWebhooks.length > 0) {
       // Gather relevant pricing scheme identity mappings concurrently to assign local references
-      const pricingSchemesInPayload = inflowPayload.prices.map(p => p.pricingSchemeId);
+      const pricingSchemesInPayload = cleanInflowPayload.prices.map(p => p.pricingSchemeId);
       const existingPricingMaps = await prisma.pricingSchemeLocationMap.findMany({
         where: { pricingSchemeId: { in: pricingSchemesInPayload } },
         select: { pricingSchemeId: true, locationId: true, localId: true }
@@ -531,21 +685,49 @@ export async function POST(request: NextRequest) {
       const jobsToQueue = validWebhooks
         .filter(webhook => webhook.location.url && webhook.location.url.trim() !== "")
         .map((webhook) => {
+          const costMatch = existingProductCostMaps.find(m => m.locationId === webhook.locationId);
+          const categoryMatch = existingCategoryMappings.find(m => m.locationId === webhook.locationId);
+
+          // Extract the primary barcode string if one exists in the array
+          const primaryBarcode = cleanInflowPayload.productBarcodes[0]?.barcode || "";
+          
           return {
             name: "product_localsync_job",
+            
             data: {
               source: "PRODUCT_UPSERT_LOCAL",
               model: "Product",
               payload: {
-                ...inflowPayload,
-                localId: null, // Signals a clean native database record insert down at the edge
+                ...cleanInflowPayload,
+                productId: cloudId,
+                localId: null, 
 
-                cost: inflowPayload.cost ? {
-                  ...inflowPayload.cost,
-                  localId: null
-                } : null,
+                barcode: primaryBarcode,
+                categoryId: categoryMatch?.localId || null,
 
-                prices: inflowPayload.prices.map(p => {
+                uom: cleanInflowPayload.standardUomName || "",
+                itemType: itemTypeNumber,
+
+                dimensions: {
+                  length: cleanInflowPayload.length,
+                  width: cleanInflowPayload.width,
+                  height: cleanInflowPayload.height,
+                  weight: cleanInflowPayload.weight,
+                },
+
+                salesUom: {
+                  name: cleanInflowPayload.salesUom.name || "",
+                  ratioStd: cleanInflowPayload.salesUom.conversion.standardQuantity,
+                  ratio: cleanInflowPayload.salesUom.conversion.uomQuantity
+                },
+
+                purchaseUom: {
+                  name: cleanInflowPayload.purchasingUom.name || "",
+                  ratioStd: cleanInflowPayload.purchasingUom.conversion.standardQuantity,
+                  ratio: cleanInflowPayload.purchasingUom.conversion.uomQuantity
+                },
+
+                prices: cleanInflowPayload.prices.map(p => {
                   const match = existingPricingMaps.find(
                     m => m.pricingSchemeId === p.pricingSchemeId && m.locationId === webhook.locationId
                   );
@@ -556,16 +738,47 @@ export async function POST(request: NextRequest) {
                   };
                 }),
 
-                barcodes: inflowPayload.barcodes.map(b => ({
-                  ...b,
-                  localId: null
-                })),
-
-                images: inflowPayload.images.map(img => ({
+                images: cleanInflowPayload.images.map(img => {
+                  const imageMatch = existingImagesMaps.find(m =>  m.productImageId === img.imageId && m.locationId === webhook.locationId);
+                  return {
                   ...img,
-                  localId: null
-                }))
+                  localId: imageMatch?.localId || null
+                }}),
+
+                customFields: {
+                  custom7: brand?.name
+                }, 
               },
+              // payload: {
+              //   ...inflowPayload,
+              //   localId: null, // Signals a clean native database record insert down at the edge
+
+              //   cost: inflowPayload.cost ? {
+              //     ...inflowPayload.cost,
+              //     localId: null
+              //   } : null,
+
+              //   prices: inflowPayload.prices.map(p => {
+              //     const match = existingPricingMaps.find(
+              //       m => m.pricingSchemeId === p.pricingSchemeId && m.locationId === webhook.locationId
+              //     );
+              //     return {
+              //       ...p,
+              //       pricingSchemeId: match ? match.localId : null, // Resolves to the specific native integer map ID
+              //       localId: null
+              //     };
+              //   }),
+
+              //   barcodes: inflowPayload.barcodes.map(b => ({
+              //     ...b,
+              //     localId: null
+              //   })),
+
+              //   images: inflowPayload.images.map(img => ({
+              //     ...img,
+              //     localId: null
+              //   }))
+              // },
               timestamp: new Date().toISOString(),
               location: {
                 inflowId: webhook.locationId,
@@ -586,7 +799,7 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    return NextResponse.json(databaseRecord, { status: 201 });
+    return NextResponse.json(outputTransaction.databaseRecord, { status: 201 });
   } catch (error: any) {
     console.error("Critical failure adding product configuration tracking metadata:", error);
     return NextResponse.json(
@@ -865,18 +1078,42 @@ export async function PATCH(request: NextRequest) {
         await tx.productSalesUom.deleteMany({ where: { productId: inflowId } });
       }
 
-      // D. Reconcile 1:Many nested barcode collections array
-      await tx.productBarcode.deleteMany({ where: { productId: inflowId } });
       const validBarcodes = barcodes.filter((b: any) => b?.barcode?.trim());
+
       if (validBarcodes.length > 0) {
-        await tx.productBarcode.createMany({
-          data: validBarcodes.map((b: any, index: number) => ({
-            inflowId: crypto.randomUUID().toString(),
+        const barcodeStrings = validBarcodes.map((b: any) => b.barcode.trim());
+
+        // 1. Find barcodes already associated with THIS product
+        const existingProductBarcodes = await tx.productBarcode.findMany({
+          where: {
             productId: inflowId,
-            barcode: b.barcode.trim(),
-            lineNum: index + 1,
-          }))
+            barcode: { in: barcodeStrings }
+          },
+          select: { barcode: true }
         });
+
+        const existingSet = new Set(existingProductBarcodes.map(eb => eb.barcode));
+
+        // 2. Only insert the barcodes the product doesn't currently have
+        const missingBarcodes = validBarcodes.filter((b: any) => !existingSet.has(b.barcode.trim()));
+
+        if (missingBarcodes.length > 0) {
+          // 3. Get the current maximum line number to increment correctly
+          const maxLineNumAggregate = await tx.productBarcode.aggregate({
+            where: { productId: inflowId },
+            _max: { lineNum: true }
+          });
+          const currentMaxLineNum = maxLineNumAggregate._max.lineNum ?? 0;
+
+          await tx.productBarcode.createMany({
+            data: missingBarcodes.map((b: any, index: number) => ({
+              inflowId: crypto.randomUUID().toString(),
+              productId: inflowId,
+              barcode: b.barcode.trim(),
+              lineNum: currentMaxLineNum + index + 1,
+            }))
+          });
+        }
       }
 
       // E. Reconcile 1:Many nested image asset paths array
@@ -929,8 +1166,8 @@ export async function PATCH(request: NextRequest) {
       const updatedProduct = await tx.product.findUnique({ 
         where: { inflowId },
         include: { 
-          purchasingUom: true,
-          salesUom: true,
+          purchasingUom: { include: { uom: true }},
+          salesUom: { include: { uom: true }},
           cost: true,
           prices: true,
           barcodes: true,
@@ -940,7 +1177,7 @@ export async function PATCH(request: NextRequest) {
 
       if(!updatedProduct) return { databaseRecord: null, inflowPayload: null }
 
-       // C. Extract structural object tree configuration to safely handle outbound pipeline tasks
+      // C. Extract structural object tree configuration to safely handle outbound pipeline tasks
       const inflowPayload = {
         cloudId: updatedProduct.inflowId,
         sku: updatedProduct.sku,
@@ -969,6 +1206,29 @@ export async function PATCH(request: NextRequest) {
         hsTariffNumber: updatedProduct.hsTariffNumber,
         remarks: updatedProduct.remarks,
 
+        defaultImageId: null,
+        
+        lastModifiedById: null,
+        lastModifiedDateTime: null,
+        lastVendorId: null,
+
+        totalQuantityOnHand: 20,
+
+        salesUom: {
+          name: updatedProduct.salesUom?.uom.name,
+          conversion: {
+            standardQuantity: updatedProduct.salesUom?.standardQuantity,
+            uomQuantity: updatedProduct.salesUom?.uomQuantity
+          }
+        },
+        purchasingUom: {
+          name: updatedProduct.purchasingUom?.uom.name,
+          conversion: {
+            standardQuantity: updatedProduct.purchasingUom?.standardQuantity,
+            uomQuantity: updatedProduct.purchasingUom?.uomQuantity
+          }
+        },
+
         // Subordinate Embedded Framework Elements
         cost: updatedProduct.cost ? {
           productCostId: updatedProduct.cost.inflowId,
@@ -996,7 +1256,7 @@ export async function PATCH(request: NextRequest) {
           largeUrl: img.largeUrl,
           mediumUrl: img.mediumUrl,
           thumbUrl: img.thumbUrl
-        }))
+        })),
       };
 
       return { databaseRecord: updatedProduct, inflowPayload };
@@ -1038,14 +1298,120 @@ export async function PATCH(request: NextRequest) {
     // ==========================================
     const validWebhooks = await WebhookService.getLocationWebhookURLs("productLocal");
 
+    // if (validWebhooks.length > 0) {
+    //   // Gather relevant pricing scheme identity mappings concurrently to assign local references
+    //   const pricingSchemesInPayload = cleanInflowPayload.prices.map(p => p.pricingSchemeId);
+    //   const pricesPayload = cleanInflowPayload.prices.map(p => p.productPriceId);
+    //   const barcodesPayload = cleanInflowPayload.productBarcodes.map(p => p.productBarcodeId);
+     
+    //   const [
+    //     existingMappings,
+    //     existingProductCostMaps,
+    //     existingPricesMaps,
+    //     existingPricingMaps,
+    //     existingBarcodeMaps,
+    //     existingImagesMaps
+    //   ] = await Promise.all([
+    //     prisma.productLocationMap.findMany({ where: { productId: cloudId }, select: { locationId: true, localId: true } }),
+    //     prisma.productCostLocationMap.findMany({ where: { productCostId: cleanInflowPayload.cost?.productCostId }, select: { productCostId: true, locationId: true, localId: true } }),
+    //     prisma.productPriceLocationMap.findMany({
+    //       where: { productPriceId: { in: pricesPayload } },
+    //       select: { productPriceId: true, locationId: true, localId: true }
+    //     }),
+    //     prisma.pricingSchemeLocationMap.findMany({
+    //       where: { pricingSchemeId: { in: pricingSchemesInPayload } },
+    //       select: { pricingSchemeId: true, locationId: true, localId: true }
+    //     }),
+    //     prisma.productBarcodeLocationMap.findMany({
+    //       where: { productBarcodeId: { in: barcodesPayload } },
+    //       select: { productBarcodeId: true, locationId: true, localId: true }
+    //     }),
+    //     prisma.productImageLocationMap.findMany({
+    //       where: { productImageId: { in: barcodesPayload } },
+    //       select: { productImageId: true, locationId: true, localId: true }
+    //     }),
+    //   ]);
+
+    //   const jobsToQueue = validWebhooks
+    //     .filter(webhook => webhook.location.url && webhook.location.url.trim() !== "")
+    //     .map((webhook) => {
+    //       const match = existingMappings.find(m => m.locationId === webhook.locationId);
+    //       const costMatch = existingProductCostMaps.find(m => m.locationId === webhook.locationId);
+
+    //       return {
+    //         name: "product_localsync_job",
+    //         data: {
+    //           source: "PRODUCT_UPSERT_LOCAL",
+    //           model: "Product",
+    //           payload: {
+    //             ...cleanInflowPayload,
+    //             productId: cloudId,
+    //             localId: match?.localId || null, // Signals a clean native database record insert down at the edge
+
+    //             cost: cleanInflowPayload.cost ? {
+    //               ...cleanInflowPayload.cost,
+    //               localId: costMatch?.localId || null,
+    //             } : null,
+
+    //             prices: cleanInflowPayload.prices.map(p => {
+    //               const priceMatch = existingPricesMaps.find(m =>  m.productPriceId === p.productPriceId && m.locationId === webhook.locationId);
+    //               const pricingMatch = existingPricingMaps.find(
+    //                 m => m.pricingSchemeId === p.pricingSchemeId && m.locationId === webhook.locationId
+    //               );
+    //               return {
+    //                 ...p,
+    //                 pricingSchemeId: pricingMatch?.localId || null, // Resolves to the specific native integer map ID
+    //                 localId: priceMatch?.localId || null
+    //               };
+    //             }),
+
+    //             productBarcodes: cleanInflowPayload.productBarcodes.map(b => {
+    //               const barcodeMatch = existingBarcodeMaps.find(m =>  m.productBarcodeId === b.productBarcodeId && m.locationId === webhook.locationId);
+    //               return {
+    //                 ...b,
+    //                 localId: barcodeMatch?.localId || null
+    //             }}),
+
+    //             images: cleanInflowPayload.images.map(img => {
+    //               const imageMatch = existingImagesMaps.find(m =>  m.productImageId === img.imageId && m.locationId === webhook.locationId);
+    //               return {
+    //               ...img,
+    //               localId: imageMatch?.localId || null
+    //             }})
+    //           },
+    //           timestamp: new Date().toISOString(),
+    //           location: {
+    //             inflowId: webhook.locationId,
+    //             url: webhook.location.url,
+    //             name: webhook.location.name
+    //           }
+    //         },
+    //         opts: { 
+    //           attempts: 3, 
+    //           backoff: { type: "exponential", delay: 2000 },
+    //           removeOnComplete: true
+    //         }
+    //       };
+    //     });
+
+    //   if (jobsToQueue.length > 0) {
+    //     await getMidSyncQueue().addBulk(jobsToQueue);
+    //   }
+    // }
+
     if (validWebhooks.length > 0) {
       // Gather relevant pricing scheme identity mappings concurrently to assign local references
       const pricingSchemesInPayload = cleanInflowPayload.prices.map(p => p.pricingSchemeId);
       const pricesPayload = cleanInflowPayload.prices.map(p => p.productPriceId);
       const barcodesPayload = cleanInflowPayload.productBarcodes.map(p => p.productBarcodeId);
-     
+      
+      const itemTypeNumber = UI_TO_API_ITEM_TYPE[cleanInflowPayload.itemType || "Stock"] ?? 0;
+
+      const brand = await BrandService.getBasicBrand(cleanInflowPayload.brandId || "");
+      
       const [
         existingMappings,
+        existingCategoryMappings,
         existingProductCostMaps,
         existingPricesMaps,
         existingPricingMaps,
@@ -1053,6 +1419,7 @@ export async function PATCH(request: NextRequest) {
         existingImagesMaps
       ] = await Promise.all([
         prisma.productLocationMap.findMany({ where: { productId: cloudId }, select: { locationId: true, localId: true } }),
+        prisma.categoryLocationMap.findMany({ where: { categoryId: cloudId }, select: { locationId: true, localId: true } }),
         prisma.productCostLocationMap.findMany({ where: { productCostId: cleanInflowPayload.cost?.productCostId }, select: { productCostId: true, locationId: true, localId: true } }),
         prisma.productPriceLocationMap.findMany({
           where: { productPriceId: { in: pricesPayload } },
@@ -1067,7 +1434,8 @@ export async function PATCH(request: NextRequest) {
           select: { productBarcodeId: true, locationId: true, localId: true }
         }),
         prisma.productImageLocationMap.findMany({
-          where: { productImageId: { in: barcodesPayload } },
+          // ⚠️ Fixed structural bug: originally queried against barcodesPayload instead of image ids
+          where: { productImageId: { in: cleanInflowPayload.images.map(img => img.imageId) } },
           select: { productImageId: true, locationId: true, localId: true }
         }),
       ]);
@@ -1077,6 +1445,72 @@ export async function PATCH(request: NextRequest) {
         .map((webhook) => {
           const match = existingMappings.find(m => m.locationId === webhook.locationId);
           const costMatch = existingProductCostMaps.find(m => m.locationId === webhook.locationId);
+          const categoryMatch = existingCategoryMappings.find(m => m.locationId === webhook.locationId);
+
+          // Extract the primary barcode string if one exists in the array
+          const primaryBarcode = cleanInflowPayload.productBarcodes[0]?.barcode || "";
+
+          // Construct the payload strictly formatted to the InflowProduct Interface
+          // const inflowProductPayload = {
+          //   productId: cloudId,
+          //   localId: match?.localId || null,
+          //   itemType: itemTypeNumber, // typeof cleanInflowPayload.itemType === "number" ? cleanInflowPayload.itemType :
+          //   name: cleanInflowPayload.name || "",
+          //   description: cleanInflowPayload.description || "",
+          //   remarks: cleanInflowPayload.remarks || "",
+          //   barcode: primaryBarcode,
+          //   categoryId: categoryMatch?.localId || null,
+          //   defaultLocationId: null,
+          //   defaultSublocation: null,
+
+          //   reorderPoint: 0,
+          //   reorderQuantity: 0,
+
+          //   uom: cleanInflowPayload.standardUomName || "",
+          //   masterPackQty: 0,
+          //   innerPackQty: 0,
+
+          //   dimensions: {
+          //     caseLength: 0,
+          //     caseWidth: 0,
+          //     caseHeight: 0,
+          //     caseWeight: 0,
+          //     productLength: cleanInflowPayload.length ? parseFloat(cleanInflowPayload.length) : 0,
+          //     productWidth: cleanInflowPayload.width ? parseFloat(cleanInflowPayload.width) : 0,
+          //     productHeight: cleanInflowPayload.height ? parseFloat(cleanInflowPayload.height) : 0,
+          //     productWeight: cleanInflowPayload.weight ? parseFloat(cleanInflowPayload.weight) : 0
+          //   },
+
+          //   customFields: {
+          //     custom7: brand?.name
+          //   }, 
+            
+          //   isSellable: true, 
+          //   isPurchaseable: true,
+          //   isActive: cleanInflowPayload.isActive ?? true,
+          //   trackSerials: cleanInflowPayload.trackSerials ?? false,
+
+          //   dateIntroduced: new Date().toISOString(),
+          //   dateUpdated: new Date().toISOString(),
+
+          //   lastModifiedById: null,
+          //   lastModifiedDttm: null,
+
+          //   // Associates the primary image if exists
+          //   pictureFileAttachmentId: null,
+
+          //   salesUom: {
+          //     name: cleanInflowPayload.standardUomName || "",
+          //     ratioStd: 1,
+          //     ratio: 1
+          //   },
+
+          //   purchaseUom: {
+          //     name: cleanInflowPayload.standardUomName || "",
+          //     ratioStd: 1,
+          //     ratio: 1
+          //   }
+          // };
 
           return {
             name: "product_localsync_job",
@@ -1086,38 +1520,54 @@ export async function PATCH(request: NextRequest) {
               payload: {
                 ...cleanInflowPayload,
                 productId: cloudId,
-                localId: match?.localId || null, // Signals a clean native database record insert down at the edge
+                localId: match?.localId || null, 
 
-                cost: cleanInflowPayload.cost ? {
-                  ...cleanInflowPayload.cost,
-                  localId: costMatch?.localId || null,
-                } : null,
+                barcode: primaryBarcode,
+                categoryId: categoryMatch?.localId || null,
+
+                uom: cleanInflowPayload.standardUomName || "",
+                itemType: itemTypeNumber,
+
+                dimensions: {
+                  length: cleanInflowPayload.length,
+                  width: cleanInflowPayload.width,
+                  height: cleanInflowPayload.height,
+                  weight: cleanInflowPayload.weight,
+                },
+
+                salesUom: {
+                  name: cleanInflowPayload.salesUom.name || "",
+                  ratioStd: cleanInflowPayload.salesUom.conversion.standardQuantity,
+                  ratio: cleanInflowPayload.salesUom.conversion.uomQuantity
+                },
+
+                purchaseUom: {
+                  name: cleanInflowPayload.purchasingUom.name || "",
+                  ratioStd: cleanInflowPayload.purchasingUom.conversion.standardQuantity,
+                  ratio: cleanInflowPayload.purchasingUom.conversion.uomQuantity
+                },
 
                 prices: cleanInflowPayload.prices.map(p => {
-                  const priceMatch = existingPricesMaps.find(m =>  m.productPriceId === p.productPriceId && m.locationId === webhook.locationId);
-                  const pricingMatch = existingPricingMaps.find(
+                  const match = existingPricingMaps.find(
                     m => m.pricingSchemeId === p.pricingSchemeId && m.locationId === webhook.locationId
                   );
                   return {
                     ...p,
-                    pricingSchemeId: pricingMatch?.localId || null, // Resolves to the specific native integer map ID
-                    localId: priceMatch?.localId || null
+                    pricingSchemeId: match ? match.localId : null, // Resolves to the specific native integer map ID
+                    localId: null
                   };
                 }),
-
-                productBarcodes: cleanInflowPayload.productBarcodes.map(b => {
-                  const barcodeMatch = existingBarcodeMaps.find(m =>  m.productBarcodeId === b.productBarcodeId && m.locationId === webhook.locationId);
-                  return {
-                    ...b,
-                    localId: barcodeMatch?.localId || null
-                }}),
 
                 images: cleanInflowPayload.images.map(img => {
                   const imageMatch = existingImagesMaps.find(m =>  m.productImageId === img.imageId && m.locationId === webhook.locationId);
                   return {
                   ...img,
                   localId: imageMatch?.localId || null
-                }})
+                }}),
+
+                customFields: {
+                  custom7: brand?.name
+                }, 
               },
               timestamp: new Date().toISOString(),
               location: {
@@ -1148,6 +1598,65 @@ export async function PATCH(request: NextRequest) {
     );
   }
 }
+
+
+ // Keep local sync relationship tracking inside metadata for execution use
+              // meta: {
+              //   localId: match?.localId || null,
+              //   cost: cleanInflowPayload.cost ? {
+              //     ...cleanInflowPayload.cost,
+              //     localId: costMatch?.localId || null,
+              //   } : null,
+              //   prices: cleanInflowPayload.prices.map(p => {
+              //     const priceMatch = existingPricesMaps.find(m => m.productPriceId === p.productPriceId && m.locationId === webhook.locationId);
+              //     const pricingMatch = existingPricingMaps.find(
+              //       m => m.pricingSchemeId === p.pricingSchemeId && m.locationId === webhook.locationId
+              //     );
+              //     return {
+              //       ...p,
+              //       pricingSchemeId: pricingMatch?.localId || null,
+              //       localId: priceMatch?.localId || null
+              //     };
+              //   }),
+              //   productBarcodes: cleanInflowPayload.productBarcodes.map(b => {
+              //     const barcodeMatch = existingBarcodeMaps.find(m => m.productBarcodeId === b.productBarcodeId && m.locationId === webhook.locationId);
+              //     return {
+              //       ...b,
+              //       localId: barcodeMatch?.localId || null
+              //     };
+              //   }),
+              //   images: cleanInflowPayload.images.map(img => {
+              //     const imageMatch = existingImagesMaps.find(m => m.productImageId === img.imageId && m.locationId === webhook.locationId);
+              //     return {
+              //       ...img,
+              //       localId: imageMatch?.localId || null
+              //     };
+              //   })
+              // },
+
+  // cost: cleanInflowPayload.cost ? {
+                //   ...cleanInflowPayload.cost,
+                //   localId: costMatch?.localId || null,
+                // } : null,
+
+                // prices: cleanInflowPayload.prices.map(p => {
+                //   const priceMatch = existingPricesMaps.find(m =>  m.productPriceId === p.productPriceId && m.locationId === webhook.locationId);
+                //   const pricingMatch = existingPricingMaps.find(
+                //     m => m.pricingSchemeId === p.pricingSchemeId && m.locationId === webhook.locationId
+                //   );
+                //   return {
+                //     ...p,
+                //     pricingSchemeId: pricingMatch?.localId || null, // Resolves to the specific native integer map ID
+                //     localId: priceMatch?.localId || null
+                //   };
+                // }),
+
+                // productBarcodes: cleanInflowPayload.productBarcodes.map(b => {
+                //   const barcodeMatch = existingBarcodeMaps.find(m =>  m.productBarcodeId === b.productBarcodeId && m.locationId === webhook.locationId);
+                //   return {
+                //     ...b,
+                //     localId: barcodeMatch?.localId || null
+                // }}),
 
 // export async function PATCH(request: NextRequest) {
 //   try {

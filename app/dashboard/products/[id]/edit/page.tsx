@@ -85,6 +85,7 @@ export default async function EditProductPage({ params }: Props) {
     height: prodData.height ? Number(prodData.height) : null,
     length: prodData.length ? Number(prodData.length) : null,
     initialCost: prodData.cost?.cost ? Number(prodData.cost.cost) : 0,
+    standardUomName: prodData.standardUomName || "",
     prices: prodData.prices.map((p) => ({
       inflowId: p.inflowId,
       pricingSchemeId: p.pricingSchemeId,
@@ -116,7 +117,7 @@ export default async function EditProductPage({ params }: Props) {
   delete (formattedPayload as any).cost;
 
   return (
-    <div className="w-full max-w-5xl mx-auto p-6 space-y-6">
+    <div className="w-full max-w-12xl mx-auto p-6 space-y-6">
       <Link
         href="/dashboard/products"
         className="mb-4 inline-flex items-center gap-2 text-sm font-medium text-slate-600 hover:text-slate-900"

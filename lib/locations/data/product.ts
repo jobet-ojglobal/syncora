@@ -8,8 +8,8 @@ export interface InflowProduct {
   remarks: string;
   barcode: string;
   categoryId: string;
-  defaultLocationId: string;
-  defaultSublocation: string;
+  defaultLocationId: string | null;
+  defaultSublocation: string | null;
 
   reorderPoint: number;
   reorderQuantity: number;
@@ -18,11 +18,290 @@ export interface InflowProduct {
   masterPackQty: number;
   innerPackQty: number;
 
-  timestamp: string;
-  syncedAt: string;
+  dimensions: {
+    caseLength: number,
+    caseWidth: number,
+    caseHeight: number,
+    caseWeight: number,
+    productLength: number,
+    productWidth: number,
+    productHeight: number,
+    productWeight: number
+  }
+
+  customFields: InflowCustomFields;
+  
+  isSellable: boolean;
+  isPurchaseable: boolean;
+  isActive: boolean;
+  trackSerials: boolean,
+
+  dateIntroduced: string;
+  dateUpdated: string | null;
+
+  lastModifiedById: string | null;
+  lastModifiedDttm: string | null;
+
+  pictureFileAttachmentId: string | null;
+
+  salesUom: {
+    name: string;
+    ratioStd: number;
+    ratio: number;
+  };
+
+  purchaseUom: {
+    name: string;
+    ratioStd: number;
+    ratio: number;
+  }
 }
 
-export async function getCategories(url: string) {
+//  productBarcodes?: InflowProductBarcode[];
+//   taxCodes?: InflowProductTaxCode[];
+//   prices?: InflowProductPrice[];
+//   cost?: InflowProductCost | null;
+//   itemBoms?: InflowItemBom[];
+//   attachments?: InflowProductAttachment[];
+  
+  /**
+   * Nested Include Array Interfaces
+   */
+  export interface InflowProductBarcode {
+    productBarcodeId: string;
+    barcode: string;
+    lineNum: number | string; // Handled as number or string from variations
+    productId: string;
+    timestamp: string;
+    product?: InflowProduct;
+  }
+  
+  export interface InflowProductTaxCode {
+    productTaxCodeId: string;
+    productId: string;
+    taxCodeId: string;
+    taxingSchemeId: string;
+    timestamp: string;
+    product?: InflowProduct;
+    taxCode?: InflowTaxCode;
+    taxingScheme?: InflowTaxingScheme;
+  }
+
+  export interface InflowOperationType {
+    operationTypeId: string;
+    name: string;
+    estimatedPerHourCost: string;
+    isActive: boolean;
+    isDefault: boolean;
+    timestamp: string;
+    trackTime: boolean;
+  }
+  
+  export interface InflowProductOperation {
+    productOperationId: string;
+    productId: string;
+    operationTypeId: string;
+    cost: string;
+    estimatedPerHourCost: string;
+    estimatedSeconds: string;
+    instructions: string | null;
+    lineNum: number | string;
+    timestamp: string;
+    trackTime: boolean;
+    operationType?: InflowOperationType;
+    product?: InflowProduct;
+  }
+  
+  export interface InflowProductPrice {
+    productPriceId: string;
+    productId: string;
+    pricingSchemeId: string;
+    priceType: "fixedPrice" | "FixedPrice" | string;
+    fixedMarkup?: string | null;
+    unitPrice: string;
+    timestamp: string;
+    pricingScheme?: InflowPricingScheme;
+    product?: InflowProduct;
+  }
+  
+  export interface InflowProductCost {
+    productCostId: string;
+    productId: string;
+    cost: string;
+    product?: InflowProduct;
+  }
+  
+  export interface InflowBomQuantity {
+    standardQuantity: string;
+    uomQuantity: string;
+    uom: string | null;
+    serialNumbers?: string[];
+  }
+  
+  export interface InflowItemBom {
+    itemBomId: string;
+    productId: string;
+    childProductId: string;
+    quantity: InflowBomQuantity;
+    timestamp: string;
+    childProduct?: InflowProduct;
+    product?: InflowProduct;
+  }
+  
+  export interface InflowProductAttachment {
+    attachmentId: string;
+    attachmentUrl: string;
+    fileName: string;
+    fileSize: any; // Object or number variations across payloads
+    lastModDttm: string;
+    lastModifiedById: string;
+    lastModifiedBy?: InflowTeamMember;
+  }
+
+  
+//  TEAM MEMBERS
+
+export interface InflowTeamMember {
+  teamMemberId: string;
+  accessAllLocations: boolean;
+  accessLocationIds: string[];
+  accessRights: AccessRight[];
+  canBeSalesRep: boolean;
+  email: string;
+  isActive: boolean;
+  name: string;
+}
+
+export type AccessRight =
+  | "SalesOrderView"
+  | "SalesOrderEdit"
+  | "SalesOrderPick"
+  | "SalesOrderPrioritization"
+  | "CustomerView"
+  | "CustomerEdit"
+  | "SalesPriceEdit"
+  | "PurchaseOrderView"
+  | "PurchaseOrderEdit"
+  | "PurchaseOrderReceive"
+  | "VendorView"
+  | "VendorEdit"
+  | "ReorderStock"
+  | "CountSheetView"
+  | "CountSheetEdit"
+  | "CountSheetOnly"
+  | "TransferStockView"
+  | "TransferStockEdit"
+  | "AdjustStockView"
+  | "AdjustStockEdit"
+  | "CurrentStockView"
+  | "MovementHistoryView"
+  | "ProductView"
+  | "ProductEdit"
+  | "ProductCostingView"
+  | "ProductCostingEdit"
+  | "ProductCategoryEdit"
+  | "ManufacturingOrderView"
+  | "ManufacturingOrderEdit"
+  | "ManufacturingOrderPrioritization"
+  | "StockroomScanView"
+  | "StockroomScanEdit"
+  | "EstimatedLaborHoursView"
+  | "EstimatedLaborHoursEdit"
+  | "ActualLaborHoursView"
+  | "ActualLaborHoursEdit"
+  | "CurrentOperationsView"
+  | "CurrentOperationsEdit"
+  | "SettingsView"
+  | "SettingsEdit"
+  | "ImportData"
+  | "ExportData"
+  | "BackupData"
+  | "PrintSettingsView"
+  | "PrintSettingsEdit"
+  | "ResetAllData"
+  | "Integrations"
+  | "Reports";
+
+// TAXING CODES
+
+export interface InflowTaxCode {
+  taxCodeId: string;
+  taxingSchemeId: string;
+  name: string;
+  isActive: boolean;
+  tax1Rate: string;
+  tax2Rate: string;
+  timestamp: string;
+}
+
+
+export interface InflowTaxingScheme {
+  taxingSchemeId: string;
+  name: string;
+  isActive: boolean;
+  isDefault: boolean;
+  calculateTax2OnTax1: boolean;
+  tax1Name: string | null;
+  tax1OnShipping: boolean;
+  tax2Name: string | null;
+  tax2OnShipping: boolean;
+  defaultTaxCodeId: string | null;
+  timestamp: string;
+  defaultTaxCode?: InflowTaxCode;
+  taxCodes?: InflowTaxCode[];
+}
+
+
+export interface InflowCurrency {
+  currencyId: string;
+  decimalPlaces: number;
+  decimalSeparator: string;
+  isoCode: string;
+  isSymbolFirst: boolean;
+  name: string;
+  negativeType: string;
+  symbol: string;
+  thousandsSeparator: string;
+  timestamp: string;
+}
+
+//  ADJUSTMENT REASON
+
+export interface InflowAdjustmentReason {
+  adjustmentReasonId: string;
+  isActive: boolean;
+  isInternal: boolean;
+  name: string;
+}
+
+// PRICING SCHEMES
+
+export interface InflowPricingScheme {
+  pricingSchemeId: string;
+  currencyId: string;
+  name: string;
+  isActive: boolean;
+  isDefault: boolean;
+  isTaxInclusive: boolean;
+  timestamp: string;
+  currency?: InflowCurrency;
+  productPrices?: InflowProductPrice[];
+}
+
+interface InflowCustomFields {
+  custom1?: string; // Brand
+  custom2?: string; // Features
+  custom3?: string; // Tags
+  custom4?: string;
+  custom5?: string;
+  custom6?: string;
+  custom7?: string;
+  custom8?: string;
+  custom9?: string;
+  custom10?: string;
+}
+
+export async function getProducts(url: string) {
  const apiClient = new BranchClient(url)
   return await apiClient.get<InflowProduct[]>(
     `/inflow-local/products`,
@@ -43,8 +322,8 @@ export async function upsertProduct(
   return await apiClient.post<UpsertResult>(
     `/inbound/receive`, {
         "eventType": "productLocal",
-        "transactionType": "CATEGORY",
-        "batch_id": `CTGRY-${crypto.randomUUID().toLowerCase()}`,
+        "transactionType": "PRODUCT",
+        "batch_id": `PRDCT-${crypto.randomUUID().toLowerCase()}`,
         "sourceSystem": "MID",
         "sourceKey": payload.productId,
         "payload": payload 
@@ -73,126 +352,4 @@ export async function upsertProduct(
 //   "masterPackQty": null,
 //   "innerPackQty": null,
 
-//   "dimensions": {
-//     "caseLength": null,
-//     "caseWidth": null,
-//     "caseHeight": null,
-//     "caseWeight": null,
-//     "productLength": "12.0000",
-//     "productWidth": "3.0000",
-//     "productHeight": "12.0000",
-//     "productWeight": null
-//   },
-
-//   "customFields": {
-//     "custom1": "",
-//     "custom2": "",
-//     "custom3": "",
-//     "custom4": "01/14/2025_NA_0_NA",
-//     "custom5": "Laz_Main, SPH_Main, JG_Website, Tiktok",
-//     "custom6": "A7-L 17% 0% DL",
-//     "custom7": "1 SPOT",
-//     "custom8": "",
-//     "custom9": "",
-//     "custom10": ""
-//   },
-
-//   "isSellable": true,
-//   "isPurchaseable": true,
-//   "isActive": true,
-//   "trackSerials": false,
-
-//   "dateIntroduced": "2026-06-22T11:28:26.997",
-//   "dateUpdated": null,
-
-//   "lastModifiedById": "100",
-//   "lastModifiedDttm": "2026-06-22T17:04:39.817",
-//   "timestamp": null,
-
-//   "pictureFileAttachmentId": null,
-
-//   "salesUom": {
-//     "name": "",
-//     "ratioStd": "1.0000",
-//     "ratio": "1.0000"
-//   },
-
-//   "purchaseUom": {
-//     "name": "",
-//     "ratioStd": "1.0000",
-//     "ratio": "1.0000"
-//   },
-
-//   "category": {
-//     "categoryId": "101",
-//     "name": "Sample Category",
-//     "description": "",
-//     "isActive": true
-//   },
-
-//   "lastModifiedBy": {
-//     "teamMemberId": "100",
-//     "name": "Default User",
-//     "isInternal": false
-//   },
-
-//   "attachments": [],
-//   "prices": [],
-//   "taxCodes": [],
-//   "balances": []
-// }
-
-
-// {
-//     "version": 2,
-//     "itemType": 1,
-//     "name": "ACCSOON AA-01",
-//     "description": "Accsoon AA-01 Aluminum 1/4\" Adjustable Cold Shoe Mount Adapter for Videography & Photography Camera Accessories, Video Light, Microphone, Field Display Monitor, Phone Holder",
-//     "remarks": "",
-//     "barCode": "664918771676",
-//     "categoryId": 103,
-//     "defaultLocationId": null,
-//     "defaultSublocation": "",
-//     "reorderPoint": "25.0000",
-//     "reorderQuantity": "25.0000",
-//     "uom": "",
-//     "masterPackQty": null,
-//     "innerPackQty": null,
-//     "caseLength": null,
-//     "caseWidth": null,
-//     "caseHeight": null,
-//     "caseWeight": null,
-//     "productLength": "7.0000",
-//     "productWidth": "4.0000",
-//     "productHeight": "10.0000",
-//     "productWeight": null,
-//     "custom1": "",
-//     "custom2": "",
-//     "custom3": "",
-//     "custom4": "01/05/2024_MOVING_19_NA",
-//     "custom5": "Laz_Main, Laz_Pro, SPH_Main, JG_Website, Tiktok",
-//     "lastVendorId": 102,
-//     "isSellable": 1,
-//     "isPurchaseable": 1,
-//     "dateIntroduced": "2026-06-22 11:50:18.140000",
-//     "dateUpdated": null,
-//     "lastModUserId": 100,
-//     "lastModDttm": "2026-06-22 13:08:10.737000",
-//     "timestamp": "00000002486d3918",
-//     "isActive": 1,
-//     "custom6": "A60-O 17% 12% DT",
-//     "custom7": "ACCSOON",
-//     "custom8": "",
-//     "custom9": "",
-//     "custom10": "",
-//     "pictureFileAttachmentId": null,
-//     "soUomName": "",
-//     "soUomRatioStd": "1.0000",
-//     "soUomRatio": "1.0000",
-//     "poUomName": "",
-//     "poUomRatioStd": "1.0000",
-//     "poUomRatio": "1.0000",
-//     "prodId": 103,
-//     "trackSerials": 1,
-//     "syncedAt": "2026-07-11 13:12:17"
-//   },
+//   

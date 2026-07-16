@@ -36,7 +36,7 @@ export const productSchema = z.object({
   originCountry: z.string().nullable().optional(),
   hsTariffNumber: z.string().nullable().optional(),
   remarks: z.string().nullable().optional(),
-  standardUomName: z.string().nullable().optional(),
+  standardUomName: z.string().min(1, "Base system UOM is required"),
 
   // 💰 Financial Costing & Pricing Elements
   initialCost: z.number().min(0, "Cost basis cannot be negative"),
