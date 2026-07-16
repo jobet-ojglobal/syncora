@@ -26,11 +26,12 @@ import z from "zod";
 interface UnifiedCustomerFormProps {
   initialData?: Partial<CustomerFormData>;
   catalogs: {
-    pricing: { id: string; name: string }[];
-    taxing: { id: string; name: string }[];
-    terms: { id: string; name: string }[];
+    currencies: { id: string; name: string }[];
+    taxingSchemes: { id: string; name: string }[];
+    paymentTerms: { id: string; name: string }[];
     locations: { id: string; name: string }[];
-    reps: { id: string; name: string }[];
+    pricingSchemes: { id: string; name: string }[];
+    salesReps: { id: string; name: string }[];
   };
 }
 
@@ -355,8 +356,8 @@ export default function UnifiedCustomerForm({ initialData, catalogs }: UnifiedCu
                           <SelectValue placeholder="Select Representative" />
                         </SelectTrigger>
                         <SelectContent>
-                          {catalogs.reps.length > 0 ? (
-                            catalogs.reps.map((cat) => (
+                          {catalogs.salesReps.length > 0 ? (
+                            catalogs.salesReps.map((cat) => (
                               <SelectItem key={cat.id} value={cat.id}>{cat.name}</SelectItem>
                             ))
                           ) : (
@@ -428,8 +429,8 @@ export default function UnifiedCustomerForm({ initialData, catalogs }: UnifiedCu
                           <SelectValue placeholder="Select" />
                         </SelectTrigger>
                         <SelectContent position="item-aligned">
-                          { catalogs.pricing.length > 0 ? (
-                            catalogs.pricing.map((val) => (
+                          { catalogs.pricingSchemes.length > 0 ? (
+                            catalogs.pricingSchemes.map((val) => (
                               <SelectItem key={val.id} value={val.id}>
                                 {val.name}
                               </SelectItem>
@@ -469,8 +470,8 @@ export default function UnifiedCustomerForm({ initialData, catalogs }: UnifiedCu
                           <SelectValue placeholder="Select" />
                         </SelectTrigger>
                         <SelectContent position="item-aligned">
-                          { catalogs.taxing.length > 0 ? (
-                            catalogs.taxing.map((val) => (
+                          { catalogs.taxingSchemes.length > 0 ? (
+                            catalogs.taxingSchemes.map((val) => (
                               <SelectItem key={val.id} value={val.id}>
                                 {val.name}
                               </SelectItem>
@@ -512,8 +513,8 @@ export default function UnifiedCustomerForm({ initialData, catalogs }: UnifiedCu
                           <SelectValue placeholder="Select" />
                         </SelectTrigger>
                         <SelectContent position="item-aligned">
-                          { catalogs.terms.length > 0 ? (
-                            catalogs.terms.map((val) => (
+                          { catalogs.paymentTerms.length > 0 ? (
+                            catalogs.paymentTerms.map((val) => (
                               <SelectItem key={val.id} value={val.id}>
                                 {val.name}
                               </SelectItem>

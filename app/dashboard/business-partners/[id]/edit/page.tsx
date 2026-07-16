@@ -4,10 +4,10 @@ import PageHeader from "@/components/layout/dashboard/PageHeader";
 import UnifiedCustomerForm from "@/components/customer/unified-customer-form";
 import { getBusinessPartnerMetadata } from "@/services/customer.metadata";
 
-export const metadata = {
-  title: "Onboard Business Client Partner | Management Directory",
-  description: "Instantiate legal corporate entity profiles and map relational billing profiles settings configuration indexes lines nodes."
-};
+// export const metadata = {
+//   title: "Onboard Business Client Partner | Management Directory",
+//   description: "Instantiate legal corporate entity profiles and map relational billing profiles settings configuration indexes lines nodes."
+// };
 
 export default async function OnboardNewCustomerAccountPage() {
   // Fetch dependencies from the extracted backend provider layer

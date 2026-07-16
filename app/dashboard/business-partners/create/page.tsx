@@ -1,13 +1,13 @@
 import { ArrowLeft, Building2 } from "lucide-react";
 import Link from "next/link";
 import PageHeader from "@/components/layout/dashboard/PageHeader";
-import UnifiedCustomerForm from "@/components/customer/unified-customer-form";
 import { getBusinessPartnerMetadata } from "@/services/customer.metadata";
+import { BusinessPartnerForm } from "@/components/partner/business-partner-form";
 
-export const metadata = {
-  title: "Onboard Business Client Partner | Management Directory",
-  description: "Instantiate legal corporate entity profiles and map relational billing profiles settings configuration indexes lines nodes."
-};
+// export const metadata = {
+//   title: "Onboard Business Client Partner | Management Directory",
+//   description: "Instantiate legal corporate entity profiles and map relational billing profiles settings configuration indexes lines nodes."
+// };
 
 export default async function OnboardNewCustomerAccountPage() {
   // Fetch dependencies from the extracted backend provider layer
@@ -29,7 +29,7 @@ export default async function OnboardNewCustomerAccountPage() {
         icon={Building2}
       />
 
-      <UnifiedCustomerForm catalogs={catalogs} />
+      <BusinessPartnerForm catalogs={catalogs} />
     </div>
   );
 }
