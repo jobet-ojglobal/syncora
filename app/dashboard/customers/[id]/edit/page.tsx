@@ -4,7 +4,7 @@ import PageHeader from "@/components/layout/dashboard/PageHeader";
 import UnifiedCustomerForm from "@/components/customer/unified-customer-form";
 import { prisma } from "@/lib/prisma"; 
 import { notFound } from "next/navigation";
-import { getCustomerMetadata } from "@/services/customer.metadata";
+import { getBusinessPartnerMetadata } from "@/services/customer.metadata";
 
 interface EditCustomerPageProps {
   params: Promise<{
@@ -22,7 +22,7 @@ export default async function ModifyExistingCustomerProfileLedgerPage({ params }
 
   // Resolve catalogs service and specific customer entity concurrently without HTTP overhead
   const [catalogs, customerData] = await Promise.all([
-    getCustomerMetadata(),
+    getBusinessPartnerMetadata(),
     prisma.customer.findUnique({
       where: { id: targetId },
       include: {

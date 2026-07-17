@@ -75,11 +75,11 @@ const locationWorker = new Worker<LocationWebhookJobData>(
       }
 
       if (result?.success) {
+        console.log(`[Location Worker] Dispatching downstream job for ID: ${dataId}`);
         if (source === "customer") {
           const customerResult = result as CustomerSyncResult;
           
           if (customerResult.inflowPayload) {
-            console.log(`[Location Worker] Dispatching customer downstream job to midSyncQueue for ID: ${dataId}`);
             // await getMidSyncQueue().add(
             //   "customer_sync_job",
             //   {
@@ -97,7 +97,7 @@ const locationWorker = new Worker<LocationWebhookJobData>(
           }
         }
 
-        if(locationUrl && dataId && !source_key) {
+        if(locationUrl && dataId && (source_key === undefined || source_key === null)) {
           const apiClient = new BranchClient(locationUrl);
           try {
             await apiClient.put("/cloud/ack", {

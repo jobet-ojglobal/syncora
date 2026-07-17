@@ -6,13 +6,14 @@ import useSWR from "swr";
 import { 
   ArrowLeft, Edit3, Building2, UserCheck, Mail, Phone, Globe, FileText, 
   MapPin, CheckCircle2, XCircle, ShoppingBag, Landmark, Truck, ShieldCheck, 
-  BadgeDollarSign, Calendar, Clock, Layers, AlertCircle
+  BadgeDollarSign, Calendar, Clock, Layers, AlertCircle, Coins, ShieldAlert,
+  Percent, ArrowDownRight, ArrowUpRight, Scale, ReceiptText
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import PageHeader from "@/components/layout/dashboard/PageHeader";
+import { Separator } from "@/components/ui/separator";
 
 const fetcher = (url: string) => fetch(url).then((res) => {
   if (!res.ok) throw new Error("Failed syncing business partner metrics.");
@@ -27,7 +28,7 @@ export default function BusinessPartnerOverviewPage({ params }: OverviewPageProp
   const resolvedParams = use(params);
   const { id } = resolvedParams;
 
-  // Leveraging SWR to dynamically fetch unified records matching your Prisma structure
+  // SWR dynamically fetches unified records matching your Prisma structure
   const { data: partner, error, isLoading } = useSWR(
     `/api/admin/business-partners/${id}`,
     fetcher
@@ -70,11 +71,12 @@ export default function BusinessPartnerOverviewPage({ params }: OverviewPageProp
       {/* Return Navigation and Editing Controls Container */}
       <div className="flex items-center justify-between">
         <Button asChild variant="ghost" size="sm" className="gap-1.5 text-xs font-medium">
-          <Link href="/admin/business-partners">
+          <Link href="/dashboard/business-partners">
             <ArrowLeft className="w-3.5 h-3.5" /> Back to Partners Directory
           </Link>
         </Button>
         <Button asChild size="sm" variant="outline" className="gap-1.5 text-xs font-semibold">
+          {/* Linked using dashboard namespace context consistent with edit route schema */}
           <Link href={`/dashboard/business-partners/${id}/edit`}>
             <Edit3 className="w-3.5 h-3.5" /> Modify Account Properties
           </Link>
@@ -169,6 +171,15 @@ export default function BusinessPartnerOverviewPage({ params }: OverviewPageProp
                   <span>{partner.phone || "N/A"}</span>
                 </div>
               </div>
+              {partner.fax && (
+                <div className="flex items-center gap-2 border-b pb-2">
+                  <FileText className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+                  <div>
+                    <span className="text-muted-foreground text-[10px] block font-normal">Fax Transmission</span>
+                    <span>{partner.fax}</span>
+                  </div>
+                </div>
+              )}
               <div className="flex items-center gap-2">
                 <Globe className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
                 <div>
@@ -196,14 +207,31 @@ export default function BusinessPartnerOverviewPage({ params }: OverviewPageProp
                 <div className="text-muted-foreground italic text-center py-4">No localized physical mapping coordinates stored.</div>
               ) : (
                 partner.addresses.map((addr: any) => (
-                  <div key={addr.id} className="p-3 bg-muted/40 border rounded-lg space-y-1 font-medium">
-                    <div className="flex items-center justify-between mb-1">
+                  <div key={addr.id} className="p-3 bg-muted/40 border rounded-lg space-y-2 font-medium">
+                    <div className="flex items-center justify-between">
                       <span className="font-bold text-foreground text-[11px]">{addr.name || "HQ Branch"}</span>
-                      {addr.addressType && (
-                        <Badge variant="outline" className="text-[9px] px-1 h-4 uppercase font-sans tracking-wide">
-                          {addr.addressType}
-                        </Badge>
-                      )}
+                      <div className="flex gap-1 flex-wrap">
+                        {addr.addressType && (
+                          <Badge variant="outline" className="text-[8px] px-1 h-4 uppercase tracking-wide">
+                            {addr.addressType}
+                          </Badge>
+                        )}
+                        {addr.isDefaultBilling && (
+                          <Badge className="bg-sky-500/10 text-sky-600 border-sky-200/20 text-[8px] px-1 h-4">
+                            Billing
+                          </Badge>
+                        )}
+                        {addr.isDefaultShipping && (
+                          <Badge className="bg-emerald-500/10 text-emerald-600 border-emerald-200/20 text-[8px] px-1 h-4">
+                            Shipping
+                          </Badge>
+                        )}
+                        {addr.isDefaultVendorAddress && (
+                          <Badge className="bg-amber-500/10 text-amber-600 border-amber-200/20 text-[8px] px-1 h-4">
+                            Vendor
+                          </Badge>
+                        )}
+                      </div>
                     </div>
                     <div className="text-slate-600 font-sans leading-relaxed text-[11px]">
                       <div>{addr.address1}</div>
@@ -211,6 +239,11 @@ export default function BusinessPartnerOverviewPage({ params }: OverviewPageProp
                       <div>{addr.city}, {addr.state} {addr.postalCode}</div>
                       <div className="text-foreground font-semibold text-[10px] uppercase mt-0.5 tracking-tight">{addr.country}</div>
                     </div>
+                    {addr.remarks && (
+                      <p className="text-[10px] text-muted-foreground border-t pt-1.5 font-normal italic">
+                        Note: {addr.remarks}
+                      </p>
+                    )}
                   </div>
                 ))
               )}
@@ -218,7 +251,7 @@ export default function BusinessPartnerOverviewPage({ params }: OverviewPageProp
           </Card>
         </div>
 
-        {/* Right Column: Roles Execution Tabs (Customer Operations vs Vendor Rules) */}
+        {/* Right Column: Roles Execution Tabs */}
         <div className="lg:col-span-2">
           <Tabs defaultValue={partner.customer ? "customer-role" : "vendor-role"} className="w-full">
             <TabsList className="grid w-full grid-cols-2 h-10 p-1">
@@ -251,9 +284,15 @@ export default function BusinessPartnerOverviewPage({ params }: OverviewPageProp
                           <span className="text-muted-foreground">Pricing Tier:</span>
                           <span className="text-foreground font-semibold">{partner.customer.pricingScheme?.name || "Standard Price Matrix"}</span>
                         </div>
-                        <div className="flex justify-between py-1">
+                        <div className="flex justify-between border-b py-1">
                           <span className="text-muted-foreground">Tax Matrix Protocol:</span>
                           <span className="text-foreground font-semibold">{partner.customer.taxingScheme?.name || "Open Tax Exempt"}</span>
+                        </div>
+                        <div className="flex justify-between py-1">
+                          <span className="text-muted-foreground flex items-center gap-1">
+                            <Scale className="w-3 h-3 text-slate-400" /> Tax Exempt No.
+                          </span>
+                          <span className="font-mono font-semibold">{partner.customer.taxExemptNumber || "None Assigned"}</span>
                         </div>
                       </CardContent>
                     </Card>
@@ -261,7 +300,7 @@ export default function BusinessPartnerOverviewPage({ params }: OverviewPageProp
                     <Card className="shadow-3xs">
                       <CardHeader className="p-4 pb-2">
                         <CardTitle className="text-[11px] uppercase tracking-wider text-muted-foreground flex items-center gap-1.5 font-bold">
-                          <BadgeDollarSign className="w-3.5 h-3.5 text-slate-400" /> Logistic & Sales Defaults
+                          <BadgeDollarSign className="w-3.5 h-3.5 text-slate-400" /> Logistics & Sales Defaults
                         </CardTitle>
                       </CardHeader>
                       <CardContent className="p-4 pt-0 font-medium space-y-2">
@@ -273,10 +312,65 @@ export default function BusinessPartnerOverviewPage({ params }: OverviewPageProp
                           <span className="text-muted-foreground">Payment Route:</span>
                           <span>{partner.customer.defaultPaymentMethod || "Standard Processing"}</span>
                         </div>
-                        <div className="flex justify-between py-1">
+                        <div className="flex justify-between border-b py-1">
                           <span className="text-muted-foreground">Assigned Carrier Line:</span>
                           <span>{partner.customer.defaultCarrier || "Ex-Works Logistics"}</span>
                         </div>
+                        <div className="flex justify-between py-1">
+                          <span className="text-muted-foreground flex items-center gap-1">
+                            <Percent className="w-3 h-3 text-slate-400" /> Customer Discount Rate:
+                          </span>
+                          <span className="font-bold text-indigo-600">{partner.customer.discount ? `${partner.customer.discount}%` : "0.00%"}</span>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </div>
+
+                  {/* Customer Liquid Account Balances & Available Credits */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    {/* Live Balances Array */}
+                    <Card className="shadow-3xs">
+                      <CardHeader className="pb-2">
+                        <CardTitle className="text-xs font-bold flex items-center gap-1.5">
+                          <Coins className="w-4 h-4 text-muted-foreground" /> Account Balance Matrix
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent className="space-y-2">
+                        {(!partner.customer.balances || partner.customer.balances.length === 0) ? (
+                          <div className="text-muted-foreground italic text-center py-2">No active balances.</div>
+                        ) : (
+                          partner.customer.balances.map((bal: any) => (
+                            <div key={bal.id} className="flex justify-between items-center p-2 bg-muted/30 rounded border">
+                              <span className="font-medium text-slate-500">{bal.currency?.name} ({bal.currency?.isoCode})</span>
+                              <span className={`font-mono font-bold ${Number(bal.balance) > 0 ? "text-rose-600" : "text-emerald-600"}`}>
+                                {Number(bal.balance).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {bal.currency?.symbol}
+                              </span>
+                            </div>
+                          ))
+                        )}
+                      </CardContent>
+                    </Card>
+
+                    {/* Available Credits Array */}
+                    <Card className="shadow-3xs">
+                      <CardHeader className="pb-2">
+                        <CardTitle className="text-xs font-bold flex items-center gap-1.5">
+                          <ReceiptText className="w-4 h-4 text-muted-foreground" /> Customer Store Credits
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent className="space-y-2">
+                        {(!partner.customer.credits || partner.customer.credits.length === 0) ? (
+                          <div className="text-muted-foreground italic text-center py-2">No available store credit lines.</div>
+                        ) : (
+                          partner.customer.credits.map((cred: any) => (
+                            <div key={cred.id} className="flex justify-between items-center p-2 bg-muted/30 rounded border">
+                              <span className="font-medium text-slate-500">{cred.currency?.name} ({cred.currency?.isoCode})</span>
+                              <span className="font-mono font-bold text-blue-600">
+                                {Number(cred.credit).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {cred.currency?.symbol}
+                              </span>
+                            </div>
+                          ))
+                        )}
                       </CardContent>
                     </Card>
                   </div>
@@ -296,8 +390,10 @@ export default function BusinessPartnerOverviewPage({ params }: OverviewPageProp
                         partner.customer.dues.map((due: any) => (
                           <div key={due.id} className="space-y-3">
                             <div className="flex justify-between items-center bg-muted/40 p-2 rounded-md font-mono text-[11px] font-bold">
-                              <span className="text-muted-foreground font-sans text-xs">Currency Allocation Stack</span>
-                              <span className="text-foreground">{due.currency?.isoCode} ({due.currency?.symbol})</span>
+                              <span className="text-muted-foreground font-sans text-xs flex items-center gap-1">
+                                <ArrowDownRight className="w-3.5 h-3.5 text-red-500" /> Currency Allocation Stack
+                              </span>
+                              <span className="text-foreground">{due.currency?.name} — {due.currency?.isoCode} ({due.currency?.symbol})</span>
                             </div>
                             <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 font-mono text-center">
                               <div className="bg-muted/30 border p-2.5 rounded-lg">
@@ -351,9 +447,15 @@ export default function BusinessPartnerOverviewPage({ params }: OverviewPageProp
                             {partner.vendor._count?.products || 0} Registered Items
                           </span>
                         </div>
-                        <div className="flex justify-between py-1">
+                        <div className="flex justify-between border-b py-1">
                           <span className="text-muted-foreground">Operational Lead Time:</span>
                           <span className="font-semibold">{partner.vendor.leadTimeDays ? `${partner.vendor.leadTimeDays} Days` : "Unconfigured / Dynamic"}</span>
+                        </div>
+                        <div className="flex justify-between py-1">
+                          <span className="text-muted-foreground">Functional Currency:</span>
+                          <span className="font-bold text-amber-600 uppercase">
+                            {partner.vendor.currency?.name} ({partner.vendor.currency?.isoCode || "USD"})
+                          </span>
                         </div>
                       </CardContent>
                     </Card>
@@ -373,13 +475,40 @@ export default function BusinessPartnerOverviewPage({ params }: OverviewPageProp
                           <span className="text-muted-foreground">Pricing Policy:</span>
                           <span>{partner.vendor.isTaxInclusivePricing ? "Tax Inclusive Anchors" : "Gross Tax Exclusive Matrix"}</span>
                         </div>
-                        <div className="flex justify-between py-1">
+                        <div className="flex justify-between border-b py-1">
                           <span className="text-muted-foreground">Tax Matrix Scope:</span>
                           <span>{partner.vendor.taxingScheme?.name || "Corporate Standard Open"}</span>
+                        </div>
+                        <div className="flex justify-between py-1">
+                          <span className="text-muted-foreground">Default Carrier:</span>
+                          <span>{partner.vendor.defaultCarrier || "None Specified"}</span>
                         </div>
                       </CardContent>
                     </Card>
                   </div>
+
+                  {/* Vendor Account Balances Detail Block */}
+                  <Card className="shadow-3xs">
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-xs font-bold flex items-center gap-1.5">
+                        <Coins className="w-4 h-4 text-muted-foreground" /> Accounts Payable Balances
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-2">
+                      {(!partner.vendor.balances || partner.vendor.balances.length === 0) ? (
+                        <div className="text-muted-foreground italic text-center py-2">No active vendor balance metrics available.</div>
+                      ) : (
+                        partner.vendor.balances.map((bal: any) => (
+                          <div key={bal.id} className="flex justify-between items-center p-2 bg-muted/30 rounded border">
+                            <span className="font-medium text-slate-500">{bal.currency?.name} ({bal.currency?.isoCode})</span>
+                            <span className="font-mono font-bold text-amber-600">
+                              {Number(bal.balance).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {bal.currency?.symbol}
+                            </span>
+                          </div>
+                        ))
+                      )}
+                    </CardContent>
+                  </Card>
 
                   {/* Vendor Aging Liabilities Details Block */}
                   <Card className="shadow-3xs">
@@ -395,8 +524,10 @@ export default function BusinessPartnerOverviewPage({ params }: OverviewPageProp
                       ) : (
                         <div className="space-y-3">
                           <div className="flex justify-between items-center bg-muted/40 p-2 rounded-md font-mono text-[11px] font-bold">
-                            <span className="text-muted-foreground font-sans text-xs">Settlement Currency Base</span>
-                            <span className="text-foreground">{partner.vendor.currency?.isoCode || "USD"}</span>
+                            <span className="text-muted-foreground font-sans text-xs flex items-center gap-1">
+                              <ArrowUpRight className="w-3.5 h-3.5 text-amber-500" /> Settlement Currency Base
+                            </span>
+                            <span className="text-foreground">{partner.vendor.currency?.name || "Standard Dollar"} ({partner.vendor.currency?.isoCode || "USD"})</span>
                           </div>
                           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 font-mono text-center">
                             <div className="bg-muted/30 border p-2.5 rounded-lg">
@@ -413,7 +544,7 @@ export default function BusinessPartnerOverviewPage({ params }: OverviewPageProp
                             </div>
                             <div className="bg-muted/30 border p-2.5 rounded-lg">
                               <span className="text-muted-foreground text-[9px] block uppercase tracking-wider font-sans mb-1">61+ Critical</span>
-                              <span className={`font-bold ${Number(liveDuesRow.amount61Plus) > 0 ? "text-rose-600 font-extrabold" : "text-muted-foreground"}`}>
+                              <span className={`font-bold ${Number(liveDuesRow.amount61Plus) > 0 ? "text-rose-600 font-extrabold animate-pulse" : "text-muted-foreground"}`}>
                                 {Number(liveDuesRow.amount61Plus).toFixed(2)}
                               </span>
                             </div>

@@ -1,6 +1,19 @@
 import { Prisma } from "@/generated/prisma/client";
+import { splitBusinessPartnerPayload } from "@/helpers/businessPartnerSplitPayload";
 import { prisma } from "@/lib/prisma";
+import { CloudSyncDispatcher } from "@/lib/queues/businer-partner.helper";
+import { LocalSyncDispatcher } from "@/lib/queues/local-dispatcher.helper";
+import { getMidSyncQueue } from "@/lib/queues/sync.queue";
+import { softDeleteBusinessPartner } from "@/services/business-partner.service";
+import { WebhookService } from "@/services/webhook.service";
 import { NextRequest, NextResponse } from "next/server";
+
+interface Props {
+  params: Promise<{
+    id: string;
+  }>;
+}
+
 
 export async function GET(
   request: NextRequest,
@@ -97,13 +110,9 @@ export async function GET(
   }
 }
 
-interface Params {
-  params: { id: string };
-}
-
-export async function PATCH(request: NextRequest, { params }: Params) {
+export async function PATCH(request: NextRequest, { params }: Props) {
   try {
-    const { id } = params;
+    const { id } = await params;
     const body = await request.json();
     const { 
       name, contactName, email, phone, fax, website, remarks, isActive,
@@ -129,8 +138,10 @@ export async function PATCH(request: NextRequest, { params }: Params) {
           website: website?.trim() || null,
           remarks: remarks?.trim() || null,
           isActive: isActive ?? true,
-          isCustomer: isCustomer ?? false,
-          isVendor: isVendor ?? false,
+        },
+        include: {
+          customer: { select: { id: true } },
+          vendor: { select: { id: true } }
         }
       });
 
@@ -304,19 +315,32 @@ export async function PATCH(request: NextRequest, { params }: Params) {
             }
           });
 
-          await tx.vendorRating.create({
-            data: {
-              inflowId: crypto.randomUUID().toLowerCase(),
-              vendorId,
-              onTimeDeliveryRate: 100,
-              qualityRating: 5,
-              overallScore: 100
-            }
-          });
+          const currencyId = vendorConfig.currencyId;
+
+          // Seed financial structures
+          await Promise.all([
+            tx.vendorBalance.create({ data: { inflowId: crypto.randomUUID().toLowerCase(), vendorId, currencyId, balance: 0 } }),
+            tx.vendorCredit.create({ data: { inflowId: crypto.randomUUID().toLowerCase(), vendorId, currencyId, credit: 0 } }),
+            tx.vendorDue.create({ data: { inflowId: crypto.randomUUID().toLowerCase(), vendorId, currencyId, amountCurrent: 0, amount1To30: 0, amount31To60: 0, amount61Plus: 0 } })
+          ]);
+
+          // await tx.vendorRating.create({
+          //   data: {
+          //     inflowId: crypto.randomUUID().toLowerCase(),
+          //     vendorId,
+          //     onTimeDeliveryRate: 100,
+          //     qualityRating: 5,
+          //     overallScore: 100
+          //   }
+          // });
         }
 
-        const ratings = await tx.vendorRating.findMany({ where: { vendorId: vendor.inflowId } });
-        vendorPayloadData = { ...vendor, ratings };
+        const balances = await tx.vendorBalance.findMany({ where: { vendorId: vendor.inflowId } });
+        const credits = await tx.vendorCredit.findMany({ where: { vendorId: vendor.inflowId } });
+        const dues = await tx.vendorDue.findMany({ where: { vendorId: vendor.inflowId } });
+
+        // const ratings = await tx.vendorRating.findMany({ where: { vendorId: vendor.inflowId } });
+        vendorPayloadData = { ...vendor, balances, credits, dues  };
       }
 
       return { businessPartner, savedAddresses, customerPayloadData, vendorPayloadData };
@@ -335,8 +359,8 @@ export async function PATCH(request: NextRequest, { params }: Params) {
       website: result.businessPartner.website,
       remarks: result.businessPartner.remarks,
       isActive: result.businessPartner.isActive,
-      isCustomer: result.businessPartner.isCustomer,
-      isVendor: result.businessPartner.isVendor,
+      isCustomer: !!result.businessPartner.customer,
+      isVendor: !!result.businessPartner.vendor,
       addresses: result.savedAddresses.map(addr => ({
         customerAddressId: addr.inflowId,
         name: addr.name,
@@ -382,21 +406,30 @@ export async function PATCH(request: NextRequest, { params }: Params) {
       } : null
     };
 
-    const validCloudWebhook = await WebhookService.getCloudWebhookURL("businessPartner");
-    if (validCloudWebhook) {
-      await getMidSyncQueue().add(
-        "business_partner_cloudsync_job",
-        {
-          source: "BUSINESS_PARTNER_UPSERT_CLOUD",
-          model: "BusinessPartner",
-          payload: syncPayload,
-          timestamp: new Date().toISOString(),
-        },
-        { 
-          attempts: 3, 
-          backoff: { type: "exponential", delay: 2000 },
-          removeOnComplete: true
-        }
+    const splitPayloads = splitBusinessPartnerPayload(result);
+
+    // Dispatch job to background syncing queue (e.g., Cloud sync)
+    await CloudSyncDispatcher.dispatchSplitBusinessPartnerSyncJobs(splitPayloads);
+
+    // Dispatch job to background syncing queue (e.g., Local sync)
+    const localJobs = await LocalSyncDispatcher.prepareLocalBusinessPartnerSyncJobs(
+      result.businessPartner.id,
+      splitPayloads,
+      prisma,
+      WebhookService
+    );
+
+    // Map and execute queue insertions concurrently
+    if (localJobs.length > 0) {
+      const localQueue = getMidSyncQueue();
+      await Promise.all(
+        localJobs.map(job => 
+          localQueue.add(
+            job.name, 
+            job.data, 
+            { attempts: 3, backoff: { type: "exponential", delay: 2000 }, removeOnComplete: true }
+          )
+        )
       );
     }
 
@@ -404,5 +437,47 @@ export async function PATCH(request: NextRequest, { params }: Params) {
   } catch (error) {
     console.error("[BUSINESS_PARTNER_PATCH_ERROR]:", error);
     return NextResponse.json({ error: "Failed to update business partner configuration." }, { status: 500 });
+  }
+}
+
+
+export async function DELETE(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    // Await params per Next.js App Router signature rules
+    const resolvedParams = await params;
+    const { id } = resolvedParams;
+
+    if (!id) {
+      return NextResponse.json(
+        { success: false, error: 'Business Partner ID parameter is required.' },
+        { status: 400 }
+      );
+    }
+
+    // Call database deletion service wrapper containing validation checks
+    const result = await softDeleteBusinessPartner(id);
+
+    return NextResponse.json(result, { status: 200 });
+  } catch (error: any) {
+    // Extract validation error strings or fallback on unknown engine errors
+    const errorMessage = error instanceof Error ? error.message : 'Internal Server Error';
+    
+    // Check if the error was a validation block we intentionally threw
+    if (errorMessage.startsWith('Action blocked') || errorMessage.includes('not found')) {
+      return NextResponse.json(
+        { success: false, error: errorMessage },
+        { status: 422 } // Unprocessable Entity due to business rule violation
+      );
+    }
+
+    // Default error structure for unexpected developer faults / network hiccups
+    console.error('Fatal API error deleting Business Partner:', error);
+    return NextResponse.json(
+      { success: false, error: 'An unexpected database error occurred while processing your request.' },
+      { status: 500 }
+    );
   }
 }

@@ -7,7 +7,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
 import { 
   Building2, User, Mail, Phone, Globe, Printer, FileText, CheckCircle2, 
-  MapPin, Plus, Trash2, ShoppingBag, Truck, CreditCard, ShieldAlert 
+  MapPin, Plus, Trash2, ShoppingBag, Truck, CreditCard, ShieldAlert, ClipboardList
 } from "lucide-react";
 
 import { Input } from "@/components/ui/input";
@@ -20,6 +20,11 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { businessPartnerFormSchema, type BusinessPartnerFormData } from "@/schemas/business-partner.scheme";
+import { FormSelect } from "../shared/form-select";
+import { FormInput } from "../shared/form-input";
+import { FormSwitch } from "../shared/form-switch";
+import { FormTextarea } from "../shared/form-textarea";
+import { FormCheckbox } from "../shared/form-checkbox";
 
 export interface BusinessPartnerFormProps {
   initialData?: Partial<BusinessPartnerFormData>;
@@ -158,7 +163,7 @@ export function BusinessPartnerForm({ initialData, catalogs }: BusinessPartnerFo
   };
 
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className="w-full text-xs font-medium space-y-6 max-w-7xl mx-auto">
+    <form onSubmit={handleSubmit(onSubmit)} className="w-full text-xs font-medium space-y-6 ">
       
       {/* Dynamic Type & State Header Card */}
       <Card className="shadow-xs border-muted/80">
@@ -172,56 +177,27 @@ export function BusinessPartnerForm({ initialData, catalogs }: BusinessPartnerFo
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-6 bg-muted/30 border p-3 rounded-xl shrink-0">
-            <div className="flex items-center space-x-2">
-              <Controller
-                control={control}
-                name="isCustomer"
-                render={({ field }) => (
-                  <Checkbox 
-                    id="isCustomer" 
-                    checked={field.value} 
-                    onCheckedChange={field.onChange} 
-                  />
-                )}
-              />
-              <Label htmlFor="isCustomer" className="text-xs font-bold cursor-pointer flex items-center gap-1">
-                <ShoppingBag className="w-3.5 h-3.5 text-blue-500" /> Customer Role
-              </Label>
-            </div>
-
-            <div className="flex items-center space-x-2">
-              <Controller
-                control={control}
-                name="isVendor"
-                render={({ field }) => (
-                  <Checkbox 
-                    id="isVendor" 
-                    checked={field.value} 
-                    onCheckedChange={field.onChange} 
-                  />
-                )}
-              />
-              <Label htmlFor="isVendor" className="text-xs font-bold cursor-pointer flex items-center gap-1">
-                <Truck className="w-3.5 h-3.5 text-amber-500" /> Vendor Role
-              </Label>
-            </div>
-
-            <div className="flex items-center space-x-2 border-l pl-4 border-slate-200">
-              <Controller
-                control={control}
-                name="isActive"
-                render={({ field }) => (
-                  <Switch 
-                    id="isActive" 
-                    checked={field.value} 
-                    onCheckedChange={field.onChange} 
-                  />
-                )}
-              />
-              <Label htmlFor="isActive" className="text-xs font-bold cursor-pointer text-muted-foreground">
-                Active State
-              </Label>
-            </div>
+            <FormCheckbox
+              name="isCustomer"
+              control={control}
+              label="Customer Role"
+              icon={ShoppingBag}
+              iconClassName="text-blue-500"
+            />
+            <FormCheckbox
+              name="isVendor"
+              control={control}
+              label="Vendor Role"
+              icon={Truck}
+              iconClassName="text-amber-500"
+            />
+            <FormSwitch
+              name="isActive"
+              control={control}
+              label="Active State"
+              variant="inline"
+              className="border-l pl-4 border-slate-200"
+            />
           </div>
         </CardContent>
         {errors.isCustomer && (
@@ -237,71 +213,76 @@ export function BusinessPartnerForm({ initialData, catalogs }: BusinessPartnerFo
         {/* Left Hand: Shared Base Business Partner Metrics */}
         <div className="lg:col-span-1 space-y-6">
           <Card className="shadow-xs">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-xs font-bold uppercase tracking-wider flex items-center gap-2">
-                <Building2 className="w-4 h-4 text-muted-foreground" /> Core Profile Identity
+            <CardHeader className="border-b ">
+              <CardTitle className="text-sm font-semibold flex items-center gap-1.5">
+                <Building2 className="w-4 h-4 text-primary" /> 
+                Core Profile Identity
               </CardTitle>
-              <CardDescription className="text-[10px]">Primary legal entity name and interaction loggers.</CardDescription>
+              <CardDescription className="text-[11px]">Primary legal entity name and interaction loggers.</CardDescription>
             </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-1.5">
-                <Label className="text-muted-foreground font-semibold">Corporate Legal Name *</Label>
-                <div className="relative">
-                  <Input {...register("name")} className="text-xs font-medium pl-8" placeholder="e.g. Acme Logistics Group Inc." />
-                  <Building2 className="w-3.5 h-3.5 absolute left-2.5 top-3 text-muted-foreground" />
-                </div>
-                {errors.name && <p className="text-destructive font-semibold text-[10px] mt-0.5">{errors.name.message}</p>}
+            <CardContent className="grid grid-cols-1 gap-4">
+              <FormInput
+                name="name"
+                control={control}
+                label="Corporate Legal Name"
+                icon={Building2}
+                required
+                placeholder="e.g. Acme Logistics Group Inc."
+                classNameLabel="text-muted-foreground font-semibold"
+              />
+              <FormInput
+                name="contactName"
+                control={control}
+                label="Primary Contact Officer"
+                icon={User}
+                placeholder="e.g. Maria Santos"
+                classNameLabel="text-muted-foreground font-semibold"
+              />
+              <FormInput
+                name="email"
+                control={control}
+                label="Communications Email Endpoint"
+                icon={User}
+                type="email"
+                placeholder="accounts@acme.com"
+                classNameLabel="text-muted-foreground font-semibold"
+              />
+
+              <div className="grid grid-cols-1 xl:grid-cols-2 gap-3">
+                <FormInput
+                  name="phone"
+                  control={control}
+                  label="Telephone Line"
+                  icon={User}
+                  placeholder="+63 2..."
+                  classNameLabel="text-muted-foreground font-semibold"
+                />
+                <FormInput
+                  name="fax"
+                  control={control}
+                  label="Facsimile Network"
+                  icon={User}
+                  placeholder="Fax Number"
+                  classNameLabel="text-muted-foreground font-semibold"
+                />
               </div>
 
-              <div className="space-y-1.5">
-                <Label className="text-muted-foreground font-semibold">Primary Contact Officer</Label>
-                <div className="relative">
-                  <Input {...register("contactName")} className="text-xs font-medium pl-8" placeholder="e.g. Maria Santos" />
-                  <User className="w-3.5 h-3.5 absolute left-2.5 top-3 text-muted-foreground" />
-                </div>
-              </div>
+              <FormInput
+                name="website"
+                control={control}
+                label="Web Portal Domain"
+                icon={Globe}
+                placeholder="https://www.acmelogistics.com"
+                classNameLabel="text-muted-foreground font-semibold"
+              />
 
-              <div className="space-y-1.5">
-                <Label className="text-muted-foreground font-semibold">Communications Email Endpoint</Label>
-                <div className="relative">
-                  <Input type="email" {...register("email")} className="text-xs font-medium pl-8 font-mono" placeholder="accounts@acme.com" />
-                  <Mail className="w-3.5 h-3.5 absolute left-2.5 top-3 text-muted-foreground" />
-                </div>
-                {errors.email && <p className="text-destructive font-semibold text-[10px] mt-0.5">{errors.email.message}</p>}
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1.5">
-                  <Label className="text-muted-foreground font-semibold">Telephone Line</Label>
-                  <div className="relative">
-                    <Input {...register("phone")} className="text-xs font-medium pl-8" placeholder="+63 2..." />
-                    <Phone className="w-3.5 h-3.5 absolute left-2.5 top-3 text-muted-foreground" />
-                  </div>
-                </div>
-                <div className="space-y-1.5">
-                  <Label className="text-muted-foreground font-semibold">Facsimile Network</Label>
-                  <div className="relative">
-                    <Input {...register("fax")} className="text-xs font-medium pl-8" placeholder="Fax Number" />
-                    <Printer className="w-3.5 h-3.5 absolute left-2.5 top-3 text-muted-foreground" />
-                  </div>
-                </div>
-              </div>
-
-              <div className="space-y-1.5">
-                <Label className="text-muted-foreground font-semibold">Web Portal Domain</Label>
-                <div className="relative">
-                  <Input {...register("website")} className="text-xs font-medium pl-8 font-mono" placeholder="https://www.acmelogistics.com" />
-                  <Globe className="w-3.5 h-3.5 absolute left-2.5 top-3 text-muted-foreground" />
-                </div>
-                {errors.website && <p className="text-destructive font-semibold text-[10px] mt-0.5">{errors.website.message}</p>}
-              </div>
-
-              <div className="space-y-1.5">
-                <Label className="text-muted-foreground font-semibold">Administrative Annotations & Remarks</Label>
-                <div className="relative">
-                  <Textarea {...register("remarks")} className="text-xs font-medium min-h-[60px]" placeholder="Internal operational notes regarding this partner baseline configuration..." />
-                </div>
-              </div>
+              <FormTextarea
+                name="remarks"
+                control={control}
+                label="Administrative Annotations & Remarks"
+                placeholder="Internal operational notes regarding this partner baseline configuration..."
+                className="min-h-[80px] text-xs"
+              />
             </CardContent>
           </Card>
         </div>
@@ -324,105 +305,87 @@ export function BusinessPartnerForm({ initialData, catalogs }: BusinessPartnerFo
               {/* Customer Parameter Form Blocks */}
               <TabsContent value="customer-segment" className="mt-4">
                 <Card className="shadow-xs">
-                  <CardHeader className="py-3">
-                    <CardTitle className="text-xs font-bold flex items-center gap-1.5 text-blue-600">
-                      <CreditCard className="w-3.5 h-3.5" /> CUSTOMER FINANCIAL & SHIPPING PROTOCOLS
+                  <CardHeader className="border-b text-blue-500">
+                    <CardTitle className="text-sm font-semibold flex items-center gap-1.5">
+                      <CreditCard className="w-4 h-4 text-primary" /> 
+                      Customer Financial & Shipping Protocols
                     </CardTitle>
                   </CardHeader>
-                  <CardContent className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                    <div className="space-y-1.5">
-                      <Label className="text-muted-foreground font-semibold">Tax Identification/Exempt Code</Label>
-                      <Input {...register("customerConfig.taxExemptNumber")} className="text-xs font-medium" placeholder="TIN-000-000" />
-                    </div>
-                    <div className="space-y-1.5">
-                      <Label className="text-muted-foreground font-semibold">Default Shipping Carrier</Label>
-                      <Input {...register("customerConfig.defaultCarrier")} className="text-xs font-medium" placeholder="FedEx / LBC Express" />
-                    </div>
-                    <div className="space-y-1.5">
-                      <Label className="text-muted-foreground font-semibold">Payment Mode Variant</Label>
-                      <Input {...register("customerConfig.defaultPaymentMethod")} className="text-xs font-medium" />
-                    </div>
-
-                    <div className="space-y-1.5">
-                      <Label className="text-muted-foreground font-semibold">Pricing Scheme Matrix</Label>
-                      <Controller
-                        control={control}
-                        name="customerConfig.pricingSchemeId"
-                        render={({ field }) => (
-                          <Select onValueChange={field.onChange} value={field.value || undefined}>
-                            <SelectTrigger className="text-xs font-medium h-9"><SelectValue placeholder="Select Pricing Matrix" /></SelectTrigger>
-                            <SelectContent>
-                              {catalogs.pricingSchemes.map((p) => <SelectItem className="text-xs" key={p.id} value={p.id}>{p.name}</SelectItem>)}
-                            </SelectContent>
-                          </Select>
-                        )}
-                      />
-                    </div>
-                    <div className="space-y-1.5">
-                      <Label className="text-muted-foreground font-semibold">Customer Taxing Scheme</Label>
-                      <Controller
-                        control={control}
-                        name="customerConfig.taxingSchemeId"
-                        render={({ field }) => (
-                          <Select onValueChange={field.onChange} value={field.value || undefined}>
-                            <SelectTrigger className="text-xs font-medium h-9"><SelectValue placeholder="Select Tax Model" /></SelectTrigger>
-                            <SelectContent>
-                              {catalogs.taxingSchemes.map((t) => <SelectItem className="text-xs" key={t.id} value={t.id}>{t.name}</SelectItem>)}
-                            </SelectContent>
-                          </Select>
-                        )}
-                      />
-                    </div>
-                    <div className="space-y-1.5">
-                      <Label className="text-muted-foreground font-semibold">Grace Payment Terms</Label>
-                      <Controller
-                        control={control}
-                        name="customerConfig.defaultPaymentTermsId"
-                        render={({ field }) => (
-                          <Select onValueChange={field.onChange} value={field.value || undefined}>
-                            <SelectTrigger className="text-xs font-medium h-9"><SelectValue placeholder="Select Payment Grace" /></SelectTrigger>
-                            <SelectContent>
-                              {catalogs.paymentTerms.map((pt) => <SelectItem className="text-xs" key={pt.id} value={pt.id}>{pt.name}</SelectItem>)}
-                            </SelectContent>
-                          </Select>
-                        )}
-                      />
-                    </div>
-
-                    <div className="space-y-1.5">
-                      <Label className="text-muted-foreground font-semibold">Assigned Account Fulfillment Depot</Label>
-                      <Controller
-                        control={control}
-                        name="customerConfig.defaultLocationId"
-                        render={({ field }) => (
-                          <Select onValueChange={field.onChange} value={field.value || undefined}>
-                            <SelectTrigger className="text-xs font-medium h-9"><SelectValue placeholder="Select Depot Node" /></SelectTrigger>
-                            <SelectContent>
-                              {catalogs.locations.map((loc) => <SelectItem className="text-xs" key={loc.id} value={loc.id}>{loc.name}</SelectItem>)}
-                            </SelectContent>
-                          </Select>
-                        )}
-                      />
-                    </div>
-                    <div className="space-y-1.5">
-                      <Label className="text-muted-foreground font-semibold">Dedicated Corporate Rep</Label>
-                      <Controller
-                        control={control}
-                        name="customerConfig.defaultSalesRepTeamMemberId"
-                        render={({ field }) => (
-                          <Select onValueChange={field.onChange} value={field.value || undefined}>
-                            <SelectTrigger className="text-xs font-medium h-9"><SelectValue placeholder="Assign Executive" /></SelectTrigger>
-                            <SelectContent>
-                              {catalogs.salesReps.map((rep) => <SelectItem className="text-xs" key={rep.id} value={rep.id}>{rep.name}</SelectItem>)}
-                            </SelectContent>
-                          </Select>
-                        )}
-                      />
-                    </div>
-                    <div className="space-y-1.5">
-                      <Label className="text-muted-foreground font-semibold">Standard Commercial Discount (%)</Label>
-                      <Input type="number" step="0.01" {...register("customerConfig.discount")} className="text-xs font-medium h-9" />
-                    </div>
+                  <CardContent className="grid grid-cols-1 sm:grid-cols-2 2xl:grid-cols-3 gap-4">
+                    <FormInput
+                      name="customerConfig.taxExemptNumber"
+                      control={control}
+                      label="Tax Identification/Exempt Code"
+                      placeholder="TIN-000-000"
+                      classNameLabel="text-muted-foreground font-semibold"
+                    />
+                    <FormInput
+                      name="customerConfig.defaultCarrier"
+                      control={control}
+                      label="Default Shipping Carrier"
+                      placeholder="Flash / LBC Express"
+                      classNameLabel="text-muted-foreground font-semibold"
+                    />
+                    <FormInput
+                      name="customerConfig.defaultPaymentMethod"
+                      control={control}
+                      label="Payment Mode Variant"
+                      classNameLabel="text-muted-foreground font-semibold"
+                    />
+                    <FormSelect
+                      name="customerConfig.pricingSchemeId"
+                      control={control}
+                      label="Pricing Scheme Matrix"
+                      placeholder="Select Pricing Matrix"
+                      options={catalogs.pricingSchemes}
+                      emptyMessage="No pricing schemes available"
+                      classNameLabel="text-muted-foreground font-semibold"
+                    />
+                    <FormSelect
+                      name="customerConfig.taxingSchemeId"
+                      control={control}
+                      label="Customer Taxing Scheme"
+                      placeholder="Select Tax Model"
+                      options={catalogs.taxingSchemes}
+                      emptyMessage="No taxing schemes available"
+                      classNameLabel="text-muted-foreground font-semibold"
+                    />
+                    <FormSelect
+                      name="customerConfig.defaultPaymentTermsId"
+                      control={control}
+                      label="Payment Terms"
+                      placeholder="Select Payment Term"
+                      options={catalogs.paymentTerms}
+                      emptyMessage="No payment terms available"
+                      classNameLabel="text-muted-foreground font-semibold"
+                    />
+                    <FormSelect
+                      name="customerConfig.defaultLocationId"
+                      control={control}
+                      label="Assigned Account Fulfillment Depot"
+                      placeholder="Select Depot Node"
+                      options={catalogs.locations}
+                      emptyMessage="No locations available"
+                      classNameLabel="text-muted-foreground font-semibold"
+                    />
+                    <FormSelect
+                      name="customerConfig.defaultSalesRepTeamMemberId"
+                      control={control}
+                      label="Assigned Account Fulfillment Depot"
+                      placeholder="Assign Executive"
+                      options={catalogs.salesReps}
+                      emptyMessage="No sales rep available"
+                      classNameLabel="text-muted-foreground font-semibold"
+                    />
+                    <FormInput
+                      name="customerConfig.discount"
+                      control={control}
+                      label="Standard Commercial Discount (%)"
+                      step="0.01"
+                      type="number"
+                      placeholder="0.00"
+                      classNameLabel="text-muted-foreground font-semibold"
+                    />
                   </CardContent>
                 </Card>
               </TabsContent>
@@ -430,88 +393,81 @@ export function BusinessPartnerForm({ initialData, catalogs }: BusinessPartnerFo
               {/* Vendor Parameter Form Blocks */}
               <TabsContent value="vendor-segment" className="mt-4">
                 <Card className="shadow-xs">
-                  <CardHeader className="py-3">
-                    <CardTitle className="text-xs font-bold flex items-center gap-1.5 text-amber-600">
-                      <Truck className="w-3.5 h-3.5" /> VENDOR SUPPLY CHAIN & PROCUREMENT PROTOCOLS
+                  <CardHeader className="border-b text-amber-600">
+                    <CardTitle className="text-sm font-semibold flex items-center gap-1.5">
+                      <Truck className="w-4 h-4 text-primary" /> 
+                      Vendor Supply Chain & Procurement Protocols
                     </CardTitle>
                   </CardHeader>
-                  <CardContent className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                    <div className="space-y-1.5">
-                      <Label className="text-muted-foreground font-semibold">Default Inbound Carrier Line</Label>
-                      <Input {...register("vendorConfig.defaultCarrier")} className="text-xs font-medium" placeholder="DHL / Cargo Express" />
-                    </div>
-                    <div className="space-y-1.5">
-                      <Label className="text-muted-foreground font-semibold">Settlement Method</Label>
-                      <Input {...register("vendorConfig.defaultPaymentMethod")} className="text-xs font-medium" />
-                    </div>
-                    <div className="space-y-1.5">
-                      <Label className="text-muted-foreground font-semibold">Operational Procurement Lead Time (Days)</Label>
-                      <Input type="number" {...register("vendorConfig.leadTimeDays")} className="text-xs font-medium" />
-                    </div>
+                  <CardContent className="grid grid-cols-1 sm:grid-cols-2 2xl:grid-cols-3 gap-4">
+                    <FormInput
+                      name="vendorConfig.defaultCarrier"
+                      control={control}
+                      label="Default Inbound Carrier Line"
+                      placeholder="Lalamove / Cargo Express"
+                      classNameLabel="text-muted-foreground font-semibold"
+                    />
+                    <FormInput
+                      name="vendorConfig.defaultPaymentMethod"
+                      control={control}
+                      label="Settlement Method"
+                      classNameLabel="text-muted-foreground font-semibold"
+                    />
+                    <FormInput
+                      name="vendorConfig.leadTimeDays"
+                      control={control}
+                      type="number"
+                      label="Operational Procurement Lead Time (Days)"
+                      classNameLabel="text-muted-foreground font-semibold"
+                    />
+                    <FormSelect
+                      name="vendorConfig.currencyId"
+                      control={control}
+                      label="Base Currency Ledger"
+                      placeholder="Select Currency"
+                      options={catalogs.currencies}
+                      emptyMessage="No currencies available"
+                      classNameLabel="text-muted-foreground font-semibold"
+                    />
+                    
+                    <FormSelect
+                      name="vendorConfig.taxingSchemeId"
+                      control={control}
+                      label="Vendor Outbound Tax Model"
+                      placeholder="Select Tax Matrix"
+                      options={catalogs.taxingSchemes}
+                      emptyMessage="No taxing schemes available"
+                      classNameLabel="text-muted-foreground font-semibold"
+                    />
+                    <FormSelect
+                      name="vendorConfig.defaultPaymentTermsId"
+                      control={control}
+                      label="Payment Term"
+                      placeholder="Select Payment Terms"
+                      options={catalogs.paymentTerms}
+                      emptyMessage="No payment terms available"
+                      classNameLabel="text-muted-foreground font-semibold"
+                    />
 
-                    <div className="space-y-1.5">
-                      <Label className="text-muted-foreground font-semibold">Base Currency Ledger</Label>
-                      <Controller
-                        control={control}
-                        name="vendorConfig.currencyId"
-                        render={({ field }) => (
-                          <Select onValueChange={field.onChange} value={field.value || undefined}>
-                            <SelectTrigger className="text-xs font-medium h-9"><SelectValue placeholder="Select Currency" /></SelectTrigger>
-                            <SelectContent>
-                              {catalogs.currencies.map((curr) => <SelectItem className="text-xs" key={curr.id} value={curr.id}>{curr.name}</SelectItem>)}
-                            </SelectContent>
-                          </Select>
-                        )}
-                      />
-                    </div>
-                    <div className="space-y-1.5">
-                      <Label className="text-muted-foreground font-semibold">Vendor Outbound Tax Model</Label>
-                      <Controller
-                        control={control}
-                        name="vendorConfig.taxingSchemeId"
-                        render={({ field }) => (
-                          <Select onValueChange={field.onChange} value={field.value || undefined}>
-                            <SelectTrigger className="text-xs font-medium h-9"><SelectValue placeholder="Select Tax Matrix" /></SelectTrigger>
-                            <SelectContent>
-                              {catalogs.taxingSchemes.map((t) => <SelectItem className="text-xs" key={t.id} value={t.id}>{t.name}</SelectItem>)}
-                            </SelectContent>
-                          </Select>
-                        )}
-                      />
-                    </div>
-                    <div className="space-y-1.5">
-                      <Label className="text-muted-foreground font-semibold">Outbound Payable Grace Terms</Label>
-                      <Controller
-                        control={control}
-                        name="vendorConfig.defaultPaymentTermsId"
-                        render={({ field }) => (
-                          <Select onValueChange={field.onChange} value={field.value || undefined}>
-                            <SelectTrigger className="text-xs font-medium h-9"><SelectValue placeholder="Select Payment Terms" /></SelectTrigger>
-                            <SelectContent>
-                              {catalogs.paymentTerms.map((pt) => <SelectItem className="text-xs" key={pt.id} value={pt.id}>{pt.name}</SelectItem>)}
-                            </SelectContent>
-                          </Select>
-                        )}
-                      />
-                    </div>
+                    <FormInput
+                      name="vendorConfig.discount"
+                      control={control}
+                      label="Global Purchasing Discount (%)"
+                      step="0.01"
+                      type="number"
+                      placeholder="0.00"
+                      classNameLabel="text-muted-foreground font-semibold"
+                    />
 
-                    <div className="space-y-1.5">
-                      <Label className="text-muted-foreground font-semibold">Global Purchasing Discount (%)</Label>
-                      <Input type="number" step="0.01" {...register("vendorConfig.discount")} className="text-xs font-medium h-9" />
-                    </div>
-                    <div className="sm:col-span-2 flex items-center justify-between border rounded-lg p-2.5 mt-5 bg-muted/20">
-                      <div className="space-y-0.5">
-                        <Label htmlFor="v-tax-inc" className="text-xs font-bold cursor-pointer">Tax-Inclusive Pricing Policy</Label>
-                        <p className="text-[10px] text-muted-foreground">Automatically bundle structural system taxes straight inside cost rates.</p>
-                      </div>
-                      <Controller
-                        control={control}
-                        name="vendorConfig.isTaxInclusivePricing"
-                        render={({ field }) => (
-                          <Switch id="v-tax-inc" checked={field.value} onCheckedChange={field.onChange} />
-                        )}
-                      />
-                    </div>
+                    <FormSwitch
+                      name="vendorConfig.isTaxInclusivePricing"
+                      control={control}
+                      label="Tax-Inclusive Pricing Policy"
+                      variant="card"
+                      description="Controls transactional accessibility."
+                      className="sm:col-span-2 p-2.5"
+                    />
+                    
                   </CardContent>
                 </Card>
               </TabsContent>
@@ -520,12 +476,13 @@ export function BusinessPartnerForm({ initialData, catalogs }: BusinessPartnerFo
 
           {/* Dynamic Address Relational Matrix Block */}
           <Card className="shadow-xs">
-            <CardHeader className="pb-3 flex flex-row items-center justify-between space-y-0">
+            <CardHeader className="border-b pb-3 flex flex-row items-center justify-between space-y-0">
               <div className="space-y-1">
-                <CardTitle className="text-xs font-bold uppercase tracking-wider flex items-center gap-2">
-                  <MapPin className="w-4 h-4 text-muted-foreground" /> Physical Mapping Coordinates Matrix
+                <CardTitle className="text-sm font-semibold flex items-center gap-1.5">
+                  <MapPin className="w-4 h-4 text-primary" /> 
+                  Physical Mapping Coordinates Matrix
                 </CardTitle>
-                <CardDescription className="text-[10px]">Configure spatial deployment nodes, shipping markers, and tax profiles.</CardDescription>
+                <CardDescription className="text-[11px]">Configure spatial deployment nodes, shipping markers, and tax profiles.</CardDescription>
               </div>
               <Button 
                 type="button" 
@@ -541,7 +498,7 @@ export function BusinessPartnerForm({ initialData, catalogs }: BusinessPartnerFo
                 <Plus className="w-3.5 h-3.5" /> Append Coordinate Row
               </Button>
             </CardHeader>
-            <CardContent className="space-y-6">
+            <CardContent className="space-y-6" >
               {fields.map((field, index) => (
                 <div key={field.id} className="p-4 bg-muted/30 border rounded-xl relative space-y-4 font-medium">
                   
@@ -563,133 +520,124 @@ export function BusinessPartnerForm({ initialData, catalogs }: BusinessPartnerFo
 
                   {/* Address Grid Fields */}
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                    <div className="space-y-1.5">
-                      <Label className="text-muted-foreground font-semibold">Address Label Name *</Label>
-                      <Input {...register(`addresses.${index}.name`)} placeholder="e.g. Warehouse 3 Dock B" className="text-xs font-medium" />
-                      {errors.addresses?.[index]?.name && <p className="text-destructive text-[10px] font-bold">{errors.addresses[index].name?.message}</p>}
-                    </div>
-                    <div className="space-y-1.5">
-                      <Label className="text-muted-foreground font-semibold">Street Line 1 *</Label>
-                      <Input {...register(`addresses.${index}.address1`)} placeholder="Building, Street, Industrial Zone" className="text-xs font-medium" />
-                      {errors.addresses?.[index]?.address1 && <p className="text-destructive text-[10px] font-bold">{errors.addresses[index].address1?.message}</p>}
-                    </div>
-                    <div className="space-y-1.5">
-                      <Label className="text-muted-foreground font-semibold">Line 2 (Suite/Floor)</Label>
-                      <Input {...register(`addresses.${index}.address2`)} placeholder="Apartment, unit, etc." className="text-xs font-medium" />
-                    </div>
+                    <FormInput
+                      name={`addresses.${index}.name`}
+                      control={control}
+                      label="Address Label Name"
+                      required
+                      placeholder="e.g. Warehouse 3 Dock B"
+                      classNameLabel="text-muted-foreground font-semibold"
+                    />
+                    
+                    <FormInput
+                      name={`addresses.${index}.address1`}
+                      control={control}
+                      label="Street Line 1"
+                      required
+                      placeholder="Building, Street, Industrial Zone"
+                      classNameLabel="text-muted-foreground font-semibold"
+                    />
+                    <FormInput
+                      name={`addresses.${index}.address2`}
+                      control={control}
+                      label="Line 2 (Suite/Floor)"
+                      placeholder="Apartment, unit, etc."
+                      classNameLabel="text-muted-foreground font-semibold"
+                    />
+                    <FormInput
+                      name={`addresses.${index}.city`}
+                      control={control}
+                      label="City Terminal"
+                      required
+                      placeholder="City"
+                      classNameLabel="text-muted-foreground font-semibold"
+                    />
+                    <FormInput
+                      name={`addresses.${index}.state`}
+                      control={control}
+                      label="State / Province"
+                      required
+                      placeholder="Region / State"
+                      classNameLabel="text-muted-foreground font-semibold"
+                    />
+                    <FormInput
+                      name={`addresses.${index}.postalCode`}
+                      control={control}
+                      label="Postal Code"
+                      required
+                      placeholder="ZIP"
+                      classNameLabel="text-muted-foreground font-semibold"
+                    />
+                    <FormInput
+                      name={`addresses.${index}.country`}
+                      control={control}
+                      label="Country Anchor Designation"
+                      required
+                      classNameLabel="text-muted-foreground font-semibold"
+                    />
+                    <FormSelect
+                      name={`addresses.${index}.addressType`}
+                      control={control}
+                      label="Node Classification"
+                      placeholder="Type"
+                      options={[{ id: "Commercial", name: "Commercial" }, { id: "Residential", name: "Residential" }]}
+                      classNameLabel="text-muted-foreground font-semibold"
+                    />
+                    <FormTextarea
+                      name={`addresses.${index}.remarks`}
+                      control={control}
+                      label="Site Specific Instructions"
+                      placeholder="e.g., Forklift access available, deliver to gate 4"
+                      className="min-h-[80px] text-xs "
+                      classNameLabel="text-muted-foreground font-semibold "
+                      classNameField="sm:col-span-3"
+                    />
 
-                    <div className="space-y-1.5">
-                      <Label className="text-muted-foreground font-semibold">City Terminal *</Label>
-                      <Input {...register(`addresses.${index}.city`)} placeholder="City" className="text-xs font-medium" />
-                      {errors.addresses?.[index]?.city && <p className="text-destructive text-[10px] font-bold">{errors.addresses[index].city?.message}</p>}
-                    </div>
-                    <div className="space-y-1.5">
-                      <Label className="text-muted-foreground font-semibold">State / Province *</Label>
-                      <Input {...register(`addresses.${index}.state`)} placeholder="Region / State" className="text-xs font-medium" />
-                      {errors.addresses?.[index]?.state && <p className="text-destructive text-[10px] font-bold">{errors.addresses[index].state?.message}</p>}
-                    </div>
-                    <div className="grid grid-cols-2 gap-2">
-                      <div className="space-y-1.5">
-                        <Label className="text-muted-foreground font-semibold">Postal Code *</Label>
-                        <Input {...register(`addresses.${index}.postalCode`)} placeholder="ZIP" className="text-xs font-medium font-mono" />
-                        {errors.addresses?.[index]?.postalCode && <p className="text-destructive text-[10px] font-bold">{errors.addresses[index].postalCode?.message}</p>}
-                      </div>
-                      <div className="space-y-1.5">
-                        <Label className="text-muted-foreground font-semibold">Node Classification</Label>
-                        <Controller
-                          control={control}
-                          name={`addresses.${index}.addressType`}
-                          render={({ field }) => (
-                            <Select onValueChange={field.onChange} value={field.value || undefined}>
-                              <SelectTrigger className="text-xs font-medium h-9"><SelectValue placeholder="Type" /></SelectTrigger>
-                              <SelectContent>
-                                <SelectItem className="text-xs" value="Commercial">Commercial</SelectItem>
-                                <SelectItem className="text-xs" value="Residential">Residential</SelectItem>
-                              </SelectContent>
-                            </Select>
-                          )}
-                        />
-                      </div>
-                    </div>
-
-                    <div className="space-y-1.5 sm:col-span-1">
-                      <Label className="text-muted-foreground font-semibold">Country Anchor Designation *</Label>
-                      <Input {...register(`addresses.${index}.country`)} className="text-xs font-medium" />
-                      {errors.addresses?.[index]?.country && <p className="text-destructive text-[10px] font-bold">{errors.addresses[index].country?.message}</p>}
-                    </div>
-
-                    <div className="sm:col-span-2 space-y-1.5">
-                      <Label className="text-muted-foreground font-semibold">Site Specific Instructions</Label>
-                      <Input {...register(`addresses.${index}.remarks`)} placeholder="e.g., Forklift access available, deliver to gate 4" className="text-xs font-medium" />
-                    </div>
+                   
                   </div>
 
                   {/* Mutually Exclusive Status Flag Matrix Sub-Grid */}
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-2 border-t border-dashed">
                     {isCustomer && (
                       <>
-                        <div className="flex items-center space-x-2">
-                          <Controller
-                            control={control}
-                            name={`addresses.${index}.isDefaultBilling`}
-                            render={({ field }) => (
-                              <Checkbox 
-                                id={`billing-${index}`} 
-                                checked={field.value} 
-                                onCheckedChange={(val) => {
-                                  field.onChange(val);
-                                  handleAddressCheckboxMutex(index, "isDefaultBilling", !!val);
-                                }} 
-                              />
-                            )}
-                          />
-                          <Label htmlFor={`billing-${index}`} className="text-[11px] text-slate-600 font-bold cursor-pointer">
-                            Default Customer Billing Node
-                          </Label>
-                        </div>
+                        {/* Dynamic Billing Form Selector Grid Context */}
+                        <FormCheckbox
+                          name={`addresses.${index}.isDefaultBilling`}
+                          control={control}
+                          label="Default Customer Billing Node"
+                          icon={CreditCard}
+                          iconClassName="text-blue-500"
+                          onChange={(checked) => 
+                            handleAddressCheckboxMutex(index, "isDefaultBilling", checked)
+                          }
+                        />
 
-                        <div className="flex items-center space-x-2">
-                          <Controller
-                            control={control}
-                            name={`addresses.${index}.isDefaultShipping`}
-                            render={({ field }) => (
-                              <Checkbox 
-                                id={`shipping-${index}`} 
-                                checked={field.value} 
-                                onCheckedChange={(val) => {
-                                  field.onChange(val);
-                                  handleAddressCheckboxMutex(index, "isDefaultShipping", !!val);
-                                }} 
-                              />
-                            )}
-                          />
-                          <Label htmlFor={`shipping-${index}`} className="text-[11px] text-slate-600 font-bold cursor-pointer">
-                            Default Customer Shipping Anchor
-                          </Label>
-                        </div>
+                        {/* Dynamic Shipping Form Selector Grid Context */}
+                        <FormCheckbox
+                          name={`addresses.${index}.isDefaultShipping`}
+                          control={control}
+                          label="Default Customer Shipping Anchor"
+                          icon={Truck}
+                          iconClassName="text-indigo-500"
+                          onChange={(checked) => 
+                            handleAddressCheckboxMutex(index, "isDefaultShipping", checked)
+                          }
+                        />
                       </>
                     )}
 
                     {isVendor && (
-                      <div className="flex items-center space-x-2">
-                        <Controller
-                          control={control}
-                          name={`addresses.${index}.isDefaultVendorAddress`}
-                          render={({ field }) => (
-                            <Checkbox 
-                              id={`vendor-addr-${index}`} 
-                              checked={field.value} 
-                              onCheckedChange={(val) => {
-                                field.onChange(val);
-                                handleAddressCheckboxMutex(index, "isDefaultVendorAddress", !!val);
-                              }} 
-                            />
-                          )}
-                        />
-                        <Label htmlFor={`vendor-addr-${index}`} className="text-[11px] text-slate-600 font-bold cursor-pointer">
-                          Default Procurement Order Node
-                        </Label>
-                      </div>
+                      /* Dynamic Vendor Procurement Selector Panel Context */
+                      <FormCheckbox
+                        name={`addresses.${index}.isDefaultVendorAddress`}
+                        control={control}
+                        label="Default Procurement Order Node"
+                        icon={ClipboardList}
+                        iconClassName="text-amber-500"
+                        onChange={(checked) => 
+                          handleAddressCheckboxMutex(index, "isDefaultVendorAddress", checked)
+                        }
+                      />
                     )}
                   </div>
 
@@ -700,6 +648,7 @@ export function BusinessPartnerForm({ initialData, catalogs }: BusinessPartnerFo
               )}
             </CardContent>
           </Card>
+          
 
           {/* Form Action Controls Bar */}
           <div className="flex justify-end gap-3 pt-2">

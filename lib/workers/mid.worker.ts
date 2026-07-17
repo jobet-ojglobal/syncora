@@ -9,7 +9,6 @@ import { upsertCategory as upsertLocalCategory } from "../locations/data/categor
 import { upsertTaxingScheme as upsertLocalTaxingScheme } from "../locations/data/taxing-scheme";
 import { upsertPricingScheme as upsertLocalPricingScheme } from "../locations/data/pricing-scheme";
 import { upsertProduct as upsertLocalProductScheme } from "../locations/data/product";
-import { BranchClient } from "../locations/location.client";
 
 interface MidWebhookJobData {
   source: string;
@@ -29,56 +28,65 @@ const midWorker = new Worker<MidWebhookJobData>(
   "mid_sync",
   async (job: Job<MidWebhookJobData>) => {
     const { source, model, payload, timestamp, location } = job.data;
-
-    console.log(`[Mid Worker] Processing job ${job.id} for source: ${source} (model: ${model}) at ${timestamp}`);
-
     const locationUrl = (location?.url && location.url.trim() !== "") ? location.url : null;
 
+    console.log(`[Mid Worker] Processing job ${job.id} for source: ${source} (model: ${model}) at ${timestamp}`);
     try {
       let result: UpsertResult | undefined;
 
-      switch (source) {
-        // ========= TAXING SCHEME ============
-        case "TAXING_SCHEME_UPSERT_LOCAL": // OK
-          if (!locationUrl) {
-            throw new Error(`Cannot sync taxing scheme: No location URL found for location ${location?.name}`);
-          }
-          result = await upsertLocalTaxingScheme(payload, locationUrl);
-          break;
-        case "CUSTOMER_UPSERT_LOCAL": // OK
-          if (!locationUrl) {
-            throw new Error(`Cannot sync currency: No location URL found for location ${location?.name}`);
-          }
-          result = await upsertLocalCustomer(payload, locationUrl);
-          break;
-        case "VENDOR_UPSERT_LOCAL": 
-          if (!locationUrl) {
-            throw new Error(`Cannot sync currency: No location URL found for location ${location?.name}`);
-          }
-          result = { success: true } //await upsertLocalCustomer(payload, locationUrl);
-          break;
-        case "CATEGORY_UPSERT_LOCAL": 
-          if (!locationUrl) {
-            throw new Error(`Cannot sync category: No location URL found for location ${location?.name}`);
-          }
-          result = await upsertLocalCategory(payload, locationUrl);
-          break;
-         case "PRODUCT_UPSERT_LOCAL": 
-          if (!locationUrl) {
-            throw new Error(`Cannot sync product: No location URL found for location ${location?.name}`);
-          }
-          result = await upsertLocalProductScheme(payload, locationUrl);
-          break;
-        case "PRICING_SCHEME_UPSERT_LOCAL": // OK
-          if (!locationUrl) {
-            throw new Error(`Cannot sync pricing scheme: No location URL found for location ${location?.name}`);
-          }
-          result = await upsertLocalPricingScheme(payload, locationUrl);
-          break;
-
-        
-        default:
-          throw new Error(`Unsupported mid sync source: ${source}`);
+      if(locationUrl) {
+        switch (source) {
+          // ========= LOCAL JOBS ============
+          case "TAXING_SCHEME_UPSERT_LOCAL": // OK
+            result = await upsertLocalTaxingScheme(payload, locationUrl);
+            break;
+          case "CUSTOMER_UPSERT_LOCAL": // OK
+            result = await upsertLocalCustomer(payload, locationUrl);
+            break;
+          case "VENDOR_UPSERT_LOCAL": 
+            result = { success: true } //await upsertLocalCustomer(payload, locationUrl);
+            break;
+          case "CATEGORY_UPSERT_LOCAL": 
+            result = await upsertLocalCategory(payload, locationUrl);
+            break;
+          case "PRODUCT_UPSERT_LOCAL": 
+            result = await upsertLocalProductScheme(payload, locationUrl);
+            break;
+          case "PRICING_SCHEME_UPSERT_LOCAL": // OK
+            if (!locationUrl) {
+              throw new Error(`Cannot sync pricing scheme: No location URL found for location ${location?.name}`);
+            }
+            result = await upsertLocalPricingScheme(payload, locationUrl);
+            break;
+          case "BUSINESS_PARTNER_UPSERT_LOCAL": 
+            if(model === "Vendor") {
+              // await upsertCloudVendor(payload);
+              result = { success: true}
+            } else if (model === "Customer") {
+              await upsertLocalCustomer(payload, locationUrl);
+              result = { success: true}
+            }
+            break;
+          
+          default:
+            throw new Error(`Unsupported mid sync source: ${source}`);
+        }
+      } else {
+        // ========= CLOUD JOBS ============
+        switch (source) {
+          case "BUSINESS_PARTNER_UPSERT_CLOUD": 
+            if(model === "Vendor") {
+              await upsertCloudVendor(payload);
+              result = { success: true}
+            } else if (model === "Customer") {
+              await upsertCloudCustomer(payload);
+              result = { success: true}
+            }
+            break;
+          
+          default:
+            throw new Error(`Unsupported mid sync source: ${source}`);
+        }
       }
 
       if (result?.success) {
@@ -114,11 +122,6 @@ const midWorker = new Worker<MidWebhookJobData>(
           // });
           console.log(`[Mapping Registry] Saved Identity Map: Central String (${payload.taxingSchemeId}) ⇄ Local Int (${newLocalId}) for Location: ${location.name}`);
         }
-
-        // Cloud acknowledgement fallback protection
-
-        
-        
         
       } else if (result) {
         console.error(`[Mid Worker Sync Warn] API did not return success for ${model}. Message: ${result.message}`);

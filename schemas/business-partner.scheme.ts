@@ -10,9 +10,9 @@ export const addressSchema = z.object({
   country: z.string().min(1, "Country designation is required"),
   postalCode: z.string().min(1, "Postal code is required"),
   addressType: z.enum(["Commercial", "Residential"]).nullable(),
-  isDefaultBilling: z.boolean().default(false),
-  isDefaultShipping: z.boolean().default(false),
-  isDefaultVendorAddress: z.boolean().default(false),
+  isDefaultBilling: z.boolean(),
+  isDefaultShipping: z.boolean(),
+  isDefaultVendorAddress: z.boolean(),
   remarks: z.string().optional(),
 });
 
@@ -25,18 +25,18 @@ export const businessPartnerFormSchema = z.object({
   fax: z.string().optional().nullable(),
   website: z.string().url("Invalid web path formatting").or(z.literal("")).nullable(),
   remarks: z.string().optional().nullable(),
-  isActive: z.boolean().default(true),
+  isActive: z.boolean(),
 
   // Operational Type Flags
-  isCustomer: z.boolean().default(false),
-  isVendor: z.boolean().default(false),
+  isCustomer: z.boolean(),
+  isVendor: z.boolean(),
 
   // Conditional Customer Properties Matrix
   customerConfig: z.object({
     taxExemptNumber: z.string().optional().nullable(),
     defaultCarrier: z.string().optional().nullable(),
-    defaultPaymentMethod: z.string().default("Cash"),
-    discount: z.coerce.number().min(0).max(100).default(0),
+    defaultPaymentMethod: z.string(),
+    discount: z.number().min(0).max(100),
     defaultLocationId: z.string().optional().nullable(),
     defaultPaymentTermsId: z.string().optional().nullable(),
     pricingSchemeId: z.string().optional().nullable(),
@@ -47,10 +47,10 @@ export const businessPartnerFormSchema = z.object({
   // Conditional Vendor Properties Matrix
   vendorConfig: z.object({
     defaultCarrier: z.string().optional().nullable(),
-    defaultPaymentMethod: z.string().default("Cash"),
-    discount: z.coerce.number().min(0).max(100).default(0),
-    isTaxInclusivePricing: z.boolean().default(false),
-    leadTimeDays: z.coerce.number().int().min(0).default(0),
+    defaultPaymentMethod: z.string(),
+    discount: z.number().min(0).max(100),
+    isTaxInclusivePricing: z.boolean(),
+    leadTimeDays: z.number().int().min(0),
     currencyId: z.string().optional().nullable(),
     defaultPaymentTermsId: z.string().optional().nullable(),
     taxingSchemeId: z.string().optional().nullable(),

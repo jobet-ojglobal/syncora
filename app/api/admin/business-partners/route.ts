@@ -4,6 +4,9 @@ import { getMidSyncQueue } from "@/lib/queues/sync.queue";
 import { Prisma } from "@/generated/prisma/client";
 import { WebhookService } from "@/services/webhook.service";
 import { ADDRESS_TYPE_MAP } from "@/types/local-location.type";
+import { splitBusinessPartnerPayload } from "@/helpers/businessPartnerSplitPayload";
+import { CloudSyncDispatcher } from "@/lib/queues/businer-partner.helper";
+import { LocalSyncDispatcher } from "@/lib/queues/local-dispatcher.helper";
 
 export async function POST(request: NextRequest) {
   try {
@@ -31,12 +34,6 @@ export async function POST(request: NextRequest) {
           website: website?.trim() || null, 
           remarks: remarks?.trim() || null, 
           isActive: isActive ?? true,
-          isCustomer: isCustomer ?? false,
-          isVendor: isVendor ?? false,
-        },
-        include: {
-            customer: { select: { id: true } },
-            vendor: { select: { id: true } }
         }
       });
 
@@ -130,12 +127,21 @@ export async function POST(request: NextRequest) {
             discount: vendorConfig.discount ? new Prisma.Decimal(vendorConfig.discount) : 0,
             isTaxInclusivePricing: vendorConfig.isTaxInclusivePricing ?? false,
             leadTimeDays: vendorConfig.leadTimeDays ? parseInt(vendorConfig.leadTimeDays) : 0,
-            currencyId: vendorConfig.currencyId || "USD",
+            currencyId: vendorConfig.currencyId || null,
             defaultPaymentTermsId: vendorConfig.defaultPaymentTermsId || null,
             taxingSchemeId: vendorConfig.taxingSchemeId || null,
             defaultAddressId: vendorAddrInflowId
           }
         });
+
+        const currencyId = vendorConfig.currencyId;
+
+        // Seed financial structures
+        const [balance, credit, due] = await Promise.all([
+          tx.vendorBalance.create({ data: { inflowId: crypto.randomUUID().toLowerCase(), vendorId, currencyId, balance: 0 } }),
+          tx.vendorCredit.create({ data: { inflowId: crypto.randomUUID().toLowerCase(), vendorId, currencyId, credit: 0 } }),
+          tx.vendorDue.create({ data: { inflowId: crypto.randomUUID().toLowerCase(), vendorId, currencyId, amountCurrent: 0, amount1To30: 0, amount31To60: 0, amount61Plus: 0 } })
+        ]);
 
         // Seed vendor performance tracking metrics
         // const rating = await tx.vendorRating.create({
@@ -150,6 +156,9 @@ export async function POST(request: NextRequest) {
 
         vendorPayloadData = {
           ...vendor,
+          balances: [balance],
+          credits: [credit],
+          dues: [due],
         //   ratings: [rating]
         };
       }
@@ -171,8 +180,8 @@ export async function POST(request: NextRequest) {
       website: result.businessPartner.website,
       remarks: result.businessPartner.remarks,
       isActive: result.businessPartner.isActive,
-      isCustomer: !!result.businessPartner.customer,
-      isVendor: !!result.businessPartner.vendor,
+      isCustomer: !!result.customerPayloadData,
+      isVendor: !!result.vendorPayloadData,
       addresses: result.savedAddresses.map(addr => ({
         customerAddressId: addr.inflowId,
         name: addr.name,
@@ -218,29 +227,32 @@ export async function POST(request: NextRequest) {
       } : null
     };
 
-    // Dispatch job to your background syncing queue (e.g., Cloud sync)
-    const validCloudWebhook = await WebhookService.getCloudWebhookURL("businessPartner");
-    if (validCloudWebhook) {
-      await getMidSyncQueue().add(
-        "business_partner_cloudsync_job",
-        {
-          source: "BUSINESS_PARTNER_UPSERT_CLOUD",
-          model: "BusinessPartner",
-          payload: syncPayload,
-          timestamp: new Date().toISOString(),
-        },
-        { 
-          attempts: 3, 
-          backoff: { type: "exponential", delay: 2000 },
-          removeOnComplete: true
-        }
+    const splitPayloads = splitBusinessPartnerPayload(result);
+
+    // Dispatch job to background syncing queue (e.g., Cloud sync)
+    await CloudSyncDispatcher.dispatchSplitBusinessPartnerSyncJobs(splitPayloads);
+
+    // Dispatch job to background syncing queue (e.g., Local sync)
+    const localJobs = await LocalSyncDispatcher.prepareLocalBusinessPartnerSyncJobs(
+      result.businessPartner.id,
+      splitPayloads,
+      prisma,
+      WebhookService
+    );
+
+    // Map and execute queue insertions concurrently
+    if (localJobs.length > 0) {
+      const localQueue = getMidSyncQueue();
+      await Promise.all(
+        localJobs.map(job => 
+          localQueue.add(
+            job.name, 
+            job.data, 
+            { attempts: 3, backoff: { type: "exponential", delay: 2000 }, removeOnComplete: true }
+          )
+        )
       );
     }
-
-    // Dispatch job to your background syncing queue (e.g., Local sync)
-    // const validWebhooks = await WebhookService.getLocationWebhookURLByLocationID(
-    //   syncPayload.defaultLocationId as string, "customerLocal"
-    // );
 
     return NextResponse.json(result.businessPartner, { status: 201 });
   } catch (error) {

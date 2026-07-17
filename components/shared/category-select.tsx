@@ -260,3 +260,4 @@ export function CategorySelect({ value, onChange, className }: CategorySelectPro
     </>
   );
 }
+

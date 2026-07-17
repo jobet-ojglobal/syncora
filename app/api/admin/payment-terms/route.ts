@@ -20,7 +20,7 @@ export async function POST(request: NextRequest) {
     // Atomic insert of the new payment term rule
     const newTerm = await prisma.paymentTerm.create({
       data: {
-        inflowId: `TERM-${crypto.randomUUID().toLowerCase()}`,
+        inflowId: crypto.randomUUID().toLowerCase(),
         name: name.trim(),
         daysDue: parseDaysDue(daysDue),
         isActive

@@ -22,6 +22,7 @@ import { Field, FieldLabel, FieldError, FieldContent, FieldGroup } from "@/compo
 import { customerFormSchema, CustomerFormData } from "@/schemas/customer.schema";
 import { addressFormSchema } from "@/schemas/address.schema";
 import z from "zod";
+import { FormSelect } from "../shared/form-select";
 
 interface UnifiedCustomerFormProps {
   initialData?: Partial<CustomerFormData>;
@@ -308,32 +309,14 @@ export default function UnifiedCustomerForm({ initialData, catalogs }: UnifiedCu
             </h2>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <Field>
-                <FieldLabel>Default Dispatch Location</FieldLabel>
-                <Controller
-                  control={control}
-                  name="defaultLocationId"
-                  render={({ field, fieldState }) => (
-                    <>
-                      <Select onValueChange={field.onChange} value={field.value}>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select Warehouse" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {catalogs.locations.length > 0 ? (
-                            catalogs.locations.map((cat) => (
-                              <SelectItem key={cat.id} value={cat.id}>{cat.name}</SelectItem>
-                            ))
-                          ) : (
-                            <SelectItem value="0" disabled>No locations available</SelectItem>
-                          )}
-                        </SelectContent>
-                      </Select>
-                      {fieldState.error && <FieldError>{fieldState.error.message}</FieldError>}
-                    </>
-                  )}
-                />
-              </Field>
+              <FormSelect
+                name="defaultLocationId"
+                control={control}
+                label="Default Dispatch Location"
+                placeholder="Select a warehouse"
+                options={catalogs.locations}
+                emptyMessage="No locations available"
+              />
 
               <Field>
                 <FieldLabel>Default Shipping Carrier</FieldLabel>

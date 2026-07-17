@@ -83,6 +83,7 @@ export async function POST(request: NextRequest) {
               source: eventType,
               loggedEventId: loggedEvent.id,
               dataId: payload.inflowId || batchID,
+              source_key: payload.source_key || null,
               locationId, 
               data: { locationId: batchID }
             },
@@ -98,7 +99,7 @@ export async function POST(request: NextRequest) {
         break;
       }
       case "currencyLocal": {
-        const currencyId = payload.source_key;
+        const currencyId = payload.source_key || payload.source_key;
 
         if (currencyId) {
           // Offload the sync processing to the dedicated background worker queue
@@ -108,6 +109,7 @@ export async function POST(request: NextRequest) {
               source: eventType,
               loggedEventId: loggedEvent.id,
               dataId: payload.inflowId,
+              source_key: payload.source_key || null,
               locationId, 
               data: { currencyId }
             },
@@ -126,7 +128,7 @@ export async function POST(request: NextRequest) {
       
 
       case "taxingSchemeLocal": {
-        const taxingSchemeId = payload.source_key;
+        const taxingSchemeId = payload.source_key || payload.source_key;
 
         if (taxingSchemeId) {
           // Offload the sync processing to the dedicated background worker queue
@@ -136,6 +138,7 @@ export async function POST(request: NextRequest) {
               source: eventType,
               loggedEventId: loggedEvent.id,
               dataId: payload.inflowId,
+              source_key: payload.source_key || null,
               locationId, 
               data: { taxingSchemeId }
             },
@@ -152,7 +155,7 @@ export async function POST(request: NextRequest) {
       }
 
       case "salesOrder": {
-        const batchID = payload.batch_id;
+        const batchID = payload.batch_id || payload.source_key;
 
         if (batchID) {
           await getLocationSyncQueue().add(
@@ -161,7 +164,9 @@ export async function POST(request: NextRequest) {
               source: eventType,
               loggedEventId: loggedEvent.id,
               dataId: batchID,
+              source_key: payload.source_key || null,
               locationId, 
+              data: { salesId: batchID }
             },
             {
               attempts: 3,
@@ -184,6 +189,7 @@ export async function POST(request: NextRequest) {
               source: eventType,
               loggedEventId: loggedEvent.id,
               dataId: payload.inflowId || batchID,
+              source_key: payload.source_key || null,
               locationId, 
               data: { customerId: batchID }
             },
@@ -238,6 +244,7 @@ export async function POST(request: NextRequest) {
               source: eventType,
               loggedEventId: loggedEvent.id,
               dataId: payload.inflowId || batchID,
+              source_key: payload.source_key || null,
               locationId, 
               data: { categoryId: batchID }
             },
