@@ -30,6 +30,8 @@ export interface InflowProduct {
   }
 
   customFields: InflowCustomFields;
+
+  productImageId?: string | null;
   
   isSellable: boolean;
   isPurchaseable: boolean;
@@ -326,6 +328,23 @@ export async function upsertProduct(
         "batch_id": `PRDCT-${crypto.randomUUID().toLowerCase()}`,
         "sourceSystem": "MID",
         "sourceKey": payload.productId,
+        "payload": payload 
+      }
+  );
+}
+
+export async function upsertProductImage(
+  payload: InflowProduct,
+  url: string
+) {
+  const apiClient = new BranchClient(url)
+  return await apiClient.post<UpsertResult>(
+    `/inbound/receive`, {
+        "eventType": "imageLocal",
+        "transactionType": "IMAGE",
+        "batch_id": `IMAGE-${crypto.randomUUID().toLowerCase()}`,
+        "sourceSystem": "MID",
+        "sourceKey": payload.productImageId,
         "payload": payload 
       }
   );

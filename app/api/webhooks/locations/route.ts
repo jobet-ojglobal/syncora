@@ -56,6 +56,7 @@ export async function POST(request: NextRequest) {
       select: { id: true }
     });
 
+
     if (!webhookParent) {
       throw new Error(`No LocationWebhook configuration initialized for locationId: ${locationId}`);
     }
@@ -220,6 +221,33 @@ export async function POST(request: NextRequest) {
               source_key: payload.source_key || null,
               locationId, 
               data: { productId: batchID }
+            },
+            {
+              attempts: 3,
+              backoff: {
+                type: "exponential",
+                delay: 2000, // Wait 2s, then 4s, then 8s on failure
+              },
+            }
+          );
+        }
+        break;
+      }
+
+      case "imageLocal": {
+        const batchID = payload.batch_id || payload.source_key;
+
+        if (batchID) {
+          // Offload the sync processing to the dedicated background worker queue
+          await getLocationSyncQueue().add(
+            "product_image_sync_job",
+            {
+              source: eventType,
+              loggedEventId: loggedEvent.id,
+              dataId: payload.inflowId || batchID,
+              source_key: payload.source_key || null,
+              locationId, 
+              data: { imageId: batchID }
             },
             {
               attempts: 3,

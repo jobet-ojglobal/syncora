@@ -690,7 +690,10 @@ export async function POST(request: NextRequest) {
 
           // Extract the primary barcode string if one exists in the array
           const primaryBarcode = cleanInflowPayload.productBarcodes[0]?.barcode || "";
-          
+
+          // const imageMatch = existingImagesMaps.find(m =>  m.productImageId === cleanInflowPayload.images[0].imageId && m.locationId === webhook.locationId);
+          const imageUrl = cleanInflowPayload.images[0].originalUrl || null;
+
           return {
             name: "product_localsync_job",
             
@@ -737,13 +740,6 @@ export async function POST(request: NextRequest) {
                     localId: null
                   };
                 }),
-
-                images: cleanInflowPayload.images.map(img => {
-                  const imageMatch = existingImagesMaps.find(m =>  m.productImageId === img.imageId && m.locationId === webhook.locationId);
-                  return {
-                  ...img,
-                  localId: imageMatch?.localId || null
-                }}),
 
                 customFields: {
                   custom7: brand?.name
@@ -1512,6 +1508,8 @@ export async function PATCH(request: NextRequest) {
           //   }
           // };
 
+          const imageUrl = cleanInflowPayload.images[0].originalUrl || null;
+
           return {
             name: "product_localsync_job",
             data: {
@@ -1558,12 +1556,14 @@ export async function PATCH(request: NextRequest) {
                   };
                 }),
 
-                images: cleanInflowPayload.images.map(img => {
-                  const imageMatch = existingImagesMaps.find(m =>  m.productImageId === img.imageId && m.locationId === webhook.locationId);
-                  return {
-                  ...img,
-                  localId: imageMatch?.localId || null
-                }}),
+                // images: cleanInflowPayload.images.map(img => {
+                //   const imageMatch = existingImagesMaps.find(m =>  m.productImageId === img.imageId && m.locationId === webhook.locationId);
+                //   return {
+                //   ...img,
+                //   localId: imageMatch?.localId || null
+                // }}),
+
+                // imageUrl: null,
 
                 customFields: {
                   custom7: brand?.name

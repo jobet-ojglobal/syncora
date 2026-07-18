@@ -12,6 +12,7 @@ import { INFLOW_EVENTS } from "@/lib/inflow/types/inflow";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "../ui/dialog";
 import { SyncButtonOptions } from "../shared/sync-button";
+import { InflowWebhookStatusCard } from "./webhook-status-card";
 
 const InflowWorkspace = () => {
   const [pending, startTransition] = useTransition();
@@ -124,6 +125,8 @@ const InflowWorkspace = () => {
         </TabsList>
 
         <TabsContent value="overview" >
+
+          <InflowWebhookStatusCard />
         
           <div className="grid gap-6 md:grid-cols-3">
               

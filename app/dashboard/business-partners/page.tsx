@@ -62,7 +62,7 @@ export default function BusinessPartnerListPage() {
   const { data: payload, error, isLoading, mutate } = useSWR(
     `/api/admin/business-partners/filtered?search=${debouncedSearch}&role=${roleFilter}&page=${pageIndex}&limit=${PAGE_SIZE}`,
     fetcher,
-    { keepPreviousData: true }
+    { keepPreviousData: true, revalidateOnFocus: true  }
   );
 
   const directory: BusinessPartnerRow[] = payload?.data || [];
@@ -79,7 +79,7 @@ export default function BusinessPartnerListPage() {
 
   return (
     <TooltipProvider>
-      <div className="w-full mx-auto p-6 space-y-6 text-xs">
+      <div className="w-full max-w-7xl mx-auto p-6 space-y-6 text-xs">
         {/* Page Header */}
         <PageHeader 
           className="border-b pb-5" 

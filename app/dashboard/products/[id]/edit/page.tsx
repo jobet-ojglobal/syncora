@@ -22,6 +22,9 @@ export default async function EditProductPage({ params }: Props) {
         deletedAt: null // Safeguard to ensure soft-deleted rows are hidden
       },
       include: {
+        localMappings: {
+          select: { localId: true }
+        },
         variant: {
           select: {
             productGroupId: true,
@@ -111,7 +114,8 @@ export default async function EditProductPage({ params }: Props) {
       mediumUrl: img.mediumUrl,
       smallUrl: img.smallUrl,
       thumbUrl: img.thumbUrl,
-    }))
+    })),
+    isMapped: !!prodData.localMappings
   };
   
   delete (formattedPayload as any).cost;

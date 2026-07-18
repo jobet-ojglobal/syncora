@@ -5,6 +5,7 @@ import { connection } from "@/lib/redis";
 import { CustomerSyncResult, InflowCustomerWebhookService } from "../locations/services/customer-upsert.service";
 import { MappingWebhookService } from "../locations/services/mapping.service";
 import { BranchClient } from "../locations/location.client";
+import { NotificationService } from "@/services/notification.service";
 
 // import { locationApi } from "@/lib/location/location.client";
 // import { CustomerSyncResult } from "@/lib/location/webhooks/webhook-customer.service";
@@ -67,8 +68,9 @@ const locationWorker = new Worker<LocationWebhookJobData>(
         case "productLocal":
           result = await MappingWebhookService.handleProductMap(data.productId, dataId, loggedEventId, locationId); 
           break;
-        
-        
+        case "imageLocal":
+          result = await MappingWebhookService.handleProductImageMap(data.imageId, dataId, loggedEventId, locationId); 
+          break;
 
         default:
           throw new Error(`Unsupported webhook sync source: ${source}`);
@@ -126,13 +128,35 @@ const locationWorker = new Worker<LocationWebhookJobData>(
   }
 );
 
-// Worker Lifecycle Events
-locationWorker.on("completed", (job) => {
+// ==========================================================
+// 🔔 UPGRADED WORKER LIFECYCLE EVENTS WITH NOTIFICATIONS
+// ==========================================================
+
+locationWorker.on("completed", async (job: Job<LocationWebhookJobData>) => {
   console.log(`✓ [Location Worker] Job ${job.id} completed successfully.`);
+  
+  // Trigger success alert asynchronously so it doesn't block processing threads
+  // NotificationService.sendAlert({
+  //   jobId: job.id || "UNKNOWN",
+  //   source: job.data.source,
+  //   locationId: job.data.locationId,
+  //   status: "SUCCESS"
+  // }).catch(err => console.error("Notification thread dropped:", err));
 });
 
-locationWorker.on("failed", (job, err) => {
+locationWorker.on("failed", async (job: Job<LocationWebhookJobData> | undefined, err: Error) => {
   console.error(`✗ [Location Worker] Job ${job?.id} failed:`, err.message);
+
+  if (job) {
+    // Route critical failure diagnostic data out to team members
+    // NotificationService.sendAlert({
+    //   jobId: job.id || "UNKNOWN",
+    //   source: job.data.source,
+    //   locationId: job.data.locationId,
+    //   status: "FAILED",
+    //   error: err.message
+    // }).catch(notifyErr => console.error("Notification thread dropped:", notifyErr));
+  }
 });
 
 locationWorker.on("error", (error) => {
@@ -148,3 +172,26 @@ process.on("SIGTERM", async () => {
   await prisma.$disconnect();
   process.exit(0);
 });
+
+// // Worker Lifecycle Events
+// locationWorker.on("completed", (job) => {
+//   console.log(`✓ [Location Worker] Job ${job.id} completed successfully.`);
+// });
+
+// locationWorker.on("failed", (job, err) => {
+//   console.error(`✗ [Location Worker] Job ${job?.id} failed:`, err.message);
+// });
+
+// locationWorker.on("error", (error) => {
+//   console.error("!! [Location Worker Critical Error]:", error);
+// });
+
+// console.log("🚀 Location Webhook Worker started. Listening for 'location_sync' jobs...");
+
+// // Graceful shutdown
+// process.on("SIGTERM", async () => {
+//   console.log("Shutting down location worker...");
+//   await locationWorker.close();
+//   await prisma.$disconnect();
+//   process.exit(0);
+// });

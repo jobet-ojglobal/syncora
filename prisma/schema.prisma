@@ -29,8 +29,8 @@ model SyncJob {
 }
 // INFLOW MODELS
 model InflowWebhook {
-  id                      String   @id // webHookSubscriptionId
-  url                     String   @unique // <--- ADD THIS @unique ANNOTATION
+  id                      String   @id 
+  url                     String   @unique 
   secret                  String?
   events                  Json
   isDisabled              Boolean  @default(false)
@@ -864,6 +864,7 @@ model ProductImageLocationMap {
   productImageId String       // References ProductImage.inflowId
   locationId     String       // References your Location table identifier
   localId        Int          // The unique INT assigned by that specific local database
+  imageUrl       String?
 
   location       Location? @relation(fields: [locationId], references: [inflowId])
   productImage   ProductImage @relation(fields: [productImageId], references: [inflowId], onDelete: Cascade)

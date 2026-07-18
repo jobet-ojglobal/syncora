@@ -22,8 +22,8 @@ export default async function EditBusinessPartner({ params }: EditBusinessPartne
       id: id,
     },
     include: {
-      customer: true,
-      vendor: true,
+      customer: { include: { localMappings: true }},
+      vendor: { include: { localMappings: true }},
       addresses: {
         orderBy: {
           createdAt: "asc", // Keeps address sorting predictable inside form array fields

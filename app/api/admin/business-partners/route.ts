@@ -13,7 +13,7 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const { 
       name, contactName, email, phone, fax, website, remarks, isActive,
-      isCustomer, isVendor, customerConfig, vendorConfig, addresses = []
+      isCustomer, isVendor, customerConfig, vendorConfig, addresses = [], locations = []
     } = body;
 
     if (!name?.trim()) {
@@ -75,11 +75,24 @@ export async function POST(request: NextRequest) {
       if (isCustomer && customerConfig) {
         const customerId = crypto.randomUUID().toLowerCase();
         
-        // Resolve target Pricing Scheme Currency
+        // 1. Resolve target Pricing Scheme Currency
         const targetPricingScheme = customerConfig.pricingSchemeId 
-          ? await tx.pricingScheme.findUnique({ where: { inflowId: customerConfig.pricingSchemeId }, select: { currencyId: true } })
+          ? await tx.pricingScheme.findUnique({ 
+              where: { inflowId: customerConfig.pricingSchemeId }, 
+              select: { currencyId: true } 
+            })
           : null;
-        const currencyId = targetPricingScheme?.currencyId || "USD";
+          
+        let resolvedCurrencyId = targetPricingScheme?.currencyId || null;
+
+        // 2. Fallback to PHP if no explicit pricing scheme currency is resolved
+        if (!resolvedCurrencyId) {
+          const fallbackCurrency = await tx.currency.findUnique({ 
+            where: { isoCode: "PHP" }, 
+            select: { inflowId: true } 
+          });
+          resolvedCurrencyId = fallbackCurrency?.inflowId || null;
+        }
 
         const customer = await tx.customer.create({
           data: {
@@ -99,25 +112,66 @@ export async function POST(request: NextRequest) {
           }
         });
 
-        // Seed financial structures
-        const [balance, credit, due] = await Promise.all([
-          tx.customerBalance.create({ data: { inflowId: crypto.randomUUID().toLowerCase(), customerId, currencyId, balance: 0 } }),
-          tx.customerCredit.create({ data: { inflowId: crypto.randomUUID().toLowerCase(), customerId, currencyId, credit: 0 } }),
-          tx.customerDue.create({ data: { inflowId: crypto.randomUUID().toLowerCase(), customerId, currencyId, amountCurrent: 0, amount1To30: 0, amount31To60: 0, amount61Plus: 0 } })
-        ]);
+        let balance: any = null;
+        let credit: any = null;
+        let due: any = null;
+
+        // 3. Seed financial structures if a currency context is valid
+        if (resolvedCurrencyId) {
+          [balance, credit, due] = await Promise.all([
+            tx.customerBalance.create({ 
+              data: { 
+                inflowId: crypto.randomUUID().toLowerCase(), 
+                customerId, 
+                currencyId: resolvedCurrencyId, // Fixed field identifier
+                balance: 0 
+              } 
+            }),
+            tx.customerCredit.create({ 
+              data: { 
+                inflowId: crypto.randomUUID().toLowerCase(), 
+                customerId, 
+                currencyId: resolvedCurrencyId, // Fixed variable reference
+                credit: 0 
+              } 
+            }),
+            tx.customerDue.create({ 
+              data: { 
+                inflowId: crypto.randomUUID().toLowerCase(), 
+                customerId, 
+                currencyId: resolvedCurrencyId, // Fixed variable reference
+                amountCurrent: 0, 
+                amount1To30: 0, 
+                amount31To60: 0, 
+                amount61Plus: 0 
+              } 
+            })
+          ]);
+        }
 
         customerPayloadData = {
           ...customer,
-          currencyId,
-          balances: [balance],
-          credits: [credit],
-          dues: [due]
+          balances: balance ? [balance] : [],
+          credits: credit ? [credit] : [],
+          dues: due ? [due] : []
         };
       }
 
       // 4. Create Vendor block if active
       if (isVendor && vendorConfig) {
         const vendorId = crypto.randomUUID().toLowerCase();
+
+        let resolvedCurrencyId = vendorConfig.currencyId || null;
+
+        // 2. Fallback to PHP if no explicit pricing scheme currency is resolved
+        if (!resolvedCurrencyId) {
+          const fallbackCurrency = await tx.currency.findUnique({ 
+            where: { isoCode: "PHP" }, 
+            select: { inflowId: true } 
+          });
+          resolvedCurrencyId = fallbackCurrency?.inflowId || null;
+        }
+
         const vendor = await tx.vendor.create({
           data: {
             businessPartnerId: businessPartner.id,
@@ -127,21 +181,49 @@ export async function POST(request: NextRequest) {
             discount: vendorConfig.discount ? new Prisma.Decimal(vendorConfig.discount) : 0,
             isTaxInclusivePricing: vendorConfig.isTaxInclusivePricing ?? false,
             leadTimeDays: vendorConfig.leadTimeDays ? parseInt(vendorConfig.leadTimeDays) : 0,
-            currencyId: vendorConfig.currencyId || null,
+            currencyId: resolvedCurrencyId,
             defaultPaymentTermsId: vendorConfig.defaultPaymentTermsId || null,
             taxingSchemeId: vendorConfig.taxingSchemeId || null,
             defaultAddressId: vendorAddrInflowId
           }
         });
 
-        const currencyId = vendorConfig.currencyId;
+        let balance: any = null;
+        let credit: any = null;
+        let due: any = null;
 
-        // Seed financial structures
-        const [balance, credit, due] = await Promise.all([
-          tx.vendorBalance.create({ data: { inflowId: crypto.randomUUID().toLowerCase(), vendorId, currencyId, balance: 0 } }),
-          tx.vendorCredit.create({ data: { inflowId: crypto.randomUUID().toLowerCase(), vendorId, currencyId, credit: 0 } }),
-          tx.vendorDue.create({ data: { inflowId: crypto.randomUUID().toLowerCase(), vendorId, currencyId, amountCurrent: 0, amount1To30: 0, amount31To60: 0, amount61Plus: 0 } })
-        ]);
+        // 3. Seed financial structures if a currency context is valid
+        if (resolvedCurrencyId) {
+          [balance, credit, due] = await Promise.all([
+            tx.vendorBalance.create({ 
+              data: { 
+                inflowId: crypto.randomUUID().toLowerCase(), 
+                vendorId, 
+                currencyId: resolvedCurrencyId, // Fixed field identifier
+                balance: 0 
+              } 
+            }),
+            tx.vendorCredit.create({ 
+              data: { 
+                inflowId: crypto.randomUUID().toLowerCase(), 
+                vendorId, 
+                currencyId: resolvedCurrencyId, // Fixed variable reference
+                credit: 0 
+              } 
+            }),
+            tx.vendorDue.create({ 
+              data: { 
+                inflowId: crypto.randomUUID().toLowerCase(), 
+                vendorId, 
+                currencyId: resolvedCurrencyId, // Fixed variable reference
+                amountCurrent: 0, 
+                amount1To30: 0, 
+                amount31To60: 0, 
+                amount61Plus: 0 
+              } 
+            })
+          ]);
+        }
 
         // Seed vendor performance tracking metrics
         // const rating = await tx.vendorRating.create({
@@ -156,85 +238,24 @@ export async function POST(request: NextRequest) {
 
         vendorPayloadData = {
           ...vendor,
-          balances: [balance],
-          credits: [credit],
-          dues: [due],
-        //   ratings: [rating]
+          balances: balance ? [balance] : [],
+          credits: credit ? [credit] : [],
+          dues: due ? [due] : []
         };
       }
 
       return { businessPartner, savedAddresses, customerPayloadData, vendorPayloadData };
     });
 
-    // ==========================================
-    // 🏢 BROADCAST SYNC TO EXTERNAL QUEUES
-    // ==========================================
-    // Prepare transaction payload structure
-    const syncPayload = {
-      id: result.businessPartner.id,
-      name: result.businessPartner.name,
-      contactName: result.businessPartner.contactName,
-      email: result.businessPartner.email,
-      phone: result.businessPartner.phone,
-      fax: result.businessPartner.fax,
-      website: result.businessPartner.website,
-      remarks: result.businessPartner.remarks,
-      isActive: result.businessPartner.isActive,
-      isCustomer: !!result.customerPayloadData,
-      isVendor: !!result.vendorPayloadData,
-      addresses: result.savedAddresses.map(addr => ({
-        customerAddressId: addr.inflowId,
-        name: addr.name,
-        addressType: addr.addressType,
-        address1: addr.address1,
-        address2: addr.address2,
-        city: addr.city,
-        state: addr.state,
-        postalCode: addr.postalCode,
-        country: addr.country,
-        remarks: addr.remarks
-      })),
-      customerConfig: result.customerPayloadData ? {
-        customerId: result.customerPayloadData.inflowId,
-        taxExemptNumber: result.customerPayloadData.taxExemptNumber,
-        defaultCarrier: result.customerPayloadData.defaultCarrier,
-        defaultPaymentMethod: result.customerPayloadData.defaultPaymentMethod,
-        discount: result.customerPayloadData.discount.toString(),
-        defaultLocationId: result.customerPayloadData.defaultLocationId,
-        defaultPaymentTermsId: result.customerPayloadData.defaultPaymentTermsId,
-        pricingSchemeId: result.customerPayloadData.pricingSchemeId,
-        taxingSchemeId: result.customerPayloadData.taxingSchemeId,
-        defaultSalesRepTeamMemberId: result.customerPayloadData.defaultSalesRepTeamMemberId,
-        defaultBillingAddressId: result.customerPayloadData.defaultBillingAddressId,
-        defaultShippingAddressId: result.customerPayloadData.defaultShippingAddressId,
-        currencyId: result.customerPayloadData.currencyId,
-        balances: result.customerPayloadData.balances.map((b: any) => ({ ...b, balance: b.balance.toString() })),
-        credits: result.customerPayloadData.credits.map((c: any) => ({ ...c, credit: c.credit.toString() })),
-        dues: result.customerPayloadData.dues.map((d: any) => ({ ...d, amountCurrent: d.amountCurrent.toString() }))
-      } : null,
-      vendorConfig: result.vendorPayloadData ? {
-        vendorId: result.vendorPayloadData.inflowId,
-        defaultCarrier: result.vendorPayloadData.defaultCarrier,
-        defaultPaymentMethod: result.vendorPayloadData.defaultPaymentMethod,
-        discount: result.vendorPayloadData.discount.toString(),
-        isTaxInclusivePricing: result.vendorPayloadData.isTaxInclusivePricing,
-        leadTimeDays: result.vendorPayloadData.leadTimeDays,
-        currencyId: result.vendorPayloadData.currencyId,
-        defaultPaymentTermsId: result.vendorPayloadData.defaultPaymentTermsId,
-        taxingSchemeId: result.vendorPayloadData.taxingSchemeId,
-        defaultAddressId: result.vendorPayloadData.defaultAddressId,
-        ratings: result.vendorPayloadData.ratings
-      } : null
-    };
-
     const splitPayloads = splitBusinessPartnerPayload(result);
 
     // Dispatch job to background syncing queue (e.g., Cloud sync)
-    await CloudSyncDispatcher.dispatchSplitBusinessPartnerSyncJobs(splitPayloads);
+    // await CloudSyncDispatcher.dispatchSplitBusinessPartnerSyncJobs(splitPayloads);
 
     // Dispatch job to background syncing queue (e.g., Local sync)
     const localJobs = await LocalSyncDispatcher.prepareLocalBusinessPartnerSyncJobs(
       result.businessPartner.id,
+      locations,
       splitPayloads,
       prisma,
       WebhookService

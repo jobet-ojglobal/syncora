@@ -25,6 +25,7 @@ import { FormInput } from "../shared/form-input";
 import { FormSwitch } from "../shared/form-switch";
 import { FormTextarea } from "../shared/form-textarea";
 import { FormCheckbox } from "../shared/form-checkbox";
+import { FormMultiSelect } from "../shared/form-multiple-select";
 
 export interface BusinessPartnerFormProps {
   initialData?: Partial<BusinessPartnerFormData>;
@@ -86,6 +87,8 @@ export function BusinessPartnerForm({ initialData, catalogs }: BusinessPartnerFo
         defaultPaymentTermsId: initialData?.vendorConfig?.defaultPaymentTermsId || "",
         taxingSchemeId: initialData?.vendorConfig?.taxingSchemeId || "",
       },
+
+      locations: initialData?.locations?.length ? initialData.locations : [],
 
       addresses: initialData?.addresses?.length ? initialData.addresses : [{
         name: "HQ Primary Branch",
@@ -276,6 +279,17 @@ export function BusinessPartnerForm({ initialData, catalogs }: BusinessPartnerFo
                 classNameLabel="text-muted-foreground font-semibold"
               />
 
+              <FormMultiSelect
+                name="locations"
+                control={control}
+                options={catalogs.locations}
+                label="Local Department Placements"
+                placeholder="Choose placements..."
+                searchPlaceholder="Search departments..."
+                loading={false}
+                classNameLabel="text-muted-foreground font-semibold"
+              />
+
               <FormTextarea
                 name="remarks"
                 control={control}
@@ -286,6 +300,7 @@ export function BusinessPartnerForm({ initialData, catalogs }: BusinessPartnerFo
             </CardContent>
           </Card>
         </div>
+
 
         {/* Right Hand Dynamic Tabs Block: Configuration Matrix & Address Logic */}
         <div className="lg:col-span-2 space-y-6">
@@ -368,6 +383,7 @@ export function BusinessPartnerForm({ initialData, catalogs }: BusinessPartnerFo
                       emptyMessage="No locations available"
                       classNameLabel="text-muted-foreground font-semibold"
                     />
+                    
                     <FormSelect
                       name="customerConfig.defaultSalesRepTeamMemberId"
                       control={control}

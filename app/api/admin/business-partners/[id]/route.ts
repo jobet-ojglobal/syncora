@@ -116,7 +116,7 @@ export async function PATCH(request: NextRequest, { params }: Props) {
     const body = await request.json();
     const { 
       name, contactName, email, phone, fax, website, remarks, isActive,
-      isCustomer, isVendor, customerConfig, vendorConfig, addresses = []
+      isCustomer, isVendor, customerConfig, vendorConfig, addresses = [], locations = []
     } = body;
 
     if (!id) {
@@ -138,10 +138,6 @@ export async function PATCH(request: NextRequest, { params }: Props) {
           website: website?.trim() || null,
           remarks: remarks?.trim() || null,
           isActive: isActive ?? true,
-        },
-        include: {
-          customer: { select: { id: true } },
-          vendor: { select: { id: true } }
         }
       });
 
@@ -213,10 +209,24 @@ export async function PATCH(request: NextRequest, { params }: Props) {
 
       // 3. Handle Customer Configuration (Upsert/Deactivate)
       if (isCustomer && customerConfig) {
+        // 1. Resolve target Pricing Scheme Currency
         const targetPricingScheme = customerConfig.pricingSchemeId 
-          ? await tx.pricingScheme.findUnique({ where: { inflowId: customerConfig.pricingSchemeId }, select: { currencyId: true } })
+          ? await tx.pricingScheme.findUnique({ 
+              where: { inflowId: customerConfig.pricingSchemeId }, 
+              select: { currencyId: true } 
+            })
           : null;
-        const currencyId = targetPricingScheme?.currencyId || "USD";
+          
+        let resolvedCurrencyId = targetPricingScheme?.currencyId || null;
+
+        // 2. Fallback to PHP if no explicit pricing scheme currency is resolved
+        if (!resolvedCurrencyId) {
+          const fallbackCurrency = await tx.currency.findUnique({ 
+            where: { isoCode: "PHP" }, 
+            select: { inflowId: true } 
+          });
+          resolvedCurrencyId = fallbackCurrency?.inflowId || null;
+        }
 
         const existingCustomer = await tx.customer.findFirst({
           where: { businessPartnerId: id }
@@ -261,18 +271,49 @@ export async function PATCH(request: NextRequest, { params }: Props) {
           });
 
           // Seed finance items for newly generated sub-record
-          await Promise.all([
-            tx.customerBalance.create({ data: { inflowId: crypto.randomUUID().toLowerCase(), customerId, currencyId, balance: 0 } }),
-            tx.customerCredit.create({ data: { inflowId: crypto.randomUUID().toLowerCase(), customerId, currencyId, credit: 0 } }),
-            tx.customerDue.create({ data: { inflowId: crypto.randomUUID().toLowerCase(), customerId, currencyId, amountCurrent: 0, amount1To30: 0, amount31To60: 0, amount61Plus: 0 } })
-          ]);
+          let balance: any = null;
+          let credit: any = null;
+          let due: any = null;
+
+          // 3. Seed financial structures if a currency context is valid
+          if (resolvedCurrencyId) {
+            [balance, credit, due] = await Promise.all([
+              tx.customerBalance.create({ 
+                data: { 
+                  inflowId: crypto.randomUUID().toLowerCase(), 
+                  customerId, 
+                  currencyId: resolvedCurrencyId, // Fixed field identifier
+                  balance: 0 
+                } 
+              }),
+              tx.customerCredit.create({ 
+                data: { 
+                  inflowId: crypto.randomUUID().toLowerCase(), 
+                  customerId, 
+                  currencyId: resolvedCurrencyId, // Fixed variable reference
+                  credit: 0 
+                } 
+              }),
+              tx.customerDue.create({ 
+                data: { 
+                  inflowId: crypto.randomUUID().toLowerCase(), 
+                  customerId, 
+                  currencyId: resolvedCurrencyId, // Fixed variable reference
+                  amountCurrent: 0, 
+                  amount1To30: 0, 
+                  amount31To60: 0, 
+                  amount61Plus: 0 
+                } 
+              })
+            ]);
+          }
         }
 
         const balances = await tx.customerBalance.findMany({ where: { customerId: customer.inflowId } });
         const credits = await tx.customerCredit.findMany({ where: { customerId: customer.inflowId } });
         const dues = await tx.customerDue.findMany({ where: { customerId: customer.inflowId } });
 
-        customerPayloadData = { ...customer, currencyId, balances, credits, dues };
+        customerPayloadData = { ...customer, balances, credits, dues };
       }
 
       // 4. Handle Vendor Configuration (Upsert)
@@ -280,6 +321,17 @@ export async function PATCH(request: NextRequest, { params }: Props) {
         const existingVendor = await tx.vendor.findFirst({
           where: { businessPartnerId: id }
         });
+
+        let resolvedCurrencyId = vendorConfig.currencyId || null;
+
+        // 2. Fallback to PHP if no explicit pricing scheme currency is resolved
+        if (!resolvedCurrencyId) {
+          const fallbackCurrency = await tx.currency.findUnique({ 
+            where: { isoCode: "PHP" }, 
+            select: { inflowId: true } 
+          });
+          resolvedCurrencyId = fallbackCurrency?.inflowId || null;
+        }
 
         let vendor;
         if (existingVendor) {
@@ -291,7 +343,7 @@ export async function PATCH(request: NextRequest, { params }: Props) {
               discount: vendorConfig.discount ? new Prisma.Decimal(vendorConfig.discount) : 0,
               isTaxInclusivePricing: vendorConfig.isTaxInclusivePricing ?? false,
               leadTimeDays: vendorConfig.leadTimeDays ? parseInt(vendorConfig.leadTimeDays) : 0,
-              currencyId: vendorConfig.currencyId || "USD",
+              currencyId: resolvedCurrencyId,
               defaultPaymentTermsId: vendorConfig.defaultPaymentTermsId || null,
               taxingSchemeId: vendorConfig.taxingSchemeId || null,
               defaultAddressId: vendorAddrInflowId
@@ -308,21 +360,50 @@ export async function PATCH(request: NextRequest, { params }: Props) {
               discount: vendorConfig.discount ? new Prisma.Decimal(vendorConfig.discount) : 0,
               isTaxInclusivePricing: vendorConfig.isTaxInclusivePricing ?? false,
               leadTimeDays: vendorConfig.leadTimeDays ? parseInt(vendorConfig.leadTimeDays) : 0,
-              currencyId: vendorConfig.currencyId || "USD",
+              currencyId: resolvedCurrencyId,
               defaultPaymentTermsId: vendorConfig.defaultPaymentTermsId || null,
               taxingSchemeId: vendorConfig.taxingSchemeId || null,
               defaultAddressId: vendorAddrInflowId
             }
           });
+        
+          let balance: any = null;
+          let credit: any = null;
+          let due: any = null;
 
-          const currencyId = vendorConfig.currencyId;
+          // 3. Seed financial structures if a currency context is valid
+          if (resolvedCurrencyId) {
+            [balance, credit, due] = await Promise.all([
+              tx.vendorBalance.create({ 
+                data: { 
+                  inflowId: crypto.randomUUID().toLowerCase(), 
+                  vendorId, 
+                  currencyId: resolvedCurrencyId, // Fixed field identifier
+                  balance: 0 
+                } 
+              }),
+              tx.vendorCredit.create({ 
+                data: { 
+                  inflowId: crypto.randomUUID().toLowerCase(), 
+                  vendorId, 
+                  currencyId: resolvedCurrencyId, // Fixed variable reference
+                  credit: 0 
+                } 
+              }),
+              tx.vendorDue.create({ 
+                data: { 
+                  inflowId: crypto.randomUUID().toLowerCase(), 
+                  vendorId, 
+                  currencyId: resolvedCurrencyId, // Fixed variable reference
+                  amountCurrent: 0, 
+                  amount1To30: 0, 
+                  amount31To60: 0, 
+                  amount61Plus: 0 
+                } 
+              })
+            ]);
 
-          // Seed financial structures
-          await Promise.all([
-            tx.vendorBalance.create({ data: { inflowId: crypto.randomUUID().toLowerCase(), vendorId, currencyId, balance: 0 } }),
-            tx.vendorCredit.create({ data: { inflowId: crypto.randomUUID().toLowerCase(), vendorId, currencyId, credit: 0 } }),
-            tx.vendorDue.create({ data: { inflowId: crypto.randomUUID().toLowerCase(), vendorId, currencyId, amountCurrent: 0, amount1To30: 0, amount31To60: 0, amount61Plus: 0 } })
-          ]);
+          }
 
           // await tx.vendorRating.create({
           //   data: {
@@ -340,80 +421,21 @@ export async function PATCH(request: NextRequest, { params }: Props) {
         const dues = await tx.vendorDue.findMany({ where: { vendorId: vendor.inflowId } });
 
         // const ratings = await tx.vendorRating.findMany({ where: { vendorId: vendor.inflowId } });
-        vendorPayloadData = { ...vendor, balances, credits, dues  };
+        vendorPayloadData = { ...vendor, currencyId: resolvedCurrencyId, balances, credits, dues  };
       }
 
       return { businessPartner, savedAddresses, customerPayloadData, vendorPayloadData };
     });
 
-    // ==========================================
-    // 🏢 BROADCAST UPDATE OUTBOUND TO SYNC QUEUE
-    // ==========================================
-    const syncPayload = {
-      id: result.businessPartner.id,
-      name: result.businessPartner.name,
-      contactName: result.businessPartner.contactName,
-      email: result.businessPartner.email,
-      phone: result.businessPartner.phone,
-      fax: result.businessPartner.fax,
-      website: result.businessPartner.website,
-      remarks: result.businessPartner.remarks,
-      isActive: result.businessPartner.isActive,
-      isCustomer: !!result.businessPartner.customer,
-      isVendor: !!result.businessPartner.vendor,
-      addresses: result.savedAddresses.map(addr => ({
-        customerAddressId: addr.inflowId,
-        name: addr.name,
-        addressType: addr.addressType,
-        address1: addr.address1,
-        address2: addr.address2,
-        city: addr.city,
-        state: addr.state,
-        postalCode: addr.postalCode,
-        country: addr.country,
-        remarks: addr.remarks
-      })),
-      customerConfig: result.customerPayloadData ? {
-        customerId: result.customerPayloadData.inflowId,
-        taxExemptNumber: result.customerPayloadData.taxExemptNumber,
-        defaultCarrier: result.customerPayloadData.defaultCarrier,
-        defaultPaymentMethod: result.customerPayloadData.defaultPaymentMethod,
-        discount: result.customerPayloadData.discount.toString(),
-        defaultLocationId: result.customerPayloadData.defaultLocationId,
-        defaultPaymentTermsId: result.customerPayloadData.defaultPaymentTermsId,
-        pricingSchemeId: result.customerPayloadData.pricingSchemeId,
-        taxingSchemeId: result.customerPayloadData.taxingSchemeId,
-        defaultSalesRepTeamMemberId: result.customerPayloadData.defaultSalesRepTeamMemberId,
-        defaultBillingAddressId: result.customerPayloadData.defaultBillingAddressId,
-        defaultShippingAddressId: result.customerPayloadData.defaultShippingAddressId,
-        currencyId: result.customerPayloadData.currencyId,
-        balances: result.customerPayloadData.balances.map((b: any) => ({ ...b, balance: b.balance.toString() })),
-        credits: result.customerPayloadData.credits.map((c: any) => ({ ...c, credit: c.credit.toString() })),
-        dues: result.customerPayloadData.dues.map((d: any) => ({ ...d, amountCurrent: d.amountCurrent.toString() }))
-      } : null,
-      vendorConfig: result.vendorPayloadData ? {
-        vendorId: result.vendorPayloadData.inflowId,
-        defaultCarrier: result.vendorPayloadData.defaultCarrier,
-        defaultPaymentMethod: result.vendorPayloadData.defaultPaymentMethod,
-        discount: result.vendorPayloadData.discount.toString(),
-        isTaxInclusivePricing: result.vendorPayloadData.isTaxInclusivePricing,
-        leadTimeDays: result.vendorPayloadData.leadTimeDays,
-        currencyId: result.vendorPayloadData.currencyId,
-        defaultPaymentTermsId: result.vendorPayloadData.defaultPaymentTermsId,
-        taxingSchemeId: result.vendorPayloadData.taxingSchemeId,
-        defaultAddressId: result.vendorPayloadData.defaultAddressId,
-        ratings: result.vendorPayloadData.ratings
-      } : null
-    };
-
     const splitPayloads = splitBusinessPartnerPayload(result);
 
     // Dispatch job to background syncing queue (e.g., Cloud sync)
-    await CloudSyncDispatcher.dispatchSplitBusinessPartnerSyncJobs(splitPayloads);
+    // await CloudSyncDispatcher.dispatchSplitBusinessPartnerSyncJobs(splitPayloads);
 
     // Dispatch job to background syncing queue (e.g., Local sync)
     const localJobs = await LocalSyncDispatcher.prepareLocalBusinessPartnerSyncJobs(
       result.businessPartner.id,
+      locations,
       splitPayloads,
       prisma,
       WebhookService

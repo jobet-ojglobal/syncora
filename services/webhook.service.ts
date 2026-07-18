@@ -60,6 +60,35 @@ export class WebhookService {
     });
   }
 
+  // multiple locations
+  static async getLocationWebhookURLByLocationIDs(inflowIds: string[], event: string) {
+    if (!inflowIds || inflowIds.length === 0) return [];
+
+    // 1. Fetch all active webhooks for all provided location IDs using the `in` operator
+    const webhooks = await prisma.locationWebhook.findMany({
+      where: {
+        isDisabled: false,
+        locationId: { in: inflowIds }
+      },
+      select: {
+        locationId: true,
+        events: true, // JSON field
+        location: {
+          select: {
+            name: true,
+            url: true
+          },
+        },
+      },
+    });
+
+    // 2. Filter in-memory to confirm the targeted event registration matches
+    return webhooks.filter((webhook) => {
+      const eventArray = webhook.events as string[];
+      return Array.isArray(eventArray) && eventArray.includes(event);
+    });
+  }
+
   static async getCloudWebhookURL(event: string) {
     const webhook = await prisma.inflowWebhook.findFirst({
       where: {

@@ -46,7 +46,17 @@ export interface BPBaseContext {
 }
 
 export interface CustomerSyncPayload {
-  baseContext: BPBaseContext & { addresses: CustomerAddress[] };
+  id: string;
+  name: string;
+  contactName: string | null;
+  email: string | null;
+  phone: string | null;
+  fax: string | null;
+  website: string | null;
+  remarks: string | null;
+  isActive: boolean;
+  
+  addresses: CustomerAddress[];
   customerId: string;
   taxExemptNumber: string | null;
   defaultCarrier: string | null;
@@ -59,14 +69,23 @@ export interface CustomerSyncPayload {
   defaultSalesRepTeamMemberId: string | null;
   defaultBillingAddressId: string | null;
   defaultShippingAddressId: string | null;
-  currencyId: string | null;
   balances: Array<{ currencyId: string; customerBalanceId: string; customerId: string; balance: string }>;
   credits: Array<{ customerId: string; customerCreditId: string; currencyId: string; credit: string }>;
   dues: Array<{ customerDueId: string; currencyId: string; amountCurrent: string; amount1To30: string; amount31To60: string; amount61Plus: string }>;
 }
 
 export interface VendorSyncPayload {
-  baseContext: BPBaseContext & { addresses: VendorAddress[] };
+  id: string;
+  name: string;
+  contactName: string | null;
+  email: string | null;
+  phone: string | null;
+  fax: string | null;
+  website: string | null;
+  remarks: string | null;
+  isActive: boolean;
+
+  addresses: VendorAddress[];
   vendorId: string;
   defaultCarrier: string | null;
   defaultPaymentMethod: string | null;
@@ -130,7 +149,8 @@ export function splitBusinessPartnerPayload(result: any): SplitSyncPayloads {
       }));
 
     customer = {
-      baseContext: { ...coreContext, addresses: customerAddresses },
+      ...coreContext, 
+      addresses: customerAddresses,
       customerId: cData.inflowId,
       taxExemptNumber: cData.taxExemptNumber,
       defaultCarrier: cData.defaultCarrier,
@@ -143,7 +163,6 @@ export function splitBusinessPartnerPayload(result: any): SplitSyncPayloads {
       defaultSalesRepTeamMemberId: cData.defaultSalesRepTeamMemberId,
       defaultBillingAddressId: cData.defaultBillingAddressId,
       defaultShippingAddressId: cData.defaultShippingAddressId,
-      currencyId: cData.currencyId,
       balances: (cData.balances || []).map((b: any) => ({
         currencyId: b.currencyId,
         customerBalanceId: b.inflowId || b.id,
@@ -190,7 +209,8 @@ export function splitBusinessPartnerPayload(result: any): SplitSyncPayloads {
       }));
 
     vendor = {
-      baseContext: { ...coreContext, addresses: vendorAddresses },
+      ...coreContext, 
+      addresses: vendorAddresses,
       vendorId: vData.inflowId,
       defaultCarrier: vData.defaultCarrier,
       defaultPaymentMethod: vData.defaultPaymentMethod,

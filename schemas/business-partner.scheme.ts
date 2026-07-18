@@ -57,6 +57,7 @@ export const businessPartnerFormSchema = z.object({
   }).optional(),
 
   addresses: z.array(addressSchema).min(1, "At least one address identity must be configured"),
+  locations: z.array(z.string()),
 }).refine((data) => data.isCustomer || data.isVendor, {
   message: "The entity must be registered as a Customer, a Vendor, or both.",
   path: ["isCustomer"],

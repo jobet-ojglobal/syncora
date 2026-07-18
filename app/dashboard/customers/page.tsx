@@ -60,7 +60,7 @@ export default function CustomersDirectoryListPage() {
   const { data: payload, error, isLoading, mutate } = useSWR(
     `/api/admin/customers/filtered?search=${debouncedSearch}&page=${pageIndex}&limit=${PAGE_SIZE}`,
     fetcher,
-    { keepPreviousData: true }
+    { keepPreviousData: true, revalidateOnFocus: true  }
   );
 
   const directory: CustomerRow[] = payload?.data || [];

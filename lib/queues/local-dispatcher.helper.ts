@@ -6,7 +6,7 @@ export interface LocalSyncJobData {
     source: "BUSINESS_PARTNER_UPSERT_LOCAL";
     model: "Customer" | "Vendor";
     payload: any;
-    webhookUrl: string;
+    timestamp: string;
     location: {
       inflowId: string;
       url: string;
@@ -22,6 +22,7 @@ export class LocalSyncDispatcher {
    */
   static async prepareLocalBusinessPartnerSyncJobs(
     cloudId: string, 
+    locations: string[],
     splitPayloads: SplitSyncPayloads, 
     prisma: any,
     WebhookService: any
@@ -31,8 +32,8 @@ export class LocalSyncDispatcher {
     // --- 1. RESOLVE CUSTOMER LOCAL PATHS ---
     if (splitPayloads.customer) {
       const customerPayload = splitPayloads.customer;
-      const webhooks = await WebhookService.getLocationWebhookURLByLocationID(
-        customerPayload.defaultLocationId, 
+      const webhooks = await WebhookService.getLocationWebhookURLByLocationIDs(
+        locations, 
         "customerLocal"
       );
 
@@ -42,13 +43,11 @@ export class LocalSyncDispatcher {
         // Query database context mappings concurrently for all matching target locations
         const [
           bpMappings,
-        //   currencyMappings,
           pricingMappings,
           paymentMappings,
           taxingMappings
         ] = await Promise.all([
           prisma.customerLocationMap.findMany({ where: { customerId: cloudId }, select: { locationId: true, localId: true } }),
-          prisma.currencyLocationMap.findMany({ where: { currencyId: customerPayload.currencyId }, select: { locationId: true, localId: true } }),
           prisma.pricingSchemeLocationMap.findMany({ where: { pricingSchemeId: customerPayload.pricingSchemeId || undefined }, select: { locationId: true, localId: true } }),
           prisma.paymentTermLocationMap.findMany({ where: { paymentTermId: customerPayload.defaultPaymentTermsId || undefined }, select: { locationId: true, localId: true } }),
           prisma.taxingSchemeLocationMap.findMany({ where: { taxingSchemeId: customerPayload.taxingSchemeId || undefined }, select: { locationId: true, localId: true } })
@@ -58,7 +57,6 @@ export class LocalSyncDispatcher {
           const locId = webhook.locationId;
           
           const bpMatch = bpMappings.find((m: any) => m.locationId === locId);
-        //   const currMatch = currencyMappings.find((m: any) => m.locationId === locId);
           const pricingMatch = pricingMappings.find((m: any) => m.locationId === locId);
           const paymentMatch = paymentMappings.find((m: any) => m.locationId === locId);
           const taxingMatch = taxingMappings.find((m: any) => m.locationId === locId);
@@ -68,7 +66,7 @@ export class LocalSyncDispatcher {
             data: {
               source: "BUSINESS_PARTNER_UPSERT_LOCAL",
               model: "Customer",
-              webhookUrl: webhook.location.url,
+              timestamp: new Date().toISOString(),
               location: {
                 inflowId: webhook.locationId,
                 url: webhook.location.url,
@@ -82,7 +80,6 @@ export class LocalSyncDispatcher {
                 defaultShippingAddressId: null,
                 defaultLocationId: null,
 
-                // currencyId: currMatch?.localId || null,
                 pricingSchemeId: pricingMatch?.localId || null,
                 defaultPaymentTermsId: paymentMatch?.localId || null,
                 taxingSchemeId: taxingMatch?.localId || null,
@@ -97,8 +94,8 @@ export class LocalSyncDispatcher {
     if (splitPayloads.vendor) {
       const vendorPayload = splitPayloads.vendor;
       // Re-use core currency/tax references relative to Vendor rules config targeting local synchronization endpoints
-      const webhooks = await WebhookService.getLocationWebhookURLByLocationID(
-        vendorPayload.defaultAddressId, // or specific location reference configured inside fallback payload variables
+      const webhooks = await WebhookService.getLocationWebhookURLByLocationIDs(
+        locations, 
         "vendorLocal"
       );
 
@@ -130,7 +127,7 @@ export class LocalSyncDispatcher {
             data: {
               source: "BUSINESS_PARTNER_UPSERT_LOCAL",
               model: "Vendor",
-              webhookUrl: webhook.location.url,
+              timestamp: new Date().toISOString(),
               location: {
                 inflowId: webhook.locationId,
                 url: webhook.location.url,

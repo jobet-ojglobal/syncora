@@ -35,7 +35,7 @@ export default async function LocationLayout({
   return (
     <div className="w-full">
       <div className="border-b border-border bg-card">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 space-y-6">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 space-y-3">
           
           {/* Back Navigation Button */}
           <Button asChild variant="ghost" size="sm" className="w-fit gap-1 text-xs -ml-2 text-muted-foreground hover:text-foreground">

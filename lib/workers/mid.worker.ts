@@ -8,7 +8,7 @@ import { upsertCustomer as upsertLocalCustomer } from "../locations/data/custome
 import { upsertCategory as upsertLocalCategory } from "../locations/data/category";
 import { upsertTaxingScheme as upsertLocalTaxingScheme } from "../locations/data/taxing-scheme";
 import { upsertPricingScheme as upsertLocalPricingScheme } from "../locations/data/pricing-scheme";
-import { upsertProduct as upsertLocalProductScheme } from "../locations/data/product";
+import { upsertProduct as upsertLocalProductScheme, upsertProductImage as upsertLocalProductImageScheme } from "../locations/data/product";
 
 interface MidWebhookJobData {
   source: string;
@@ -50,7 +50,12 @@ const midWorker = new Worker<MidWebhookJobData>(
             result = await upsertLocalCategory(payload, locationUrl);
             break;
           case "PRODUCT_UPSERT_LOCAL": 
+            console.log(payload)
             result = await upsertLocalProductScheme(payload, locationUrl);
+            break;
+          case "PRODUCT_IMAGE_UPSERT_LOCAL": 
+            console.log(payload)
+            result = await upsertLocalProductImageScheme(payload, locationUrl);
             break;
           case "PRICING_SCHEME_UPSERT_LOCAL": // OK
             if (!locationUrl) {
@@ -60,11 +65,12 @@ const midWorker = new Worker<MidWebhookJobData>(
             break;
           case "BUSINESS_PARTNER_UPSERT_LOCAL": 
             if(model === "Vendor") {
+              console.log(payload)
+              result = { success: true}
               // await upsertCloudVendor(payload);
-              result = { success: true}
             } else if (model === "Customer") {
-              await upsertLocalCustomer(payload, locationUrl);
-              result = { success: true}
+              console.log(payload)
+              result = await upsertLocalCustomer(payload, locationUrl);
             }
             break;
           

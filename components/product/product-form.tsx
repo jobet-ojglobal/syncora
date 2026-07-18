@@ -42,6 +42,7 @@ import { cn } from "@/lib/utils";
 import Image from "next/image";
 import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from "../ui/input-group";
 import { DynamicAlert } from "../shared/alert";
+import ProductProfileForm from "../shared/form-product-image";
 
 interface BrandLookupOption {
   id: string;
@@ -390,6 +391,8 @@ export function ProductForm({  brands, uoms, groups: productGroups, pricingSchem
         
         {/* Left Column */}
         <div className="space-y-6">
+          {/* <ProductProfileForm /> */}
+
           {/* Core Profile */}
           <div className="bg-card border rounded-xl p-5 space-y-4 shadow-xs">
             <div className="space-y-0.5 border-b pb-2">
@@ -398,6 +401,7 @@ export function ProductForm({  brands, uoms, groups: productGroups, pricingSchem
                 Master SKU Core Identification
               </FieldLegend>
             </div>
+
 
             <FieldSet className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <Controller 

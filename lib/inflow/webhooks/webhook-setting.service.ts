@@ -3,11 +3,48 @@ import { randomUUID } from "crypto";
 import { prisma } from "@/lib/prisma";
 import { InflowEvent, InflowWebhook } from "../types/inflow";
 import { inflow } from "../inflow.client";
+import { WebhookDisplayData, WebhookStatus } from "@/types";
 
 const CLOUD_WEBHOOK_URL = `${process.env.SITE_URL}/api/webhooks/inflow`;
 
 export async function listWebhooks() {
   return inflow.get<InflowWebhook[]>("/webhooks");
+}
+
+export async function getWebhookStatusDetails(): Promise<WebhookDisplayData> {
+  // Find your active remote matching webhook
+  const remoteWebhook = await findInflowWebhook();
+
+  if (!remoteWebhook) {
+    return {
+      url: `${process.env.SITE_URL}/api/webhooks/inflow`,
+      events: [],
+      status: "disconnected",
+      consecutiveFailureCount: 0
+    };
+  }
+
+  // Find local DB telemetry data
+  const localDbData = await prisma.inflowWebhook.findUnique({
+    where: { url: remoteWebhook.url }
+  });
+
+  let status: WebhookStatus = "online";
+
+  if (localDbData?.isDisabled || remoteWebhook.isDisabled) {
+    status = "offline";
+  } else if ((localDbData?.consecutiveFailureCount ?? 0) > 0) {
+    status = "degraded"; // An operational but failing status
+  }
+
+  return {
+    id: remoteWebhook.webHookSubscriptionId,
+    url: remoteWebhook.url,
+    events: remoteWebhook.events,
+    status,
+    consecutiveFailureCount: localDbData?.consecutiveFailureCount ?? 0,
+    lastFailureMessage: localDbData?.lastFailureMessage
+  };
 }
 
 /**

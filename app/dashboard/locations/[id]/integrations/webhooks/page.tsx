@@ -1,6 +1,6 @@
 // app/dashboard/locations/[id]/integrations/webhooks/page.tsx
 
-import LocationWorkspace from "@/components/location/location-workspace";
+import { LocationWorkspaceStatus } from "@/components/location/location-workspace";
 
 interface PageProps {
   params: Promise<{
@@ -13,7 +13,7 @@ export default async function LocationWebhooksPage({ params }: PageProps) {
 
   return (
     <div className="w-full max-w-5xl mx-auto p-6 space-y-6">
-      <LocationWorkspace selectedLocationInflowId={id} />
+      <LocationWorkspaceStatus selectedLocationInflowId={id} />
     </div>
   );
 }

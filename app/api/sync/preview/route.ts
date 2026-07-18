@@ -7,6 +7,7 @@ import { getCurrencies } from "@/lib/locations/data/currency";
 import { getCategories } from "@/lib/locations/data/category";
 import { getPricingSchemes } from "@/lib/locations/data/pricing-scheme";
 import { getPaymentTerms } from "@/lib/locations/data/payment-term";
+import { getLocations } from "@/lib/locations/data/location";
 
 export const dynamic = "force-dynamic";
 
@@ -58,11 +59,11 @@ export async function GET(request: NextRequest) {
       const rawCustomer = await getCustomers(location.url);
       
       // Transform records into a uniform preview structure
-      const previewItems = rawCustomer.map((scheme: any) => ({
-        id: String(scheme.customerId), // incoming original ID
-        name: scheme.name,
-        description: `${scheme.dues?.length || 0} nested dues present. ${scheme.balances?.length || 0} nested balances present. ${scheme.credits?.length || 0} nested credits present.`,
-        rawData: scheme, // Cache full object to pass back later
+      const previewItems = rawCustomer.map((getLocations: any) => ({
+        id: String(getLocations.customerId), // incoming original ID
+        name: getLocations.name,
+        description: `${getLocations.dues?.length || 0} nested dues present. ${getLocations.balances?.length || 0} nested balances present. ${getLocations.credits?.length || 0} nested credits present.`,
+        rawData: getLocations, // Cache full object to pass back later
       }));
 
       return NextResponse.json({ items: previewItems });
@@ -70,11 +71,11 @@ export async function GET(request: NextRequest) {
       const rawCurrency = await getCurrencies(location.url);
       
       // Transform records into a uniform preview structure
-      const previewItems = rawCurrency.map((scheme: any) => ({
-        id: String(scheme.currencyId), // incoming original ID
-        name: scheme.description,
-        description: `${scheme.address?.length || 0} nested items present`,
-        rawData: scheme, // Cache full object to pass back later
+      const previewItems = rawCurrency.map((item: any) => ({
+        id: String(item.currencyId), // incoming original ID
+        name: item.description,
+        description: `${item.address?.length || 0} nested items present`,
+        rawData: item, // Cache full object to pass back later
       }));
 
       return NextResponse.json({ items: previewItems });
@@ -82,11 +83,11 @@ export async function GET(request: NextRequest) {
       const rawPayment = await getPaymentTerms(location.url);
       
       // Transform records into a uniform preview structure
-      const previewItems = rawPayment.map((scheme: any) => ({
-        id: String(scheme.paymentTermId), // incoming original ID
-        name: scheme.name,
+      const previewItems = rawPayment.map((item: any) => ({
+        id: String(item.paymentTermsId), // incoming original ID
+        name: item.name,
         description: `0 nested items present`,
-        rawData: scheme, // Cache full object to pass back later
+        rawData: item, // Cache full object to pass back later
       }));
 
       return NextResponse.json({ items: previewItems });
@@ -94,11 +95,23 @@ export async function GET(request: NextRequest) {
       const rawCategories = await getCategories(location.url);
       
       // Transform records into a uniform preview structure
-      const previewItems = rawCategories.map((scheme: any) => ({
-        id: String(scheme.categoryId), // incoming original ID
-        name: scheme.name,
+      const previewItems = rawCategories.map((item: any) => ({
+        id: String(item.categoryId), // incoming original ID
+        name: item.name,
         description: `0 nested items present`,
-        rawData: scheme, // Cache full object to pass back later
+        rawData: item, // Cache full object to pass back later
+      }));
+
+      return NextResponse.json({ items: previewItems });
+    } else if (source === "locations_local") {
+      const rawLocations = await getLocations(location.url);
+      
+      // Transform records into a uniform preview structure
+      const previewItems = rawLocations.map((item: any) => ({
+        id: String(item.locationId), // incoming original ID
+        name: item.name,
+        description: `0 nested items present`,
+        rawData: item, // Cache full object to pass back later
       }));
 
       return NextResponse.json({ items: previewItems });

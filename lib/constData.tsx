@@ -332,40 +332,40 @@ export const data = {
         },
       ],
     },
-    {
-      title: "Customer",
-      url: "/dashboard/customers",
-      icon: Contact2,
-      items: [
-        {
-          title: "All Customers",
-          url: "/dashboard/customers",
-          icon: Users,
-        },
-         {
-          title: "Create Customer",
-          url: "/dashboard/customers/create",
-          icon: UserPlus,
-        },
-      ],
-    },
-    {
-      title: "Vendors",
-      url: "/dashboard/vendors",
-      icon: Briefcase,
-      items: [
-        {
-          title: "All Vendors",
-          url: "/dashboard/vendors",
-          icon: Store,
-        },
-        {
-          title: "Create Vendor",
-          url: "/dashboard/vendors/create",
-          icon: PlusCircle,
-        },
-      ],
-    },
+    // {
+    //   title: "Customer",
+    //   url: "/dashboard/customers",
+    //   icon: Contact2,
+    //   items: [
+    //     {
+    //       title: "All Customers",
+    //       url: "/dashboard/customers",
+    //       icon: Users,
+    //     },
+    //      {
+    //       title: "Create Customer",
+    //       url: "/dashboard/customers/create",
+    //       icon: UserPlus,
+    //     },
+    //   ],
+    // },
+    // {
+    //   title: "Vendors",
+    //   url: "/dashboard/vendors",
+    //   icon: Briefcase,
+    //   items: [
+    //     {
+    //       title: "All Vendors",
+    //       url: "/dashboard/vendors",
+    //       icon: Store,
+    //     },
+    //     {
+    //       title: "Create Vendor",
+    //       url: "/dashboard/vendors/create",
+    //       icon: PlusCircle,
+    //     },
+    //   ],
+    // },
     {
       title: "Users",
       url: "/dashboard/users",
