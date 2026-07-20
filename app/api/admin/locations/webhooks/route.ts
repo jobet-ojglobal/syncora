@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma"; // Adjust this route according to your architecture project root
+import { prisma } from "@/lib/prisma"; 
+import { findLocationWebhookByLocation } from "@/lib/locations/services/webhook.service";
 
 export async function GET(request: NextRequest) {
   try {
-    // 1. Fetch active locations from Prisma
-    // Note: If you have soft deletes enabled via a middleware, deletedAt: null is handled automatically
+    // 1. Fetch active workspace nodes from Prisma
     const locations = await prisma.location.findMany({
       where: {
         deletedAt: null,
@@ -15,36 +15,45 @@ export async function GET(request: NextRequest) {
         inflowId: true,
         name: true,
         url: true,
-        webhooks: {
-          select: {
-            isDisabled: true,
-          },
-        },
       },
       orderBy: {
         name: "asc",
       },
     });
 
-    // 2. Format the payload to fit your LocationSwitcher expected contract properties
-    const formattedLocations = locations.map((loc) => {
-      // Determine online/offline based on whether a webhook exists and is active
-      const hasWebhooks = loc.webhooks.length > 0;
-      const isOnline = hasWebhooks && loc.webhooks.every((w) => !w.isDisabled);
+    // 2. Fetch statuses for ALL locations concurrently using your service helper
+    const formattedLocations = await Promise.all(
+      locations.map(async (loc) => {
+        let isOnline = false;
 
-      return {
-        id: loc.id,
-        name: loc.name,
-        url: loc.url,
-        isOnline: isOnline,
-      };
-    });
+        if (loc.inflowId) {
+          try {
+            // Re-use your workspace matching function logic
+            const webhook = await findLocationWebhookByLocation(loc.inflowId);
+            
+            // Check if a registration stream instance exists and isn't disabled
+            // Customize this condition based on how `webhook` returns when active
+            isOnline = !!webhook && !webhook.isDisabled; 
+          } catch (err) {
+            console.error(`Failed live evaluation lookup for node ${loc.name}:`, err);
+            isOnline = false; // Graceful fallback if a single network request drops
+          }
+        }
+
+        return {
+          id: loc.id,
+          name: loc.name,
+          url: loc.url,
+          isOnline: isOnline,
+        };
+      })
+    );
 
     return NextResponse.json(formattedLocations);
   } catch (error: any) {
-    console.error("Error retrieving locations matrix setup:", error);
+    console.error("Error retrieving global locations status matrix maps:", error);
     return NextResponse.json(
-      { error: "Failed to fetch locations list data pipeline context" },
+      { error: "Failed to load real-time workspace pipelines overview list" },
       { status: 500 }
     );
   }

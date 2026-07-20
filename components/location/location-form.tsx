@@ -17,10 +17,7 @@ import {
   FieldError,
   FieldGroup,
   FieldLabel,
-  FieldLegend,
-  FieldSet,
 } from "@/components/ui/field";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../ui/select";
 import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from "../ui/input-group";
 import { useState } from "react";
 
@@ -43,9 +40,10 @@ interface LocationFormProps {
     } | null;
     sublocations: { id: string; name: string }[];
   } | null;
+  onSuccess?: () => void;
 }
 
-export function LocationForm({ initialData }: LocationFormProps) {
+export function LocationForm({ initialData, onSuccess }: LocationFormProps) {
   const router = useRouter();
   const isEditMode = !!initialData;
   const [showUrl, setShowUrl] = useState(false);
@@ -73,7 +71,7 @@ export function LocationForm({ initialData }: LocationFormProps) {
     },
   });
 
-  const { register, control, handleSubmit, reset, formState: { errors, isSubmitting } } = form;
+  const { control, handleSubmit, reset, formState: { errors, isSubmitting } } = form;
 
   // Manage the 1:Many sublocation fields array
   const { fields, append, remove } = useFieldArray({
@@ -101,6 +99,8 @@ export function LocationForm({ initialData }: LocationFormProps) {
         description: `Committed logistics mapping for "${values.name}".`,
       });
 
+      onSuccess?.();
+
       router.push("/dashboard/locations");
       router.refresh();
     } catch (err: any) {
@@ -110,7 +110,7 @@ export function LocationForm({ initialData }: LocationFormProps) {
 
   return (
 
-    <form id="form-vendor" onSubmit={handleSubmit(onSubmit)}> 
+    <form onSubmit={handleSubmit(onSubmit)}> 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Left Column */}
         <div className="space-y-6 col-span-2">
@@ -466,7 +466,7 @@ export function LocationForm({ initialData }: LocationFormProps) {
         <Button type="button" variant="outline" onClick={() => reset()}>
           Reset
         </Button>
-        <Button type="submit" form="form-vendor">
+        <Button type="submit" >
           {isSubmitting ? "Submitting..." : "Submit"}
         </Button>
       </Field>

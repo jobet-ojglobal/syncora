@@ -17,13 +17,14 @@ interface FormSelectProps<
 > {
   name: TName;
   control: Control<TFieldValues>;
-  label: string;
+  label?: string;
   placeholder?: string;
   options: SelectOption[];
   emptyMessage?: string;
   disabled?: boolean;
   classNameLabel?: string;
   classNameField?: string;
+  required?: boolean;
 }
 
 // 2. Remove the default values inside the function declarations as well
@@ -40,6 +41,7 @@ export function FormSelect<
   classNameLabel = "",
   classNameField = "",
   disabled = false,
+  required = false
 }: FormSelectProps<TFieldValues, TName>) {
   const selectId = `form-select-${name}`;
 
@@ -49,7 +51,11 @@ export function FormSelect<
       control={control}
       render={({ field, fieldState }) => (
         <Field data-invalid={fieldState.invalid} className={classNameField}>
-          <FieldLabel htmlFor={selectId} className={classNameLabel}>{label}</FieldLabel>
+          { label ? 
+            <FieldLabel htmlFor={selectId} className={classNameLabel}>
+              {label} {required && <b className="text-red-500">*</b>}
+            </FieldLabel> : "" 
+          }
           <FieldContent className="relative">
             <Select
               name={field.name}

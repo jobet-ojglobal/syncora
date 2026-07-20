@@ -1,60 +1,28 @@
 "use client"
 
 import * as React from "react"
-import useSWR from "swr"
 import {
   Sidebar,
   SidebarContent,
   SidebarFooter,
   SidebarHeader,
   SidebarRail,
-  useSidebar,
 } from "@/components/ui/sidebar"
 import { NavMain } from "./NavMain"
 import { NavUser } from "./NavUser"
 import { data } from "@/lib/constData"
 import { LocationSwitcher } from "./LocationSwitcher"
 import { useRouter } from "next/navigation"
-
-const fetcher = (url: string) => fetch(url).then((res) => res.json());
-
-interface LocationItem {
-  id: string;
-  name: string;
-  url: string | null;
-  isOnline: boolean;
-}
+import { useLocationWorkspace } from "@/context/LocationWorkspaceContext"
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
-  const { state } = useSidebar();
-  const isCollapsed = state === "collapsed";
   const router = useRouter();
-
-  // 1. Fetch locations directly from your real-time prisma pipeline endpoint via SWR
-  const { data: locations, error, isLoading } = useSWR<LocationItem[]>(
-    "/api/admin/locations/webhooks",
-    fetcher,
-    {
-      refreshInterval: 30000, // Optional: Poll network status updates every 30 seconds
-    }
-  );
-
-  // 2. Local State tracking the currently selected Active global location workspace stream
-  const [currentLocationId, setCurrentLocationId] = React.useState<string>("");
-
-  // Auto-select the first location once the matrix logs data arrives
-  React.useEffect(() => {
-    if (locations && locations.length > 0 && !currentLocationId) {
-      // Prioritize setting default workspace identifier flags if you have them, otherwise pick index 0
-      setCurrentLocationId(locations[0].id);
-    }
-  }, [locations, currentLocationId]);
+  const { locations, currentLocationId, isLoading, changeLocation } = useLocationWorkspace();
 
   const handleLocationWorkspaceChange = (locationId: string) => {
-    setCurrentLocationId(locationId);
+    changeLocation(locationId);
     console.log(`Switched active data stream to inflow node: ${locationId}`);
-    // Optional architectural implementation: Push route parameters or update global context providers
-    router.push(`/dashboard/locations/${locationId}`)
+    router.push(`/dashboard/locations/${locationId}`);
   };
 
   return (
@@ -83,8 +51,78 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       
       <SidebarRail />
     </Sidebar>
-  )
+  );
 }
+
+// const fetcher = (url: string) => fetch(url).then((res) => res.json());
+
+// interface LocationItem {
+//   id: string;
+//   name: string;
+//   url: string | null;
+//   isOnline: boolean;
+// }
+
+// export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
+//   const { state } = useSidebar();
+//   const isCollapsed = state === "collapsed";
+//   const router = useRouter();
+
+//   // 1. Fetch locations directly from your real-time prisma pipeline endpoint via SWR
+//   const { data: locations, error, isLoading } = useSWR<LocationItem[]>(
+//     "/api/admin/locations/webhooks",
+//     fetcher,
+//     {
+//       refreshInterval: 30000, // Optional: Poll network status updates every 30 seconds
+//     }
+//   );
+
+//   // 2. Local State tracking the currently selected Active global location workspace stream
+//   const [currentLocationId, setCurrentLocationId] = React.useState<string>("");
+
+//   // Auto-select the first location once the matrix logs data arrives
+//   React.useEffect(() => {
+//     if (locations && locations.length > 0 && !currentLocationId) {
+//       // Prioritize setting default workspace identifier flags if you have them, otherwise pick index 0
+//       setCurrentLocationId(locations[0].id);
+//     }
+//   }, [locations, currentLocationId]);
+
+//   const handleLocationWorkspaceChange = (locationId: string) => {
+//     setCurrentLocationId(locationId);
+//     console.log(`Switched active data stream to inflow node: ${locationId}`);
+//     // Optional architectural implementation: Push route parameters or update global context providers
+//     router.push(`/dashboard/locations/${locationId}`)
+//   };
+
+//   return (
+//     <Sidebar collapsible="icon" {...props}>
+//       <SidebarHeader className="border-b border-sidebar-border">
+//         {isLoading || !locations ? (
+//           <div className="h-12 flex items-center px-4 text-xs text-muted-foreground animate-pulse">
+//             Loading active workspaces...
+//           </div>
+//         ) : (
+//           <LocationSwitcher 
+//             locations={locations}
+//             currentLocationId={currentLocationId}
+//             onLocationChange={handleLocationWorkspaceChange}
+//           />
+//         )}
+//       </SidebarHeader>
+      
+//       <SidebarContent className="pt-2">
+//         <NavMain items={data.adminMain} />
+//       </SidebarContent>
+      
+//       <SidebarFooter className="border-t border-sidebar-border">
+//         <NavUser />
+//       </SidebarFooter>
+      
+//       <SidebarRail />
+//     </Sidebar>
+//   )
+// }
 
 // "use client"
 

@@ -12,7 +12,7 @@ interface FormInputProps<
 > extends Omit<React.InputHTMLAttributes<HTMLInputElement>, "name" | "defaultValue"> {
   name: TName;
   control: Control<TFieldValues>;
-  label: string;
+  label?: string;
   required?: boolean;
   icon?: LucideIcon;
   classNameLabel?: string;
@@ -42,9 +42,11 @@ export function FormInput<
       control={control}
       render={({ field: { onChange, value, ...fieldProps }, fieldState }) => (
         <Field data-invalid={fieldState.invalid} className={classNameField}>
-          <FieldLabel htmlFor={inputId} className={classNameLabel}>
-            {label} {required && <b className="text-red-500">*</b>}
-          </FieldLabel>
+          { label ? 
+            <FieldLabel htmlFor={inputId} className={classNameLabel}>
+              {label} {required && <b className="text-red-500">*</b>}
+            </FieldLabel> : "" 
+          }
           <FieldContent className="relative">
             {Icon && (
               <Icon className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground/60" />

@@ -3,7 +3,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Plus, Search, Warehouse, Package, Layers, AlertTriangle, Edit, Info, Truck, AlertCircle } from "lucide-react";
+import { Plus, Search, Warehouse, Package, Layers, AlertTriangle, Edit, Info, Truck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -25,12 +25,12 @@ interface InventoryStockRow {
   quantityOnHand: number;
   quantityReserved: number;
   quantityAvailable: number;
-  quantityInTransit: number; // 🚀 Registered new state metric
+  quantityInTransit: number;
   reorderThreshold: number;
   bins: BinDetail[];
 }
 
-export default function InventoryListIntransit() {
+export default function InventoryList() {
   const [inventory, setInventory] = useState<InventoryStockRow[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [isLoading, setIsLoading] = useState(true);
@@ -63,7 +63,11 @@ export default function InventoryListIntransit() {
     );
   });
 
-  
+  // Calculate total units currently held in Bulk Floor / Unassigned storage across filtered stock lines
+  const totalBulkStockOverall = filteredItems.reduce((acc, item) => {
+    const binSum = item.bins.reduce((bAcc, b) => bAcc + b.quantity, 0);
+    return acc + Math.max(0, item.quantityOnHand - binSum);
+  }, 0);
 
   return (
     <div className="w-full max-w-7xl mx-auto p-6 space-y-6">
@@ -95,9 +99,20 @@ export default function InventoryListIntransit() {
           />
         </div>
 
-        <div className="text-xs text-muted-foreground font-medium bg-muted/50 border px-3 py-1.5 rounded-lg flex items-center gap-2 self-start sm:self-auto">
-          <Info className="w-3.5 h-3.5 text-blue-500" />
-          Monitored Stock Lines: <span className="font-bold text-foreground">{inventory.length}</span>
+        <div className="flex flex-wrap items-center gap-2 self-start sm:self-auto">
+          <div className="text-xs text-muted-foreground font-medium bg-muted/50 border px-3 py-1.5 rounded-lg flex items-center gap-2">
+            <Info className="w-3.5 h-3.5 text-blue-500" />
+            Monitored Lines: <span className="font-bold text-foreground">{inventory.length}</span>
+          </div>
+
+          {/* Bulk Total Counter Badge */}
+          <div className="text-xs text-muted-foreground font-medium bg-amber-50/60 dark:bg-amber-950/30 border border-amber-200/60 px-3 py-1.5 rounded-lg flex items-center gap-2">
+            <Warehouse className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
+            Total Bulk Area:{" "}
+            <span className="font-bold font-mono text-foreground">
+              {totalBulkStockOverall.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            </span>
+          </div>
         </div>
       </div>
 
@@ -122,7 +137,7 @@ export default function InventoryListIntransit() {
                   <th className="p-4 text-right">Committed</th>
                   <th className="p-4 text-right">In Transit</th> 
                   <th className="p-4 text-right">Available for Sale</th>
-                  <th className="p-4 text-center">Sub-bins</th>
+                  <th className="p-4 text-center">Sub-bins & Bulk</th>
                   <th className="p-4 text-right">Actions</th>
                 </tr>
               </thead>
@@ -130,11 +145,14 @@ export default function InventoryListIntransit() {
                 {filteredItems.map((item) => {
                   const isOutOfStock = item.quantityAvailable <= 0;
                   const isStrained = item.quantityReserved > item.quantityOnHand * 0.5;
-                  const isLowStock = item.reorderThreshold > 0 && item.quantityAvailable <= item.reorderThreshold;
+                  
+                  // Calculate bin sum and bulk floor area quantity
+                  const totalBinQty = item.bins.reduce((sum, b) => sum + b.quantity, 0);
+                  const bulkAreaQty = Math.max(0, item.quantityOnHand - totalBinQty);
+
                   return (
                     <tr key={item.id} className="hover:bg-muted/20 transition-colors">
                       {/* Product Column */}
-                      
                       <td className="p-4 max-w-[220px]">
                         <div className="flex items-center gap-2.5">
                           <div className="w-7 h-7 bg-muted border rounded-md flex items-center justify-center shrink-0">
@@ -171,7 +189,7 @@ export default function InventoryListIntransit() {
                         )}
                       </td>
 
-                      {/* 🚀 In Transit Numeric Column */}
+                      {/* In Transit Numeric Column */}
                       <td className="p-4 text-right font-mono text-muted-foreground">
                         {item.quantityInTransit > 0 ? (
                           <span className="inline-flex items-center gap-1 bg-purple-50 text-purple-600 dark:bg-purple-950/40 dark:text-purple-400 font-bold px-1.5 py-0.5 rounded-sm text-[11px]">
@@ -196,22 +214,24 @@ export default function InventoryListIntransit() {
                         )}
                       </td>
 
-                      {/* Internal Storage Sublocations Count Metric Badge */}
+                      {/* Internal Storage Sublocations Count & Bulk Area Display */}
                       <td className="p-4 text-center">
-                        {item.bins.length > 0 ? (
-                          <button
-                            type="button"
-                            onClick={() => setActiveInspectionItem(item)}
-                            className="inline-flex items-center gap-1 bg-blue-50 text-blue-600 hover:bg-blue-100 border border-blue-200 px-2 py-0.5 rounded-md font-medium transition-colors text-[11px]"
-                          >
-                            <Layers className="w-3 h-3" /> {item.bins.length} {item.bins.length === 1 ? "bin" : "bins"}
-                          </button>
-                        ) : (
-                          <span className="text-[10px] text-muted-foreground/50 italic font-normal">Bulk Floor</span>
-                        )}
+                        <button
+                          type="button"
+                          onClick={() => setActiveInspectionItem(item)}
+                          className="inline-flex items-center gap-1.5 bg-muted/60 hover:bg-muted border px-2.5 py-1 rounded-md transition-colors text-[11px] group"
+                        >
+                          <Layers className="w-3.5 h-3.5 text-blue-500 shrink-0" />
+                          <span className="font-semibold">
+                            {item.bins.length} {item.bins.length === 1 ? "bin" : "bins"}
+                          </span>
+                          <span className="text-muted-foreground font-mono text-[10px] pl-1 border-l border-muted-foreground/30">
+                            Bulk: <strong className="text-amber-600 dark:text-amber-400 font-medium">{bulkAreaQty.toLocaleString(undefined, { maximumFractionDigits: 2 })}</strong>
+                          </span>
+                        </button>
                       </td>
 
-                      {/* Actions Controls buttons mapping context row */}
+                      {/* Actions Controls */}
                       <td className="p-4">
                         <div className="flex items-center justify-end gap-1">
                           <Button asChild variant="ghost" size="sm" className="h-7 px-2 font-semibold gap-1">
@@ -238,48 +258,97 @@ export default function InventoryListIntransit() {
       )}
 
       {/* Slide-out Inspection Modal Panel */}
-      {activeInspectionItem && (
-        <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-card border w-full max-w-md rounded-xl p-5 shadow-lg space-y-4 animate-in fade-in zoom-in-95 duration-150">
-            <div className="flex items-start justify-between border-b pb-3">
-              <div>
-                <h3 className="text-sm font-bold text-foreground">Storage Layout Inspection</h3>
-                <p className="text-[11px] text-muted-foreground font-mono mt-0.5">{activeInspectionItem.productSlug}</p>
-              </div>
-              <Badge variant="outline" className="text-[10px] py-0 h-5 border-blue-200 text-blue-600 bg-blue-50">
-                {activeInspectionItem.locationName}
-              </Badge>
-            </div>
+      {activeInspectionItem && (() => {
+        const totalBinQty = activeInspectionItem.bins.reduce((sum, bin) => sum + bin.quantity, 0);
+        const bulkAreaQty = Math.max(0, activeInspectionItem.quantityOnHand - totalBinQty);
 
-            <div className="space-y-2 max-h-[240px] overflow-y-auto pr-1">
-              <div className="text-[10px] uppercase font-bold tracking-wider text-muted-foreground mb-1">Assigned Layout Picking Slots</div>
-              {activeInspectionItem.bins.map((bin) => (
-                <div key={bin.id} className="flex items-center justify-between border p-2 rounded-lg bg-muted/30 font-medium">
-                  <span className="text-xs text-foreground flex items-center gap-2">
-                    <span className="w-1.5 h-1.5 rounded-full bg-blue-500 shrink-0" />
-                    {bin.sublocationName}
-                  </span>
-                  <span className="font-mono text-xs text-muted-foreground">
-                    <strong className="text-foreground">{bin.quantity}</strong> units
+        return (
+          <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4">
+            <div className="bg-card border w-full max-w-md rounded-xl p-5 shadow-lg space-y-4 animate-in fade-in zoom-in-95 duration-150">
+              <div className="flex items-start justify-between border-b pb-3">
+                <div>
+                  <h3 className="text-sm font-bold text-foreground">Storage Layout Inspection</h3>
+                  <p className="text-[11px] text-muted-foreground font-mono mt-0.5">{activeInspectionItem.productSlug}</p>
+                </div>
+                <Badge variant="outline" className="text-[10px] py-0 h-5 border-blue-200 text-blue-600 bg-blue-50">
+                  {activeInspectionItem.locationName}
+                </Badge>
+              </div>
+
+              {/* Total Summary Matrix Cards */}
+              <div className="grid grid-cols-3 gap-2 bg-muted/40 p-2.5 rounded-lg border text-center">
+                <div>
+                  <span className="text-[10px] text-muted-foreground font-medium block uppercase tracking-wide">Total On Hand</span>
+                  <span className="text-xs font-mono font-bold text-foreground">
+                    {activeInspectionItem.quantityOnHand.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 4 })}
                   </span>
                 </div>
-              ))}
-            </div>
+                <div>
+                  <span className="text-[10px] text-muted-foreground font-medium block uppercase tracking-wide">In Bins</span>
+                  <span className="text-xs font-mono font-bold text-blue-600 dark:text-blue-400">
+                    {totalBinQty.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 4 })}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-[10px] text-muted-foreground font-medium block uppercase tracking-wide">Bulk Area</span>
+                  <span className="text-xs font-mono font-bold text-amber-600 dark:text-amber-400">
+                    {bulkAreaQty.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 4 })}
+                  </span>
+                </div>
+              </div>
 
-            <div className="flex justify-end pt-2 border-t">
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => setActiveInspectionItem(null)}
-                className="text-xs px-4"
-              >
-                Close View
-              </Button>
+              {/* Picking Slots & Bulk Area Detailed Breakdown */}
+              <div className="space-y-2 max-h-[240px] overflow-y-auto pr-1">
+                <div className="text-[10px] uppercase font-bold tracking-wider text-muted-foreground mb-1">
+                  Storage Allocation Breakdown
+                </div>
+
+                {/* Bulk Floor Row */}
+                <div className="flex items-center justify-between border p-2 rounded-lg bg-amber-50/50 dark:bg-amber-950/20 border-amber-200/60 font-medium">
+                  <span className="text-xs text-amber-900 dark:text-amber-300 flex items-center gap-2">
+                    <span className="w-1.5 h-1.5 rounded-full bg-amber-500 shrink-0" />
+                    Bulk Floor / Unassigned Area
+                  </span>
+                  <span className="font-mono text-xs text-amber-800 dark:text-amber-400">
+                    <strong className="text-amber-950 dark:text-amber-200">
+                      {bulkAreaQty.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 4 })}
+                    </strong>{" "}
+                    units
+                  </span>
+                </div>
+
+                {/* Assigned Sub-bins Rows */}
+                {activeInspectionItem.bins.map((bin) => (
+                  <div key={bin.id} className="flex items-center justify-between border p-2 rounded-lg bg-muted/30 font-medium">
+                    <span className="text-xs text-foreground flex items-center gap-2">
+                      <span className="w-1.5 h-1.5 rounded-full bg-blue-500 shrink-0" />
+                      {bin.sublocationName}
+                    </span>
+                    <span className="font-mono text-xs text-muted-foreground">
+                      <strong className="text-foreground">
+                        {bin.quantity.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 4 })}
+                      </strong>{" "}
+                      units
+                    </span>
+                  </div>
+                ))}
+              </div>
+
+              <div className="flex justify-end pt-2 border-t">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setActiveInspectionItem(null)}
+                  className="text-xs px-4"
+                >
+                  Close View
+                </Button>
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
     </div>
   );

@@ -1,7 +1,7 @@
 // components/InventoryForm.tsx
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useMemo } from "react";
 import { useForm, useFieldArray, Controller, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { adjustmentSchema, AdjustmentInput } from "@/schemas/adjustment.schema";
@@ -101,6 +101,11 @@ export function InventoryForm({ products, locations, sublocations, initialData, 
       setValue("quantityOnHand", sum);
     }
   };
+
+  const unassignedQuantity = useMemo(() => {
+    const binTotal = watchedBins.reduce((sum, b) => sum + (Number(b?.quantity) || 0), 0);
+    return Number(watchedOnHand) - binTotal;
+  }, [watchedOnHand, watchedBins]);
 
   const onSubmit = async (values: any) => {
     try {
@@ -245,6 +250,12 @@ export function InventoryForm({ products, locations, sublocations, initialData, 
           </div>
 
           <div className="mt-3 space-y-2 max-h-[260px] overflow-y-auto pr-1">
+            <div className="flex items-center justify-between text-xs py-1 px-2 bg-muted/50 rounded-lg border">
+              <span className="text-muted-foreground">Bulk / Unassigned Area:</span>
+              <span className={`font-semibold ${unassignedQuantity < 0 ? 'text-destructive' : 'text-foreground'}`}>
+                {unassignedQuantity.toFixed(4)}
+              </span>
+            </div>
             {fields.map((field, index) => (
               <div key={field.id} className="flex items-start gap-3 bg-muted/30 border p-2 rounded-xl relative">
                 

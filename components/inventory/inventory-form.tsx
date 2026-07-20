@@ -1,7 +1,7 @@
 // components/InventoryForm.tsx
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useForm, useFieldArray, Controller, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { inventorySchema, InventoryInput } from "@/schemas/inventory.schema";
@@ -43,7 +43,7 @@ export function InventoryForm({ products, locations, sublocations, initialData }
   const form = useForm<InventoryInput>({
     resolver: zodResolver(inventorySchema),
     defaultValues: {
-      id: initialData?.id,
+      id: initialData?.id || undefined,
       productId: initialData?.productId || "",
       locationId: initialData?.locationId || "",
       quantityOnHand: initialData?.quantityOnHand ? Number(initialData.quantityOnHand) : 0,
@@ -53,7 +53,7 @@ export function InventoryForm({ products, locations, sublocations, initialData }
         id: b.id,
         sublocationId: b.sublocationId,
         quantity: Number(b.quantity)
-      })) || [],
+      })) || [], // Explicitly non-undefined default fallback
     },
   });
 
@@ -87,32 +87,66 @@ export function InventoryForm({ products, locations, sublocations, initialData }
     }
   };
 
+  // Inside InventoryForm component:
+  const unassignedQuantity = useMemo(() => {
+    const binTotal = watchedBins.reduce((sum, b) => sum + (Number(b?.quantity) || 0), 0);
+    return Number(watchedOnHand) - binTotal;
+  }, [watchedOnHand, watchedBins]);
+
   const onSubmit = async (values: InventoryInput) => {
-    try {
-      const endpoint = "/api/admin/inventory";
-      const method = isEditMode ? "PATCH" : "POST";
+      try {
+        const endpoint = "/api/admin/inventory";
+        const method = isEditMode ? "PATCH" : "POST";
 
-      const response = await fetch(endpoint, {
-        method,
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(values),
-      });
+        // 1. Calculate sum of existing bins
+        const activeBins = values.bins || [];
+        const binTotal = activeBins.reduce((sum, b) => sum + (Number(b.quantity) || 0), 0);
+        const unassigned = Number(values.quantityOnHand) - binTotal;
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || "Failed stock adjustment process allocation.");
+        // 2. Locate the designated Bulk/Unassigned sublocation for this warehouse location
+        const bulkSublocation = availableSublocations.find(
+          (sub) => sub.name.toLowerCase().includes("bulk") || sub.name.toLowerCase().includes("unassigned")
+        );
+
+        const finalBins = [...activeBins];
+
+        // 3. If there is remaining unassigned stock and a Bulk zone exists, assign the excess to it
+        if (unassigned > 0 && bulkSublocation) {
+          const existingBulkIndex = finalBins.findIndex((b) => b.sublocationId === bulkSublocation.id);
+          if (existingBulkIndex >= 0) {
+            finalBins[existingBulkIndex].quantity += unassigned;
+          } else {
+            finalBins.push({
+              sublocationId: bulkSublocation.id,
+              quantity: unassigned,
+            });
+          }
+        }
+
+        // 4. Clean empty/invalid bin rows
+        const cleanedValues = {
+          ...values,
+          bins: finalBins.filter((b) => b.sublocationId && Number(b.quantity) > 0),
+        };
+
+        const response = await fetch(endpoint, {
+          method,
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(cleanedValues),
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.error || "Failed stock adjustment process allocation.");
+        }
+
+        toast.success(isEditMode ? "Stock Levels Updated" : "Inventory Initialized Successfully");
+        router.push("/dashboard/inventory");
+        router.refresh();
+      } catch (err: any) {
+        toast.error("Process Deviation Error", { description: err.message });
       }
-
-      toast.success(isEditMode ? "Stock Levels Updated" : "Inventory Initialized Successfully", {
-        description: "Balanced logistics records entry allocations.",
-      });
-
-      router.push("/dashboard/inventory");
-      router.refresh();
-    } catch (err: any) {
-      toast.error("Process Deviation Error", { description: err.message });
-    }
-  };
+    };
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="w-full max-w-3xl mx-auto p-6 bg-card border rounded-xl shadow-sm space-y-6">
@@ -122,6 +156,8 @@ export function InventoryForm({ products, locations, sublocations, initialData }
             <Boxes className="w-4 h-4 text-muted-foreground" />
             {isEditMode ? "Process Stock Level Corrections" : "Initialize Virtual Warehouse Inventory Balance"}
           </FieldLegend>
+
+          
 
           {/* Core Selectors Grid */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
@@ -205,8 +241,11 @@ export function InventoryForm({ products, locations, sublocations, initialData }
               </FieldLegend>
               <p className="text-[11px] text-muted-foreground mt-0.5">Distribute total stock across active aisles, rows, or picker slots.</p>
             </div>
+
+            
             
             <div className="flex flex-col items-center gap-2 self-start sm:self-auto">
+              
               {watchedBins.length > 0 && (
                 <Button 
                   type="button" 
@@ -231,7 +270,15 @@ export function InventoryForm({ products, locations, sublocations, initialData }
             </div>
           </div>
 
+          
+
           <div className="mt-3 space-y-2 max-h-[260px] overflow-y-auto pr-1">
+            <div className="flex items-center justify-between text-xs py-1 px-2 bg-muted/50 rounded-lg border">
+              <span className="text-muted-foreground">Bulk / Unassigned Area:</span>
+              <span className={`font-semibold ${unassignedQuantity < 0 ? 'text-destructive' : 'text-foreground'}`}>
+                {unassignedQuantity.toFixed(4)}
+              </span>
+            </div>
             {fields.map((field, index) => {
               // 1. Gather all currently selected sublocation IDs across the field array
               const selectedBinIds = watchedBins.map((b) => b?.sublocationId).filter(Boolean);

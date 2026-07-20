@@ -1,42 +1,22 @@
 import Link from "next/link";
-import {
-  ArrowLeft,
-} from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 import PageHeader from "@/components/layout/dashboard/PageHeader";
-import { InventoryForm } from "@/components/inventory/inventory-form";
 import { prisma } from "@/lib/prisma";
+import { InventoryFormV2 } from "@/components/inventory/inventory-multi-form";
 
 export default async function NewInventoryPage() {
-  const [products, locations, sublocations] = await Promise.all([
-    prisma.product.findMany({
-      select: {
-        inflowId: true,
-        name: true,
-      },
-      orderBy: { name: "asc" },
-    }),
+  const locations = await prisma.location.findMany({
+    where: {
+      isActive: true,
+      deletedAt: null,
+    },
+    select: {
+      inflowId: true,
+      name: true,
+    },
+    orderBy: { name: "asc" },
+  });
 
-    prisma.location.findMany({
-      where: {
-        isActive: true,
-        deletedAt: null
-      },
-      select: {
-        inflowId: true,
-        name: true,
-      },
-      orderBy: { name: "asc" },
-    }),
-
-    prisma.sublocation.findMany({
-      select: {
-        id: true,
-        name: true,
-        locationId: true,
-      },
-      orderBy: { name: "asc" },
-    }),
-  ]);
   return (
     <div className="w-full max-w-2xl mx-auto p-6 space-y-6">
       {/* HEADER */}
@@ -49,18 +29,13 @@ export default async function NewInventoryPage() {
       </Link>
       <PageHeader 
         title="New Inventory"
-        description="Add a new inventory" 
+        description="Add a new inventory entry" 
       />
-      <InventoryForm 
-        products={products.map((p) => ({
-          inflowId: p.inflowId,
-          name: p.name,
-        }))}
+      <InventoryFormV2
         locations={locations.map((l) => ({
           inflowId: l.inflowId,
           name: l.name,
         }))}
-        sublocations={sublocations}
       />
     </div>
   );
