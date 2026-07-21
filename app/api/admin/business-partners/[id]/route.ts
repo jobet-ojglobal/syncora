@@ -14,7 +14,6 @@ interface Props {
   }>;
 }
 
-
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -78,9 +77,25 @@ export async function GET(
                 currency: true,
               },
             },
+            vendorItems: {
+              include: {
+                product: {
+                  select: {
+                    id: true,
+                    inflowId: true,
+                    sku: true,
+                    name: true,
+                  },
+                },
+              },
+              orderBy: {
+                createdAt: "asc",
+              },
+            },
             _count: {
               select: {
                 products: true,
+                vendorItems: true,
               },
             },
           },

@@ -103,7 +103,7 @@ const worker = new Worker<SyncWebhookJobData>(
 
     const locationUrl = (location?.url && location.url.trim() !== "") ? location.url : null;
 
-    console.log(`[Sync Worker] Processing job source: ${source} for location ${location.name}`);
+    console.log(`[Sync Worker] Processing job source: ${source} for location ${location?.name || "cloud"}`);
     
     const syncOptions: SyncOptions = {
       onProgress: async (progress) => {

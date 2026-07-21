@@ -2,6 +2,9 @@
 import { prisma } from "@/lib/prisma";
 import { getVendors } from "../data/vendors";
 import { syncVendor } from "./vendor.sync";
+import { Prisma } from "@/generated/prisma/client";
+
+
 
 type SyncOptions = {
   onProgress?: (processedCount: number) => Promise<void>;
@@ -17,6 +20,7 @@ export class VendorSyncService {
     // Cross-batch tracking caches passed down to single items safely
     const caches = {
       verifiedPaymentTermsIds: new Set<string>(),
+      verifiedTaxingSchemeIds: new Set<string>(),
       verifiedCurrencyIds: new Set<string>(),
     };
 

@@ -1,26 +1,31 @@
+import { prisma } from "@/lib/prisma";
 import { getCurrencies } from "../data/currencies";
 import { upsertCurrencyScheme } from "./currency.sync";
 
 type SyncOptions = {
+  batchSize?: number;
   onProgress?: (processedCount: number) => Promise<void>;
 };
 
 export class CurrencySyncService {
   async sync(options?: SyncOptions) {
     const currencies = await getCurrencies();
+    const batchSize = options?.batchSize ?? 5; // Controlled concurrency limit
     let processed = 0;
-    const total = currencies.length;
 
-    // Process sequentially or in controlled chunks to safeguard connection limits
-    for (let i = 0; i < total; i++) {
-      const currency = currencies[i];
-      
-      // Fire single isolated atomic write pipeline
-      await upsertCurrencyScheme(currency);
-      
-      processed++;
+    for (let i = 0; i < currencies.length; i += batchSize) {
+      const chunk = currencies.slice(i, i + batchSize);
 
-      // Progress reporting now triggers predictably per record iteration
+      await Promise.all(
+        chunk.map((currency) =>
+          prisma.$transaction(async (tx) => {
+            await upsertCurrencyScheme(tx, currency);
+          })
+        )
+      );
+
+      processed += chunk.length;
+
       if (options?.onProgress) {
         await options.onProgress(processed);
       }

@@ -133,7 +133,7 @@ export default async function InventoryAdjustmentPage({ searchParams }: PageProp
           currentQuantity: line.previousQuantity,
           adjustedQuantity: line.newQuantity,
           delta: line.delta,
-          reasonNote: line.reasonNote || "",
+          reasonNote: line.reason || "",
         })),
       }
     : preselectedLocationId

@@ -125,8 +125,6 @@ const InflowWorkspace = () => {
         </TabsList>
 
         <TabsContent value="overview" >
-
-          <InflowWebhookStatusCard />
         
           <div className="grid gap-6 md:grid-cols-3">
               
@@ -141,7 +139,7 @@ const InflowWorkspace = () => {
                   {webhook ? "Active Stream" : "Offline"}
                 </Badge>
               </CardHeader>
-              <CardContent className="space-y-3 text-sm pt-4  h-full flex justify-center items-center">
+              <CardContent className="space-y-3 text-sm pt-4  "> 
                 {webhook ? (
                   <>
                     <div className="flex justify-between border-b pb-2">

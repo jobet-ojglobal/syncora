@@ -2,8 +2,16 @@
 import { AddressType, Prisma } from "@/generated/prisma/client";
 import { ensurePaymentTermsShell } from "./helpers";
 import { InflowVendor } from "../types";
+import { syncTaxingScheme } from "./taxing-scheme.sync";
+import { syncTeamMember } from "./team-member.sync";
+import { syncProduct } from "./product.sync";
+import { upsertCurrencyScheme } from "./currency.sync";
+import { ensureSyncProduct } from "./ensure-product.sync";
 
 type Tx = Prisma.TransactionClient;
+
+
+
 
 /**
  * Syncs a single vendor payload into the local database using an ongoing Prisma transaction.
@@ -11,7 +19,7 @@ type Tx = Prisma.TransactionClient;
 export async function syncVendor(
   tx: Tx,
   vendor: InflowVendor,
-  caches: { verifiedPaymentTermsIds: Set<string>; verifiedCurrencyIds: Set<string> }
+  caches: { verifiedPaymentTermsIds: Set<string>; verifiedCurrencyIds: Set<string>; verifiedTaxingSchemeIds: Set<string>; }
 ) {
   const cleanEmail = vendor.email?.trim().toLowerCase();
 
@@ -26,18 +34,14 @@ export async function syncVendor(
     caches.verifiedPaymentTermsIds.add(vendor.defaultPaymentTermsId);
   }
 
-  if (vendor.currencyId && !caches.verifiedCurrencyIds.has(vendor.currencyId)) {
-    await tx.currency.upsert({
-      where: { inflowId: vendor.currencyId },
-      create: {
-        inflowId: vendor.currencyId,
-        name: vendor.currency?.name || vendor.currency?.isoCode || "Fallback Currency",
-        isoCode: vendor.currency?.isoCode || "USD",
-        symbol: vendor.currency?.symbol || "$",
-      },
-      update: {},
-    });
+  if (vendor.currencyId && vendor.currency && !caches.verifiedCurrencyIds.has(vendor.currencyId)) {
+    await upsertCurrencyScheme(tx, vendor.currency);
     caches.verifiedCurrencyIds.add(vendor.currencyId);
+  }
+
+  if (vendor.taxingSchemeId && vendor?.taxingScheme && !caches.verifiedTaxingSchemeIds.has(vendor.taxingSchemeId)) {
+    await syncTaxingScheme(tx, vendor?.taxingScheme);
+    caches.verifiedCurrencyIds.add(vendor.taxingSchemeId);
   }
 
   /**
@@ -120,6 +124,13 @@ export async function syncVendor(
       console.warn(
         `[Sync Notification] TeamMember with inflowId "${vendor.lastModifiedById}" not synced yet. Setting vendor.lastModifiedById to null to avoid constraint errors.`
       );
+      if(vendor.lastModifiedBy) {
+        console.log(vendor.lastModifiedBy)
+        const syncMember = await syncTeamMember(tx, vendor.lastModifiedBy);
+        if(syncMember) {
+          validLastModifiedById = syncMember.inflowId;
+        }
+      }
     }
   }
 
@@ -163,17 +174,59 @@ export async function syncVendor(
    */
   if (vendor.vendorItems !== undefined) {
     await tx.vendorItem.deleteMany({ where: { vendorId: vendor.vendorId } });
+
     if (vendor.vendorItems?.length) {
-      await tx.vendorItem.createMany({
-        data: vendor.vendorItems.filter(item => item.vendorItemId).map((item) => ({
+      const validItemsToCreate = [];
+
+      for (const item of vendor.vendorItems) {
+        if (!item.vendorItemId) continue;
+
+        let validProductId: string | null = null;
+
+        if (item.productId) {
+          const localProduct = await tx.product.findUnique({
+            where: { inflowId: item.productId },
+            select: { inflowId: true },
+          });
+
+          if (localProduct) {
+            validProductId = localProduct.inflowId; // 🟢 FIXED: assigning to validProductId
+          } else if (item.product) {
+            console.warn(
+              `[Sync Notification] Product with inflowId "${item.productId}" not synced yet. Attempting inline sync...`
+            );
+            const syncedProduct = await ensureSyncProduct(tx, item.product);
+            if (syncedProduct) {
+              validProductId = syncedProduct.inflowId;
+            }
+          }
+        }
+
+        // Skip if product cannot be resolved or mapped
+        if (!validProductId) {
+          console.warn(
+            `[Sync Notification] Skipping vendor item "${item.vendorItemId}" because productId could not be resolved.`
+          );
+          continue;
+        }
+
+        validItemsToCreate.push({
           inflowId: item.vendorItemId,
           vendorId: vendor.vendorId,
-          productId: item.productId,
+          productId: validProductId, // 🟢 FIXED: passing verified productId
           vendorSku: item.vendorItemCode,
           unitCost: item.cost ? new Prisma.Decimal(item.cost) : null,
-        })),
-        skipDuplicates: true,
-      });
+          lineNum: item.lineNum || null,
+          leadTimeDays: item.leadTimeDays || null,
+        });
+      }
+
+      if (validItemsToCreate.length > 0) {
+        await tx.vendorItem.createMany({
+          data: validItemsToCreate,
+          skipDuplicates: true,
+        });
+      }
     }
   }
 

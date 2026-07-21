@@ -1,21 +1,11 @@
 // services/sync/products/team-member.sync.ts
 import { AccessRight, UserRole } from "@/generated/prisma/enums";
-
-export interface InflowTeamMemberPayload {
-  teamMemberId: string;
-  name: string;
-  email?: string;
-  isActive: boolean;
-  canBeSalesRep: boolean;
-  accessAllLocations: boolean;
-  accessRights: string[];
-  accessLocationIds?: string[];
-}
+import { InflowTeamMember } from "../types";
 
 /**
  * Syncs a single team member payload into the local database using an ongoing Prisma transaction.
  */
-export async function syncTeamMember(tx: any, member: InflowTeamMemberPayload) {
+export async function syncTeamMember(tx: any, member: InflowTeamMember) {
   const cleanEmail = member.email?.trim().toLowerCase();
 
   // 1. Upsert the base TeamMember profile from inFlow
@@ -28,6 +18,7 @@ export async function syncTeamMember(tx: any, member: InflowTeamMemberPayload) {
       name: member.name,
       email: cleanEmail,
       isActive: member.isActive,
+      isInternal: member.isInternal,
       canBeSalesRep: member.canBeSalesRep,
       accessAllLocations: member.accessAllLocations,
     },
@@ -78,18 +69,20 @@ export async function syncTeamMember(tx: any, member: InflowTeamMemberPayload) {
     where: { teamMemberId: teamMember.id },
   });
 
-  const validRights = member.accessRights.filter(
-    (right): right is AccessRight => Object.values(AccessRight).includes(right as AccessRight)
-  );
+  if(member.accessRights && member.accessRights.length > 0){
+    const validRights = member.accessRights.filter(
+      (right): right is AccessRight => Object.values(AccessRight).includes(right as AccessRight)
+    );
 
-  if (validRights.length > 0) {
-    await tx.teamMemberAccessRight.createMany({
-      data: validRights.map((rightName) => ({
-        teamMemberId: teamMember.id,
-        rightName,
-      })),
-      skipDuplicates: true,
-    });
+    if (validRights.length > 0) {
+      await tx.teamMemberAccessRight.createMany({
+        data: validRights.map((rightName) => ({
+          teamMemberId: teamMember.id,
+          rightName,
+        })),
+        skipDuplicates: true,
+      });
+    }
   }
 
   // 4. Sync Location Access Privileges

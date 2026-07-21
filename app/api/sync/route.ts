@@ -25,10 +25,14 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    const location = await prisma.location.findUnique({
-      where:  { id: locationId },
-      select: { inflowId: true, url: true, name: true }
-    });
+    let location = null;
+
+    if(locationId) {
+      location = await prisma.location.findUnique({
+        where:  { id: locationId },
+        select: { inflowId: true, url: true, name: true }
+      });
+    }
 
     // Add job to queue
     await getSyncQueue().add(

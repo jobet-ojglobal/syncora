@@ -2,7 +2,7 @@
 CREATE TYPE "UserRole" AS ENUM ('Admin', 'StoreManager', 'Customer', 'InventoryClerk', 'SalesAssociate', 'Cashier', 'WarehouseStaff', 'Auditor', 'SupportStaff');
 
 -- CreateEnum
-CREATE TYPE "ProductPriceType" AS ENUM ('fixedPrice', 'markup', 'margin');
+CREATE TYPE "ProductPriceType" AS ENUM ('FixedPrice', 'FixedMarkup');
 
 -- CreateEnum
 CREATE TYPE "UomCategory" AS ENUM ('COUNT', 'WEIGHT', 'VOLUME', 'LENGTH', 'AREA');
@@ -11,7 +11,13 @@ CREATE TYPE "UomCategory" AS ENUM ('COUNT', 'WEIGHT', 'VOLUME', 'LENGTH', 'AREA'
 CREATE TYPE "InventoryAdjustmentReason" AS ENUM ('STOCK_COUNT', 'DAMAGE', 'LOSS', 'THEFT', 'EXPIRED', 'RETURN', 'CORRECTION', 'MANUAL');
 
 -- CreateEnum
-CREATE TYPE "InventoryTransactionType" AS ENUM ('ADJUSTMENT', 'TRANSFER_IN', 'TRANSFER_OUT', 'PURCHASE', 'SALE', 'RETURN');
+CREATE TYPE "AdjustmentStatus" AS ENUM ('DRAFT', 'POSTED', 'VOIDED');
+
+-- CreateEnum
+CREATE TYPE "InventoryReferenceType" AS ENUM ('SALES_ORDER', 'PURCHASE_ORDER', 'TRANSFER_ORDER', 'ADJUSTMENT', 'RETURN', 'STOCK_COUNT');
+
+-- CreateEnum
+CREATE TYPE "InventoryTransactionType" AS ENUM ('PURCHASE', 'PURCHASE_RETURN', 'SALE', 'SALES_RETURN', 'TRANSFER_IN', 'TRANSFER_OUT', 'ADJUSTMENT', 'STOCK_COUNT', 'PRODUCTION_IN', 'PRODUCTION_OUT', 'OPENING_BALANCE');
 
 -- CreateEnum
 CREATE TYPE "TransferOrderStatus" AS ENUM ('DRAFT', 'PENDING', 'IN_TRANSIT', 'RECEIVED', 'CANCELLED');
@@ -24,6 +30,15 @@ CREATE TYPE "AddressType" AS ENUM ('Commercial', 'Residential');
 
 -- CreateEnum
 CREATE TYPE "CurrencyNegativeType" AS ENUM ('Leading', 'Trailing', 'Parentheses');
+
+-- CreateEnum
+CREATE TYPE "SalesOrderStatus" AS ENUM ('DRAFT', 'CONFIRMED', 'PICKING', 'PACKED', 'SHIPPED', 'COMPLETED', 'CANCELLED');
+
+-- CreateEnum
+CREATE TYPE "PaymentStatus" AS ENUM ('UNPAID', 'PARTIALLY_PAID', 'PAID', 'REFUNDED');
+
+-- CreateEnum
+CREATE TYPE "ReservationStatus" AS ENUM ('STAT');
 
 -- CreateTable
 CREATE TABLE "sync_job" (
@@ -66,6 +81,36 @@ CREATE TABLE "inflow_webhook_event" (
 );
 
 -- CreateTable
+CREATE TABLE "location_webhook" (
+    "id" TEXT NOT NULL,
+    "locationId" TEXT NOT NULL,
+    "url" TEXT NOT NULL,
+    "secret" TEXT,
+    "events" JSONB NOT NULL,
+    "isDisabled" BOOLEAN NOT NULL DEFAULT false,
+    "consecutiveFailureCount" INTEGER NOT NULL DEFAULT 0,
+    "lastFailureMessage" TEXT,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "location_webhook_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "location_webhook_event" (
+    "id" TEXT NOT NULL,
+    "locationWebhookId" TEXT NOT NULL,
+    "eventType" TEXT NOT NULL,
+    "payload" JSONB NOT NULL,
+    "responseStatus" INTEGER,
+    "errorMessage" TEXT,
+    "processed" BOOLEAN NOT NULL DEFAULT false,
+    "receivedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "location_webhook_event_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
 CREATE TABLE "partner_webhook" (
     "id" TEXT NOT NULL,
     "url" TEXT NOT NULL,
@@ -103,6 +148,7 @@ CREATE TABLE "user" (
     "inflowCustomerId" TEXT,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
+    "deletedAt" TIMESTAMP(3),
 
     CONSTRAINT "user_pkey" PRIMARY KEY ("id")
 );
@@ -132,6 +178,7 @@ CREATE TABLE "category" (
     "parentId" TEXT,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
+    "deletedAt" TIMESTAMP(3),
 
     CONSTRAINT "category_pkey" PRIMARY KEY ("id")
 );
@@ -185,6 +232,7 @@ CREATE TABLE "product_variant" (
     "variantCount" INTEGER NOT NULL DEFAULT 0,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
+    "deletedAt" TIMESTAMP(3),
 
     CONSTRAINT "product_variant_pkey" PRIMARY KEY ("id")
 );
@@ -203,7 +251,7 @@ CREATE TABLE "product_variant_location_map" (
 CREATE TABLE "product" (
     "id" TEXT NOT NULL,
     "inflowId" TEXT NOT NULL,
-    "sku" TEXT,
+    "sku" TEXT NOT NULL,
     "name" TEXT NOT NULL,
     "slug" TEXT NOT NULL,
     "description" TEXT,
@@ -260,6 +308,7 @@ CREATE TABLE "product_price" (
     "fixedMarkup" DECIMAL(18,5),
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
+    "deletedAt" TIMESTAMP(3),
 
     CONSTRAINT "product_price_pkey" PRIMARY KEY ("id")
 );
@@ -275,6 +324,16 @@ CREATE TABLE "product_price_location_map" (
 );
 
 -- CreateTable
+CREATE TABLE "product_price_tier" (
+    "id" TEXT NOT NULL,
+    "productPriceId" TEXT NOT NULL,
+    "minQuantity" DECIMAL(18,4) NOT NULL,
+    "unitPrice" DECIMAL(18,5) NOT NULL,
+
+    CONSTRAINT "product_price_tier_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
 CREATE TABLE "product_cost_adjustment" (
     "id" TEXT NOT NULL,
     "inflowId" TEXT NOT NULL,
@@ -285,6 +344,7 @@ CREATE TABLE "product_cost_adjustment" (
     "unitCost" DECIMAL(18,5) NOT NULL,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
+    "deletedAt" TIMESTAMP(3),
 
     CONSTRAINT "product_cost_adjustment_pkey" PRIMARY KEY ("id")
 );
@@ -308,6 +368,7 @@ CREATE TABLE "product_barcode" (
     "lineNum" INTEGER NOT NULL,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
+    "deletedAt" TIMESTAMP(3),
 
     CONSTRAINT "product_barcode_pkey" PRIMARY KEY ("id")
 );
@@ -336,6 +397,7 @@ CREATE TABLE "product_operation" (
     "trackTime" BOOLEAN NOT NULL DEFAULT false,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
+    "deletedAt" TIMESTAMP(3),
 
     CONSTRAINT "product_operation_pkey" PRIMARY KEY ("id")
 );
@@ -361,6 +423,7 @@ CREATE TABLE "operation_type" (
     "trackTime" BOOLEAN NOT NULL DEFAULT false,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
+    "deletedAt" TIMESTAMP(3),
 
     CONSTRAINT "operation_type_pkey" PRIMARY KEY ("id")
 );
@@ -384,6 +447,7 @@ CREATE TABLE "product_tax_code" (
     "taxingSchemeId" TEXT NOT NULL,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
+    "deletedAt" TIMESTAMP(3),
 
     CONSTRAINT "product_tax_code_pkey" PRIMARY KEY ("id")
 );
@@ -399,6 +463,7 @@ CREATE TABLE "product_attachment" (
     "lastModifiedById" TEXT,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
+    "deletedAt" TIMESTAMP(3),
 
     CONSTRAINT "product_attachment_pkey" PRIMARY KEY ("id")
 );
@@ -421,6 +486,7 @@ CREATE TABLE "product_cost" (
     "cost" DECIMAL(12,4) NOT NULL,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
+    "deletedAt" TIMESTAMP(3),
 
     CONSTRAINT "product_cost_pkey" PRIMARY KEY ("id")
 );
@@ -450,6 +516,7 @@ CREATE TABLE "product_reorder_setting" (
     "reorderQuantity" DECIMAL(12,4) NOT NULL,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
+    "deletedAt" TIMESTAMP(3),
 
     CONSTRAINT "product_reorder_setting_pkey" PRIMARY KEY ("id")
 );
@@ -473,6 +540,7 @@ CREATE TABLE "product_bom" (
     "quantity" DECIMAL(12,4) NOT NULL,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
+    "deletedAt" TIMESTAMP(3),
 
     CONSTRAINT "product_bom_pkey" PRIMARY KEY ("id")
 );
@@ -519,6 +587,7 @@ CREATE TABLE "unit_of_measure" (
     "isActive" BOOLEAN NOT NULL DEFAULT true,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
+    "deletedAt" TIMESTAMP(3),
 
     CONSTRAINT "unit_of_measure_pkey" PRIMARY KEY ("id")
 );
@@ -546,6 +615,8 @@ CREATE TABLE "product_image" (
     "originalUrl" TEXT,
     "smallUrl" TEXT,
     "thumbUrl" TEXT,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
 
     CONSTRAINT "product_image_pkey" PRIMARY KEY ("id")
 );
@@ -556,6 +627,7 @@ CREATE TABLE "product_image_location_map" (
     "productImageId" TEXT NOT NULL,
     "locationId" TEXT NOT NULL,
     "localId" INTEGER NOT NULL,
+    "imageUrl" TEXT,
 
     CONSTRAINT "product_image_location_map_pkey" PRIMARY KEY ("id")
 );
@@ -564,6 +636,9 @@ CREATE TABLE "product_image_location_map" (
 CREATE TABLE "attribute" (
     "id" TEXT NOT NULL,
     "name" TEXT NOT NULL,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+    "deletedAt" TIMESTAMP(3),
 
     CONSTRAINT "attribute_pkey" PRIMARY KEY ("id")
 );
@@ -741,33 +816,13 @@ CREATE TABLE "sublocation" (
 );
 
 -- CreateTable
-CREATE TABLE "location_webhook" (
+CREATE TABLE "sublocation_location_map" (
     "id" TEXT NOT NULL,
+    "sublocationId" TEXT NOT NULL,
     "locationId" TEXT NOT NULL,
-    "url" TEXT NOT NULL,
-    "secret" TEXT,
-    "events" JSONB NOT NULL,
-    "isDisabled" BOOLEAN NOT NULL DEFAULT false,
-    "consecutiveFailureCount" INTEGER NOT NULL DEFAULT 0,
-    "lastFailureMessage" TEXT,
-    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updatedAt" TIMESTAMP(3) NOT NULL,
+    "localId" INTEGER NOT NULL,
 
-    CONSTRAINT "location_webhook_pkey" PRIMARY KEY ("id")
-);
-
--- CreateTable
-CREATE TABLE "location_webhook_event" (
-    "id" TEXT NOT NULL,
-    "locationWebhookId" TEXT NOT NULL,
-    "eventType" TEXT NOT NULL,
-    "payload" JSONB NOT NULL,
-    "responseStatus" INTEGER,
-    "errorMessage" TEXT,
-    "processed" BOOLEAN NOT NULL DEFAULT false,
-    "receivedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-
-    CONSTRAINT "location_webhook_event_pkey" PRIMARY KEY ("id")
+    CONSTRAINT "sublocation_location_map_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
@@ -782,6 +837,8 @@ CREATE TABLE "inventory" (
     "reorderQuantity" DECIMAL(18,4) NOT NULL DEFAULT 0.0000,
     "isAutoReorderEnabled" BOOLEAN NOT NULL DEFAULT false,
     "preferredSourceLocationId" TEXT,
+    "lastCountedAt" TIMESTAMP(3),
+    "lastMovementAt" TIMESTAMP(3),
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
 
@@ -792,7 +849,6 @@ CREATE TABLE "inventory" (
 CREATE TABLE "inventory_bin" (
     "id" TEXT NOT NULL,
     "inventoryId" TEXT NOT NULL,
-    "productId" TEXT NOT NULL,
     "sublocationId" TEXT NOT NULL,
     "quantity" DECIMAL(18,4) NOT NULL,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -808,6 +864,7 @@ CREATE TABLE "inventory_adjustment" (
     "reason" "InventoryAdjustmentReason" NOT NULL,
     "notes" TEXT,
     "performedById" TEXT NOT NULL,
+    "status" "AdjustmentStatus" NOT NULL,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT "inventory_adjustment_pkey" PRIMARY KEY ("id")
@@ -817,6 +874,7 @@ CREATE TABLE "inventory_adjustment" (
 CREATE TABLE "inventory_adjustment_line" (
     "id" TEXT NOT NULL,
     "adjustmentId" TEXT NOT NULL,
+    "inventoryId" TEXT,
     "productId" TEXT NOT NULL,
     "locationId" TEXT NOT NULL,
     "sublocationId" TEXT,
@@ -827,6 +885,28 @@ CREATE TABLE "inventory_adjustment_line" (
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT "inventory_adjustment_line_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "inventoryLedger" (
+    "id" TEXT NOT NULL,
+    "productId" TEXT NOT NULL,
+    "locationId" TEXT NOT NULL,
+    "sublocationId" TEXT,
+    "transactionType" "InventoryTransactionType" NOT NULL,
+    "referenceType" "InventoryReferenceType",
+    "referenceId" TEXT,
+    "performedById" TEXT,
+    "remarks" TEXT,
+    "unitCost" DECIMAL(65,30),
+    "batchNumber" TEXT,
+    "serialNumber" TEXT,
+    "quantityChange" DECIMAL(18,4) NOT NULL,
+    "quantityBefore" DECIMAL(18,4) NOT NULL,
+    "quantityAfter" DECIMAL(18,4) NOT NULL,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "inventoryLedger_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
@@ -844,31 +924,72 @@ CREATE TABLE "adjustment_reason" (
 );
 
 -- CreateTable
-CREATE TABLE "adjustment_reason_location_map" (
+CREATE TABLE "StockAdjustment" (
     "id" TEXT NOT NULL,
-    "adjustmentReasonId" TEXT NOT NULL,
+    "inflowId" TEXT NOT NULL,
+    "adjustmentNumber" TEXT NOT NULL,
+    "adjustmentReasonId" TEXT,
     "locationId" TEXT NOT NULL,
-    "localId" INTEGER NOT NULL,
+    "lastModifiedById" TEXT,
+    "date" TIMESTAMP(3) NOT NULL,
+    "remarks" TEXT,
+    "isCancelled" BOOLEAN NOT NULL DEFAULT false,
+    "timestamp" TEXT NOT NULL,
+    "custom1" TEXT,
+    "custom2" TEXT,
+    "custom3" TEXT,
+    "custom4" TEXT,
+    "custom5" TEXT,
+    "custom6" TEXT,
+    "custom7" TEXT,
+    "custom8" TEXT,
+    "custom9" TEXT,
+    "custom10" TEXT,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
 
-    CONSTRAINT "adjustment_reason_location_map_pkey" PRIMARY KEY ("id")
+    CONSTRAINT "StockAdjustment_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
-CREATE TABLE "InventoryLedger" (
+CREATE TABLE "StockAdjustmentLine" (
     "id" TEXT NOT NULL,
+    "inflowId" TEXT NOT NULL,
+    "stockAdjustmentId" TEXT NOT NULL,
     "productId" TEXT NOT NULL,
-    "locationId" TEXT NOT NULL,
-    "sublocationId" TEXT,
-    "transactionType" "InventoryTransactionType" NOT NULL,
-    "referenceType" TEXT,
-    "referenceId" TEXT,
-    "quantityChange" DECIMAL(18,4) NOT NULL,
-    "quantityBefore" DECIMAL(18,4) NOT NULL,
-    "quantityAfter" DECIMAL(18,4) NOT NULL,
-    "performedById" TEXT,
+    "description" TEXT,
+    "standardQuantity" DECIMAL(18,5) NOT NULL,
+    "uomQuantity" DECIMAL(18,5) NOT NULL,
+    "uom" TEXT,
+    "sublocation" TEXT,
+    "timestamp" TEXT NOT NULL,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
 
-    CONSTRAINT "InventoryLedger_pkey" PRIMARY KEY ("id")
+    CONSTRAINT "StockAdjustmentLine_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "StockAdjustmentSerial" (
+    "id" TEXT NOT NULL,
+    "lineId" TEXT NOT NULL,
+    "serialNumber" TEXT NOT NULL,
+
+    CONSTRAINT "StockAdjustmentSerial_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "StockAdjustmentAttachment" (
+    "id" TEXT NOT NULL,
+    "inflowId" TEXT NOT NULL,
+    "stockAdjustmentId" TEXT NOT NULL,
+    "fileName" TEXT NOT NULL,
+    "attachmentUrl" TEXT NOT NULL,
+    "fileSize" BIGINT,
+    "lastModifiedDate" TIMESTAMP(3),
+    "lastModifiedById" TEXT,
+
+    CONSTRAINT "StockAdjustmentAttachment_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
@@ -881,6 +1002,10 @@ CREATE TABLE "transfer_order" (
     "remarks" TEXT,
     "transferredAt" TIMESTAMP(3),
     "receivedAt" TIMESTAMP(3),
+    "expectedArrival" TIMESTAMP(3),
+    "requestedById" TEXT NOT NULL,
+    "approvedById" TEXT,
+    "receivedById" TEXT,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
 
@@ -895,6 +1020,7 @@ CREATE TABLE "transfer_order_line" (
     "sourceSublocationId" TEXT,
     "targetSublocationId" TEXT,
     "quantity" DECIMAL(18,4) NOT NULL,
+    "quantityReceived" DECIMAL(65,30),
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT "transfer_order_line_pkey" PRIMARY KEY ("id")
@@ -1411,8 +1537,8 @@ CREATE TABLE "sales_order" (
     "returnFreight" DECIMAL(18,5) NOT NULL,
     "exchangeRate" DOUBLE PRECISION NOT NULL DEFAULT 1.0,
     "exchangeRateAutoPulled" TIMESTAMP(3),
-    "paymentStatus" TEXT NOT NULL,
-    "inventoryStatus" TEXT NOT NULL,
+    "paymentStatus" "PaymentStatus" NOT NULL,
+    "inventoryStatus" "SalesOrderStatus" NOT NULL,
     "isCancelled" BOOLEAN NOT NULL DEFAULT false,
     "isCompleted" BOOLEAN NOT NULL DEFAULT false,
     "isFullyPicked" BOOLEAN NOT NULL DEFAULT false,
@@ -1622,6 +1748,19 @@ CREATE TABLE "sales_order_attachment" (
 );
 
 -- CreateTable
+CREATE TABLE "InventoryReservation" (
+    "id" TEXT NOT NULL,
+    "salesOrderId" TEXT,
+    "inventoryId" TEXT NOT NULL,
+    "quantity" DECIMAL(18,4) NOT NULL,
+    "status" "ReservationStatus" NOT NULL,
+    "expiresAt" TIMESTAMP(3),
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "InventoryReservation_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
 CREATE TABLE "purchase_order" (
     "id" TEXT NOT NULL,
     "inflowId" TEXT NOT NULL,
@@ -1676,6 +1815,9 @@ CREATE TABLE "purchase_order" (
     "tax2Name" TEXT,
     "tax2OnShipping" BOOLEAN NOT NULL DEFAULT false,
     "tax2Rate" DECIMAL(18,5) NOT NULL,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+    "deletedAt" TIMESTAMP(3),
 
     CONSTRAINT "purchase_order_pkey" PRIMARY KEY ("id")
 );
@@ -1791,6 +1933,15 @@ CREATE INDEX "inflow_webhook_event_eventType_idx" ON "inflow_webhook_event"("eve
 CREATE INDEX "inflow_webhook_event_receivedAt_idx" ON "inflow_webhook_event"("receivedAt");
 
 -- CreateIndex
+CREATE UNIQUE INDEX "location_webhook_url_key" ON "location_webhook"("url");
+
+-- CreateIndex
+CREATE INDEX "location_webhook_event_eventType_idx" ON "location_webhook_event"("eventType");
+
+-- CreateIndex
+CREATE INDEX "location_webhook_event_receivedAt_idx" ON "location_webhook_event"("receivedAt");
+
+-- CreateIndex
 CREATE UNIQUE INDEX "partner_webhook_url_key" ON "partner_webhook"("url");
 
 -- CreateIndex
@@ -1881,13 +2032,16 @@ CREATE INDEX "product_price_pricingSchemeId_idx" ON "product_price"("pricingSche
 CREATE INDEX "product_price_productId_idx" ON "product_price"("productId");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "product_price_pricingSchemeId_productId_key" ON "product_price"("pricingSchemeId", "productId");
+CREATE UNIQUE INDEX "product_price_pricingSchemeId_productId_priceType_key" ON "product_price"("pricingSchemeId", "productId", "priceType");
 
 -- CreateIndex
 CREATE INDEX "product_price_location_map_locationId_localId_idx" ON "product_price_location_map"("locationId", "localId");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "product_price_location_map_productPriceId_locationId_key" ON "product_price_location_map"("productPriceId", "locationId");
+
+-- CreateIndex
+CREATE INDEX "product_price_tier_productPriceId_idx" ON "product_price_tier"("productPriceId");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "product_cost_adjustment_inflowId_key" ON "product_cost_adjustment"("inflowId");
@@ -2133,13 +2287,10 @@ CREATE INDEX "sublocation_locationId_idx" ON "sublocation"("locationId");
 CREATE UNIQUE INDEX "sublocation_locationId_name_key" ON "sublocation"("locationId", "name");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "location_webhook_url_key" ON "location_webhook"("url");
+CREATE INDEX "sublocation_location_map_locationId_localId_idx" ON "sublocation_location_map"("locationId", "localId");
 
 -- CreateIndex
-CREATE INDEX "location_webhook_event_eventType_idx" ON "location_webhook_event"("eventType");
-
--- CreateIndex
-CREATE INDEX "location_webhook_event_receivedAt_idx" ON "location_webhook_event"("receivedAt");
+CREATE UNIQUE INDEX "sublocation_location_map_sublocationId_locationId_key" ON "sublocation_location_map"("sublocationId", "locationId");
 
 -- CreateIndex
 CREATE INDEX "inventory_productId_idx" ON "inventory"("productId");
@@ -2151,9 +2302,6 @@ CREATE INDEX "inventory_locationId_idx" ON "inventory"("locationId");
 CREATE UNIQUE INDEX "inventory_productId_locationId_key" ON "inventory"("productId", "locationId");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "inventory_bin_productId_sublocationId_key" ON "inventory_bin"("productId", "sublocationId");
-
--- CreateIndex
 CREATE UNIQUE INDEX "inventory_adjustment_adjustmentNumber_key" ON "inventory_adjustment"("adjustmentNumber");
 
 -- CreateIndex
@@ -2163,16 +2311,58 @@ CREATE INDEX "inventory_adjustment_line_productId_idx" ON "inventory_adjustment_
 CREATE INDEX "inventory_adjustment_line_locationId_idx" ON "inventory_adjustment_line"("locationId");
 
 -- CreateIndex
+CREATE INDEX "inventoryLedger_productId_createdAt_idx" ON "inventoryLedger"("productId", "createdAt");
+
+-- CreateIndex
+CREATE INDEX "inventoryLedger_locationId_createdAt_idx" ON "inventoryLedger"("locationId", "createdAt");
+
+-- CreateIndex
+CREATE INDEX "inventoryLedger_referenceType_referenceId_idx" ON "inventoryLedger"("referenceType", "referenceId");
+
+-- CreateIndex
+CREATE INDEX "inventoryLedger_transactionType_idx" ON "inventoryLedger"("transactionType");
+
+-- CreateIndex
+CREATE INDEX "inventoryLedger_createdAt_idx" ON "inventoryLedger"("createdAt");
+
+-- CreateIndex
+CREATE INDEX "inventoryLedger_productId_locationId_createdAt_idx" ON "inventoryLedger"("productId", "locationId", "createdAt");
+
+-- CreateIndex
+CREATE INDEX "inventoryLedger_sublocationId_idx" ON "inventoryLedger"("sublocationId");
+
+-- CreateIndex
 CREATE UNIQUE INDEX "adjustment_reason_inflowId_key" ON "adjustment_reason"("inflowId");
 
 -- CreateIndex
 CREATE INDEX "adjustment_reason_name_idx" ON "adjustment_reason"("name");
 
 -- CreateIndex
-CREATE INDEX "adjustment_reason_location_map_locationId_localId_idx" ON "adjustment_reason_location_map"("locationId", "localId");
+CREATE UNIQUE INDEX "StockAdjustment_inflowId_key" ON "StockAdjustment"("inflowId");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "adjustment_reason_location_map_adjustmentReasonId_locationI_key" ON "adjustment_reason_location_map"("adjustmentReasonId", "locationId");
+CREATE INDEX "StockAdjustment_locationId_idx" ON "StockAdjustment"("locationId");
+
+-- CreateIndex
+CREATE INDEX "StockAdjustment_date_idx" ON "StockAdjustment"("date");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "StockAdjustmentLine_inflowId_key" ON "StockAdjustmentLine"("inflowId");
+
+-- CreateIndex
+CREATE INDEX "StockAdjustmentLine_stockAdjustmentId_idx" ON "StockAdjustmentLine"("stockAdjustmentId");
+
+-- CreateIndex
+CREATE INDEX "StockAdjustmentLine_productId_idx" ON "StockAdjustmentLine"("productId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "StockAdjustmentSerial_lineId_serialNumber_key" ON "StockAdjustmentSerial"("lineId", "serialNumber");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "StockAdjustmentAttachment_inflowId_key" ON "StockAdjustmentAttachment"("inflowId");
+
+-- CreateIndex
+CREATE INDEX "StockAdjustmentAttachment_stockAdjustmentId_idx" ON "StockAdjustmentAttachment"("stockAdjustmentId");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "transfer_order_transferNumber_key" ON "transfer_order"("transferNumber");
@@ -2598,6 +2788,12 @@ CREATE INDEX "purchase_order_payment_line_purchaseOrderId_idx" ON "purchase_orde
 CREATE INDEX "purchase_order_attachment_purchaseOrderId_idx" ON "purchase_order_attachment"("purchaseOrderId");
 
 -- AddForeignKey
+ALTER TABLE "location_webhook" ADD CONSTRAINT "location_webhook_locationId_fkey" FOREIGN KEY ("locationId") REFERENCES "location"("inflowId") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "location_webhook_event" ADD CONSTRAINT "location_webhook_event_locationWebhookId_fkey" FOREIGN KEY ("locationWebhookId") REFERENCES "location_webhook"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
 ALTER TABLE "user" ADD CONSTRAINT "user_teamMemberId_fkey" FOREIGN KEY ("teamMemberId") REFERENCES "team_member"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
@@ -2665,6 +2861,9 @@ ALTER TABLE "product_price_location_map" ADD CONSTRAINT "product_price_location_
 
 -- AddForeignKey
 ALTER TABLE "product_price_location_map" ADD CONSTRAINT "product_price_location_map_productPriceId_fkey" FOREIGN KEY ("productPriceId") REFERENCES "product_price"("inflowId") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "product_price_tier" ADD CONSTRAINT "product_price_tier_productPriceId_fkey" FOREIGN KEY ("productPriceId") REFERENCES "product_price"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "product_cost_adjustment" ADD CONSTRAINT "product_cost_adjustment_productId_fkey" FOREIGN KEY ("productId") REFERENCES "product"("inflowId") ON DELETE CASCADE ON UPDATE CASCADE;
@@ -2871,10 +3070,13 @@ ALTER TABLE "location_address" ADD CONSTRAINT "location_address_locationId_fkey"
 ALTER TABLE "sublocation" ADD CONSTRAINT "sublocation_locationId_fkey" FOREIGN KEY ("locationId") REFERENCES "location"("inflowId") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "location_webhook" ADD CONSTRAINT "location_webhook_locationId_fkey" FOREIGN KEY ("locationId") REFERENCES "location"("inflowId") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "sublocation_location_map" ADD CONSTRAINT "sublocation_location_map_locationId_fkey" FOREIGN KEY ("locationId") REFERENCES "location"("inflowId") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "location_webhook_event" ADD CONSTRAINT "location_webhook_event_locationWebhookId_fkey" FOREIGN KEY ("locationWebhookId") REFERENCES "location_webhook"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "sublocation_location_map" ADD CONSTRAINT "sublocation_location_map_sublocationId_fkey" FOREIGN KEY ("sublocationId") REFERENCES "sublocation"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "inventory" ADD CONSTRAINT "inventory_preferredSourceLocationId_fkey" FOREIGN KEY ("preferredSourceLocationId") REFERENCES "location"("inflowId") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "inventory" ADD CONSTRAINT "inventory_productId_fkey" FOREIGN KEY ("productId") REFERENCES "product"("inflowId") ON DELETE CASCADE ON UPDATE CASCADE;
@@ -2884,9 +3086,6 @@ ALTER TABLE "inventory" ADD CONSTRAINT "inventory_locationId_fkey" FOREIGN KEY (
 
 -- AddForeignKey
 ALTER TABLE "inventory_bin" ADD CONSTRAINT "inventory_bin_inventoryId_fkey" FOREIGN KEY ("inventoryId") REFERENCES "inventory"("id") ON DELETE CASCADE ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "inventory_bin" ADD CONSTRAINT "inventory_bin_productId_fkey" FOREIGN KEY ("productId") REFERENCES "product"("inflowId") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "inventory_bin" ADD CONSTRAINT "inventory_bin_sublocationId_fkey" FOREIGN KEY ("sublocationId") REFERENCES "sublocation"("id") ON DELETE CASCADE ON UPDATE CASCADE;
@@ -2907,16 +3106,40 @@ ALTER TABLE "inventory_adjustment_line" ADD CONSTRAINT "inventory_adjustment_lin
 ALTER TABLE "inventory_adjustment_line" ADD CONSTRAINT "inventory_adjustment_line_sublocationId_fkey" FOREIGN KEY ("sublocationId") REFERENCES "sublocation"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "adjustment_reason_location_map" ADD CONSTRAINT "adjustment_reason_location_map_locationId_fkey" FOREIGN KEY ("locationId") REFERENCES "location"("inflowId") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "inventoryLedger" ADD CONSTRAINT "inventoryLedger_productId_fkey" FOREIGN KEY ("productId") REFERENCES "product"("inflowId") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "adjustment_reason_location_map" ADD CONSTRAINT "adjustment_reason_location_map_adjustmentReasonId_fkey" FOREIGN KEY ("adjustmentReasonId") REFERENCES "adjustment_reason"("inflowId") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "inventoryLedger" ADD CONSTRAINT "inventoryLedger_locationId_fkey" FOREIGN KEY ("locationId") REFERENCES "location"("inflowId") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "InventoryLedger" ADD CONSTRAINT "InventoryLedger_productId_fkey" FOREIGN KEY ("productId") REFERENCES "product"("inflowId") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "inventoryLedger" ADD CONSTRAINT "inventoryLedger_performedById_fkey" FOREIGN KEY ("performedById") REFERENCES "team_member"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "InventoryLedger" ADD CONSTRAINT "InventoryLedger_locationId_fkey" FOREIGN KEY ("locationId") REFERENCES "location"("inflowId") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "inventoryLedger" ADD CONSTRAINT "inventoryLedger_sublocationId_fkey" FOREIGN KEY ("sublocationId") REFERENCES "sublocation"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "StockAdjustment" ADD CONSTRAINT "StockAdjustment_adjustmentReasonId_fkey" FOREIGN KEY ("adjustmentReasonId") REFERENCES "adjustment_reason"("inflowId") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "StockAdjustment" ADD CONSTRAINT "StockAdjustment_locationId_fkey" FOREIGN KEY ("locationId") REFERENCES "location"("inflowId") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "StockAdjustment" ADD CONSTRAINT "StockAdjustment_lastModifiedById_fkey" FOREIGN KEY ("lastModifiedById") REFERENCES "team_member"("inflowId") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "StockAdjustmentLine" ADD CONSTRAINT "StockAdjustmentLine_stockAdjustmentId_fkey" FOREIGN KEY ("stockAdjustmentId") REFERENCES "StockAdjustment"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "StockAdjustmentLine" ADD CONSTRAINT "StockAdjustmentLine_productId_fkey" FOREIGN KEY ("productId") REFERENCES "product"("inflowId") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "StockAdjustmentSerial" ADD CONSTRAINT "StockAdjustmentSerial_lineId_fkey" FOREIGN KEY ("lineId") REFERENCES "StockAdjustmentLine"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "StockAdjustmentAttachment" ADD CONSTRAINT "StockAdjustmentAttachment_stockAdjustmentId_fkey" FOREIGN KEY ("stockAdjustmentId") REFERENCES "StockAdjustment"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "StockAdjustmentAttachment" ADD CONSTRAINT "StockAdjustmentAttachment_lastModifiedById_fkey" FOREIGN KEY ("lastModifiedById") REFERENCES "team_member"("inflowId") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "transfer_order" ADD CONSTRAINT "transfer_order_sourceLocationId_fkey" FOREIGN KEY ("sourceLocationId") REFERENCES "location"("inflowId") ON DELETE CASCADE ON UPDATE CASCADE;
@@ -3217,6 +3440,12 @@ ALTER TABLE "cost_of_goods_sold" ADD CONSTRAINT "cost_of_goods_sold_salesOrderId
 
 -- AddForeignKey
 ALTER TABLE "sales_order_attachment" ADD CONSTRAINT "sales_order_attachment_salesOrderId_fkey" FOREIGN KEY ("salesOrderId") REFERENCES "sales_order"("inflowId") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "InventoryReservation" ADD CONSTRAINT "InventoryReservation_inventoryId_fkey" FOREIGN KEY ("inventoryId") REFERENCES "inventory"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "InventoryReservation" ADD CONSTRAINT "InventoryReservation_salesOrderId_fkey" FOREIGN KEY ("salesOrderId") REFERENCES "sales_order"("inflowId") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "purchase_order" ADD CONSTRAINT "purchase_order_vendorId_fkey" FOREIGN KEY ("vendorId") REFERENCES "vendor"("inflowId") ON DELETE RESTRICT ON UPDATE CASCADE;

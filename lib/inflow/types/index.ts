@@ -97,7 +97,7 @@ export interface InflowProductVariant {
 export interface InflowProduct {
   productId: string;
 
-  sku: string | null;
+  sku: string;
   name: string;
   description: string | null;
   itemType: "stockedProduct" | "serializedProduct" | "service" | string;
@@ -146,7 +146,7 @@ export interface InflowProduct {
   cost?: InflowProductCost | null;
   itemBoms?: InflowItemBom[];
   attachments?: InflowProductAttachment[];
-
+  lastVendor?: InflowVendor | null;
 }
 
 /**
@@ -274,7 +274,6 @@ export interface InflowInventoryLine {
   serial: string;
   sublocation: string;
   timestamp: string;
-
   location: InflowLocation
 }
 
@@ -313,7 +312,32 @@ export interface InflowInventoryLine {
 //   product?: InflowProduct
 // }
 
+// =====================================
+// Product Summary
+// =====================================
 
+export interface InflowProductSummary {
+  productId: string;
+  locationId: string;
+  imageSmallUrl: string | null;
+  quantityOnHand: number;
+  quantityOnOrder: number;
+  quantityOnPurchaseOrder: number;
+  quantityOnWorkOrder: number;
+  quantityOnTransferOrder: number;
+  quantityReserved: number;
+  quantityReservedForSales: number;
+  quantityReservedForManufacturing: number;
+  quantityReservedForTransfers: number;
+  quantityReservedForBuilds: number;
+  quantityAvailable: number;
+  rawQuantityAvailable: number;
+  quantityPicked: number;
+  quantityInTransit: number;
+  quantityBuildable: number;
+  quantityExpiring: number;
+  quantityAnticipated: number;
+}
 
 
 // =====================================
@@ -429,6 +453,7 @@ export interface InflowTeamMember {
   canBeSalesRep: boolean;
   email: string;
   isActive: boolean;
+  isInternal: boolean;
   name: string;
 }
 
@@ -750,6 +775,7 @@ export interface InflowVendorItem {
   timestamp: string;
   vendorId: string;
   vendorItemCode: string | null; // Maps to Prisma vendorSku
+  product: InflowProduct
 }
 
 export interface InflowVendor {
@@ -786,6 +812,7 @@ export interface InflowVendor {
   lastModifiedBy?: InflowTeamMember | null;
   taxingScheme?: InflowTaxingScheme| null;
   vendorItems?: InflowVendorItem[];
+
 }
 
 // ==========================================

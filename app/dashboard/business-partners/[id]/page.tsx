@@ -7,13 +7,14 @@ import {
   ArrowLeft, Edit3, Building2, UserCheck, Mail, Phone, Globe, FileText, 
   MapPin, CheckCircle2, XCircle, ShoppingBag, Landmark, Truck, ShieldCheck, 
   BadgeDollarSign, Calendar, Clock, Layers, AlertCircle, Coins, ShieldAlert,
-  Percent, ArrowDownRight, ArrowUpRight, Scale, ReceiptText
+  Percent, ArrowDownRight, ArrowUpRight, Scale, ReceiptText,
+  Package,
+  Tag
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Separator } from "@/components/ui/separator";
 
 const fetcher = (url: string) => fetch(url).then((res) => {
   if (!res.ok) throw new Error("Failed syncing business partner metrics.");
@@ -437,10 +438,10 @@ export default function BusinessPartnerOverviewPage({ params }: OverviewPageProp
                         </CardTitle>
                       </CardHeader>
                       <CardContent className="p-4 pt-0 font-medium space-y-2">
-                        <div className="flex justify-between border-b py-1">
+                        {/* <div className="flex justify-between border-b py-1">
                           <span className="text-muted-foreground">Vendor Token Inflow:</span>
                           <span className="font-mono select-all font-bold">{partner.vendor.inflowId}</span>
-                        </div>
+                        </div> */}
                         <div className="flex justify-between border-b py-1">
                           <span className="text-muted-foreground">Catalog Scope:</span>
                           <span className="font-mono font-bold text-slate-700 bg-muted border rounded px-1.5 py-0.5">
@@ -454,7 +455,7 @@ export default function BusinessPartnerOverviewPage({ params }: OverviewPageProp
                         <div className="flex justify-between py-1">
                           <span className="text-muted-foreground">Functional Currency:</span>
                           <span className="font-bold text-amber-600 uppercase">
-                            {partner.vendor.currency?.name} ({partner.vendor.currency?.isoCode || "USD"})
+                            {partner.vendor.currency?.description} ({partner.vendor.currency?.isoCode || "USD"})
                           </span>
                         </div>
                       </CardContent>
@@ -549,6 +550,81 @@ export default function BusinessPartnerOverviewPage({ params }: OverviewPageProp
                               </span>
                             </div>
                           </div>
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+
+                  {/* Vendor Catalog / Vendor Items Table Card */}
+                  <Card className="shadow-3xs">
+                    <CardHeader className="pb-3">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <CardTitle className="text-xs font-bold flex items-center gap-2">
+                            <Package className="w-4 h-4 text-muted-foreground" /> Vendor Supplied Items
+                          </CardTitle>
+                          <CardDescription className="text-[10px]">
+                            Mapped catalog products and contracted supplier pricing for this vendor.
+                          </CardDescription>
+                        </div>
+                        <Badge variant="outline" className="font-mono text-[10px]">
+                          {partner.vendor?.vendorItems?.length || 0} Items
+                        </Badge>
+                      </div>
+                    </CardHeader>
+                    <CardContent>
+                      {!partner.vendor?.vendorItems || partner.vendor.vendorItems.length === 0 ? (
+                        <div className="text-muted-foreground italic text-center py-6 text-xs bg-muted/20 border rounded-lg">
+                          No vendor item mappings linked to this vendor profile.
+                        </div>
+                      ) : (
+                        <div className="overflow-x-auto border rounded-lg">
+                          <table className="w-full text-left text-xs border-collapse">
+                            <thead>
+                              <tr className="bg-muted/50 border-b text-[11px] font-semibold text-muted-foreground">
+                                <th className="p-2.5 font-bold">Product Name</th>
+                                <th className="p-2.5 font-bold">System SKU</th>
+                                <th className="p-2.5 font-bold">Vendor SKU</th>
+                                <th className="p-2.5 font-bold text-right">Unit Cost</th>
+                                <th className="p-2.5 font-bold text-right">Lead Time</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y">
+                              {partner.vendor.vendorItems.map((item: any) => (
+                                <tr key={item.id} className="hover:bg-muted/30 transition-colors">
+                                  <td className="p-2.5 font-medium text-foreground">
+                                    <div className="flex items-center gap-1.5">
+                                      <Tag className="w-3 h-3 text-slate-400 shrink-0" />
+                                      <span>{item.product?.name || "Unlinked Product"}</span>
+                                    </div>
+                                  </td>
+                                  <td className="p-2.5 font-mono text-[11px] text-muted-foreground">
+                                    {item.product?.sku || "N/A"}
+                                  </td>
+                                  <td className="p-2.5 font-mono text-[11px] text-slate-700">
+                                    {item.vendorSku ? (
+                                      <Badge variant="secondary" className="font-mono text-[10px] px-1.5 py-0">
+                                        {item.vendorSku}
+                                      </Badge>
+                                    ) : (
+                                      <span className="text-muted-foreground italic">—</span>
+                                    )}
+                                  </td>
+                                  <td className="p-2.5 font-mono font-bold text-right text-emerald-600">
+                                    {item.unitCost != null
+                                      ? `${Number(item.unitCost).toLocaleString("en-US", {
+                                          minimumFractionDigits: 2,
+                                          maximumFractionDigits: 4,
+                                        })} ${vendorCurrency}`
+                                      : "—"}
+                                  </td>
+                                  <td className="p-2.5 font-mono text-right text-slate-600">
+                                    {item.leadTimeDays ? `${item.leadTimeDays}d` : "—"}
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
                         </div>
                       )}
                     </CardContent>
