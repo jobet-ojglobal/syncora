@@ -3,7 +3,7 @@ import {
   getLocations,
   getSublocationsByLocation,
 } from "../data/locations";
-import { ensureLocationShell } from "./helpers";
+import { ensureLocationShell } from "./ensure.service";
 
 type SyncOptions = {
   onProgress?: (progress: number) => Promise<void>;
@@ -21,13 +21,7 @@ export class LocationSyncService {
 
       await prisma.$transaction(async (tx) => {
         // Reuse the shared utility to safely write Location + Address + Default Sublocation
-        await ensureLocationShell(tx, {
-          inflowId: location.locationId,
-          name: location.name,
-          isActive: location.isActive,
-          isDefault: location.isDefault,
-          address: location.address,
-        });
+        await ensureLocationShell(tx, location);
 
         // Pull down and sync custom nested storage sublocations
         const sublocationsResponse = await getSublocationsByLocation(location.locationId);

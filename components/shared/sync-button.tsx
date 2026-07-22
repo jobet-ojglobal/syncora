@@ -158,7 +158,11 @@ const SYNC_CONFIG_REGISTRY: Record<string, { id: string; label: string; apiField
     { id: "images", label: "Product Images", apiField: "images" },
     { id: "productBarcodes", label: "Barcodes & Identifiers", apiField: "productBarcodes" },
     { id: "taxCodes", label: "Tax Codes & Schemes", apiField: "taxCodes" },
-    { id: "reorderSettings", label: "Location Reorder Settings", apiField: "reorderSettings" },
+    { 
+      id: "reorderSettings", 
+      label: "Location Reorder Settings", 
+      apiField: "reorderSettings.formLocation,reorderSettings.location,reorderSettings.vendor" 
+    },
     { id: "productOperations", label: "Manufacturing Operations", apiField: "productOperations" },
     { id: "prices", label: "Price Schemes & Matrix Lists", apiField: "prices" },
     { id: "itemBoms", label: "Bill of Materials (BOM Components)", apiField: "itemBoms" },

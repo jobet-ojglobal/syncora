@@ -1,0 +1,5 @@
+ssh-keygen -t ed25519 -C "jobetguarte.ojglobal@gmail.com"
+C:\Users\Ron\.ssh\github_work
+ssh-keygen -t ed25519 -C "guartejobet01@gmail.com"
+~/.ssh/github_personal
+C:\Users\Ron\.ssh\github_personal

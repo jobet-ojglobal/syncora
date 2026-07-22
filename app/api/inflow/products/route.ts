@@ -1,10 +1,10 @@
 import { NextResponse } from 'next/server';
-import { getProducts } from '@/lib/inflow/data/products';
+import { getEntireCatalogs } from '@/lib/inflow/data/products';
 
 export async function GET() {
   try {
     const data =
-        await getProducts();
+        await getEntireCatalogs();
 
     return NextResponse.json({
       success: true,

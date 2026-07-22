@@ -97,7 +97,6 @@ export async function deleteProduct(productId: string) {
 
   // "images,productBarcodes,taxCodes,reorderSettings,productOperations,prices,cost,itemBoms,attachments,productVariant.productGroup.category,productVariant.productGroup.options.optionValues,productVariant.productGroup.images.image"
 
-
 // export async function fetchProductInventory() {
 //   const data = await inflow.get<InflowProduct[]>(
 //     "/products?include=cost,defaultPrice,inventoryLines"

@@ -353,7 +353,7 @@ model Product {
   productOperations ProductOperation[]
   taxCodes          ProductTaxCode[]
   images            ProductImage[]
-  reorderSettings   reorderSetting[]
+  reorderSettings   ReorderSetting[]
   bomComponents     ProductBom[]      @relation("ParentProduct")
   bomUsedIn         ProductBom[]      @relation("ChildProduct")
 
@@ -689,7 +689,7 @@ model ProductCostLocationMap {
   @@map("product_cost_location_map")
 }
 
-model reorderSetting {
+model ReorderSetting {
   id                 String   @id @default(cuid())
   inflowId           String   @unique // Storing payload's reorderSettingsId
   productId          String
@@ -727,7 +727,7 @@ model ReorderSettingLocationMap {
   localId         Int          // The unique INT assigned by that specific local database
 
   location        Location? @relation(fields: [locationId], references: [inflowId])
-  reorderSetting  reorderSetting @relation(fields: [reorderSettingId], references: [inflowId], onDelete: Cascade)
+  reorderSetting  ReorderSetting @relation(fields: [reorderSettingId], references: [inflowId], onDelete: Cascade)
 
   @@unique([reorderSettingId, locationId])
   @@index([locationId, localId])
@@ -1112,8 +1112,8 @@ model Location {
   
   outgoingTransfers TransferOrder[] @relation("TransferSourceLocation")
   incomingTransfers TransferOrder[]  @relation("TransferTargetLocation")
-  reorderTargets reorderSetting[] @relation("TargetLocation")
-  reorderSources reorderSetting[] @relation("SourceLocation")
+  reorderTargets ReorderSetting[] @relation("TargetLocation")
+  reorderSources ReorderSetting[] @relation("SourceLocation")
   webhooks      LocationWebhook[]
 
   inventoryPreferredSource   Inventory[]  @relation("PreferredReplenishmentLocation")    
@@ -2041,7 +2041,7 @@ model Vendor {
   credits    VendorCredit[]
   attachments     VendorAttachment[]
   vendorItems     VendorItem[]
-  reorderSettings reorderSetting[]
+  reorderSettings ReorderSetting[]
   purchaseOrders        PurchaseOrder[]
 
   localMappings     VendorLocationMap[]

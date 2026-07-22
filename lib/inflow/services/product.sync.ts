@@ -10,7 +10,6 @@ import {
   syncSalesUom
 } from "./helpers";
 import { genInflowUniqueSlug } from "@/helpers/genUniqueSlug";
-import { getVendor } from "../data/vendors";
 import { syncVendor } from "./vendor.sync";
 
 import { Prisma } from "@/generated/prisma/client";
@@ -227,7 +226,23 @@ export async function syncProduct(
         skipDuplicates: true,
       });
     }
+
+    
   }
+
+  /**
+     * STEP 1: Rich Foreign Key Healing (Locations & Terms)
+     */
+    if (customer.defaultLocation?.locationId && !caches.verifiedLocationIds.has(customer.defaultLocation.locationId)) {
+      await ensureLocationShell(tx, {
+        inflowId: customer.defaultLocation.locationId,
+        name: customer.defaultLocation.name || "Default Warehouse",
+        isActive: customer.defaultLocation.isActive,
+        isDefault: customer.defaultLocation.isDefault,
+        address: customer.defaultLocation.address,
+      });
+      caches.verifiedLocationIds.add(customer.defaultLocation.locationId);
+    }
 
   /**
    * 5. Product Operations Sync

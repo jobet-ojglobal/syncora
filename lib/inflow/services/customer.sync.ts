@@ -1,7 +1,7 @@
 // lib/inflow/services/customer.sync.ts
 
 import { Prisma } from "@/generated/prisma/client";
-import { ensureLocationShell, ensurePaymentTermsShell } from "./helpers";
+import { ensureLocationShell, ensurePaymentTermsShell } from "./ensure.service";
 import { InflowCustomer } from "../types";
 import { getTaxingScheme } from "../data/taxing-schemes";
 import { syncTaxingScheme } from "./taxing-scheme.sync";

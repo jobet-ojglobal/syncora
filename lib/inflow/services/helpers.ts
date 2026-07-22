@@ -28,110 +28,7 @@ export async function syncBrand(
   return brand.id;
 }
 
-/**
- * Safely upserts a standard core location shell along with its required 
- * structural address and "Default" sublocation sub-records.
- * Guarantees foreign key integrity across downstream synchronizers.
- */
-export async function ensureLocationShell(
-  tx:  typeof prisma | Tx,
-  payload: {
-    inflowId: string;
-    name: string;
-    isActive?: boolean;
-    isDefault?: boolean;
-    address?: {
-      address1?: string | null;
-      address2?: string | null;
-      city?: string | null;
-      state?: string | null;
-      country?: string | null;
-      postalCode?: string | null;
-      remarks?: string | null;
-      addressType?: string | null;
-    } | null;
-  }
-) {
-  const locId = payload.inflowId;
 
-  // 1. Core Location record
-  await tx.location.upsert({
-    where: { inflowId: locId },
-    create: {
-      inflowId: locId,
-      name: payload.name,
-      isActive: payload.isActive ?? true,
-      isDefault: payload.isDefault ?? false,
-    },
-    update: {
-      name: payload.name,
-      isActive: payload.isActive ?? true,
-      isDefault: payload.isDefault ?? false,
-    },
-  });
-
-  // 2. Structural Address record
-  await tx.locationAddress.upsert({
-    where: { locationId: locId },
-    create: {
-      locationId: locId,
-      address1: payload.address?.address1,
-      address2: payload.address?.address2,
-      city: payload.address?.city,
-      state: payload.address?.state,
-      country: payload.address?.country,
-      postalCode: payload.address?.postalCode,
-      remarks: payload.address?.remarks ?? "Auto-generated shell",
-      addressType: payload.address?.addressType,
-    },
-    update: {
-      address1: payload.address?.address1,
-      address2: payload.address?.address2,
-      city: payload.address?.city,
-      state: payload.address?.state,
-      country: payload.address?.country,
-      postalCode: payload.address?.postalCode,
-      remarks: payload.address?.remarks,
-      addressType: payload.address?.addressType,
-    },
-  });
-
-  // 3. Fallback Core Sublocation record
-  await tx.sublocation.upsert({
-    where: {
-      locationId_name: {
-        locationId: locId,
-        name: "Default",
-      },
-    },
-    create: {
-      locationId: locId,
-      name: "Default",
-    },
-    update: {}, // Never overwrite sublocation tracking references if present
-  });
-}
-
-/**
- * Safely upserts a standard PaymentTerms skeleton shell.
- * Guarantees foreign key integrity for relation pipelines.
- */
-export async function ensurePaymentTermsShell(
-  tx: Prisma.TransactionClient,
-  payload: {
-    inflowId: string;
-    name: string;
-  }
-) {
-  await tx.paymentTerm.upsert({
-    where: { inflowId: payload.inflowId },
-    create: {
-      inflowId: payload.inflowId,
-      name: payload.name,
-    },
-    update: {}, // Leave properties unmodified if the true sync already ran
-  });
-}
 
 /**
  * 📸 Separated Feature Synchronization Layer
@@ -563,27 +460,27 @@ export async function syncInventoryLines1(
         continue;
       }
 
-      await tx.inventoryBin.upsert({
-        where: {
-          productId_sublocationId: {
-            productId,
-            sublocationId: sublocation.id,
-          },
-        },
-        create: {
-          inventoryId: inventory.id,
-          productId,
-          sublocationId: sublocation.id,
-          quantity: new Prisma.Decimal(
-            line.quantityOnHand
-          ),
-        },
-        update: {
-          quantity: new Prisma.Decimal(
-            line.quantityOnHand
-          ),
-        },
-      });
+      // await tx.inventoryBin.upsert({
+      //   where: {
+      //     productId_sublocationId: {
+      //       productId,
+      //       sublocationId: sublocation.id,
+      //     },
+      //   },
+      //   create: {
+      //     inventoryId: inventory.id,
+      //     productId,
+      //     sublocationId: sublocation.id,
+      //     quantity: new Prisma.Decimal(
+      //       line.quantityOnHand
+      //     ),
+      //   },
+      //   update: {
+      //     quantity: new Prisma.Decimal(
+      //       line.quantityOnHand
+      //     ),
+      //   },
+      // });
     }
   }
 }
