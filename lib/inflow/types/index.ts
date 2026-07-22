@@ -5,17 +5,19 @@
 
 export interface InflowProductGroup {
   productGroupId: string;
-  categoryId: string;
+  categoryId: string | null;
   defaultImageId: string | null;
   defaultProductId: string | null;
   isActive: boolean;
   name: string;
   timestamp: string;
-  category: InflowCategory | null;
-  images: InflowProductGroupImage[];
-  options: InflowProductGroupOption[];
-  productVariants: InflowProductVariant[];
-  defaultProduct?: InflowProduct
+
+  category?: InflowCategory;
+  images?: InflowProductGroupImage[];
+  options?: InflowProductGroupOption[];
+  productVariants?: InflowProductVariant[];
+  defaultImage?: InflowProductImage;
+  defaultProduct?: InflowProduct;
 }
 
 // =====================================
@@ -27,6 +29,7 @@ export interface InflowCategory {
   isDefault: boolean;
   name: string;
   parentCategoryId: string | null;
+  parentCategory?: InflowCategory;
   timestamp: string;
 }
 
@@ -35,6 +38,8 @@ export interface InflowCategory {
 // =====================================
 
 export interface InflowProductGroupImage {
+  imageId: string;
+  productGroupId: string;
   productGroupImageId: string;
   image: InflowProductImage
 }
@@ -96,7 +101,6 @@ export interface InflowProductVariant {
 
 export interface InflowProduct {
   productId: string;
-
   sku: string;
   name: string;
   description: string | null;
@@ -129,7 +133,7 @@ export interface InflowProduct {
   createdDttm: string;
   lastModifiedDateTime: string;
   timestamp: string;
-  category: InflowCategory | null;
+  
   purchasingUom: InflowPurchasingUom | null;
   salesUom: InflowSalesUom | null;
   customFields: InflowCustomFields;
@@ -138,6 +142,7 @@ export interface InflowProduct {
   inventoryLines: InflowInventoryLine[];
   productVariant: InflowProductVariant
 
+  category?: InflowCategory;
   productBarcodes?: InflowProductBarcode[];
   taxCodes?: InflowProductTaxCode[];
   reorderSettings?: InflowReorderSetting[];
@@ -147,6 +152,7 @@ export interface InflowProduct {
   itemBoms?: InflowItemBom[];
   attachments?: InflowProductAttachment[];
   lastVendor?: InflowVendor | null;
+  lastModifiedBy?: InflowTeamMember;
 }
 
 /**
@@ -580,7 +586,7 @@ export interface InflowPricingScheme {
   isDefault: boolean;
   isTaxInclusive: boolean;
   timestamp: string;
-  currency?: InflowCurrency;
+  currency: InflowCurrency;
   productPrices?: InflowProductPrice[];
 }
 
@@ -599,7 +605,7 @@ export interface InflowProductCostAdjustment {
 }
 
 // PAYMENT TERM
-export interface InflowPaymentTerm {
+export interface InflowPaymentTerms {
   paymentTermsId: string;
   name: string;
   daysDue: number;
@@ -689,7 +695,7 @@ export interface InflowCustomer {
   defaultShippingAddress?: InflowCustomerAddress | null;
   defaultLocation?: InflowLocation | null;
   
-  defaultPaymentTerms?: InflowPaymentTerm | null;
+  defaultPaymentTerms?: InflowPaymentTerms | null;
   defaultSalesRepTeamMember?: InflowTeamMember | null;
   lastModifiedBy?: InflowTeamMember | null;
   pricingScheme?: InflowPricingScheme | null;
@@ -812,6 +818,7 @@ export interface InflowVendor {
   lastModifiedBy?: InflowTeamMember | null;
   taxingScheme?: InflowTaxingScheme| null;
   vendorItems?: InflowVendorItem[];
+  defaultPaymentTerms?: InflowPaymentTerms
 
 }
 
@@ -1201,7 +1208,7 @@ export interface InflowPurchaseOrder {
   lines: InflowPurchaseOrderLine[];
   location: InflowLocation;
   paymentLines: any[];
-  paymentTerms: InflowPaymentTerm;
+  paymentTerms: InflowPaymentTerms;
   receiveLines: InflowPurchaseReceiveLine[];
   taxingScheme: Record<string, any>;
   unstockLines: any[];

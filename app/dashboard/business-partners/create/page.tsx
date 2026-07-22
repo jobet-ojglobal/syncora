@@ -8,7 +8,7 @@ export default async function OnboardNewPartnerAccountPage() {
   const catalogs = await getBusinessPartnerMetadata();
 
   return (
-    <div className="w-full px-6 py-12 space-y-4 max-w-7xl mx-auto">
+    <div className="w-full mx-auto px-6 py-12 max-w-7xl space-y-4">
       <Link
         href="/dashboard/business-partners"
         className="inline-flex items-center gap-2 text-sm font-medium text-slate-600 hover:text-slate-900"

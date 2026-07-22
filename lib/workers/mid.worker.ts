@@ -50,11 +50,11 @@ const midWorker = new Worker<MidWebhookJobData>(
             result = await upsertLocalCategory(payload, locationUrl);
             break;
           case "PRODUCT_UPSERT_LOCAL": 
-            console.log(payload)
+            // console.log(payload)
             result = await upsertLocalProductScheme(payload, locationUrl);
             break;
           case "PRODUCT_IMAGE_UPSERT_LOCAL": 
-            console.log(payload)
+            // console.log(payload)
             result = await upsertLocalProductImageScheme(payload, locationUrl);
             break;
           case "PRICING_SCHEME_UPSERT_LOCAL": // OK

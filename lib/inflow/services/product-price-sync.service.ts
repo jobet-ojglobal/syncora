@@ -18,7 +18,7 @@ export class ProductPriceSyncService {
 
     while (true) {
       // 1. Pull the current product chunk from inFlow
-      const products = await getProductsInclude(BATCH_SIZE, after, ["prices"]);
+      const products = await getProductsInclude(BATCH_SIZE, after, ["prices.pricingScheme.currency"]);
 
       if (!products || products.length === 0) {
         break;

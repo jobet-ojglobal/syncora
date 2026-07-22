@@ -101,7 +101,7 @@ export default async function EditBusinessPartner({ params }: EditBusinessPartne
   };
 
   return (
-    <div className="w-full mx-auto px-6 py-12 space-y-4">
+    <div className="w-full mx-auto px-6 py-12 max-w-7xl space-y-4">
       {/* Dynamic Breadcrumbs Go-Back Navigation Link */}
       <Link
         href="/dashboard/business-partners"

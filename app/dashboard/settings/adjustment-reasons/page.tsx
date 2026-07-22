@@ -6,11 +6,6 @@ export const revalidate = 0; // Ensure fresh data on navigation
 export default async function AdjustmentReasonsPage() {
   const reasons = await prisma.adjustmentReason.findMany({
     where: { deletedAt: null },
-    include: {
-      _count: {
-        select: { localMappings: true },
-      },
-    },
     orderBy: { createdAt: "desc" },
   });
 

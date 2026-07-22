@@ -212,7 +212,7 @@ const worker = new Worker<SyncWebhookJobData>(
           result = await customerService.sync(syncOptions);
           break;
         case "vendors":
-          result = await vendorService.sync(syncOptions);
+          result = await vendorService.sync(syncOptions, includes);
           break;          
         case "inventory":
           result = await inventoryService.sync(syncOptions);

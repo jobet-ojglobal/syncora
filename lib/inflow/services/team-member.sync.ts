@@ -1,12 +1,23 @@
 // services/sync/products/team-member.sync.ts
+import { Prisma } from "@/generated/prisma/client";
 import { AccessRight, UserRole } from "@/generated/prisma/enums";
 import { InflowTeamMember } from "../types";
+
+type Tx = Prisma.TransactionClient;
 
 /**
  * Syncs a single team member payload into the local database using an ongoing Prisma transaction.
  */
-export async function syncTeamMember(tx: any, member: InflowTeamMember) {
+export async function syncTeamMember(tx: Tx, member: InflowTeamMember) {
   const cleanEmail = member.email?.trim().toLowerCase();
+
+  const payload = {
+    name: member.name,
+    email: cleanEmail,
+    isActive: member.isActive,
+    canBeSalesRep: member.canBeSalesRep,
+    accessAllLocations: member.accessAllLocations,
+  };
 
   // 1. Upsert the base TeamMember profile from inFlow
   const teamMember = await tx.teamMember.upsert({
@@ -14,35 +25,26 @@ export async function syncTeamMember(tx: any, member: InflowTeamMember) {
       inflowId: member.teamMemberId,
     },
     create: {
+      ...payload,
       inflowId: member.teamMemberId,
-      name: member.name,
-      email: cleanEmail,
-      isActive: member.isActive,
       isInternal: member.isInternal,
-      canBeSalesRep: member.canBeSalesRep,
-      accessAllLocations: member.accessAllLocations,
     },
-    update: {
-      name: member.name,
-      email: cleanEmail,
-      isActive: member.isActive,
-      canBeSalesRep: member.canBeSalesRep,
-      accessAllLocations: member.accessAllLocations,
-    },
+    update: payload,
   });
 
   // 2. SELF-HEALING LINK: Auto-unify with auth User profiles via email match
   if (cleanEmail) {
     const existingUser = await tx.user.findUnique({
       where: { email: cleanEmail },
-      select: { id: true, role: true, teamMemberId: true }
+      select: { id: true, role: true, teamMemberId: true },
     });
 
     if (existingUser) {
       let targetRole: UserRole = existingUser.role;
-      
+
       if (existingUser.role === UserRole.Customer) {
-        const stringRights = member.accessRights.map((r: string) => r.toLowerCase());
+        const stringRights = (member.accessRights || []).map((r: string) => r.toLowerCase());
+        
         if (stringRights.includes("admin") || stringRights.includes("fullaccess")) {
           targetRole = UserRole.Admin;
         } else if (stringRights.includes("inventory") || stringRights.includes("stock")) {
@@ -57,8 +59,8 @@ export async function syncTeamMember(tx: any, member: InflowTeamMember) {
       await tx.user.update({
         where: { id: existingUser.id },
         data: {
-          teamMemberId: teamMember.id,
-          role: targetRole
+          teamMemberId: teamMember.inflowId ?? teamMember.id,
+          role: targetRole,
         },
       });
     }
@@ -69,7 +71,7 @@ export async function syncTeamMember(tx: any, member: InflowTeamMember) {
     where: { teamMemberId: teamMember.id },
   });
 
-  if(member.accessRights && member.accessRights.length > 0){
+  if (member.accessRights && member.accessRights.length > 0) {
     const validRights = member.accessRights.filter(
       (right): right is AccessRight => Object.values(AccessRight).includes(right as AccessRight)
     );
@@ -90,7 +92,7 @@ export async function syncTeamMember(tx: any, member: InflowTeamMember) {
     where: { teamMemberId: teamMember.id },
   });
 
-  if (!member.accessAllLocations && member.accessLocationIds && member.accessLocationIds.length > 0) {
+  if (!member.accessAllLocations && member.accessLocationIds?.length) {
     await tx.teamMemberLocation.createMany({
       data: member.accessLocationIds.map((locationInflowId: string) => ({
         teamMemberId: teamMember.id,

@@ -851,6 +851,7 @@ CREATE TABLE "inventory_bin" (
     "inventoryId" TEXT NOT NULL,
     "sublocationId" TEXT NOT NULL,
     "quantity" DECIMAL(18,4) NOT NULL,
+    "serialNumber" TEXT,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
 
@@ -1033,6 +1034,7 @@ CREATE TABLE "team_member" (
     "name" TEXT NOT NULL,
     "email" TEXT NOT NULL,
     "isActive" BOOLEAN NOT NULL DEFAULT true,
+    "isInternal" BOOLEAN NOT NULL DEFAULT false,
     "canBeSalesRep" BOOLEAN NOT NULL DEFAULT false,
     "accessAllLocations" BOOLEAN NOT NULL DEFAULT false,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -1279,6 +1281,8 @@ CREATE TABLE "vendor_attachment_location_map" (
 CREATE TABLE "vendor_item" (
     "id" TEXT NOT NULL,
     "inflowId" TEXT NOT NULL,
+    "leadTimeDays" INTEGER,
+    "lineNum" INTEGER,
     "vendorId" TEXT NOT NULL,
     "productId" TEXT NOT NULL,
     "vendorSku" TEXT,
@@ -2300,6 +2304,15 @@ CREATE INDEX "inventory_locationId_idx" ON "inventory"("locationId");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "inventory_productId_locationId_key" ON "inventory"("productId", "locationId");
+
+-- CreateIndex
+CREATE INDEX "inventory_bin_inventoryId_idx" ON "inventory_bin"("inventoryId");
+
+-- CreateIndex
+CREATE INDEX "inventory_bin_sublocationId_idx" ON "inventory_bin"("sublocationId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "inventory_bin_inventoryId_sublocationId_key" ON "inventory_bin"("inventoryId", "sublocationId");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "inventory_adjustment_adjustmentNumber_key" ON "inventory_adjustment"("adjustmentNumber");

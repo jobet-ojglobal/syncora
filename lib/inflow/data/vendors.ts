@@ -19,6 +19,33 @@ export async function getVendors(
   );
 }
 
+export async function getVendorIncludes(
+  count = 100,
+  after?: string,
+  includes: string[] = []
+) {
+  // 1. Core nesting fields required by your system architecture
+  const baseIncludes = [
+    "addresses,attachments,balances,credits,currency,dues,defaultAddress",
+  ];
+
+  // 2. Merge unique structural values & join them as a comma-separated string
+  const mergedIncludes = Array.from(new Set([...baseIncludes, ...includes])).join(",");
+
+  const params = new URLSearchParams({
+    count: String(count),
+    include: mergedIncludes,
+  });
+
+  if (after) {
+    params.append("after", after);
+  }
+
+  return await inflow.get<InflowVendor[]>(
+    `/vendors?${params.toString()}`
+  );
+}
+
 export async function getVendorItems(
   count = 100,
   after?: string

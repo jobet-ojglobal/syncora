@@ -7,7 +7,7 @@ export async function getPricingSchemes(
 ) {
   const params = new URLSearchParams({
     count: String(count),
-    include: "productPrices.product,currency",
+    include: "currency",
   });
 
   if (after) {

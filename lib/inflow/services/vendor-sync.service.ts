@@ -1,6 +1,6 @@
 // services/sync/products/vendor-sync.service.ts
 import { prisma } from "@/lib/prisma";
-import { getVendors } from "../data/vendors";
+import { getVendorIncludes, getVendors } from "../data/vendors";
 import { syncVendor } from "./vendor.sync";
 import { Prisma } from "@/generated/prisma/client";
 
@@ -12,7 +12,7 @@ type SyncOptions = {
 };
 
 export class VendorSyncService {
-  async sync(options?: SyncOptions) {
+  async sync(options?: SyncOptions, includes?: string[]) {
     const BATCH_SIZE = options?.batchSize ?? 100;
     let after: string | undefined;
     let totalProcessed = 0;
@@ -27,7 +27,7 @@ export class VendorSyncService {
     console.log("Starting modular batched vendor sync operation...");
 
     while (true) {
-      const vendors = await getVendors(BATCH_SIZE, after);
+      const vendors = await getVendorIncludes(BATCH_SIZE, after, includes);
 
       if (!vendors || vendors.length === 0) {
         break;

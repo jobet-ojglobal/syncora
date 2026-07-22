@@ -1,14 +1,19 @@
 // services/sync/products/product-group-sync.service.ts
 import { prisma } from "@/lib/prisma";
 import { getProductGroups } from "../data/product-group";
-import { syncCategory } from "./category-sync";
-import { syncProductGroup } from "./product-group-sync";
-import { syncProduct } from "./product.sync";
 import { syncVariant } from "./variant.sync";
+import { ensureSyncProductGroup } from "./ensure-product-group.sync";
+import { ensureSyncProduct } from "./ensure-product.sync";
 
 type SyncOptions = {
   onProgress?: (processedCount: number) => Promise<void>;
   batchSize?: number;
+};
+
+export type SyncCaches = {
+  verifiedCategoryIds: Set<string>;
+  verifiedTeamMemberIds: Set<string>;
+  verifiedVendorIds: Set<string>;
 };
 
 export class ProductGroupSyncService {
@@ -17,6 +22,13 @@ export class ProductGroupSyncService {
     
     let after: string | undefined = undefined;
     let totalProcessed = 0;
+
+    // Runtime cache across service execution
+    const caches: SyncCaches = {
+      verifiedCategoryIds: new Set<string>(),
+      verifiedTeamMemberIds: new Set<string>(),
+      verifiedVendorIds: new Set<string>(),
+    };
     
     console.log("Starting optimized product group sync pipeline...");
 
@@ -25,33 +37,51 @@ export class ProductGroupSyncService {
       const batch = await getProductGroups(BATCH_SIZE, after, includes);
       if (!batch || batch.length === 0) break;
 
-      // 2. Loop through each group in the current batch
-      for (const group of batch) {
-        await prisma.$transaction(async (tx) => {
-          // Sync category context if provided by the upstream engine
-          if (group.category) {
-            await syncCategory(tx, group.category);
-          }
+      // 2. Process the batch in a single atomic Database Transaction
+      try {
+        await prisma.$transaction(
+          async (tx) => {
+            for (const group of batch) {
+              // Compute contextual fallback to grab custom fields if defaultProduct node is missing
+              const fallbackProductContext =
+                group.defaultProduct || group.productVariants?.[0]?.product;
 
-          // Compute contextual fallback to grab custom fields if defaultProduct node is missing
-          const fallbackProductContext = group.defaultProduct || group.productVariants?.[0]?.product;
+              // Sync main product group configuration node along with custom fields mapping rules
+              await ensureSyncProductGroup(
+                tx,
+                group,
+                fallbackProductContext,
+                caches
+              );
 
-          // Sync main product group configuration node along with custom fields mapping rules
-          await syncProductGroup(tx, group, fallbackProductContext);
-
-          // 3. Process children matrix nodes
-          for (const variant of group.productVariants ?? []) {
-            if (variant.product) {
-              await syncProduct(tx, variant.product, group.productGroupId);
+              // 3. Process children matrix nodes
+              for (const variant of group.productVariants ?? []) {
+                if (variant.product) {
+                  await ensureSyncProduct(
+                    tx,
+                    variant.product,
+                    group.productGroupId,
+                    caches
+                  );
+                }
+                
+                await syncVariant(tx, group.productGroupId, variant);
+              }
             }
-            await syncVariant(tx, group.productGroupId, variant);
+          },
+          {
+            timeout: 40000, // Safe transaction timeout for deep nested option matrices
           }
-        }, {
-          timeout: 30000 // Ensure heavy nested batches don't trigger query engine timeout errors
-        });
+        );
+      } catch (error) {
+        console.error(
+          `[ProductGroupSyncError] Transaction failed for batch starting after ID "${after}":`,
+          error
+        );
+        throw error;
       }
 
-      // 3. Advance pagination hooks and report raw progress items downstream
+      // 4. Advance pagination hooks and report raw progress items downstream
       after = batch[batch.length - 1].productGroupId;
       totalProcessed += batch.length;
       

@@ -14,8 +14,9 @@ export class PricingSchemeSyncService {
     const BATCH_SIZE = options?.batchSize || 50; // Deep payloads; 50 balancing stability & roundtrips
     
     // Caches preserved across multiple pagination batches to maximize execution speed
-    const verifiedCurrencyIds = new Set<string>();
-    const verifiedProductIds = new Set<string>();
+    const caches = {
+      verifiedCurrencyIds: new Set<string>(),
+    };
 
     let after: string | undefined = undefined;
     let totalProcessed = 0;
@@ -30,11 +31,8 @@ export class PricingSchemeSyncService {
       // 2. Wrap the chunk operations in a discrete database transaction block
       try {
         await prisma.$transaction(async (tx) => {
-          // Pass down the cross-batch deduping state cache
-          const context = { verifiedCurrencyIds, verifiedProductIds };
-
           for (const scheme of batch) {
-            await syncPricingScheme(tx, scheme, context);
+            await syncPricingScheme(tx, scheme, caches);
           }
         }, {
           timeout: 40000 
@@ -56,12 +54,5 @@ export class PricingSchemeSyncService {
       pricingSchemesProcessed: totalProcessed,
       syncedAt: new Date().toISOString(),
     };
-  }
-
-  private mapPriceType(value: string): ProductPriceType {
-    const cleanValue = value?.toLowerCase().trim() || "";
-    if (cleanValue.includes("markup")) return ProductPriceType.markup;
-    if (cleanValue.includes("margin")) return ProductPriceType.margin;
-    return ProductPriceType.fixedPrice;
   }
 }

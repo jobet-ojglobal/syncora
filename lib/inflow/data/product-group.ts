@@ -48,7 +48,6 @@ export async function getProductGroups(
 ) {
   // 1. Core nesting fields required by your system architecture
   const baseIncludes = [
-    "category",
     "options.optionValues",
   ];
 

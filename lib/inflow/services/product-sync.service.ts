@@ -1,10 +1,9 @@
 // services/sync/products/product-sync.service.ts
 import { prisma } from "@/lib/prisma";
 import { getProducts } from "../data/products"; 
-import { syncCategory } from "./category-sync";
-import { syncProductGroup } from "./product-group-sync";
-import { syncProduct } from "./product.sync";
 import { syncVariant } from "./variant.sync";
+import { ensureSyncProduct } from "./ensure-product.sync";
+import { ensureSyncProductGroup } from "./ensure-product-group.sync";
 
 type SyncOptions = {
   onProgress?: (processedCount: number) => Promise<void>;
@@ -12,72 +11,76 @@ type SyncOptions = {
 };
 
 export class ProductSyncService {
-  async sync(options?: SyncOptions,  includes?: string[]) {
+  async sync(options?: SyncOptions, includes?: string[]) {
     const BATCH_SIZE = options?.batchSize || 10;
     
     // Track synced IDs across the entire execution to prevent duplicate DB writes
-    const syncedCategoryIds = new Set<string>();
     const syncedGroupIds = new Set<string>();
 
     let after: string | undefined = undefined;
     let totalProcessed = 0;
+
+    const caches = {
+      verifiedTeamMemberIds: new Set<string>(),
+      verifiedCategoryIds: new Set<string>(),
+      verifiedVendorIds: new Set<string>(),
+    };
     
     console.log("Starting hyper-optimized product sync...");
 
     while (true) {
-      // 1. Fetch the batch (This ALREADY includes the deep relations!)
+      // 1. Fetch the batch (includes deep relations)
       const batch = await getProducts(BATCH_SIZE, after, includes);
       if (!batch || batch.length === 0) break;
 
       // 2. Process the batch inside a single Database Transaction
       try {
-        await prisma.$transaction(async (tx) => {
-          for (const fullProduct of batch) {
-            const variantRelation = fullProduct.productVariant;
-            const groupData = variantRelation?.productGroup;
-            const categoryData = groupData?.category;
+        await prisma.$transaction(
+          async (tx) => {
+            for (const fullProduct of batch) {
+              const variantRelation = fullProduct.productVariant;
+              const groupData = variantRelation?.productGroup;
 
-            if (
-              categoryData &&
-              !syncedCategoryIds.has(categoryData.categoryId)
-            ) {
-              await syncCategory(tx, categoryData);
-              syncedCategoryIds.add(categoryData.categoryId);
-            }
+              if (
+                groupData &&
+                !syncedGroupIds.has(groupData.productGroupId)
+              ) {
+                await ensureSyncProductGroup(
+                  tx,
+                  groupData,
+                  fullProduct,
+                  caches
+                );
 
-            if (
-              groupData &&
-              !syncedGroupIds.has(groupData.productGroupId)
-            ) {
-              await syncProductGroup(
+                syncedGroupIds.add(groupData.productGroupId);
+              }
+
+              await ensureSyncProduct(
                 tx,
-                groupData,
-                fullProduct // <-- pass product
+                fullProduct,
+                groupData?.productGroupId,
+                caches
               );
 
-              syncedGroupIds.add(groupData.productGroupId);
+              if (variantRelation && groupData) {
+                await syncVariant(
+                  tx,
+                  groupData.productGroupId,
+                  variantRelation
+                );
+              }
             }
-
-            await syncProduct(
-              tx,
-              fullProduct,
-              groupData?.productGroupId
-            );
-
-            if (variantRelation && groupData) {
-              await syncVariant(
-                tx,
-                groupData.productGroupId,
-                variantRelation
-              );
-            }
+          },
+          {
+            timeout: 40000, // 40-second transaction limit
           }
-        }, {
-          timeout: 40000 // Give the batch transaction plenty of breathing room
-        });
+        );
       } catch (transactionError) {
-        console.error(`Transaction failed for batch ending with ID ${after}:`, transactionError);
-        // Depending on requirements, you can choose to throw or break here.
+        console.error(
+          `[Batch Transaction Error] Failed for batch ending with ID ${after}:`,
+          transactionError
+        );
+        throw transactionError;
       }
 
       // 3. Update pagination cursor and progress tracking

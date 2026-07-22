@@ -72,6 +72,7 @@ import {
   CreditCard,
   Landmark,
   Trash,
+  Pencil,
 } from "lucide-react";
 
     
@@ -485,6 +486,24 @@ export const data = {
       ],
     },
 
+    {
+      title: "Adjustment Reasons",
+      url: "/dashboard/adjustment-reasons",
+      icon: CalendarDays,
+      items: [
+        {
+          title: "All Adjustment Reasons",
+          url: "/dashboard/adjustment-reasons",
+          icon: FileClock,
+        },
+        {
+          title: "Create Adjustment Reasons",
+          url: "/dashboard/adjustment-reasons/create",
+          icon: PlusCircle,
+        },
+      ],
+    },
+
     /* -------------------------------------------------------------------------- */
     /* DATA, INSIGHTS & SETTINGS                          */
     /* -------------------------------------------------------------------------- */
@@ -575,6 +594,11 @@ export const data = {
       icon: Settings,
       items: [
         {
+          title: "Adjustment Reasons",
+          url: "/dashboard/settings/adjustment-reasons",
+          icon: Pencil,
+        },
+        {
           title: "General",
           url: "/dashboard/settings/general",
           icon: ToggleLeft,
@@ -604,6 +628,7 @@ export const data = {
           url: "/dashboard/settings/trash",
           icon: Trash,
         },
+        
       ],
     },
   ]

@@ -32,9 +32,6 @@ export interface AdjustmentReasonItem {
   isActive: boolean;
   isInternal: boolean;
   createdAt: string | Date;
-  _count?: {
-    localMappings: number;
-  };
 }
 
 interface AdjustmentReasonsTableProps {
@@ -103,7 +100,6 @@ export function AdjustmentReasonsTable({ initialData }: AdjustmentReasonsTablePr
               <TableHead>Reason Name</TableHead>
               <TableHead>Scope</TableHead>
               <TableHead>Status</TableHead>
-              <TableHead>Mappings</TableHead>
               <TableHead className="text-right">Actions</TableHead>
             </TableRow>
           </TableHeader>
@@ -136,9 +132,6 @@ export function AdjustmentReasonsTable({ initialData }: AdjustmentReasonsTablePr
                       {row.isActive ? "Active" : "Inactive"}
                     </Badge>
                   </TableCell>
-                  <TableCell className="text-muted-foreground text-xs">
-                    {row._count?.localMappings ?? 0} locations
-                  </TableCell>
                   <TableCell className="text-right">
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
@@ -149,7 +142,7 @@ export function AdjustmentReasonsTable({ initialData }: AdjustmentReasonsTablePr
                       <DropdownMenuContent align="end">
                         <DropdownMenuLabel>Actions</DropdownMenuLabel>
                         <DropdownMenuItem asChild className="cursor-pointer">
-                          <Link href={`/dashboard/adjustment-reasons/${row.id}/edit`}>
+                          <Link href={`/dashboard/settings/adjustment-reasons/${row.id}/edit`}>
                             <Edit2 className="mr-2 h-4 w-4" /> Edit Details
                           </Link>
                         </DropdownMenuItem>

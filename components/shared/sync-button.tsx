@@ -174,12 +174,19 @@ const SYNC_CONFIG_REGISTRY: Record<string, { id: string; label: string; apiField
     }
   ],
   "product_groups": [
-    { id: "groupImages", label: "Product Group Shared Gallery", apiField: "images.image" },
+    { id: "groupCategory", label: "Product Group Category", apiField: "category" },
     { id: "defaultProduct", label: "Default Product Fallback Reference", apiField: "defaultProduct" },
+    { id: "defaultImage", label: "Default Image Fallback Reference", apiField: "defaultImage" },
+    { id: "groupImages", label: "Product Group Shared Gallery", apiField: "images.image" },
     { id: "groupVariants", label: "Deep Variant Tree Resolution", apiField: "productVariants.product" },
+  ],
+  "vendors": [
+    { id: "lastModifiedBy", label: "Last Modify By", apiField: "lastModifiedBy" },
+    { id: "taxingScheme", label: "Default Taxing Scheme", apiField: "taxingScheme" },
+    { id: "defaultPaymentTerms", label: "Default Payment Terms", apiField: "defaultPaymentTerms" },
+    { id: "vendorItems.product", label: "Vendor Items", apiField: "vendorItems.product" },
   ]
 };
-
 
 export function SyncButtonOptions({ source, title }: SyncButtonProps) {
   const [jobId, setJobId] = useState<string | null>(null);
