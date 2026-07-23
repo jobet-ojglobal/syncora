@@ -41,6 +41,7 @@ export async function upsertProductGroup(payload: Partial<InflowGroupPayload>) {
   return inflow.put<InflowProductGroup>("/product-groups", payload);
 }
 
+// Inflow API GET Product Groupd
 export async function getProductGroups(
   count = 100,
   after?: string,
@@ -48,7 +49,7 @@ export async function getProductGroups(
 ) {
   // 1. Core nesting fields required by your system architecture
   const baseIncludes = [
-    "options.optionValues",
+    "options.optionValues,category,defaultProduct,defaultImage,images.image,productVariants.product,productVariants.product.category",
   ];
 
   // 2. Merge unique structural values & join them as a comma-separated string
@@ -74,7 +75,7 @@ export async function getProductGroupsInclude(
   includes: string[] = []
 ) {
   // 1. Core structural include required to access variants inside the group
-  const baseIncludes = ["category"];
+  const baseIncludes = [""];
   
   // 2. Append any dynamic sub-relations passed down from the client checklist
   const mergedIncludes = Array.from(new Set([...baseIncludes, ...includes])).join(",");

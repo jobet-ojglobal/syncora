@@ -8,7 +8,7 @@ export async function getEntireCatalogs(
 ) {
   const params = new URLSearchParams({
     count: String(count),
-    include: "images,productBarcodes,taxCodes,reorderSettings,productOperations,prices,cost,itemBoms,attachments,productVariant.productGroup.category,productVariant.productGroup.options.optionValues,productVariant.productGroup.images.image,lastVendor",
+    include: "images,productBarcodes,taxCodes.taxCode,taxCodes.taxingScheme,reorderSettings.vendor,reorderSettings.location,reorderSettings.fromLocation,productOperations,prices,cost,itemBoms,attachments,productVariant.productGroup.category,productVariant.productGroup.options.optionValues,productVariant.productGroup.images.image,lastVendor,inventoryLines.location",
   });
 
   if (after) {
@@ -27,7 +27,7 @@ export async function getProducts(
 ) {
   // 1. Core nesting fields required by your system architecture
   const baseIncludes = [
-    "cost",
+    "",
   ];
 
   // 2. Merge unique structural values & join them as a comma-separated string

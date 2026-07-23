@@ -3,7 +3,7 @@ import { InflowProduct } from "../types";
 
 export async function getInventory() {
   const products = await inflow.get<InflowProduct[]>(
-    "/products?include=cost,defaultPrice,inventoryLines.location"
+    "/products?include=inventoryLines.location"
   );
   return products;
 }
@@ -12,7 +12,7 @@ export async function getInventoryByProduct(
   productId: string
 ) {
   const data = await inflow.get<InflowProduct>(
-    `/products/${productId}?include=inventoryLines`
+    `/products/${productId}?include=inventoryLines.location`
   );
   return data;
 }

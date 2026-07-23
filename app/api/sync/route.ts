@@ -45,7 +45,7 @@ export async function POST(request: NextRequest) {
         selectedRecords: selectedRecords || null,
         timestamp: new Date().toISOString() 
       },
-      { attempts: 3, backoff: { type: "exponential", delay: 2000 } }
+      { attempts: 1, backoff: { type: "exponential", delay: 2000 } }
     );
 
     return NextResponse.json({

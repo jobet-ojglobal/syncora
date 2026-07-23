@@ -323,8 +323,6 @@ model Product {
   remarks                 String?
   lastVendorId            String?
   lastModifiedById        String?
-  createdDttm            DateTime?
-  lastModifiedDateTime   DateTime?
 
   brandId           String?
   brand             Brand? @relation(fields: [brandId], references: [id])
@@ -354,8 +352,8 @@ model Product {
   taxCodes          ProductTaxCode[]
   images            ProductImage[]
   reorderSettings   ReorderSetting[]
-  bomComponents     ProductBom[]      @relation("ParentProduct")
-  bomUsedIn         ProductBom[]      @relation("ChildProduct")
+  bomComponents     ProductBom[]      @relation("ParentBom")
+  bomUsedIn         ProductBom[]      @relation("ChildBom")
 
   orderLineItems         SalesOrderLine[]
   packLines              SalesOrderPackLine[]
@@ -627,7 +625,6 @@ model ProductAttachment {
   productId        String
   attachmentUrl    String
   fileName         String
-  lastModDttm      DateTime?
   lastModifiedById String?
 
   product          Product     @relation(fields: [productId], references: [inflowId], onDelete: Cascade)
@@ -736,25 +733,50 @@ model ReorderSettingLocationMap {
 
 model ProductBom {
   id             String   @id @default(cuid())
-  inflowId       String   @unique // Storing payload's itemBomId
-  productId      String   // The assembly/parent item
-  childProductId String   // The component/child item
-  quantity       Decimal  @db.Decimal(12, 4)
+  inflowId       String    @unique
+  productId       String   @map("product_id")
+  childProductId  String   @map("child_product_id")
+  
+  // Quantity fields (flattened from InflowBomQuantity)
+  standardQuantity Decimal @db.Decimal(12, 4)
+  uomQuantity      Decimal @db.Decimal(12, 4)
+  uom              String?
+  serialNumbers    String[] // Standard string array in PostgreSQL
 
-  product        Product  @relation("ParentProduct", fields: [productId], references: [inflowId], onDelete: Cascade)
-  childProduct   Product  @relation("ChildProduct", fields: [childProductId], references: [inflowId], onDelete: Cascade)
+  timestamp        DateTime @default(now())
+
+  // Relations to parent and child products
+  product      Product @relation("ParentBom", fields: [productId], references: [inflowId], onDelete: Cascade)
+  childProduct Product @relation("ChildBom", fields: [childProductId], references: [inflowId], onDelete: Cascade)
 
   localMappings   ProductBomLocationMap[]
 
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
-  deletedAt      DateTime?
-
   @@index([productId])
   @@index([childProductId])
-  @@unique([productId, childProductId])
-  @@map("product_bom")
+  @@map("product_boms")
 }
+
+// model ProductBom {
+//   id             String   @id @default(cuid())
+//   inflowId       String   @unique // Storing payload's itemBomId
+//   productId      String   // The assembly/parent item
+//   childProductId String   // The component/child item
+//   quantity       
+
+//   product        Product  @relation("ParentProduct", fields: [productId], references: [inflowId], onDelete: Cascade)
+//   childProduct   Product  @relation("ChildProduct", fields: [childProductId], references: [inflowId], onDelete: Cascade)
+
+//   localMappings   ProductBomLocationMap[]
+
+//   createdAt      DateTime @default(now())
+//   updatedAt      DateTime @updatedAt
+//   deletedAt      DateTime?
+
+//   @@index([productId])
+//   @@index([childProductId])
+//   @@unique([productId, childProductId])
+//   @@map("product_bom")
+// }
 
 model ProductBomLocationMap {
   id             String       @id @default(cuid())
@@ -1846,7 +1868,6 @@ model Customer {
   taxingSchemeId                String?
   defaultSalesRepTeamMemberId   String?
   lastModifiedById              String?
-  lastModifiedDttm              DateTime?
   defaultBillingAddressId       String?
   defaultShippingAddressId      String?
 
@@ -2015,17 +2036,16 @@ model Vendor {
   id                        String @id @default(cuid())
   inflowId                  String @unique
   businessPartnerId         String @unique
+  isTaxInclusivePricing     Boolean @default(false)
   defaultCarrier            String?
   defaultPaymentMethod      String?
   discount                  Decimal? @db.Decimal(10,2)
-  isTaxInclusivePricing     Boolean @default(false)
   leadTimeDays              Int?
   currencyId                String?
   defaultAddressId          String?
   defaultPaymentTermsId     String?
   taxingSchemeId            String?
   lastModifiedById          String?
-  lastModifiedDttm          DateTime?
 
   businessPartner BusinessPartner @relation(fields: [businessPartnerId],references: [id],onDelete: Cascade)
   currency Currency? @relation(fields: [currencyId], references: [inflowId])
@@ -2826,7 +2846,6 @@ model SalesOrderAttachment {
   attachmentUrl    String
   fileName         String
   fileSize         Json?      // Empty or structured size metadata
-  lastModDttm      DateTime?
   lastModifiedById String?
 
   @@index([salesOrderId])
@@ -3092,7 +3111,6 @@ model PurchaseOrderAttachment {
   attachmentUrl    String
   fileName         String
   fileSize         Json?         // Empty or structured size metadata
-  lastModDttm      DateTime?
   lastModifiedById String?
 
   @@index([purchaseOrderId])

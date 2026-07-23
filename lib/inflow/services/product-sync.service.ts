@@ -2,8 +2,8 @@
 import { prisma } from "@/lib/prisma";
 import { getProducts } from "../data/products"; 
 import { syncVariant } from "./variant.sync";
-import { ensureSyncProduct } from "./ensure-product.sync";
-import { ensureSyncProductGroup } from "./ensure-product-group.sync";
+import { syncProduct } from "./product.sync";
+import { syncProductGroup } from "./product-group-sync";
 
 type SyncOptions = {
   onProgress?: (processedCount: number) => Promise<void>;
@@ -17,6 +17,11 @@ export class ProductSyncService {
     // Track synced IDs across the entire execution to prevent duplicate DB writes
     const syncedGroupIds = new Set<string>();
 
+    const baseIncludes = [""];
+    const cleanIncludes = (includes ?? []).filter((item) => item !== "coreData");
+    const hasCoreProductData = (includes ?? []).includes("coreData");
+    const mergedIncludes = [...baseIncludes, ...(cleanIncludes || [])];
+
     let after: string | undefined = undefined;
     let totalProcessed = 0;
 
@@ -24,13 +29,20 @@ export class ProductSyncService {
       verifiedTeamMemberIds: new Set<string>(),
       verifiedCategoryIds: new Set<string>(),
       verifiedVendorIds: new Set<string>(),
+      verifiedLocationIds: new Set<string>(),
+      verifiedTaxingSchemes: new Set<string>(),
+      verifiedTaxCodes: new Set<string>(),
+      verifiedOperationTypes: new Set<string>(),
+      verifiedPricingSchemeIds: new Set<string>(),
+      verifiedProductIds: new Set<string>(),
     };
-    
+  
+  
     console.log("Starting hyper-optimized product sync...");
 
     while (true) {
       // 1. Fetch the batch (includes deep relations)
-      const batch = await getProducts(BATCH_SIZE, after, includes);
+      const batch = await getProducts(BATCH_SIZE, after, mergedIncludes);
       if (!batch || batch.length === 0) break;
 
       // 2. Process the batch inside a single Database Transaction
@@ -40,25 +52,29 @@ export class ProductSyncService {
             for (const fullProduct of batch) {
               const variantRelation = fullProduct.productVariant;
               const groupData = variantRelation?.productGroup;
+              const groupDefaultProduct = variantRelation?.productGroup?.defaultProduct;
 
               if (
                 groupData &&
                 !syncedGroupIds.has(groupData.productGroupId)
               ) {
-                await ensureSyncProductGroup(
+                await syncProductGroup(
                   tx,
                   groupData,
                   fullProduct,
+                  true,
                   caches
                 );
 
                 syncedGroupIds.add(groupData.productGroupId);
               }
 
-              await ensureSyncProduct(
+              await syncProduct(
                 tx,
                 fullProduct,
                 groupData?.productGroupId,
+                groupDefaultProduct,
+                hasCoreProductData,
                 caches
               );
 

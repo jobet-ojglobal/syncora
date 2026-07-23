@@ -1,7 +1,7 @@
 // services/sync/products/product-price-sync.service.ts
 import { prisma } from "@/lib/prisma";
 import { getProductsInclude } from "../data/products"; // Your existing getProducts fetcher
-import { Prisma } from "@/generated/prisma/client";
+import { Prisma, ProductPriceType } from "@/generated/prisma/client";
 
 type SyncOptions = {
   onProgress?: (processedCount: number) => Promise<void>;
@@ -52,16 +52,15 @@ export class ProductPriceSyncService {
                 await tx.productPrice.createMany({
                   data: product.prices.map((p) => {
                     // Normalize the incoming priceType string to match your strict ProductPriceType enum structure
-                    let normalizedPriceType = "fixedPrice";
+                    let normalizedPriceType = "FixedPrice";
                     const incomingType = p.priceType?.toLowerCase() || "";
-                    if (incomingType.includes("markup")) normalizedPriceType = "markup";
-                    if (incomingType.includes("margin")) normalizedPriceType = "margin";
+                    if (incomingType.includes("markup")) normalizedPriceType = "FixedMarkup";
 
                     return {
                       inflowId: p.productPriceId, // Master unique record ID from payload
                       pricingSchemeId: p.pricingSchemeId,
                       productId: product.productId,
-                      priceType: normalizedPriceType as any,
+                      priceType: normalizedPriceType as ProductPriceType,
                       // Map numbers safely to Decimals to ensure full precision compliance
                       unitPrice: p.unitPrice ? new Prisma.Decimal(p.unitPrice) : null,
                       fixedMarkup: p.fixedMarkup ? new Prisma.Decimal(p.fixedMarkup) : null,

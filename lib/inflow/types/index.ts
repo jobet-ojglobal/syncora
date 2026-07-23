@@ -274,7 +274,6 @@ export interface InflowProductAttachment {
 export interface InflowInventoryLine {
   inventoryLineId: string;
   locationId: string;
-  lotId: string | null;
   productId: string;
   quantityOnHand: string;
   serial: string;
@@ -523,6 +522,7 @@ export interface InflowTaxCode {
   tax1Rate: string;
   tax2Rate: string;
   timestamp: string;
+  taxingScheme?: InflowTaxingScheme;
 }
 
 // TAXING SCHEMES
@@ -586,7 +586,7 @@ export interface InflowPricingScheme {
   isDefault: boolean;
   isTaxInclusive: boolean;
   timestamp: string;
-  currency: InflowCurrency;
+  currency?: InflowCurrency;
   productPrices?: InflowProductPrice[];
 }
 

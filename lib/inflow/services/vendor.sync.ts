@@ -1,10 +1,7 @@
 // services/sync/products/vendor.sync.ts
 import { AddressType, Prisma } from "@/generated/prisma/client";
 import { InflowVendor } from "../types";
-import { upsertCurrencyScheme } from "./currency.sync";
-import { ensureCurrencyShell, ensurePaymentTermsShell, ensureTaxingSchemeShell } from "./ensure.service";
-import { ensureSyncProduct } from "./ensure-product.sync";
-import { syncTaxingScheme } from "./taxing-scheme.sync";
+import { ensureCurrencyShell, ensurePaymentTermsShell, ensureProductShell, ensureTaxingSchemeShell } from "./ensure.service";
 import { syncTeamMember } from "./team-member.sync";
 
 type Tx = Prisma.TransactionClient;
@@ -228,7 +225,6 @@ export async function syncVendor(
     leadTimeDays: vendor.leadTimeDays,
     taxingSchemeId: validTaxingSchemeId,
     lastModifiedById: validLastModifiedById,
-    lastModifiedDttm: vendor.lastModifiedDttm ? new Date(vendor.lastModifiedDttm) : null,
   };
 
   const syncedVendor = await tx.vendor.upsert({
@@ -271,8 +267,8 @@ export async function syncVendor(
               console.warn(
                 `[Sync Notification] Product with inflowId "${item.productId}" missing locally. Syncing JIT...`
               );
-              // Pass downstream caches into ensureSyncProduct to prevent infinite sync loops
-              const syncedProduct = await ensureSyncProduct(tx, item.product, undefined, caches);
+              // Pass downstream caches into syncProduct to prevent infinite sync loops
+              const syncedProduct = await ensureProductShell(tx, item.product);
               if (syncedProduct?.inflowId) {
                 validProductId = syncedProduct.inflowId;
                 verifiedProducts.add(syncedProduct.inflowId);
@@ -378,7 +374,7 @@ export async function syncVendor(
 // import { syncTeamMember } from "./team-member.sync";
 // import { syncProduct } from "./product.sync";
 // import { upsertCurrencyScheme } from "./currency.sync";
-// import { ensureSyncProduct } from "./ensure-product.sync";
+// import { syncProduct } from "./ensure-product.sync";
 
 // type Tx = Prisma.TransactionClient;
 
@@ -565,7 +561,7 @@ export async function syncVendor(
 //             console.warn(
 //               `[Sync Notification] Product with inflowId "${item.productId}" not synced yet. Attempting inline sync...`
 //             );
-//             const syncedProduct = await ensureSyncProduct(tx, item.product);
+//             const syncedProduct = await syncProduct(tx, item.product);
 //             if (syncedProduct) {
 //               validProductId = syncedProduct.inflowId;
 //             }

@@ -192,9 +192,10 @@ const InflowWorkspace = () => {
                 <SyncButtonOptions source="payment_terms" title="Payment Terms" />
                 <SyncButtonOptions source="adjustment_reasons" title="Adjustment Reasons" />
                 <SyncButtonOptions source="product_groups" title="Product Groups" />
-                {/* <SyncButtonOptions source="product_group_images" title="Product Group Images" /> */}
-                {/* <SyncButtonOptions source="product_variants" title="Product Variants" /> */}
                 <SyncButtonOptions source="products" title="Products" />
+                <SyncButtonOptions source="inventory" title="Inventory Levels" />
+                <SyncButtonOptions source="product_cost_adjustments" title="Cost Adjustments" />
+                <SyncButtonOptions source="product_boms" title="Bills of Materials" />
                 {/* <SyncButtonOptions source="product_images" title="Product Images" /> */}
                 {/* <SyncButtonOptions source="product_attachments" title="Product Attachments" />
                 <SyncButtonOptions source="product_barcodes" title="Product Barcodes" />
@@ -202,11 +203,10 @@ const InflowWorkspace = () => {
                 <SyncButtonOptions source="product_reorder_settings" title="Reorder Settings" />
                 <SyncButtonOptions source="product_operations" title="Product Operations" />
                 <SyncButtonOptions source="product_prices" title="Product Prices" />
-                <SyncButtonOptions source="product_boms" title="Bills of Materials (BOM)" />
-                <SyncButtonOptions source="product_cost_adjustments" title="Cost Adjustments" /> */}
+                
+                 */}
                 <SyncButtonOptions source="customers" title="Customers" />
                 <SyncButtonOptions source="vendors" title="Vendors" />
-                <SyncButtonOptions source="inventory" title="Inventory Levels" />
                 <SyncButtonOptions source="sales_orders" title="Sales Orders" />
                 <SyncButtonOptions source="purchase_orders" title="Purchase Orders" />
               </CardContent>

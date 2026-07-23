@@ -1,20 +1,20 @@
 // services/sync/products/product-group-sync.service.ts
 import { prisma } from "@/lib/prisma";
-import { getProductGroups } from "../data/product-group";
+import { getProductGroupsInclude } from "../data/product-group";
 import { syncVariant } from "./variant.sync";
-import { ensureSyncProductGroup } from "./ensure-product-group.sync";
-import { ensureSyncProduct } from "./ensure-product.sync";
+import { syncProduct } from "./product.sync";
+import { syncProductGroup } from "./product-group-sync";
 
 type SyncOptions = {
   onProgress?: (processedCount: number) => Promise<void>;
   batchSize?: number;
 };
 
-export type SyncCaches = {
-  verifiedCategoryIds: Set<string>;
-  verifiedTeamMemberIds: Set<string>;
-  verifiedVendorIds: Set<string>;
-};
+// export type SyncCaches = {
+//   verifiedCategoryIds: Set<string>;
+//   verifiedTeamMemberIds: Set<string>;
+//   verifiedVendorIds: Set<string>;
+// };
 
 export class ProductGroupSyncService {
   async sync(options?: SyncOptions, includes?: string[]) {
@@ -23,18 +23,30 @@ export class ProductGroupSyncService {
     let after: string | undefined = undefined;
     let totalProcessed = 0;
 
+    const baseIncludes = ["options.optionValues"];
+    const cleanIncludes = (includes ?? []).filter((item) => item !== "coreGroupData");
+    const hasCoreGroupData = (includes ?? []).includes("coreGroupData");
+    const mergedIncludes = [...baseIncludes, ...(cleanIncludes || [])];
+
     // Runtime cache across service execution
-    const caches: SyncCaches = {
-      verifiedCategoryIds: new Set<string>(),
+    const caches = {
       verifiedTeamMemberIds: new Set<string>(),
+      verifiedCategoryIds: new Set<string>(),
       verifiedVendorIds: new Set<string>(),
+      verifiedLocationIds: new Set<string>(),
+      verifiedTaxingSchemes: new Set<string>(),
+      verifiedTaxCodes: new Set<string>(),
+      verifiedOperationTypes: new Set<string>(),
+      verifiedPricingSchemeIds: new Set<string>(),
+      verifiedProductIds: new Set<string>(),
     };
     
     console.log("Starting optimized product group sync pipeline...");
 
     while (true) {
       // 1. Fetch current paginated chunk using custom runtime selections
-      const batch = await getProductGroups(BATCH_SIZE, after, includes);
+      
+      const batch = await getProductGroupsInclude(BATCH_SIZE, after, mergedIncludes)
       if (!batch || batch.length === 0) break;
 
       // 2. Process the batch in a single atomic Database Transaction
@@ -47,20 +59,23 @@ export class ProductGroupSyncService {
                 group.defaultProduct || group.productVariants?.[0]?.product;
 
               // Sync main product group configuration node along with custom fields mapping rules
-              await ensureSyncProductGroup(
+              await syncProductGroup(
                 tx,
                 group,
                 fallbackProductContext,
+                hasCoreGroupData,
                 caches
               );
 
               // 3. Process children matrix nodes
               for (const variant of group.productVariants ?? []) {
                 if (variant.product) {
-                  await ensureSyncProduct(
+                  await syncProduct(
                     tx,
                     variant.product,
                     group.productGroupId,
+                    fallbackProductContext,
+                    true,
                     caches
                   );
                 }

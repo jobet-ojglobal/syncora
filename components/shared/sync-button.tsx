@@ -155,31 +155,33 @@ export function SyncButton({ source, title }: SyncButtonProps) {
 // Configurable dictionary matching query features to easy-to-read UI options
 const SYNC_CONFIG_REGISTRY: Record<string, { id: string; label: string; apiField: string }[]> = {
   "products": [
-    { id: "images", label: "Product Images", apiField: "images" },
+    { id: "upsertCore", label: "Upsert Core Product Data", apiField: "coreData" },
+    { id: "category", label: "Product Category", apiField: "category" },
     { id: "productBarcodes", label: "Barcodes & Identifiers", apiField: "productBarcodes" },
-    { id: "taxCodes", label: "Tax Codes & Schemes", apiField: "taxCodes" },
+    { id: "images", label: "Product Images", apiField: "images" },
+    { id: "cost", label: "Product Cost", apiField: "cost" },
+    { id: "taxCodes", label: "Tax Codes & Schemes", apiField: "taxCodes.taxCode,taxCodes.taxingScheme" },
+    { id: "productOperations", label: "Manufacturing Operations", apiField: "productOperations" },
+    { id: "prices", label: "Price Schemes & Matrix Lists", apiField: "prices.pricingScheme.currency" },
+    { id: "attachments", label: "File Attachments", apiField: "attachments.lastModifiedBy" },
     { 
       id: "reorderSettings", 
       label: "Location Reorder Settings", 
-      apiField: "reorderSettings.formLocation,reorderSettings.location,reorderSettings.vendor" 
+      apiField: "reorderSettings.vendor,reorderSettings.location,reorderSettings.fromLocation" 
     },
-    { id: "productOperations", label: "Manufacturing Operations", apiField: "productOperations" },
-    { id: "prices", label: "Price Schemes & Matrix Lists", apiField: "prices" },
-    { id: "itemBoms", label: "Bill of Materials (BOM Components)", apiField: "itemBoms" },
-    { id: "attachments", label: "File Attachments", apiField: "attachments" },
     { 
       id: "resolveGroupRelations", 
       label: "Link & Sync Parent Variant Groups", 
       apiField: "productVariant.productGroup.category,productVariant.productGroup.options.optionValues" 
-    }
+    },
   ],
   "product_groups": [
+    { id: "upsertCore", label: "Upsert Core Group Data", apiField: "coreData" },
     { id: "groupCategory", label: "Product Group Category", apiField: "category" },
-    { id: "defaultProduct", label: "Default Product Fallback Reference", apiField: "defaultProduct" },
-    { id: "defaultImage", label: "Default Image Fallback Reference", apiField: "defaultImage" },
+    { id: "groupCustom", label: "Default Product Custom Data", apiField: "defaultProduct" },
     { id: "groupImages", label: "Product Group Shared Gallery", apiField: "images.image" },
-    { id: "groupVariants", label: "Deep Variant Tree Resolution", apiField: "productVariants.product" },
-  ],
+    { id: "groupVariants", label: "Deep Variant Tree Resolution", apiField: "productVariants.product.category" },
+  ],  
   "vendors": [
     { id: "lastModifiedBy", label: "Last Modify By", apiField: "lastModifiedBy" },
     { id: "taxingScheme", label: "Default Taxing Scheme", apiField: "taxingScheme" },

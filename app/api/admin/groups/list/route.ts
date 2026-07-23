@@ -28,7 +28,12 @@ export async function GET() {
               }
             }
           }
-        }
+        },
+        images: {
+            orderBy: { position: "asc" },
+            take: 1,
+            select: { thumbUrl: true, originalUrl: true }
+          }
       },
       orderBy: { createdAt: "desc" }
     });
@@ -43,6 +48,7 @@ export async function GET() {
       categoryName: group.category?.name || "Unassigned Dept",
       optionsCount: group._count.options,
       createdAt: group.createdAt.toISOString(),
+      thumbnail: group.images[0]?.thumbUrl || group.images[0]?.originalUrl || null,
       // Remap the variant payload array to explicitly stream loose SKU details to the UI
       linkedSkus: group.variants.map(v => ({
         variantId: v.inflowId,

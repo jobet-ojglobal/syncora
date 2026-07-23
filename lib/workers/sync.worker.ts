@@ -175,39 +175,39 @@ const worker = new Worker<SyncWebhookJobData>(
         case "product_groups":
           result = await productGroupService.sync(syncOptions, includes);
           break;
-        case "product_group_images":
-          result = await productGroupImageService.sync(syncOptions);
-          break;
-        case "product_variants":
-          result = await productVariantService.sync(syncOptions);
-          break;
+        // case "product_group_images":
+        //   result = await productGroupImageService.sync(syncOptions);
+        //   break;
+        // case "product_variants":
+        //   result = await productVariantService.sync(syncOptions);
+        //   break;
         case "products":
           result = await productService.sync(syncOptions, includes);
           break;
-        case "product_images":
-          result = await productImageService.sync(syncOptions);
-          break;
-        case "product_barcodes":
-          result = await productBarcodeService.sync(syncOptions);
-          break;
-        case "product_taxes":
-          result = await productTaxService.sync(syncOptions);
-          break;
-        case "product_reorder_settings":
-          result = await productReorderService.sync(syncOptions);
-          break;
-        case "product_operations":
-          result = await productOperationService.sync(syncOptions);
-          break;
-        case "product_prices":
-          result = await productPriceService.sync(syncOptions);
-          break;
+        // case "product_images":
+        //   result = await productImageService.sync(syncOptions);
+        //   break;
+        // case "product_barcodes":
+        //   result = await productBarcodeService.sync(syncOptions);
+        //   break;
+        // case "product_taxes":
+        //   result = await productTaxService.sync(syncOptions);
+        //   break;
+        // case "product_reorder_settings":
+        //   result = await productReorderService.sync(syncOptions);
+        //   break;
+        // case "product_operations":
+        //   result = await productOperationService.sync(syncOptions);
+        //   break;
+        // case "product_prices":
+        //   result = await productPriceService.sync(syncOptions);
+        //   break;
         case "product_boms":
-          result = await productBomService.sync(syncOptions);
+          result = await productService.sync(syncOptions, ["itemBoms"]);
           break;
-        case "product_attachments":
-          result = await productAttachmentService.sync(syncOptions);
-          break;
+        // case "product_attachments":
+        //   result = await productAttachmentService.sync(syncOptions);
+        //   break;
         case "customers":
           result = await customerService.sync(syncOptions);
           break;
@@ -215,7 +215,7 @@ const worker = new Worker<SyncWebhookJobData>(
           result = await vendorService.sync(syncOptions, includes);
           break;          
         case "inventory":
-          result = await inventoryService.sync(syncOptions);
+          result = await productService.sync(syncOptions, ["inventoryLines.location"]);
           break;
         case "locations":
           result = await locationService.sync(syncOptions);

@@ -3,7 +3,7 @@
 
 import { Fragment, useEffect, useState } from "react";
 import Link from "next/link";
-import { Plus, Search, Layers, Settings2, Package, Edit3, Trash2, Eye, EyeOff, ChevronDown, ChevronRight, ArrowUpRight } from "lucide-react";
+import { Plus, Search, Layers, Settings2, Package, Edit3, Trash2, Eye, EyeOff, ChevronDown, ChevronRight, ArrowUpRight, ImageOff } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
@@ -11,6 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { DeleteButton } from "@/components/shared/delete-button";
 import PageHeader from "@/components/layout/dashboard/PageHeader";
+import Image from "next/image";
 
 interface LinkedSkuItem {
   variantId: string;
@@ -22,6 +23,7 @@ interface LinkedSkuItem {
 interface ProductGroupRow {
   id: string;
   inflowId: string;
+  thumbnail: string | null;
   name: string;
   slug: string;
   isActive: boolean;
@@ -132,6 +134,7 @@ export default function ProductGroupsListPage() {
               <thead>
                 <tr className="bg-muted/30 border-b text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
                   <th className="p-4 pl-5 w-[40px]"></th>
+                  <th className="p-4 w-[40px]">Image</th>
                   <th className="p-4 w-[240px]">Group Specification</th>
                   <th className="p-4 w-[140px]">Department</th>
                   <th className="p-4 w-[130px]">Brand</th>
@@ -196,6 +199,23 @@ export function ExpandableGroupRow({ group, onToggleActive, onDeleteGroup }: Exp
           ) : (
             <div className="h-4 w-4" />
           )}
+        </td>
+
+        <td className="">
+          <div className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-md border bg-muted overflow-hidden">
+            {group.thumbnail ? (
+              <Image
+                src={group.thumbnail}
+                alt={group.name || "Product Image"}
+                fill
+                sizes="40px"
+                className="object-cover"
+                unoptimized // Use if referencing raw external URL addresses directly
+              />
+            ) : (
+              <ImageOff className="h-4 w-4 text-muted-foreground" />
+            )}
+          </div>
         </td>
 
         {/* Identity & Slug Handle */}

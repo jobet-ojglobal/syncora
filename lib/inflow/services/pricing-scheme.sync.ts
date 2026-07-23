@@ -17,13 +17,29 @@ export async function syncPricingScheme(
 ) {
   const { verifiedCurrencyIds } = context;
 
-  /**
-   * STEP 1: Sync Currency
-   */
-  if (scheme.currencyId && !verifiedCurrencyIds.has(scheme.currencyId)) {
-    await ensureCurrencyShell(tx, scheme.currency);
-    verifiedCurrencyIds.add(scheme.currencyId);
+  let validCurrencyId: string | null = null;
+
+  if (verifiedCurrencyIds?.has(scheme.currencyId)) {
+    validCurrencyId = scheme.currencyId;
+  } else {
+    const localCurrency = await tx.currency.findUnique({
+      where: { inflowId: scheme.currencyId },
+      select: { inflowId: true },
+    });
+  
+    if(localCurrency) {
+      validCurrencyId = localCurrency?.inflowId;
+      verifiedCurrencyIds?.add(localCurrency?.inflowId);
+    } else if (scheme.currency) {
+      const currency = await ensureCurrencyShell(tx, scheme.currency);
+      if(currency) {
+        validCurrencyId = currency?.inflowId;
+        verifiedCurrencyIds?.add(currency?.inflowId);
+      }
+    }
   }
+
+  if(!validCurrencyId) return null;
 
   /**
    * STEP 2: Sync Core Pricing Scheme
