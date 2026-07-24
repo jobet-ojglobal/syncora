@@ -1236,7 +1236,7 @@ export async function PATCH(request: NextRequest) {
           pricingSchemeId: p.pricingSchemeId,
           priceType: p.priceType,
           unitPrice: p.unitPrice?.toString() || "0",
-          fixedMarkup: p.fixedMarkup?.toString() || "0"
+          fixedMarkup: p.fixedMarkup?.toString() || "0",
         })),
 
         productBarcodes: updatedProduct.barcodes.map(b => ({

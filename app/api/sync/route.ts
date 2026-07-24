@@ -8,7 +8,7 @@ export const dynamic = "force-dynamic";
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { source, includes, locationId, selectedRecords } = body;
+    const { source, includes, locationIds, locationId, selectedRecords } = body;
 
     if (!source) {
       return NextResponse.json(
@@ -40,7 +40,7 @@ export async function POST(request: NextRequest) {
       { 
         jobId: syncJob.id,
         source, 
-        includes: includes || [],
+        includes: includes || locationIds || [],
         location,
         selectedRecords: selectedRecords || null,
         timestamp: new Date().toISOString() 

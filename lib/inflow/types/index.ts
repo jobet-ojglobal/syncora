@@ -277,7 +277,7 @@ export interface InflowInventoryLine {
   productId: string;
   quantityOnHand: string;
   serial: string;
-  sublocation: string;
+  sublocation: string; // ex. "Rack A"
   timestamp: string;
   location: InflowLocation
 }

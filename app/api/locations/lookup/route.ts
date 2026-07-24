@@ -9,6 +9,7 @@ export async function GET() {
         id: true,
         inflowId: true,
         name: true,
+        isActive: true
       },
       orderBy: { name: "asc" },
     });

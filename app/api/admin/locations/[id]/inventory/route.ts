@@ -27,7 +27,7 @@ export async function GET(
     // 1. Verify existence of target location base node to ensure clean 404 responses
     const locationExists = await prisma.location.findUnique({
       where: { id: locationId },
-      select: { name: true, isActive: true, isDefault: true  }
+      select: {inflowId: true,  name: true, isActive: true, isDefault: true  }
     });
 
     if (!locationExists) {
@@ -39,7 +39,7 @@ export async function GET(
 
     // 2. Fetch inventory allocations exclusively mapped to this facility node
     const stockItems = await prisma.inventory.findMany({
-      where: { locationId },
+      where: { locationId: locationExists.inflowId },
       include: {
         product: {
           select: { name: true, slug: true }

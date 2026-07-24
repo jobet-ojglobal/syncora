@@ -16,6 +16,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { InboundTransitMonitor } from "@/components/transfer/inbound-pipeline-card";
 import { ReplenishmentSettingsModal } from "@/components/inventory/replenishment-settings-modal";
+import { toast } from "sonner";
 
 // Data Interfaces
 interface BinDetail {
@@ -123,6 +124,37 @@ export default function LocationInventoryPage() {
     }
   }, [locationId]);
 
+
+  const startSync = async () => {
+    try {
+      setIsSyncing(true);
+      setShowProgress(true);
+      setError("");
+      setProgress(0);
+      setStatus("pending");
+
+      const res = await fetch("/api/sync", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ source }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.error || "Failed to start sync");
+      }
+
+      setJobId(data.jobId);
+    } catch (err) {
+      setIsSyncing(false);
+      setShowProgress(false);
+      setError(err instanceof Error ? err.message : "Unknown error");
+    }
+  };
+
   const filteredItems = inventory.filter((item) => {
     const normQuery = searchQuery.toLowerCase();
     return (
@@ -142,11 +174,6 @@ export default function LocationInventoryPage() {
       
       {/* Back Navigation Bar */}
       <div className="flex flex-col gap-2">
-        {/* <Button asChild variant="ghost" size="sm" className="w-fit gap-1 text-xs -ml-2">
-          <Link href="/dashboard/locations">
-            <ArrowLeft className="w-3.5 h-3.5" /> Back to Facilities
-          </Link>
-        </Button> */}
         
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b pb-5">
           <div className="flex items-start gap-3">
@@ -351,7 +378,25 @@ export default function LocationInventoryPage() {
 
                     <td className="p-4 text-right">
                       <div className="flex items-center justify-end gap-1.5">
-                        {/* 🚀 ACTION 1: The Automation Rules Gear Button */}
+                        <Button 
+                          variant="ghost" 
+                          size="icon" 
+                          onClick={() => toast.promise<{ name: string }>(
+            () =>
+              new Promise((resolve) =>
+                setTimeout(() => resolve({ name: "Event" }), 2000)
+              ),
+            {
+              loading: "Loading...",
+              success: (data) => `${data.name} has been created`,
+              error: "Error",
+            }
+          )}
+                          className="h-8 w-8 text-muted-foreground hover:text-indigo-600 hover:bg-indigo-500/5"
+                          title={`Fetch Latest Cloud Inventory ${item.productName}`}
+                        >
+                          <RefreshCw className={`w-3.5 h-3.5 "animate-spin text-indigo-500" : ""}`} />
+                        </Button>
                         <Button 
                           variant="ghost" 
                           size="sm" 

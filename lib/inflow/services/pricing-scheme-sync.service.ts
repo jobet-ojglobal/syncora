@@ -1,7 +1,6 @@
 // services/sync/products/pricing-scheme-sync.service.ts
 import { prisma } from "@/lib/prisma";
 import { getPricingSchemes } from "../data/pricing-schemes";
-import { ProductPriceType } from "@/generated/prisma/enums";
 import { syncPricingScheme } from "./pricing-scheme.sync";
 
 type SyncOptions = {

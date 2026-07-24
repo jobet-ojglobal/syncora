@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { CheckCircle2, XCircle, Loader2, Settings2 } from "lucide-react";
 import {
@@ -13,7 +13,14 @@ import {
 } from "@/components/ui/dialog";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
-import { Separator } from "../ui/separator";
+import { Separator } from "@/components/ui/separator";
+
+export interface Location {
+  id: string;
+  inflowId: string;
+  name: string;
+  isActive: boolean;
+}
 
 type SyncButtonProps = {
   source: string;
@@ -44,10 +51,9 @@ export function SyncButton({ source, title }: SyncButtonProps) {
           clearInterval(interval);
           setIsSyncing(false);
 
-          // Hide the progress element after 3 seconds so the user can verify success
           setTimeout(() => {
             setShowProgress(false);
-            setJobId(null); // Reset job tracking completely
+            setJobId(null);
           }, 3000);
         }
       } catch (err) {
@@ -61,7 +67,7 @@ export function SyncButton({ source, title }: SyncButtonProps) {
   const startSync = async () => {
     try {
       setIsSyncing(true);
-      setShowProgress(true); // Explicitly show tracking pane
+      setShowProgress(true);
       setError("");
       setProgress(0);
       setStatus("pending");
@@ -99,7 +105,6 @@ export function SyncButton({ source, title }: SyncButtonProps) {
         {isSyncing ? `${title} Syncing...` : `Sync ${title}`}
       </Button>
 
-      {/* Conditionally managed slide-down / fade tracking layout */}
       {showProgress && jobId && (
         <div className="rounded-xl border bg-card p-3 shadow-sm text-card-foreground animate-in fade-in slide-in-from-top-1 duration-200">
           <div className="flex items-center justify-between text-sm font-medium mb-1.5">
@@ -150,11 +155,12 @@ export function SyncButton({ source, title }: SyncButtonProps) {
   );
 }
 
-
-
-// Configurable dictionary matching query features to easy-to-read UI options
-const SYNC_CONFIG_REGISTRY: Record<string, { id: string; label: string; apiField: string }[]> = {
-  "products": [
+// Static configuration registry for fixed entities
+const STATIC_SYNC_CONFIG_REGISTRY: Record<
+  string,
+  { id: string; label: string; apiField: string }[]
+> = {
+  products: [
     { id: "upsertCore", label: "Upsert Core Product Data", apiField: "coreData" },
     { id: "category", label: "Product Category", apiField: "category" },
     { id: "productBarcodes", label: "Barcodes & Identifiers", apiField: "productBarcodes" },
@@ -164,30 +170,30 @@ const SYNC_CONFIG_REGISTRY: Record<string, { id: string; label: string; apiField
     { id: "productOperations", label: "Manufacturing Operations", apiField: "productOperations" },
     { id: "prices", label: "Price Schemes & Matrix Lists", apiField: "prices.pricingScheme.currency" },
     { id: "attachments", label: "File Attachments", apiField: "attachments.lastModifiedBy" },
-    { 
-      id: "reorderSettings", 
-      label: "Location Reorder Settings", 
-      apiField: "reorderSettings.vendor,reorderSettings.location,reorderSettings.fromLocation" 
+    {
+      id: "reorderSettings",
+      label: "Location Reorder Settings",
+      apiField: "reorderSettings.vendor,reorderSettings.location,reorderSettings.fromLocation",
     },
-    { 
-      id: "resolveGroupRelations", 
-      label: "Link & Sync Parent Variant Groups", 
-      apiField: "productVariant.productGroup.category,productVariant.productGroup.options.optionValues" 
+    {
+      id: "resolveGroupRelations",
+      label: "Link & Sync Parent Variant Groups",
+      apiField: "productVariant.productGroup.category,productVariant.productGroup.options.optionValues",
     },
   ],
-  "product_groups": [
+  product_groups: [
     { id: "upsertCore", label: "Upsert Core Group Data", apiField: "coreData" },
     { id: "groupCategory", label: "Product Group Category", apiField: "category" },
     { id: "groupCustom", label: "Default Product Custom Data", apiField: "defaultProduct" },
     { id: "groupImages", label: "Product Group Shared Gallery", apiField: "images.image" },
     { id: "groupVariants", label: "Deep Variant Tree Resolution", apiField: "productVariants.product.category" },
-  ],  
-  "vendors": [
+  ],
+  vendors: [
     { id: "lastModifiedBy", label: "Last Modify By", apiField: "lastModifiedBy" },
     { id: "taxingScheme", label: "Default Taxing Scheme", apiField: "taxingScheme" },
     { id: "defaultPaymentTerms", label: "Default Payment Terms", apiField: "defaultPaymentTerms" },
     { id: "vendorItems.product", label: "Vendor Items", apiField: "vendorItems.product" },
-  ]
+  ],
 };
 
 export function SyncButtonOptions({ source, title }: SyncButtonProps) {
@@ -199,16 +205,39 @@ export function SyncButtonOptions({ source, title }: SyncButtonProps) {
   const [showProgress, setShowProgress] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
-  // Retrieve current active configuration options collection array dynamically
-  const currentOptions = SYNC_CONFIG_REGISTRY[source] || [];
+  const [locations, setLocations] = useState<Location[]>([]);
+  const [isLoadingLocations, setIsLoadingLocations] = useState(false);
 
-  // Default checklist selections initialization to "all checked" on mount
+  // Fetch location choices if source is 'inventory'
+  useEffect(() => {
+    if (source === "inventory") {
+      setIsLoadingLocations(true);
+      fetch("/api/locations/lookup")
+        .then((res) => (res.ok ? res.json() : []))
+        .then((data) => setLocations(data))
+        .catch((err) => console.error("Error fetching locations:", err))
+        .finally(() => setIsLoadingLocations(false));
+    }
+  }, [source]);
+
+  // Dynamically compute selectable options list based on `source`
+  const currentOptions = useMemo(() => {
+    if (source === "inventory") {
+      return locations.map((loc) => ({
+        id: loc.id,
+        label: loc.name,
+        apiField: loc.inflowId || loc.id,
+      }));
+    }
+    return STATIC_SYNC_CONFIG_REGISTRY[source] || [];
+  }, [source, locations]);
+
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
 
-  // Initialize selections once options match source
+  // Reset/Initialize selection checklist whenever option choices update
   useEffect(() => {
     setSelectedIds(currentOptions.map((o) => o.id));
-  }, [source]);
+  }, [currentOptions]);
 
   useEffect(() => {
     if (!jobId) return;
@@ -238,9 +267,10 @@ export function SyncButtonOptions({ source, title }: SyncButtonProps) {
     return () => clearInterval(interval);
   }, [jobId]);
 
-  // Master Checklist Calculations
-  const isAllChecked = selectedIds.length === currentOptions.length;
-  const isSomeChecked = selectedIds.length > 0 && selectedIds.length < currentOptions.length;
+  const isAllChecked =
+    currentOptions.length > 0 && selectedIds.length === currentOptions.length;
+  const isSomeChecked =
+    selectedIds.length > 0 && selectedIds.length < currentOptions.length;
 
   const handleSelectAllChange = (checked: boolean) => {
     setSelectedIds(checked ? currentOptions.map((o) => o.id) : []);
@@ -261,18 +291,19 @@ export function SyncButtonOptions({ source, title }: SyncButtonProps) {
       setProgress(0);
       setStatus("pending");
 
-      // 🎯 MAP Clean UI checkbox IDs back to API inclusion parameters
-      const apiIncludesStrings = currentOptions
+      const selectedApiFields = currentOptions
         .filter((opt) => selectedIds.includes(opt.id))
         .map((opt) => opt.apiField);
+
+      const payload =
+        source === "inventory"
+          ? { source, locationIds: selectedApiFields }
+          : { source, includes: selectedApiFields };
 
       const res = await fetch("/api/sync", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ 
-          source,
-          includes: apiIncludesStrings // e.g., ["images.image", "productVariants.product"]
-        }),
+        body: JSON.stringify(payload),
       });
 
       const data = await res.json();
@@ -304,37 +335,62 @@ export function SyncButtonOptions({ source, title }: SyncButtonProps) {
               Configure {title} Sync
             </DialogTitle>
             <DialogDescription>
-              Select the contextual data relations you want to pull downstream into your environment.
+              {source === "inventory"
+                ? "Select specific target locations to sync inventory balance data from."
+                : "Select the contextual data relations you want to pull downstream into your environment."}
             </DialogDescription>
           </DialogHeader>
 
-          {currentOptions.length > 0 ? (
+          {isLoadingLocations ? (
+            <div className="py-8 flex items-center justify-center gap-2 text-sm text-muted-foreground">
+              <Loader2 className="h-4 w-4 animate-spin" /> Loading locations...
+            </div>
+          ) : currentOptions.length > 0 ? (
             <div className="py-2">
-              {/* Master Check Box Option */}
               <div className="flex items-center gap-3 px-3 py-2.5 rounded-lg border bg-muted/40 mb-3">
                 <Checkbox
                   id="select-all"
-                  checked={isAllChecked ? true : isSomeChecked ? "indeterminate" : false}
-                  onCheckedChange={(checked) => handleSelectAllChange(!!checked)}
+                  checked={
+                    isAllChecked
+                      ? true
+                      : isSomeChecked
+                      ? "indeterminate"
+                      : false
+                  }
+                  onCheckedChange={(checked) =>
+                    handleSelectAllChange(!!checked)
+                  }
                 />
-                <Label htmlFor="select-all" className="font-semibold cursor-pointer select-none flex-1">
-                  {isAllChecked ? "Deselect All Elements" : "Select All Elements"}
+                <Label
+                  htmlFor="select-all"
+                  className="font-semibold cursor-pointer select-none flex-1"
+                >
+                  {isAllChecked
+                    ? "Deselect All Locations"
+                    : "Select All Locations"}
                 </Label>
               </div>
 
               <Separator className="my-2" />
 
-              {/* Explicit Configuration Mapped Iteration */}
               <div className="grid gap-2.5 max-h-[280px] overflow-y-auto pr-1 pt-1">
                 {currentOptions.map((option) => (
-                  <div key={option.id} className="flex items-start gap-3 space-y-0 rounded-lg border p-3 shadow-sm hover:bg-accent/30 transition-colors">
+                  <div
+                    key={option.id}
+                    className="flex items-start gap-3 space-y-0 rounded-lg border p-3 shadow-sm hover:bg-accent/30 transition-colors"
+                  >
                     <Checkbox
                       id={option.id}
                       checked={selectedIds.includes(option.id)}
-                      onCheckedChange={(checked) => handleCheckboxChange(option.id, !!checked)}
+                      onCheckedChange={(checked) =>
+                        handleCheckboxChange(option.id, !!checked)
+                      }
                     />
                     <div className="grid gap-1 leading-none">
-                      <Label htmlFor={option.id} className="font-medium cursor-pointer select-none">
+                      <Label
+                        htmlFor={option.id}
+                        className="font-medium cursor-pointer select-none"
+                      >
                         {option.label}
                       </Label>
                     </div>
@@ -344,7 +400,7 @@ export function SyncButtonOptions({ source, title }: SyncButtonProps) {
             </div>
           ) : (
             <div className="py-6 text-sm text-center text-muted-foreground">
-              No configuration choices specified for this context pipeline hook.
+              No options available for this sync configuration.
             </div>
           )}
 
@@ -352,34 +408,52 @@ export function SyncButtonOptions({ source, title }: SyncButtonProps) {
             <Button variant="ghost" onClick={() => setIsModalOpen(false)}>
               Cancel
             </Button>
-            <Button onClick={startSync}>
+            <Button
+              onClick={startSync}
+              disabled={isSyncing}
+            >
               Run Pipeline
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      {/* Progress UI components remain exactly identical underneath */}
       {showProgress && jobId && (
         <div className="rounded-xl border bg-card p-3 shadow-sm text-card-foreground animate-in fade-in slide-in-from-top-1 duration-200">
           <div className="flex items-center justify-between text-sm font-medium mb-1.5">
             <span className="capitalize text-muted-foreground">Status</span>
             <span className="flex items-center gap-1.5 font-semibold">
-              {status === "completed" && <span className="text-green-600 flex items-center gap-1"><CheckCircle2 className="h-4 w-4" /> Finished</span>}
-              {status === "failed" && <span className="text-red-600 flex items-center gap-1"><XCircle className="h-4 w-4" /> Failed</span>}
-              {status !== "completed" && status !== "failed" && <span className="text-blue-600 animate-pulse">{status}</span>}
+              {status === "completed" && (
+                <span className="text-green-600 flex items-center gap-1">
+                  <CheckCircle2 className="h-4 w-4" /> Finished
+                </span>
+              )}
+              {status === "failed" && (
+                <span className="text-red-600 flex items-center gap-1">
+                  <XCircle className="h-4 w-4" /> Failed
+                </span>
+              )}
+              {status !== "completed" && status !== "failed" && (
+                <span className="text-blue-600 animate-pulse">{status}</span>
+              )}
             </span>
           </div>
 
           <div className="h-2.5 overflow-hidden rounded-full bg-secondary">
             <div
               className={`h-full transition-all duration-300 ease-out rounded-full ${
-                status === "completed" ? "bg-green-500" : status === "failed" ? "bg-red-500" : "bg-blue-600"
+                status === "completed"
+                  ? "bg-green-500"
+                  : status === "failed"
+                  ? "bg-red-500"
+                  : "bg-blue-600"
               }`}
               style={{ width: `${progress}%` }}
             />
           </div>
-          <div className="text-right text-xs text-muted-foreground mt-1">{progress}%</div>
+          <div className="text-right text-xs text-muted-foreground mt-1">
+            {progress}%
+          </div>
         </div>
       )}
 

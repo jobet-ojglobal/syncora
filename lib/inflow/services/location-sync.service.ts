@@ -3,7 +3,6 @@ import {
   getLocations,
   getSublocationsByLocation,
 } from "../data/locations";
-import { ensureLocationShell } from "./ensure.service";
 import { syncLocation } from "./location.sync";
 
 type SyncOptions = {

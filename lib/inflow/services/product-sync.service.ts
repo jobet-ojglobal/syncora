@@ -13,6 +13,8 @@ type SyncOptions = {
 export class ProductSyncService {
   async sync(options?: SyncOptions, includes?: string[]) {
     const BATCH_SIZE = options?.batchSize || 10;
+
+    console.log(includes)
     
     // Track synced IDs across the entire execution to prevent duplicate DB writes
     const syncedGroupIds = new Set<string>();
