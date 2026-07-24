@@ -34,15 +34,7 @@ export default async function EditTransferPage({ params }: Props) {
   const { id } = await params;
   const transfer = await getTransfer(id);
 
-   const [products, locations, sublocations] = await Promise.all([
-    prisma.product.findMany({
-      select: {
-        inflowId: true,
-        name: true,
-      },
-      orderBy: { name: "asc" },
-    }),
-
+   const [locations] = await Promise.all([
     prisma.location.findMany({
       where: {
         isActive: true,
@@ -54,16 +46,8 @@ export default async function EditTransferPage({ params }: Props) {
       },
       orderBy: { name: "asc" },
     }),
-
-    prisma.sublocation.findMany({
-      select: {
-        id: true,
-        name: true,
-        locationId: true,
-      },
-      orderBy: { name: "asc" },
-    }),
   ]);
+
   return (
     <div className="w-full max-w-2xl mx-auto p-6 space-y-6">
       {/* HEADER */}
@@ -80,15 +64,10 @@ export default async function EditTransferPage({ params }: Props) {
       />
       <TransferOrderForm
         initialData={transfer}
-        products={products.map((p) => ({
-          inflowId: p.inflowId,
-          name: p.name,
-        }))}
         locations={locations.map((l) => ({
           inflowId: l.inflowId,
           name: l.name,
         }))}
-        sublocations={sublocations}
        />
     </div>
   );

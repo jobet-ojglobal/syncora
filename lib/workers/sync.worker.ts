@@ -84,7 +84,7 @@ interface SyncWebhookJobData {
   jobId: string;
   source: string;
   includes: any;
-  selectedRecords: any;
+  selectedRecords: string[];
   location: {
     inflowId: string;
     name: string;
@@ -113,8 +113,6 @@ const worker = new Worker<SyncWebhookJobData>(
           where: { id: jobId },
           data: { progress },
         });
-
-        // console.log(`  Progress: ${progress}%`);
       },
     };
 
@@ -218,7 +216,8 @@ const worker = new Worker<SyncWebhookJobData>(
           result = await inventoryService.sync(syncOptions, includes);
           break;
         case "single_inventory":
-          result = await inventoryService.syncSingle(syncOptions, includes);
+          console.log(selectedRecords[0], includes)
+          result = await inventoryService.syncSingle(selectedRecords[0], includes);
           break;
         case "locations":
           result = await locationService.sync(syncOptions);

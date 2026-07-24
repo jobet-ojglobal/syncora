@@ -59,7 +59,7 @@ export async function POST(request: Request) {
     }
 
     if (action === "connect") {
-      const defaultEvents: InflowEvent[] = ["customer", "salesOrder"]; 
+      const defaultEvents: InflowEvent[] = ["customer", "salesOrder", "customerLocal", "salesOrderLocal", "adjustmentStockLocal", "categoryLocal", "productLocal", "imageLocal"]; 
       const webhook = await createOrUpdateLocationWebhook(location.inflowId, defaultEvents);
       return NextResponse.json({ success: true, webhook });
     }

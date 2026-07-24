@@ -34,7 +34,6 @@ export async function GET(request: NextRequest) {
       }),
       prisma.inventoryBin.findMany({
         where: {
-          productId,
           sublocation: {
             locationId: { in: locationsToQuery },
           },

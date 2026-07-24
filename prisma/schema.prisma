@@ -1388,7 +1388,7 @@ model InventoryLedger {
   id                String @id @default(cuid())
   productId         String
   locationId        String
-  sublocationId String?
+  sublocationId     String?
   transactionType   InventoryTransactionType
   referenceType     InventoryReferenceType?
   referenceId       String?
@@ -1405,7 +1405,7 @@ model InventoryLedger {
 
   product           Product @relation(fields: [productId], references: [inflowId], onDelete: Cascade)
   location          Location @relation(fields: [locationId], references: [inflowId], onDelete: Cascade)
-  performedBy       TeamMember? @relation(fields:[performedById], references:[id])
+  performedBy       TeamMember? @relation(fields:[performedById], references: [inflowId])
   sublocation Sublocation? @relation(fields: [sublocationId], references: [id], onDelete: SetNull)
 
 

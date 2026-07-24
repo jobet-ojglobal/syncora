@@ -8,12 +8,9 @@ interface Props {
 }
 
 /**
- * 🏢 ISOLATED LOCATION STOCK MATRIX ENGINE
+ * 🏢 ISOLATED LOCATION STOCK MATRIX ENGINE (PAGINATED INVENTORY ONLY)
  */
-export async function GET(
-  request: NextRequest,
-  { params }: Props
-) {
+export async function GET(request: NextRequest, { params }: Props) {
   try {
     const { id: locationId } = await params;
 
@@ -24,10 +21,10 @@ export async function GET(
       );
     }
 
-    // 1. Verify existence of target location base node to ensure clean 404 responses
+    // 1. Resolve Location Inflow ID
     const locationExists = await prisma.location.findUnique({
       where: { id: locationId },
-      select: {inflowId: true,  name: true, isActive: true, isDefault: true  }
+      select: { inflowId: true },
     });
 
     if (!locationExists) {
@@ -37,91 +34,96 @@ export async function GET(
       );
     }
 
-    // 2. Fetch inventory allocations exclusively mapped to this facility node
-    const stockItems = await prisma.inventory.findMany({
-      where: { locationId: locationExists.inflowId },
-      include: {
-        product: {
-          select: { name: true, slug: true }
-        },
-        bins: {
-          include: {
-            sublocation: { select: { name: true } }
-          }
-        }
-      },
-      orderBy: { updatedAt: "desc" }
-    });
+    // 2. Parse Query Parameters
+    const { searchParams } = new URL(request.url);
+    const search = searchParams.get("search")?.trim() || "";
+    const page = Math.max(0, parseInt(searchParams.get("page") || "0", 10));
+    const limit = Math.max(1, parseInt(searchParams.get("limit") || "10", 10));
 
-    if (stockItems.length === 0) {
-      return NextResponse.json({
-        location: {
-          id: locationId,
-          name: locationExists.name,
-          isActive: locationExists.isActive,
-          isDefault: locationExists.isDefault,
+    // 3. Construct Table Filter Clause
+    const tableWhereClause: any = { locationId: locationExists.inflowId };
+    if (search) {
+      tableWhereClause.product = {
+        OR: [
+          { name: { contains: search, mode: "insensitive" } },
+          { slug: { contains: search, mode: "insensitive" } },
+        ],
+      };
+    }
+
+    // 4. Query Total Filtered Records & Paginated Items
+    const [totalRecords, stockItems] = await Promise.all([
+      prisma.inventory.count({ where: tableWhereClause }),
+      prisma.inventory.findMany({
+        where: tableWhereClause,
+        include: {
+          product: { select: { name: true, slug: true } },
+          bins: {
+            include: { sublocation: { select: { name: true } } },
+          },
         },
-        inventory: [],
+        orderBy: { updatedAt: "desc" },
+        skip: page * limit,
+        take: limit,
+      }),
+    ]);
+
+    // 5. Batched In-Transit Line Calculations
+    const pageProductIds = stockItems.map((item) => item.productId);
+    const inTransitMap: Record<string, number> = {};
+
+    if (pageProductIds.length > 0) {
+      const activeInTransitLines = await prisma.transferOrderLine.findMany({
+        where: {
+          productId: { in: pageProductIds },
+          transferOrder: {
+            sourceLocationId: locationId,
+            status: "IN_TRANSIT",
+          },
+        },
+        select: { productId: true, quantity: true },
+      });
+
+      activeInTransitLines.forEach((line) => {
+        const qty = Number(line.quantity || 0);
+        inTransitMap[line.productId] = (inTransitMap[line.productId] || 0) + qty;
       });
     }
 
-    // 3. Aggregate outbound In-Transit line changes matching this location ID origin
-    const activeInTransitLines = await prisma.transferOrderLine.findMany({
-      where: {
-        transferOrder: {
-          sourceLocationId: locationId,
-          status: "IN_TRANSIT"
-        }
+    // 6. Format Final Response
+    const formattedInventory = stockItems.map((item) => ({
+      id: item.id,
+      productId: item.productId,
+      productName: item.product.name,
+      productSlug: item.product.slug,
+      locationId: item.locationId,
+      quantityOnHand: Number(item.quantityOnHand || 0),
+      quantityReserved: Number(item.quantityReserved || 0),
+      quantityAvailable: Number(item.quantityAvailable || 0),
+      quantityInTransit: inTransitMap[item.productId] || 0,
+      isAutoReorderEnabled: Boolean(item.isAutoReorderEnabled),
+      reorderThreshold: Number(item.reorderThreshold || 0),
+      reorderQuantity: Number(item.reorderQuantity || 0),
+      preferredSourceLocationId: item.preferredSourceLocationId,
+      bins: item.bins.map((b) => ({
+        id: b.id,
+        sublocationName: b.sublocation.name,
+        quantity: Number(b.quantity || 0),
+      })),
+    }));
+
+    return NextResponse.json(
+      {
+        inventory: formattedInventory,
+        pagination: {
+          totalRecords,
+          pageCount: Math.ceil(totalRecords / limit),
+          page,
+          limit,
+        },
       },
-      select: {
-        productId: true,
-        quantity: true
-      }
-    });
-
-    // 4. Compress in-transit quantities into a fast key-value lookup map
-    const inTransitMap: Record<string, number> = {};
-    activeInTransitLines.forEach((line) => {
-      const qty = Number(line.quantity);
-      inTransitMap[line.productId] = (inTransitMap[line.productId] || 0) + qty;
-    });
-
-    // 5. Structure ledger row objects matching your frontend `InventoryStockRow` contract layout
-    const formattedInventory = stockItems.map((item) => {
-      const quantityInTransit = inTransitMap[item.productId] || 0;
-
-      return {
-        id: item.id,
-        productId: item.productId,
-        productName: item.product.name,
-        productSlug: item.product.slug,
-        locationId: item.locationId,
-        quantityOnHand: Number(item.quantityOnHand),
-        quantityReserved: Number(item.quantityReserved || 0),
-        quantityAvailable: Number(item.quantityAvailable || 0),
-        quantityInTransit: quantityInTransit,
-        isAutoReorderEnabled: item.isAutoReorderEnabled,
-        reorderThreshold: Number(item.reorderThreshold),
-        reorderQuantity: Number(item.reorderQuantity),
-        preferredSourceLocationId: item.preferredSourceLocationId,
-        bins: item.bins.map((b) => ({
-          id: b.id,
-          sublocationName: b.sublocation.name,
-          quantity: Number(b.quantity)
-        }))
-      };
-    });
-
-    return NextResponse.json({
-      location: {
-        id: locationId,
-        name: locationExists.name,
-        isActive: locationExists.isActive,
-        isDefault: locationExists.isDefault,
-      },
-      inventory: formattedInventory
-    }, { status: 200 });
-
+      { status: 200 }
+    );
   } catch (error: any) {
     console.error("Isolated location stock ledger processing breakdown:", error);
     return NextResponse.json(

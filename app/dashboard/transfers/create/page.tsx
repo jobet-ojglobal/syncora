@@ -25,6 +25,7 @@ export default async function CreateTransferOrderPage() {
       sourceLocationId: fallbackLocation.inflowId,
       targetLocationId: fallbackLocation.inflowId, // Note: Your Zod schema blocks this, but Prisma allows it for initial creation
       status: "DRAFT",
+      requestedById: "Mid App"
     }
   });
 

@@ -6,18 +6,19 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { transferOrderSchema, TransferOrderInput } from "@/schemas/transfer.schema";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { Trash2, Plus, ArrowLeft, Warehouse, Package, Lock, FileText, Edit3 } from "lucide-react";
+import { Trash2, Plus, ArrowLeft, Warehouse, Package, Lock, FileText, Edit3, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 import { Field, FieldGroup, FieldLabel, FieldLegend, FieldSet } from "@/components/ui/field";
-import { ProductLineModal } from "./product-lines-modal.granular";
+import { ProductLineModal, ProductMatrixItem } from "./product-lines-modal";
+import useSWR from "swr";
 
-interface LookupItem {
+export interface LookupItem {
   inflowId: string;
   name: string;
 }
 
-interface SublocationLookup {
+export interface SublocationLookup {
   id: string;
   name: string;
   locationId: string;
@@ -25,8 +26,6 @@ interface SublocationLookup {
 
 interface TransferOrderFormProps {
   locations: LookupItem[];
-  products: LookupItem[];
-  sublocations: SublocationLookup[];
   initialData: {
     id: string;
     transferNumber: string;
@@ -44,7 +43,9 @@ interface TransferOrderFormProps {
   };
 }
 
-export function TransferOrderForm({ locations, products, sublocations, initialData }: TransferOrderFormProps) {
+const fetcher = (url: string) => fetch(url).then((res) => res.json());
+
+export function TransferOrderForm({ locations, initialData }: TransferOrderFormProps) {
   const router = useRouter();
   const isFormDisabled = initialData.status !== "DRAFT";
   const [modalOpen, setModalOpen] = useState(false);
@@ -59,31 +60,47 @@ export function TransferOrderForm({ locations, products, sublocations, initialDa
       targetLocationId: initialData.targetLocationId || "",
       status: initialData.status as any,
       remarks: initialData.remarks || "",
-      // Map properties tightly, transforming nulls to empty strings safely
-      lines: initialData.lines?.map(l => ({
-        id: l.id,
-        productId: l.productId,
-        sourceSublocationId: l.sourceSublocationId || "",
-        targetSublocationId: l.targetSublocationId || "",
-        quantity: Number(l.quantity)
-      })) || []
+      lines:
+        initialData.lines?.map((l) => ({
+          id: l.id,
+          productId: l.productId,
+          sourceSublocationId: l.sourceSublocationId || "",
+          targetSublocationId: l.targetSublocationId || "",
+          quantity: Number(l.quantity),
+        })) || [],
     },
   });
 
-  const { register, reset, control, handleSubmit, setValue, formState: { errors, isSubmitting } } = form;
-  
-  // fields here contains your actual data elements managed by RHF
+  const {
+    register,
+    reset,
+    control,
+    handleSubmit,
+    setValue,
+    formState: { errors, isSubmitting },
+  } = form;
+
   const { fields, append, remove, update } = useFieldArray({ control, name: "lines" });
 
   const watchedSourceLocId = useWatch({ control, name: "sourceLocationId" });
   const watchedTargetLocId = useWatch({ control, name: "targetLocationId" });
-  
-  // Keep this watch only to track overall changes and handle parent select updates
-  const watchedLines = useWatch({ control, name: "lines" }) || [];
 
   const isFirstRender = useRef(true);
 
-    useEffect(() => {
+  // Single batch fetch for all products & stock states when locations are selected
+  const swrKey = watchedSourceLocId
+    ? `/api/admin/transfers/stock-matrix?sourceLocationId=${watchedSourceLocId}&targetLocationId=${watchedTargetLocId || ""}`
+    : null;
+
+  const { data: matrixData, isLoading: isLoadingMatrix } = useSWR<{
+    matrix: ProductMatrixItem[];
+    sublocations: SublocationLookup[];
+  }>(swrKey, fetcher, { revalidateOnFocus: false });
+
+  const productMatrix = matrixData?.matrix || [];
+  const sublocations = matrixData?.sublocations || [];
+
+  useEffect(() => {
     if (!initialData) return;
 
     reset({
@@ -104,8 +121,7 @@ export function TransferOrderForm({ locations, products, sublocations, initialDa
     });
   }, [initialData, reset]);
 
-
-  // Clear child lines automatically if locations are changed mid-session
+  // Clear lines when source or target location changes
   useEffect(() => {
     if (isFirstRender.current) {
       isFirstRender.current = false;
@@ -122,8 +138,8 @@ export function TransferOrderForm({ locations, products, sublocations, initialDa
         body: JSON.stringify(values),
       });
 
-      if (!response.ok) throw new Error("Processing failure mapping routes.");
-      
+      if (!response.ok) throw new Error("Failed to save transfer order.");
+
       toast.success("Transfer order saved successfully");
       router.push("/dashboard/transfers");
       router.refresh();
@@ -137,12 +153,13 @@ export function TransferOrderForm({ locations, products, sublocations, initialDa
       {isFormDisabled && (
         <div className="bg-amber-500/10 border border-amber-500/20 text-amber-600 rounded-xl p-3 flex items-center gap-2 text-xs font-medium">
           <Lock className="w-4 h-4 shrink-0" />
-          <span>Immutable Document: Marked as <strong>{initialData.status}</strong>. Only entries in <strong>DRAFT</strong> states can be altered.</span>
+          <span>
+            Immutable Document: Marked as <strong>{initialData.status}</strong>. Only entries in <strong>DRAFT</strong> states can be altered.
+          </span>
         </div>
       )}
 
       <FieldGroup className="gap-6">
-        {/* Tracking ID Header */}
         <div className="bg-muted/40 border rounded-lg p-3 flex items-center gap-3">
           <div className="p-2 bg-background border rounded-md text-muted-foreground">
             <FileText className="w-4 h-4" />
@@ -153,21 +170,26 @@ export function TransferOrderForm({ locations, products, sublocations, initialDa
           </div>
         </div>
 
-        {/* Global Terminal Nodes Selector */}
         <FieldSet className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 bg-muted/20 border rounded-xl">
           <Field>
             <FieldLabel className="text-amber-600 font-semibold flex items-center gap-1 text-xs">
               <Warehouse className="w-3.5 h-3.5" /> Departure Source Site *
             </FieldLabel>
-            <select 
+            <select
               disabled={isFormDisabled || fields.length > 0}
-              className="w-full text-xs h-9 rounded-md border border-input bg-background px-3 focus-visible:outline-hidden disabled:opacity-60" 
+              className="w-full text-xs h-9 rounded-md border border-input bg-background px-3 focus-visible:outline-hidden disabled:opacity-60"
               {...register("sourceLocationId")}
             >
               <option value="">-- Choose Origin Depot Site --</option>
-              {locations.map(loc => <option key={loc.inflowId} value={loc.inflowId}>{loc.name}</option>)}
+              {locations.map((loc) => (
+                <option key={loc.inflowId} value={loc.inflowId}>
+                  {loc.name}
+                </option>
+              ))}
             </select>
-            {fields.length > 0 && <span className="text-[10px] text-muted-foreground mt-1 block">Clear line assignments to unlock site changes.</span>}
+            {fields.length > 0 && (
+              <span className="text-[10px] text-muted-foreground mt-1 block">Clear line assignments to unlock site changes.</span>
+            )}
             {errors.sourceLocationId && <span className="text-xs text-destructive">{errors.sourceLocationId.message}</span>}
           </Field>
 
@@ -175,19 +197,22 @@ export function TransferOrderForm({ locations, products, sublocations, initialDa
             <FieldLabel className="text-blue-600 font-semibold flex items-center gap-1 text-xs">
               <Warehouse className="w-3.5 h-3.5" /> Arrival Target Destination *
             </FieldLabel>
-            <select 
+            <select
               disabled={isFormDisabled || fields.length > 0}
-              className="w-full text-xs h-9 rounded-md border border-input bg-background px-3 focus-visible:outline-hidden disabled:opacity-60" 
+              className="w-full text-xs h-9 rounded-md border border-input bg-background px-3 focus-visible:outline-hidden disabled:opacity-60"
               {...register("targetLocationId")}
             >
               <option value="">-- Choose Destination Terminal Hub --</option>
-              {locations.map(loc => <option key={loc.inflowId} value={loc.inflowId}>{loc.name}</option>)}
+              {locations.map((loc) => (
+                <option key={loc.inflowId} value={loc.inflowId}>
+                  {loc.name}
+                </option>
+              ))}
             </select>
             {errors.targetLocationId && <span className="text-xs text-destructive">{errors.targetLocationId.message}</span>}
           </Field>
         </FieldSet>
 
-        {/* Consignment Lines Overview Table */}
         <FieldSet className="border-t pt-4">
           <div className="flex items-center justify-between mb-3">
             <FieldLegend className="flex items-center gap-2 text-sm font-semibold">
@@ -197,11 +222,19 @@ export function TransferOrderForm({ locations, products, sublocations, initialDa
               type="button"
               variant="outline"
               size="sm"
-              disabled={!watchedSourceLocId || !watchedTargetLocId || isFormDisabled}
-              onClick={() => { setEditingIndex(null); setModalOpen(true); }}
+              disabled={!watchedSourceLocId || !watchedTargetLocId || isFormDisabled || isLoadingMatrix}
+              onClick={() => {
+                setEditingIndex(null);
+                setModalOpen(true);
+              }}
               className="h-8 text-xs gap-1"
             >
-              <Plus className="w-3 h-3" /> Append Product Component
+              {isLoadingMatrix ? (
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              ) : (
+                <Plus className="w-3.5 h-3.5" />
+              )}
+              Append Product Component
             </Button>
           </div>
 
@@ -226,11 +259,13 @@ export function TransferOrderForm({ locations, products, sublocations, initialDa
                     </td>
                   </tr>
                 ) : (
-                  // Read properties directly from the stable useFieldArray `field` loop item
                   fields.map((field, index) => {
-                    const prodName = products.find(p => p.inflowId === field.productId)?.name || "Unknown Product";
-                    const srcBinName = sublocations.find(s => s.id === field.sourceSublocationId)?.name || "Floor / Bulk Area";
-                    const tgtBinName = sublocations.find(s => s.id === field.targetSublocationId)?.name || "Floor / Bulk Area";
+                    const matchedMatrix = productMatrix.find((item) => item.product.inflowId === field.productId);
+                    const prodName = matchedMatrix?.product.name || field.productId;
+                    const srcBinName =
+                      sublocations.find((s) => s.id === field.sourceSublocationId)?.name || "Floor / Bulk Area";
+                    const tgtBinName =
+                      sublocations.find((s) => s.id === field.targetSublocationId)?.name || "Floor / Bulk Area";
 
                     return (
                       <tr key={field.id} className="hover:bg-muted/10">
@@ -244,7 +279,10 @@ export function TransferOrderForm({ locations, products, sublocations, initialDa
                             variant="ghost"
                             size="icon"
                             disabled={isFormDisabled}
-                            onClick={() => { setEditingIndex(index); setModalOpen(true); }}
+                            onClick={() => {
+                              setEditingIndex(index);
+                              setModalOpen(true);
+                            }}
                             className="w-7 h-7"
                           >
                             <Edit3 className="w-3.5 h-3.5 text-muted-foreground" />
@@ -269,13 +307,11 @@ export function TransferOrderForm({ locations, products, sublocations, initialDa
           </div>
         </FieldSet>
 
-        {/* Remarks */}
         <Field>
           <FieldLabel className="text-xs">Consignment Delivery Remarks / Carrier Manifest Notes</FieldLabel>
           <Textarea disabled={isFormDisabled} placeholder="Detail specific freight forwarder info..." rows={2} {...register("remarks")} />
         </Field>
 
-        {/* Action Controls */}
         <div className="flex items-center justify-between border-t pt-4">
           <Button type="button" variant="ghost" size="sm" onClick={() => router.back()} className="text-xs gap-1.5">
             <ArrowLeft className="w-4 h-4" /> Back
@@ -286,25 +322,25 @@ export function TransferOrderForm({ locations, products, sublocations, initialDa
         </div>
       </FieldGroup>
 
-      {/* Find this block at the bottom of your TransferOrderForm layout */}
       {modalOpen && (
         <ProductLineModal
           isOpen={modalOpen}
-          onClose={() => { setModalOpen(false); setEditingIndex(null); }}
-          products={products}
+          onClose={() => {
+            setModalOpen(false);
+            setEditingIndex(null);
+          }}
+          productMatrix={productMatrix}
           sublocations={sublocations}
           sourceLocationId={watchedSourceLocId}
           targetLocationId={watchedTargetLocId}
-          existingLines={fields} 
+          existingLines={fields}
           editingLineIndex={editingIndex}
           onSave={(data) => {
             if (editingIndex !== null) {
-              // If modifying a single row path, save the direct object structure directly
               update(editingIndex, data);
             } else {
-              // If data is returned as an array, push all elements onto useFieldArray lines bulk checklist
               if (Array.isArray(data)) {
-                data.forEach(item => append(item));
+                data.forEach((item) => append(item));
               } else {
                 append(data);
               }
