@@ -29,9 +29,9 @@ export const LocationWorkspaceProvider = ({ children }: { children: React.ReactN
   const { data: locations, isLoading, mutate } = useSWR<LocationItem[]>(
     "/api/admin/locations/webhooks",
     fetcher,
-    // {
-    //   refreshInterval: 15000, // Sync status of all nodes every 15 seconds
-    // }
+    {
+      refreshInterval: 15000, // Sync status of all nodes every 15 seconds
+    }
   );
 
   const [currentLocationId, setCurrentLocationId] = useState<string>("");

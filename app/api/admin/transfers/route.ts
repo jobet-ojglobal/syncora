@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma"; // Adjust this path to your client instance
 import { transferOrderSchema } from "@/schemas/transfer.schema";
+import { TransferOrderStatus } from "@/generated/prisma/enums";
 
 /**
  * 📄 FETCH ALL TRANSFER MANIFESTS WITH CONDENSED AGGREGATES
@@ -107,6 +108,7 @@ import { transferOrderSchema } from "@/schemas/transfer.schema";
 // import { NextRequest, NextResponse } from "next/server";
 // import { prisma } from "@/lib/prisma";
 
+// api get transferorder (TO) list
 export async function GET() {
   try {
     const orders = await prisma.transferOrder.findMany({
@@ -155,6 +157,280 @@ export async function GET() {
     );
   }
 }
+
+// Helper function to generate custom transfer order sequential IDs (e.g., TO-10001)
+async function generateTransferNumber(tx: Parameters<Parameters<typeof prisma.$transaction>[0]>[0]) {
+  const count = await tx.transferOrder.count();
+  const nextNum = (count + 1).toString().padStart(5, "0");
+  return `TO-${nextNum}`;
+}
+
+// ==========================================
+// 1. POST: Create New Transfer Order
+// ==========================================
+export async function POST(req: Request) {
+  try {
+    const body = await req.json();
+
+    // Validate payload against schema
+    const validationResult = transferOrderSchema.safeParse(body);
+    if (!validationResult.success) {
+      return NextResponse.json(
+        { error: "Validation failed", details: validationResult.error.flatten() },
+        { status: 400 }
+      );
+    }
+
+    const data = validationResult.data;
+
+    // TODO: Replace with authenticated user ID from your session context
+    const currentUserId = "USER_SYSTEM_SESSION_ID";
+
+    // Run creation inside an isolated transaction
+    const result = await prisma.$transaction(async (tx) => {
+      // 1. Check stock availability for all source lines
+      for (const line of data.lines) {
+        const inventory = await tx.inventory.findUnique({
+          where: {
+            productId_locationId: {
+              productId: line.productId,
+              locationId: data.sourceLocationId,
+            },
+          },
+        });
+
+        const available = inventory?.quantityAvailable?.toNumber() ?? 0;
+        if (!inventory || available < line.quantity) {
+          throw new Error(
+            `Insufficient available stock for product ${line.productId} at source location. Available: ${available}, Required: ${line.quantity}`
+          );
+        }
+      }
+
+      // 2. Generate new Transfer Number
+      const transferNumber = await generateTransferNumber(tx);
+
+      // 3. Create Transfer Order header and nested line items
+      const newTransferOrder = await tx.transferOrder.create({
+        data: {
+          transferNumber,
+          sourceLocationId: data.sourceLocationId,
+          targetLocationId: data.targetLocationId,
+          status: data.status as TransferOrderStatus,
+          remarks: data.remarks,
+          requestedById: currentUserId,
+          lines: {
+            create: data.lines.map((line) => ({
+              productId: line.productId,
+              sourceSublocationId: line.sourceSublocationId,
+              targetSublocationId: line.targetSublocationId,
+              quantity: line.quantity,
+              quantityReceived: 0,
+            })),
+          },
+        },
+        include: {
+          lines: true,
+        },
+      });
+
+      return newTransferOrder;
+    });
+
+    return NextResponse.json({ success: true, data: result }, { status: 201 });
+  } catch (error: any) {
+    console.error("[TRANSFER_ORDER_POST_ERROR]", error);
+    return NextResponse.json(
+      { error: error.message || "Failed to create transfer order." },
+      { status: 500 }
+    );
+  }
+}
+
+// export async function POST(req: Request) {
+//   try {
+//     const body = await req.json();
+//     const {
+//       sourceLocationId,
+//       targetLocationId,
+//       remarks,
+//       requestedById = "SM North" ,
+//       lines,
+//     } = body; 
+
+//     // 1. Basic Validation
+//     if (!sourceLocationId || !targetLocationId || !requestedById || !lines || !Array.isArray(lines)) {
+//       return NextResponse.json(
+//         { error: "Missing required fields or invalid lines data." },
+//         { status: 400 }
+//       );
+//     }
+
+//     // 2. Flatten the lines based on sourceAllocations
+//     const prismaLinesToCreate = [];
+
+//     for (const line of lines) {
+//       // If the UI generated multi-bin allocations, split them into separate lines
+//       if (line.sourceAllocations && line.sourceAllocations.length > 0) {
+//         for (const alloc of line.sourceAllocations) {
+//           // Skip any 0 quantity allocations
+//           if (Number(alloc.quantity) <= 0) continue;
+
+//           prismaLinesToCreate.push({
+//             productId: line.productId,
+//             // Prisma expects null instead of an empty string for optional relations
+//             sourceSublocationId: alloc.sublocationId || null,
+//             targetSublocationId: line.targetSublocationId || null,
+//             quantity: Number(alloc.quantity),
+//           });
+//         }
+//       } else {
+//         // Fallback in case a line lacks the sourceAllocations array
+//         if (Number(line.quantity) > 0) {
+//           prismaLinesToCreate.push({
+//             productId: line.productId,
+//             sourceSublocationId: line.sourceSublocationId || null,
+//             targetSublocationId: line.targetSublocationId || null,
+//             quantity: Number(line.quantity),
+//           });
+//         }
+//       }
+//     }
+
+//     // Ensure we actually have lines to create after flattening
+//     if (prismaLinesToCreate.length === 0) {
+//       return NextResponse.json(
+//         { error: "Transfer order must contain at least one valid product line with a quantity greater than zero." },
+//         { status: 400 }
+//       );
+//     }
+
+//     // Generate a unique transfer number (you can replace this with your own sequence logic)
+//     const transferNumber = `TR-${Date.now()}`;
+
+//     // 3. Save to database
+//     // Prisma handles this as a single transaction automatically when using nested writes (lines: { create: ... })
+//     const transferOrder = await prisma.transferOrder.create({
+//       data: {
+//         transferNumber,
+//         sourceLocationId,
+//         targetLocationId,
+//         remarks,
+//         requestedById,
+//         status: "DRAFT",
+//         lines: {
+//           create: prismaLinesToCreate,
+//         },
+//       },
+//       include: {
+//         // Return the nested lines so the frontend can verify the split was successful
+//         lines: {
+//           include: {
+//             sourceSublocation: true,
+//             targetSublocation: true,
+//           }
+//         },
+//       },
+//     });
+
+//     return NextResponse.json({ success: true, data: transferOrder }, { status: 201 });
+//   } catch (error) {
+//     console.error("[TRANSFER_ORDER_POST]", error);
+//     return NextResponse.json(
+//       { error: "Failed to create transfer order. Please try again." },
+//       { status: 500 }
+//     );
+//   }
+// }
+
+
+// export async function PATCH(
+//   req: Request,
+//   { params }: { params: { id: string } }
+// ) {
+//   try {
+//     const body = await req.json();
+//     const {
+//       sourceLocationId,
+//       targetLocationId,
+//       remarks,
+//       lines,
+//     } = body;
+
+//     const transferOrderId = params.id;
+
+//     // 1. Flatten lines based on sourceAllocations matrix logic
+//     const prismaLinesToCreate = [];
+
+//     for (const line of lines) {
+//       if (line.sourceAllocations && line.sourceAllocations.length > 0) {
+//         for (const alloc of line.sourceAllocations) {
+//           if (Number(alloc.quantity) <= 0) continue;
+
+//           prismaLinesToCreate.push({
+//             productId: line.productId,
+//             sourceSublocationId: alloc.sublocationId || null,
+//             targetSublocationId: line.targetSublocationId || null,
+//             quantity: Number(alloc.quantity),
+//           });
+//         }
+//       } else {
+//         if (Number(line.quantity) > 0) {
+//           prismaLinesToCreate.push({
+//             productId: line.productId,
+//             sourceSublocationId: line.sourceSublocationId || null,
+//             targetSublocationId: line.targetSublocationId || null,
+//             quantity: Number(line.quantity),
+//           });
+//         }
+//       }
+//     }
+
+//     if (prismaLinesToCreate.length === 0) {
+//       return NextResponse.json(
+//         { error: "Transfer order must contain at least one line with a positive quantity." },
+//         { status: 400 }
+//       );
+//     }
+
+//     // 2. Perform transaction: Delete old lines, update header details, and create new flattened lines
+//     const updatedOrder = await prisma.$transaction(async (tx) => {
+//       // Remove existing lines to cleanly replace multi-bin allocations
+//       await tx.transferOrderLine.deleteMany({
+//         where: { transferOrderId },
+//       });
+
+//       // Update order and insert the fresh set of split lines
+//       return await tx.transferOrder.update({
+//         where: { id: transferOrderId },
+//         data: {
+//           sourceLocationId,
+//           targetLocationId,
+//           remarks,
+//           lines: {
+//             create: prismaLinesToCreate,
+//           },
+//         },
+//         include: {
+//           lines: {
+//             include: {
+//               sourceSublocation: true,
+//               targetSublocation: true,
+//             },
+//           },
+//         },
+//       });
+//     });
+
+//     return NextResponse.json({ success: true, data: updatedOrder }, { status: 200 });
+//   } catch (error) {
+//     console.error("[TRANSFER_ORDER_PATCH]", error);
+//     return NextResponse.json(
+//       { error: "Failed to update transfer order." },
+//       { status: 500 }
+//     );
+//   }
+// }
 
 // export async function POST(request: NextRequest) {
 //   try {
