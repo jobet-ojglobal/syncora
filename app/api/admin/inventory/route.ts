@@ -17,6 +17,11 @@ export async function GET() {
 }
 
 
+// Helper to safely filter valid bin items
+function lineDataBins(bins: Array<{ sublocationId: string; quantity: number | string }>) {
+  return bins.filter((bin) => Boolean(bin.sublocationId));
+}
+
 // ==========================================
 // POST: Batch Create / Bulk Upsert Inventory & Bin Allocations
 // ==========================================
@@ -30,7 +35,7 @@ export async function POST(request: Request) {
 
     // 2. Perform atomic database updates inside a transaction
     const results = await prisma.$transaction(async (tx) => {
-      const processedInventories = [];
+      const processedInventories: string[] = [];
 
       for (const line of lines) {
         // A. Upsert parent Inventory record for (productId + locationId)
@@ -55,8 +60,10 @@ export async function POST(request: Request) {
           },
         });
 
-        // B. Clear removed bin allocations for this product
-        const activeSublocationIds = line.bins.map((b) => b.sublocationId);
+        const validBins = lineDataBins(line.bins);
+        const activeSublocationIds = validBins.map((b) => b.sublocationId);
+
+        // B. Clear removed bin allocations for this product inventory
         await tx.inventoryBin.deleteMany({
           where: {
             inventoryId: inventory.id,
@@ -64,23 +71,21 @@ export async function POST(request: Request) {
           },
         });
 
-        // C. Upsert InventoryBin allocations
-        for (const bin of line.bins) {
+        // C. Upsert InventoryBin allocations using compound key (inventoryId_sublocationId)
+        for (const bin of validBins) {
           await tx.inventoryBin.upsert({
             where: {
-              productId_sublocationId: {
-                productId: line.productId,
+              inventoryId_sublocationId: {
+                inventoryId: inventory.id,
                 sublocationId: bin.sublocationId,
               },
             },
             create: {
               inventoryId: inventory.id,
-              productId: line.productId,
               sublocationId: bin.sublocationId,
               quantity: bin.quantity,
             },
             update: {
-              inventoryId: inventory.id,
               quantity: bin.quantity,
             },
           });
@@ -145,7 +150,7 @@ export async function PATCH(request: Request) {
 
     // 2. Perform updates inside a transaction
     const updatedRecords = await prisma.$transaction(async (tx) => {
-      const lineResults = [];
+      const lineResults: string[] = [];
 
       for (const line of lines) {
         // A. Update or create the main Inventory row
@@ -170,9 +175,10 @@ export async function PATCH(request: Request) {
           },
         });
 
-        // B. Remove bin allocations removed from the UI array
-        const incomingSublocationIds = line.bins.map((b) => b.sublocationId);
+        const validBins = lineDataBins(line.bins);
+        const incomingSublocationIds = validBins.map((b) => b.sublocationId);
 
+        // B. Remove bin allocations removed from the incoming list
         await tx.inventoryBin.deleteMany({
           where: {
             inventoryId: inventory.id,
@@ -180,23 +186,21 @@ export async function PATCH(request: Request) {
           },
         });
 
-        // C. Sync individual bin allocations
-        for (const binData of lineDataBins(line.bins)) {
+        // C. Sync individual bin allocations using compound key (inventoryId_sublocationId)
+        for (const binData of validBins) {
           await tx.inventoryBin.upsert({
             where: {
-              productId_sublocationId: {
-                productId: line.productId,
+              inventoryId_sublocationId: {
+                inventoryId: inventory.id,
                 sublocationId: binData.sublocationId,
               },
             },
             create: {
               inventoryId: inventory.id,
-              productId: line.productId,
               sublocationId: binData.sublocationId,
               quantity: binData.quantity,
             },
             update: {
-              inventoryId: inventory.id,
               quantity: binData.quantity,
             },
           });
@@ -244,11 +248,6 @@ export async function PATCH(request: Request) {
       { status: 500 }
     );
   }
-}
-
-// Helper to safely format bin list
-function lineDataBins(bins: Array<{ sublocationId: string; quantity: number }>) {
-  return bins.filter((bin) => Boolean(bin.sublocationId));
 }
 
 

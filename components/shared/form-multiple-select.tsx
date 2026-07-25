@@ -33,6 +33,7 @@ interface FormMultiSelectProps<
   searchPlaceholder?: string;
   loading?: boolean;
   loadingText?: string;
+  isDisabled?: boolean;
   className?: string;
   onCreateNew?: (searchQuery: string) => void;
   createNewText?: string;
@@ -52,6 +53,7 @@ export function FormMultiSelect<
   searchPlaceholder = "Search...",
   loading = false,
   loadingText = "Loading...",
+  isDisabled,
   className = "",
   onCreateNew,
   createNewText = "Add New Item",
@@ -92,10 +94,11 @@ export function FormMultiSelect<
             <Popover open={open} onOpenChange={setOpen}>
               <PopoverTrigger asChild>
                 <Button
+                  
                   variant="outline"
                   role="combobox"
                   aria-expanded={open}
-                  disabled={loading}
+                  disabled={loading || isDisabled}
                   className={cn(
                     "w-full justify-between font-normal text-sm min-h-8 h-auto py-1.5 px-3 shadow-xs items-center gap-2 flex wrap",
                     className
