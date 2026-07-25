@@ -1,4 +1,3 @@
-// app/admin/transfers/page.tsx
 "use client";
 
 import { useEffect, useState, Fragment } from "react";
@@ -9,7 +8,6 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { DeleteButton } from "@/components/shared/delete-button";
-import { TransferActionCell } from "@/components/transfer/transfer-action-cell";
 
 // Shadcn UI AlertDialog imports
 import {
@@ -46,7 +44,7 @@ interface TransferOrderRow {
   lines: LineDetail[];
 }
 
-// State tracker for our custom confirmation modal
+// State tracker for custom confirmation modal
 interface PendingAction {
   id: string;
   status: TransferOrderRow["status"];
@@ -210,6 +208,7 @@ export default function TransferOrdersListPage() {
                 {filteredOrders.map((order) => {
                   const isRowExpanded = !!expandedRows[order.id];
                   const isClosedRecord = order.status === "RECEIVED" || order.status === "CANCELLED";
+                  const canEdit = order.status === "DRAFT" || order.status === "PENDING";
                   
                   return (
                     <Fragment key={order.id}>
@@ -326,10 +325,11 @@ export default function TransferOrdersListPage() {
                               </Fragment>
                               )}
 
-                              { (order.status === "DRAFT" || order.linesCount === 0) && (
+                              {/* ALLOW EDITING IN BOTH DRAFT AND PENDING STATES */}
+                              {canEdit && (
                                 <Link 
                                   href={`/dashboard/transfers/${order.id}/edit`}
-                                  className="px-2 font-semibold gap-1 flex "
+                                  className="px-2 text-xs font-semibold gap-1 flex items-center text-muted-foreground hover:text-foreground transition-colors"
                                 >
                                   <Edit3 className="w-3 h-3" /> Manage
                                 </Link>
@@ -351,10 +351,19 @@ export default function TransferOrdersListPage() {
                           <td colSpan={8} className="p-0 bg-muted/10 border-b">
                             <div className="px-14 py-4 space-y-3 animate-in fade-in duration-100">
                               
-                              <div className="flex flex-col sm:flex-row gap-4 text-[11px] text-muted-foreground border-b pb-2">
-                                <div>Issued Date: <strong className="text-foreground">{new Date(order.createdAt).toLocaleDateString()}</strong></div>
-                                {order.transferredAt && <div>Dispatched: <strong className="text-foreground">{new Date(order.transferredAt).toLocaleDateString()}</strong></div>}
-                                {order.receivedAt && <div>Arrived: <strong className="text-foreground">{new Date(order.receivedAt).toLocaleDateString()}</strong></div>}
+                              <div className="flex flex-col sm:flex-row justify-between sm:items-center text-[11px] text-muted-foreground border-b pb-2 gap-2">
+                                <div className="flex flex-wrap gap-4">
+                                  <div>Issued Date: <strong className="text-foreground">{new Date(order.createdAt).toLocaleDateString()}</strong></div>
+                                  {order.transferredAt && <div>Dispatched: <strong className="text-foreground">{new Date(order.transferredAt).toLocaleDateString()}</strong></div>}
+                                  {order.receivedAt && <div>Arrived: <strong className="text-foreground">{new Date(order.receivedAt).toLocaleDateString()}</strong></div>}
+                                </div>
+                                {canEdit && (
+                                  <Button asChild variant="outline" size="xs" className="h-6 text-[10px] gap-1 shrink-0">
+                                    <Link href={`/dashboard/transfers/${order.id}/edit`}>
+                                      <Edit3 className="w-3 h-3" /> Edit Manifest Bins/Qty
+                                    </Link>
+                                  </Button>
+                                )}
                               </div>
 
                               <div className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1">
@@ -377,8 +386,8 @@ export default function TransferOrdersListPage() {
                                         <td className="p-2 font-medium text-foreground">
                                           {line.productName} <span className="font-mono text-[9px] text-muted-foreground ml-1">({line.productSku})</span>
                                         </td>
-                                        <td className="p-2 text-muted-foreground">{line.sourceBinName}</td>
-                                        <td className="p-2 text-muted-foreground">{line.targetBinName}</td>
+                                        <td className="p-2 text-muted-foreground">{line.sourceBinName || "Unassigned / Main Stock"}</td>
+                                        <td className="p-2 text-muted-foreground">{line.targetBinName || "Unassigned / Main Stock"}</td>
                                         <td className="p-2 text-right font-mono font-semibold text-foreground">{line.quantity.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
                                       </tr>
                                     ))}

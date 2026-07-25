@@ -47,10 +47,12 @@ const fetcher = (url: string) => fetch(url).then((res) => res.json());
 
 export function TransferOrderForm({ locations, initialData }: TransferOrderFormProps) {
   const router = useRouter();
-  const isFormDisabled = initialData.status !== "DRAFT";
   const [modalOpen, setModalOpen] = useState(false);
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
 
+  const isEditableStatus = initialData.status === "DRAFT" || initialData.status === "PENDING";
+  const isFormDisabled = !isEditableStatus;
+  
   const form = useForm<TransferOrderInput>({
     resolver: zodResolver(transferOrderSchema),
     defaultValues: {
@@ -138,13 +140,16 @@ export function TransferOrderForm({ locations, initialData }: TransferOrderFormP
         body: JSON.stringify(values),
       });
 
-      if (!response.ok) throw new Error("Failed to save transfer order.");
+      if (!response.ok) {
+        const errData = await response.json();
+        throw new Error(errData.error || "Network transaction failed.");
+      }
 
       toast.success("Transfer order saved successfully");
       router.push("/dashboard/transfers");
       router.refresh();
     } catch (err: any) {
-      toast.error("Execution Error", { description: err.message });
+      toast.error("Execution Error", { description: err.message || "Failed to save transfer order." });
     }
   };
 
@@ -337,14 +342,21 @@ export function TransferOrderForm({ locations, initialData }: TransferOrderFormP
           editingLineIndex={editingIndex}
           onSave={(data) => {
             if (editingIndex !== null) {
-              update(editingIndex, data);
+              // 1. Get current item at index to retain its React Hook Form key/id
+              const currentItem = fields[editingIndex];
+              const updatedItem = Array.isArray(data) ? data[0] : data;
+
+              // 2. Merge existing properties with updated fields so non-modal state isn't wiped
+              update(editingIndex, {
+                ...currentItem,
+                ...updatedItem,
+              });
             } else {
-              if (Array.isArray(data)) {
-                data.forEach((item) => append(item));
-              } else {
-                append(data);
-              }
+              // 3. Batch addition for new lines
+              const newLines = Array.isArray(data) ? data : [data];
+              newLines.forEach((item) => append(item));
             }
+
             setModalOpen(false);
             setEditingIndex(null);
           }}

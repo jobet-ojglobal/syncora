@@ -700,6 +700,7 @@ export interface InflowCustomer {
   lastModifiedBy?: InflowTeamMember | null;
   pricingScheme?: InflowPricingScheme | null;
   taxingScheme?: InflowTaxingScheme | null;
+
 }
 
 export interface InflowCustomerAddress {
@@ -895,7 +896,7 @@ export interface InflowPickLine {
   description?: string | null;
 }
 
-export interface InflowPaymentLine {
+export interface InflowSalesPaymentLine {
   salesOrderPaymentHistoryLineId: string;
   lineNum: number;
   amount: string;
@@ -1057,7 +1058,7 @@ export interface InflowSalesOrder {
   pickAllocationFailures: InflowAllocationFailure[];
   restockLines: InflowRestockLine[];
   shipLines: InflowShipLine[];
-  paymentLines: InflowPaymentLine[];
+  paymentLines: InflowSalesPaymentLine[];
   costOfGoodsSold?: InflowCostOfGoodsSold | null;
 
   currency: InflowCurrency;
@@ -1069,19 +1070,6 @@ export interface InflowSalesOrder {
 // Reusable Sub-structures
 // ==========================================
 
-
-export interface InflowPurchaseValueItem {
-  value: string; // e.g., "0.00000"
-  isPercent: boolean;
-}
-
-export interface InflowPurchaseQuantity {
-  standardQuantity: string;
-  uomQuantity: string;
-  uom: string;
-  serialNumbers: string[];
-}
-
 export interface InflowPurchaseUOMDetails {
   name: string;
   conversionRatio: {
@@ -1090,8 +1078,6 @@ export interface InflowPurchaseUOMDetails {
   };
 }
 
-
-
 // ==========================================
 // Lines array items
 // ==========================================
@@ -1099,13 +1085,13 @@ export interface InflowPurchaseUOMDetails {
 export interface InflowPurchaseOrderLine {
   purchaseOrderLineId: string;
   description: string | null;
-  discount: InflowPurchaseValueItem;
+  discount: InflowDiscount;
   productHeight: string | null;
   productId: string;
   productLength: string | null;
   productWeight: string | null;
   productWidth: string | null;
-  quantity: InflowPurchaseQuantity;
+  quantity: InflowQuantity;
   returnDate: string | null;
   serviceCompleted: boolean | null;
   subTotal: string;
@@ -1116,7 +1102,7 @@ export interface InflowPurchaseOrderLine {
   unitPrice: string;
   vendorItemCode: string | null;
   product?: InflowProduct;
-  taxCode?: Record<string, any> | null;
+  taxCode?: InflowTaxCode | null;
 }
 
 export interface InflowPurchaseReceiveLine {
@@ -1129,7 +1115,7 @@ export interface InflowPurchaseReceiveLine {
   productLength: string | null;
   productWeight: string | null;
   productWidth: string | null;
-  quantity: InflowPurchaseQuantity;
+  quantity: InflowQuantity;
   receiveDate: string | null;
   sublocation: string | null; // e.g., "A-01"
   timestamp: string;
@@ -1166,7 +1152,7 @@ export interface InflowPurchaseOrder {
   isTaxInclusive: boolean;
   lastModifiedById: string;
   locationId: string;
-  nonVendorCosts: InflowPurchaseValueItem;
+  nonVendorCosts: InflowDiscount;
   orderDate: string | null;
   orderNumber: string;
   orderRemarks: string;
@@ -1200,20 +1186,55 @@ export interface InflowPurchaseOrder {
   vendorOrderNumber: string;
 
   // Relationship blocks from data layout
-  approverTeamMember: Record<string, any> | null;
-  assignedToTeamMember: Record<string, any> | null;
-  attachments: any[];
-  currency: InflowCurrency;
-  lastModifiedBy: InflowTeamMember;
-  lines: InflowPurchaseOrderLine[];
-  location: InflowLocation;
-  paymentLines: any[];
-  paymentTerms: InflowPaymentTerms;
-  receiveLines: InflowPurchaseReceiveLine[];
-  taxingScheme: Record<string, any>;
-  unstockLines: any[];
-  vendor: Record<string, any>;
+  approverTeamMember?: InflowTeamMember | null;
+  assignedToTeamMember?: InflowTeamMember | null;
+  attachments?: InflowAttachment[];
+  currency?: InflowCurrency;
+  lastModifiedBy?: InflowTeamMember | null;
+  lines?: InflowPurchaseOrderLine[];
+  location?: InflowLocation;
+  paymentLines?: InflowPurchasePaymentLine[];
+  paymentTerms?: InflowPaymentTerms;
+  receiveLines?: InflowPurchaseReceiveLine[];
+  taxingScheme?: InflowTaxingScheme;
+  unstockLines?: InflowPurchaseUnstockLine[];
+  vendor?: InflowVendor | null;
 }
+
+export interface InflowPurchasePaymentLine {
+  purchaseOrderPaymentHistoryLineId: string;
+  amount: string;
+  datePaid: string | null;
+  paymentMethod: string | null;
+  paymentType: string | null;
+  referenceNumber: string | null;
+  remarks: string | null;
+  timestamp: string;
+}
+
+export interface InflowPurchaseUnstockLine {
+  purchaseOrderUnstockLineId: string;
+  locationId: string;
+  productId: string;
+  description: string;
+  quantity: InflowQuantity;
+  sublocation: string;
+  vendorItemCode: string;
+  unstockDate: string;
+  timestamp: string;
+  location?: InflowLocation;
+  product?: InflowProduct;
+}
+
+
+// "amount": "19.99",
+// "datePaid": "2020-01-31",
+// "paymentMethod": "string",
+// "paymentType": "Payment",
+// "purchaseOrderPaymentHistoryLineId": "00000000-0000-0000-0000-000000000000",
+// "referenceNumber": "string",
+// "remarks": "string",
+// "timestamp": "0000000000310AB6"
 
 
 // Shared Attachment

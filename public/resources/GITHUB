@@ -15,3 +15,15 @@ user.email= 284168292+astutefalcon@users.noreply.github.com
 
 git config --global user.name
 git config --global user.email
+
+
+git config user.name "John Doe"
+git config user.email "john@company.com"
+
+git config --list --show-origin
+
+
+git pull personal main
+git commit --allow-empty -m "Sync from personal"
+git config user.name "John Work"
+git config user.email "john@company.com"

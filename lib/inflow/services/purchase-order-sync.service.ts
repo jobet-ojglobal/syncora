@@ -1,8 +1,7 @@
 // services/sync/purchase/purchase-order-sync.service.ts
-
 import { prisma } from "@/lib/prisma";
 import { getPurchaseOrders } from "../data/purchase-orders";
-import { syncPurchaseOrder } from "./purchase-order.sync";
+import { syncPurchaseOrder, PurchaseOrderSyncCaches } from "./purchase-order.sync";
 
 type SyncOptions = {
   onProgress?: (processedCount: number) => Promise<void>;
@@ -15,7 +14,18 @@ export class PurchaseOrderSyncService {
     let after: string | undefined;
     let totalProcessed = 0;
 
-    console.log("Starting Master Purchase Order dependency-validated graph sync...");
+    // Cross-batch tracking caches passed down to single items safely
+    const caches: PurchaseOrderSyncCaches = {
+      verifiedVendorIds: new Set<string>(),
+      verifiedLocationIds: new Set<string>(),
+      verifiedTeamMemberIds: new Set<string>(),
+      verifiedProductIds: new Set<string>(),
+      verifiedPaymentTermsIds: new Set<string>(),
+      verifiedCurrencyIds: new Set<string>(),
+      verifiedTaxingSchemeIds: new Set<string>(),
+    };
+
+    console.log("Starting modular batched purchase order sync operation...");
 
     while (true) {
       const response = await getPurchaseOrders(BATCH_SIZE, after);
@@ -23,56 +33,18 @@ export class PurchaseOrderSyncService {
 
       if (!orders || orders.length === 0) break;
 
-      // Collect external IDs to batch check integrity
-      const vendorIds = new Set<string>();
-      const locationIds = new Set<string>();
-      const teamMemberIds = new Set<string>();
-      const productIds = new Set<string>();
-
-      for (const order of orders) {
-        if (order.vendorId) vendorIds.add(order.vendorId);
-        if (order.locationId) locationIds.add(order.locationId);
-        if (order.assignedToTeamMemberId) teamMemberIds.add(order.assignedToTeamMemberId);
-        if (order.approverTeamMemberId) teamMemberIds.add(order.approverTeamMemberId);
-        if (order.lastModifiedById) teamMemberIds.add(order.lastModifiedById);
-
-        order.lines?.forEach((l: any) => l.productId && productIds.add(l.productId));
-        order.receiveLines?.forEach((l: any) => l.productId && productIds.add(l.productId));
-        order.unstockLines?.forEach((l: any) => l.productId && productIds.add(l.productId));
-      }
-
-      // Query verification references in parallel blocks across the whole batch
-      const [dbVendors, dbLocations, dbTeam, dbProducts] = await Promise.all([
-        prisma.vendor.findMany({ where: { inflowId: { in: Array.from(vendorIds) } }, select: { inflowId: true } }),
-        prisma.location.findMany({ where: { inflowId: { in: Array.from(locationIds) } }, select: { inflowId: true } }),
-        prisma.teamMember.findMany({ where: { inflowId: { in: Array.from(teamMemberIds) } }, select: { inflowId: true } }),
-        prisma.product.findMany({ where: { inflowId: { in: Array.from(productIds) } }, select: { inflowId: true } }),
-      ]);
-
-      // Set configurations (Vendors are bypassed intentionally to go through the JIT self-healing layer)
-      const validationSets = {
-        validLocations: new Set(dbLocations.map((l) => l.inflowId)),
-        validTeamMembers: new Set(dbTeam.map((tm) => tm.inflowId)),
-        validProducts: new Set(dbProducts.map((p) => p.inflowId)),
-      };
-
-      // Wrap item execution inside a long-running batch transaction wrapper
       await prisma.$transaction(
         async (tx) => {
           for (const order of orders) {
-            await syncPurchaseOrder(tx, order, validationSets);
+            await syncPurchaseOrder(tx, order, caches);
+            totalProcessed++;
           }
         },
-        { timeout: 90000 } // Expanded to 90s to easily absorb recursive auto-healing vendor logic
+        { timeout: 90000 }
       );
 
-      totalProcessed += orders.length;
       after = orders[orders.length - 1].purchaseOrderId;
-
-      if (options?.onProgress) {
-        await options.onProgress(totalProcessed);
-      }
-
+      if (options?.onProgress) await options.onProgress(totalProcessed);
       if (orders.length < BATCH_SIZE) break;
     }
 
@@ -82,6 +54,92 @@ export class PurchaseOrderSyncService {
     };
   }
 }
+
+
+// // services/sync/purchase/purchase-order-sync.service.ts
+
+// import { prisma } from "@/lib/prisma";
+// import { getPurchaseOrders } from "../data/purchase-orders";
+// import { syncPurchaseOrder } from "./purchase-order.sync";
+
+// type SyncOptions = {
+//   onProgress?: (processedCount: number) => Promise<void>;
+//   batchSize?: number;
+// };
+
+// export class PurchaseOrderSyncService {
+//   async sync(options?: SyncOptions) {
+//     const BATCH_SIZE = options?.batchSize ?? 50;
+//     let after: string | undefined;
+//     let totalProcessed = 0;
+
+//     console.log("Starting Master Purchase Order dependency-validated graph sync...");
+
+//     while (true) {
+//       const response = await getPurchaseOrders(BATCH_SIZE, after);
+//       const orders = Array.isArray(response) ? response : (response as any)?.data || [];
+
+//       if (!orders || orders.length === 0) break;
+
+//       // Collect external IDs to batch check integrity
+//       const vendorIds = new Set<string>();
+//       const locationIds = new Set<string>();
+//       const teamMemberIds = new Set<string>();
+//       const productIds = new Set<string>();
+
+//       for (const order of orders) {
+//         if (order.vendorId) vendorIds.add(order.vendorId);
+//         if (order.locationId) locationIds.add(order.locationId);
+//         if (order.assignedToTeamMemberId) teamMemberIds.add(order.assignedToTeamMemberId);
+//         if (order.approverTeamMemberId) teamMemberIds.add(order.approverTeamMemberId);
+//         if (order.lastModifiedById) teamMemberIds.add(order.lastModifiedById);
+
+//         order.lines?.forEach((l: any) => l.productId && productIds.add(l.productId));
+//         order.receiveLines?.forEach((l: any) => l.productId && productIds.add(l.productId));
+//         order.unstockLines?.forEach((l: any) => l.productId && productIds.add(l.productId));
+//       }
+
+//       // Query verification references in parallel blocks across the whole batch
+//       const [dbVendors, dbLocations, dbTeam, dbProducts] = await Promise.all([
+//         prisma.vendor.findMany({ where: { inflowId: { in: Array.from(vendorIds) } }, select: { inflowId: true } }),
+//         prisma.location.findMany({ where: { inflowId: { in: Array.from(locationIds) } }, select: { inflowId: true } }),
+//         prisma.teamMember.findMany({ where: { inflowId: { in: Array.from(teamMemberIds) } }, select: { inflowId: true } }),
+//         prisma.product.findMany({ where: { inflowId: { in: Array.from(productIds) } }, select: { inflowId: true } }),
+//       ]);
+
+//       // Set configurations (Vendors are bypassed intentionally to go through the JIT self-healing layer)
+//       const validationSets = {
+//         validLocations: new Set(dbLocations.map((l) => l.inflowId)),
+//         validTeamMembers: new Set(dbTeam.map((tm) => tm.inflowId)),
+//         validProducts: new Set(dbProducts.map((p) => p.inflowId)),
+//       };
+
+//       // Wrap item execution inside a long-running batch transaction wrapper
+//       await prisma.$transaction(
+//         async (tx) => {
+//           for (const order of orders) {
+//             await syncPurchaseOrder(tx, order, validationSets);
+//           }
+//         },
+//         { timeout: 90000 } // Expanded to 90s to easily absorb recursive auto-healing vendor logic
+//       );
+
+//       totalProcessed += orders.length;
+//       after = orders[orders.length - 1].purchaseOrderId;
+
+//       if (options?.onProgress) {
+//         await options.onProgress(totalProcessed);
+//       }
+
+//       if (orders.length < BATCH_SIZE) break;
+//     }
+
+//     return {
+//       totalPurchaseOrdersScanned: totalProcessed,
+//       syncedAt: new Date().toISOString(),
+//     };
+//   }
+// }
 
 // // services/sync/purchase/purchase-order-sync.service.ts
 // import { prisma } from "@/lib/prisma";

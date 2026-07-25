@@ -23,8 +23,6 @@ export async function syncInventoryLines(
 ) {
   if (!inventoryLines.length) return;
 
-  console.log(selectedLocationIds)
-
   // 1. Filter lines by selected target locations if provided
   const linesToSync = selectedLocationIds?.length
     ? inventoryLines.filter(

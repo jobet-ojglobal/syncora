@@ -7,6 +7,19 @@ import { prisma } from "@/lib/prisma";
 
 type Tx = Prisma.TransactionClient;
 
+/**
+ * Safely converts custom interfaces/objects to Prisma-compatible JSON input values,
+ * returning Prisma.DbNull for null/undefined.
+ */
+export const toJsonInput = (
+  val: any
+): Prisma.InputJsonValue | Prisma.NullableJsonNullValueInput => {
+  if (val === null || val === undefined) {
+    return Prisma.DbNull;
+  }
+  return val as unknown as Prisma.InputJsonValue;
+};
+
 export async function syncBrand(
   tx:  typeof prisma | Tx,
   brandName?: string | null

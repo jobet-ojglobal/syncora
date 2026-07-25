@@ -1,12 +1,27 @@
 // lib/inflow/services/customer.sync.ts
 
 import { Prisma } from "@/generated/prisma/client";
-import { ensureLocationShell, ensurePaymentTermsShell } from "./ensure.service";
+import { ensureLocationShell, ensurePaymentTermsShell, ensurePricingSchemeShell, ensureTaxingSchemeShell } from "./ensure.service";
 import { InflowCustomer } from "../types";
 import { getTaxingScheme } from "../data/taxing-schemes";
 import { syncTaxingScheme } from "./taxing-scheme.sync";
 import { getPricingScheme } from "../data/pricing-schemes";
 import { syncPricingScheme } from "./pricing-scheme.sync";
+import { syncTeamMember } from "./team-member.sync";
+
+
+type SyncCache = {
+  verifiedTeamMemberIds?: Set<string>;
+  verifiedCategoryIds?: Set<string>;
+  verifiedVendorIds?: Set<string>;
+  verifiedLocationIds?: Set<string>;
+  verifiedTaxingSchemes?: Set<string>;
+  verifiedTaxCodes?: Set<string>;
+  verifiedOperationTypes?: Set<string>;
+  verifiedPricingSchemeIds?: Set<string>;
+  verifiedProductIds?: Set<string>;
+  verifiedPaymentTermsIds?: Set<string>;
+};
 
 /**
  * Syncs a single customer payload into the local database using an ongoing Prisma transaction.
@@ -14,12 +29,15 @@ import { syncPricingScheme } from "./pricing-scheme.sync";
 export async function syncCustomer(
   tx: any,
   customer: InflowCustomer,
-  caches: { verifiedLocationIds: Set<string>; verifiedPaymentTermsIds: Set<string> }
+  caches: SyncCache
 ) {
   const cleanEmail = customer.email?.trim().toLowerCase();
 
   const verifiedLocations = caches?.verifiedLocationIds ?? new Set<string>();
   const verifiedPaymentTerms = caches?.verifiedPaymentTermsIds ?? new Set<string>();
+  const verifiedTeamMembers = caches?.verifiedTeamMemberIds ?? new Set<string>();
+  const verifiedPricingSchemes = caches?.verifiedPricingSchemeIds ?? new Set<string>();
+  const verifiedTaxingSchemes = caches?.verifiedTaxingSchemes ?? new Set<string>();
 
   /**
    * STEP 1: Rich Foreign Key Healing (Locations & Terms)
@@ -61,7 +79,6 @@ export async function syncCustomer(
     }
   }
 
-
   // if (customer.defaultPaymentTerms?.paymentTermsId && !caches.verifiedPaymentTermsIds.has(customer.defaultPaymentTerms.paymentTermsId)) {
   //   await ensurePaymentTermsShell(tx, {
   //     inflowId: customer.defaultPaymentTerms.paymentTermsId,
@@ -99,87 +116,195 @@ export async function syncCustomer(
   /**
    * STEP 1.5: SELF-HEALING FOREIGN KEY GUARDS (Team Members)
    */
+  // let validLastModifiedById: string | null = null;
+  // if (customer.lastModifiedById) {
+  //   const localMember = await tx.teamMember.findUnique({
+  //     where: { inflowId: customer.lastModifiedById },
+  //     select: { inflowId: true }
+  //   });
+    
+  //   if (localMember) {
+  //     validLastModifiedById = localMember.inflowId;
+  //   } else {
+  //     console.warn(
+  //       `[Sync Notification] TeamMember with inflowId "${customer.lastModifiedById}" not synced yet. Setting customer.lastModifiedById to null.`
+  //     );
+  //   }
+  // }
+
   let validLastModifiedById: string | null = null;
   if (customer.lastModifiedById) {
-    const localMember = await tx.teamMember.findUnique({
-      where: { inflowId: customer.lastModifiedById },
-      select: { inflowId: true }
-    });
-    
-    if (localMember) {
-      validLastModifiedById = localMember.inflowId;
+    if (verifiedTeamMembers.has(customer.lastModifiedById)) {
+      validLastModifiedById = customer.lastModifiedById;
     } else {
-      console.warn(
-        `[Sync Notification] TeamMember with inflowId "${customer.lastModifiedById}" not synced yet. Setting customer.lastModifiedById to null.`
-      );
+      const localMember = await tx.teamMember.findUnique({
+        where: { inflowId: customer.lastModifiedById },
+        select: { inflowId: true },
+      });
+
+      if (localMember) {
+        validLastModifiedById = localMember.inflowId;
+        verifiedTeamMembers.add(localMember.inflowId);
+      } else if (customer.lastModifiedBy) {
+        console.warn(
+          `[Sync Notification] TeamMember with inflowId "${customer.lastModifiedById}" missing locally. Syncing JIT...`
+        );
+        const syncMember = await syncTeamMember(tx, customer.lastModifiedBy);
+        if (syncMember?.inflowId) {
+          validLastModifiedById = syncMember.inflowId;
+          verifiedTeamMembers.add(syncMember.inflowId);
+        }
+      }
     }
   }
 
   let validSalesRepId: string | null = null;
-  if (customer.defaultSalesRepTeamMemberId) { // Fixed: Checked against the correct source property
-    const localMember = await tx.teamMember.findUnique({
-      where: { inflowId: customer.defaultSalesRepTeamMemberId },
-      select: { inflowId: true }
-    });
-    
-    if (localMember) {
-      validSalesRepId = localMember.inflowId;
+  if (customer.defaultSalesRepTeamMemberId) {
+    if (verifiedTeamMembers.has(customer.defaultSalesRepTeamMemberId)) {
+      validSalesRepId = customer.defaultSalesRepTeamMemberId;
     } else {
-      console.warn(
-        `[Sync Notification] Sales Rep member with inflowId "${customer.defaultSalesRepTeamMemberId}" not synced yet.`
-      );
+      const localMember = await tx.teamMember.findUnique({
+        where: { inflowId: customer.defaultSalesRepTeamMemberId },
+        select: { inflowId: true },
+      });
+
+      if (localMember) {
+        validSalesRepId = localMember.inflowId;
+        verifiedTeamMembers.add(localMember.inflowId);
+      } else if (customer.defaultSalesRepTeamMember) {
+        console.warn(
+          `[Sync Notification] Sales Rep member with inflowId "${customer.defaultSalesRepTeamMemberId}" missing locally. Syncing JIT...`
+        );
+        const syncMember = await syncTeamMember(tx, customer.defaultSalesRepTeamMember);
+        if (syncMember?.inflowId) {
+          validSalesRepId = syncMember.inflowId;
+          verifiedTeamMembers.add(syncMember.inflowId);
+        }
+      }
     }
   }
 
-  // JIT Self-Healing Layer for missing pricing scheme
-  let validPricingSchemeId: string | null = null;
-  if (customer.pricingSchemeId) {
-    const localPricingScheme = await tx.pricingScheme.findUnique({
-      where: { inflowId: customer.pricingSchemeId },
-      select: { inflowId: true }
-    });
+  // let validSalesRepId: string | null = null;
+  // if (customer.defaultSalesRepTeamMemberId) { // Fixed: Checked against the correct source property
+  //   const localMember = await tx.teamMember.findUnique({
+  //     where: { inflowId: customer.defaultSalesRepTeamMemberId },
+  //     select: { inflowId: true }
+  //   });
     
-    if (!localPricingScheme) {
-      try {
-        console.log(`[JIT Sync] PricingScheme "${customer.pricingSchemeId}" missing locally. Fetching...`);
-        const pricingScheme = await getPricingScheme(customer.pricingSchemeId);
-        if (pricingScheme) {
-          await syncPricingScheme(tx, pricingScheme);
-          validPricingSchemeId = customer.pricingSchemeId;
-        }
-      } catch (err) {
-        console.error(`[JIT Sync Error] Could not recover Pricing Scheme:`, err);
-        validPricingSchemeId = null;
-      }
+  //   if (localMember) {
+  //     validSalesRepId = localMember.inflowId;
+  //   } else {
+  //     console.warn(
+  //       `[Sync Notification] Sales Rep member with inflowId "${customer.defaultSalesRepTeamMemberId}" not synced yet.`
+  //     );
+  //   }
+  // }
+
+  // JIT Self-Healing Layer for missing pricing scheme
+  // let validPricingSchemeId: string | null = null;
+  // if (customer.pricingSchemeId) {
+  //   const localPricingScheme = await tx.pricingScheme.findUnique({
+  //     where: { inflowId: customer.pricingSchemeId },
+  //     select: { inflowId: true }
+  //   });
+    
+  //   if (!localPricingScheme) {
+  //     try {
+  //       console.log(`[JIT Sync] PricingScheme "${customer.pricingSchemeId}" missing locally. Fetching...`);
+  //       const pricingScheme = await getPricingScheme(customer.pricingSchemeId);
+  //       if (pricingScheme) {
+  //         await syncPricingScheme(tx, pricingScheme);
+  //         validPricingSchemeId = customer.pricingSchemeId;
+  //       }
+  //     } catch (err) {
+  //       console.error(`[JIT Sync Error] Could not recover Pricing Scheme:`, err);
+  //       validPricingSchemeId = null;
+  //     }
+  //   } else {
+  //     validPricingSchemeId = localPricingScheme.inflowId;
+  //   }
+  // }
+
+  let validPricingSchemeId: string | null = null;
+  
+  if (customer.pricingSchemeId) {
+    // 1. Check in-memory cache first
+    if (verifiedPricingSchemes?.has(customer.pricingSchemeId)) {
+      validPricingSchemeId = customer.pricingSchemeId;
     } else {
-      validPricingSchemeId = localPricingScheme.inflowId;
+      // 2. Query database for local existence
+      const localScheme = await tx.pricingScheme.findUnique({
+        where: { inflowId: customer.pricingSchemeId },
+        select: { inflowId: true },
+      });
+
+      if (localScheme) {
+        validPricingSchemeId = localScheme.inflowId;
+        verifiedPricingSchemes?.add(localScheme.inflowId);
+      } else if (customer.pricingScheme) {
+        // 3. JIT Shell Creation / Fallback Sync
+        console.warn(
+          `[Sync Notification] PricingScheme "${customer.pricingSchemeId}" missing locally. Syncing JIT...`
+        );
+        const syncedScheme = await ensurePricingSchemeShell(tx, customer.pricingScheme);
+        if (syncedScheme?.inflowId) {
+          validPricingSchemeId = syncedScheme.inflowId;
+          verifiedPricingSchemes?.add(syncedScheme.inflowId);
+        }
+      }
     }
   }
 
   // JIT Self-Healing Layer for missing taxing scheme
-  let validTaxingSchemeId: string | null = null;
-  if (customer.taxingSchemeId) {
-    const localTaxingScheme = await tx.taxingScheme.findUnique({
-      where: { inflowId: customer.taxingSchemeId },
-      select: { inflowId: true }
-    });
+  // let validTaxingSchemeId: string | null = null;
+  // if (customer.taxingSchemeId) {
+  //   const localTaxingScheme = await tx.taxingScheme.findUnique({
+  //     where: { inflowId: customer.taxingSchemeId },
+  //     select: { inflowId: true }
+  //   });
     
-    if (!localTaxingScheme) {
-      try {
-        console.log(`[JIT Sync] TaxingScheme "${customer.taxingSchemeId}" missing locally. Fetching...`);
-        const taxingScheme = await getTaxingScheme(customer.taxingSchemeId);
-        if (taxingScheme) {
-          await syncTaxingScheme(tx, taxingScheme);
-          validTaxingSchemeId = customer.taxingSchemeId;
+  //   if (!localTaxingScheme) {
+  //     try {
+  //       console.log(`[JIT Sync] TaxingScheme "${customer.taxingSchemeId}" missing locally. Fetching...`);
+  //       const taxingScheme = await getTaxingScheme(customer.taxingSchemeId);
+  //       if (taxingScheme) {
+  //         await syncTaxingScheme(tx, taxingScheme);
+  //         validTaxingSchemeId = customer.taxingSchemeId;
+  //       }
+  //     } catch (err) {
+  //       console.error(`[JIT Sync Error] Could not recover Taxing Scheme:`, err);
+  //       validTaxingSchemeId = null;
+  //     }
+  //   } else {
+  //     validTaxingSchemeId = localTaxingScheme.inflowId;
+  //   }
+  // }
+
+  let validTaxingSchemeId: string | null = null;
+    if (customer.taxingSchemeId) {
+      if (verifiedTaxingSchemes.has(customer.taxingSchemeId)) {
+        validTaxingSchemeId = customer.taxingSchemeId;
+      } else {
+        const localTaxingScheme = await tx.taxingScheme.findUnique({
+          where: { inflowId: customer.taxingSchemeId },
+          select: { inflowId: true }
+        });
+        
+        if (localTaxingScheme) {
+          validTaxingSchemeId = localTaxingScheme.inflowId;
+          verifiedTaxingSchemes.add(localTaxingScheme.inflowId);
+        } else if (customer.taxingScheme) {
+          console.warn(
+            `[Sync Notification] Taxing Scheme "${customer.taxingSchemeId}" missing locally. Syncing JIT...`
+          );
+          const newTaxingScheme = await ensureTaxingSchemeShell(tx, customer.taxingScheme);
+          if (newTaxingScheme?.inflowId) {
+            validTaxingSchemeId = newTaxingScheme.inflowId;
+            verifiedTaxingSchemes.add(newTaxingScheme.inflowId);
+          }
         }
-      } catch (err) {
-        console.error(`[JIT Sync Error] Could not recover Taxing Scheme:`, err);
-        validTaxingSchemeId = null;
       }
-    } else {
-      validTaxingSchemeId = localTaxingScheme.inflowId;
     }
-  }
 
   /**
    * STEP 2: Handle BusinessPartner Row Identity Linkages
@@ -275,7 +400,6 @@ export async function syncCustomer(
       taxingSchemeId: validTaxingSchemeId,
       defaultSalesRepTeamMemberId: validSalesRepId,
       lastModifiedById: validLastModifiedById,
-      lastModifiedDttm: customer.lastModifiedDttm ? new Date(customer.lastModifiedDttm) : null,
       defaultBillingAddressId: customer.defaultBillingAddress?.customerAddressId,
       defaultShippingAddressId: customer.defaultShippingAddress?.customerAddressId,
     },
@@ -290,7 +414,6 @@ export async function syncCustomer(
       taxingSchemeId: validTaxingSchemeId,
       defaultSalesRepTeamMemberId: validSalesRepId,
       lastModifiedById: validLastModifiedById,
-      lastModifiedDttm: customer.lastModifiedDttm ? new Date(customer.lastModifiedDttm) : null,
       defaultBillingAddressId: customer.defaultBillingAddress?.customerAddressId,
       defaultShippingAddressId: customer.defaultShippingAddress?.customerAddressId,
     },

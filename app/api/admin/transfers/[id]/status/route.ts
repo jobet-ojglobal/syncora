@@ -12,7 +12,12 @@ import {
 export async function PATCH(request: NextRequest) {
   try {
     const body = await request.json();
-    const { id, status: targetStatus, remarks, teamMemberId = "cc920c31-bcb2-4264-9946-4b7693c9c7e0" } = body;
+    const {
+      id,
+      status: targetStatus,
+      remarks,
+      teamMemberId = "cc920c31-bcb2-4264-9946-4b7693c9c7e0",
+    } = body;
 
     if (!id) {
       return NextResponse.json(
@@ -69,7 +74,7 @@ export async function PATCH(request: NextRequest) {
 
     // Execute state adjustments transaction
     const processingResult = await prisma.$transaction(async (tx) => {
-      // ✅ NEW SCENARIO: SUBMIT FOR APPROVAL (DRAFT -> PENDING)
+      // ✅ SCENARIO: SUBMIT FOR APPROVAL (DRAFT -> PENDING)
       if (targetStatus === "PENDING" && oldStatus === "DRAFT") {
         return await tx.transferOrder.update({
           where: { id },
@@ -120,14 +125,18 @@ export async function PATCH(request: NextRequest) {
           if (line.sourceSublocationId) {
             const sourceBin = await tx.inventoryBin.findFirst({
               where: {
-                productId: line.productId,
-                sublocationId: line.sourceSublocationId,
                 inventoryId: sourceInv.id,
+                sublocationId: line.sourceSublocationId,
               },
             });
 
-            if (!sourceBin || new Prisma.Decimal(sourceBin.quantity).lessThan(qty)) {
-              throw new Error(`Insufficient Sublocation Volume inside selected source bin node.`);
+            if (
+              !sourceBin ||
+              new Prisma.Decimal(sourceBin.quantity).lessThan(qty)
+            ) {
+              throw new Error(
+                `Insufficient Sublocation Volume inside selected source bin node.`
+              );
             }
 
             await tx.inventoryBin.update({
@@ -146,7 +155,9 @@ export async function PATCH(request: NextRequest) {
               referenceType: InventoryReferenceType.TRANSFER_ORDER,
               referenceId: currentOrder.id,
               performedById: teamMemberId || null,
-              remarks: remarks || `Stock transfer outbound to ${currentOrder.targetLocationId}`,
+              remarks:
+                remarks ||
+                `Stock transfer outbound to ${currentOrder.targetLocationId}`,
               quantityChange: qty.negated(),
               quantityBefore: beforeQty,
               quantityAfter: afterQty,
@@ -206,7 +217,6 @@ export async function PATCH(request: NextRequest) {
             const targetBin = await tx.inventoryBin.findFirst({
               where: {
                 inventoryId: targetInv.id,
-                productId: line.productId,
                 sublocationId: line.targetSublocationId,
               },
             });
@@ -215,7 +225,6 @@ export async function PATCH(request: NextRequest) {
               await tx.inventoryBin.create({
                 data: {
                   inventoryId: targetInv.id,
-                  productId: line.productId,
                   sublocationId: line.targetSublocationId,
                   quantity: qty,
                 },
@@ -238,7 +247,9 @@ export async function PATCH(request: NextRequest) {
               referenceType: InventoryReferenceType.TRANSFER_ORDER,
               referenceId: currentOrder.id,
               performedById: teamMemberId || null,
-              remarks: remarks || `Stock transfer inbound from ${currentOrder.sourceLocationId}`,
+              remarks:
+                remarks ||
+                `Stock transfer inbound from ${currentOrder.sourceLocationId}`,
               quantityChange: qty,
               quantityBefore: beforeQty,
               quantityAfter: afterQty,
@@ -287,11 +298,10 @@ export async function PATCH(request: NextRequest) {
           });
 
           // Return stock into explicit source sublocation bin mapping node
-          if (line.sourceSublocationId) {
+          if (line.sourceSublocationId && sourceInv) {
             const sourceBin = await tx.inventoryBin.findFirst({
               where: {
-                inventoryId: sourceInv?.id,
-                productId: line.productId,
+                inventoryId: sourceInv.id,
                 sublocationId: line.sourceSublocationId,
               },
             });
@@ -314,7 +324,9 @@ export async function PATCH(request: NextRequest) {
               referenceType: InventoryReferenceType.TRANSFER_ORDER,
               referenceId: currentOrder.id,
               performedById: teamMemberId || null,
-              remarks: remarks || `Reversion: Transfer order cancelled during transit`,
+              remarks:
+                remarks ||
+                `Reversion: Transfer order cancelled during transit`,
               quantityChange: qty,
               quantityBefore: beforeQty,
               quantityAfter: afterQty,
@@ -348,7 +360,10 @@ export async function PATCH(request: NextRequest) {
   } catch (error: any) {
     console.error("State Processing Transaction Exception:", error);
     return NextResponse.json(
-      { error: error.message || "State processing pipeline breakdown encountered." },
+      {
+        error:
+          error.message || "State processing pipeline breakdown encountered.",
+      },
       { status: 500 }
     );
   }

@@ -9,7 +9,7 @@ type DbClient = Prisma.TransactionClient | PrismaClient;
  * Guarantees foreign key integrity for relation pipelines.
  */
 export async function ensureCategoryShell(
-  tx: Prisma.TransactionClient,
+  tx: DbClient,
   payload: InflowCategory
 ) {
   if (!payload.categoryId) return null;
@@ -62,7 +62,7 @@ export async function ensureLocationShell(
  * Guarantees foreign key integrity for relation pipelines.
  */
 export async function ensureOperationTypeShell(
-  tx: Prisma.TransactionClient,
+  tx: DbClient,
   payload: InflowOperationType
 ) {
   if (!payload.operationTypeId) return null;
@@ -86,7 +86,7 @@ export async function ensureOperationTypeShell(
  * Guarantees foreign key integrity for relation pipelines.
  */
 export async function ensurePaymentTermsShell(
-  tx: Prisma.TransactionClient,
+  tx: DbClient,
   payload: InflowPaymentTerms
 ) {
   if (!payload.paymentTermsId) return null;
@@ -107,7 +107,7 @@ export async function ensurePaymentTermsShell(
  * Guarantees foreign key integrity for relation pipelines.
  */
 export async function ensureCurrencyShell(
-  tx: Prisma.TransactionClient,
+  tx: DbClient,
   payload: InflowCurrency
 ) {
   if (!payload.currencyId) return null;
@@ -130,7 +130,7 @@ export async function ensureCurrencyShell(
 }
 
 export async function ensurePricingSchemeShell(
-  tx: Prisma.TransactionClient,
+  tx: DbClient,
   payload: InflowPricingScheme
 ) {
   if (!payload.pricingSchemeId) return null;

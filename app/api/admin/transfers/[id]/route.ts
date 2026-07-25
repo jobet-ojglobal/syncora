@@ -13,14 +13,14 @@ interface Props {
  */
 export async function PATCH(
   request: NextRequest,
-  { params }: Props
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const { id } = await params;
     const body = await request.json();
 
-    // 1. Destructure incoming components from your useForm body structure
-    const { sourceLocationId, targetLocationId, remarks, lines } = body;
+    // 1. Destructure incoming components from your form payload
+    const { sourceLocationId, targetLocationId, remarks, lines = [] } = body;
 
     if (!id) {
       return NextResponse.json({ error: "Missing transfer ID parameter." }, { status: 400 });
@@ -29,36 +29,64 @@ export async function PATCH(
     // 2. Lock check: Prevent updates to finalized shipments (Immutable state safety)
     const existingTransfer = await prisma.transferOrder.findUnique({
       where: { id },
-      select: { status: true }
+      select: { status: true },
     });
 
     if (!existingTransfer) {
       return NextResponse.json({ error: "Transfer order not found." }, { status: 404 });
     }
 
-    if (existingTransfer.status !== "DRAFT") {
+    const isEditable = ["DRAFT", "PENDING"].includes(existingTransfer?.status);
+
+    if (!isEditable) {
       return NextResponse.json(
-        { error: "Immutable Record: This transfer order has broken out of DRAFT status and cannot be modified." },
+        { error: "Immutable Record: This transfer order has broken out of DRAFT or PENDING status and cannot be modified." },
         { status: 423 }
       );
     }
 
     // 3. Database Write Transaction
     const updatedTransfer = await prisma.$transaction(async (tx) => {
-      
-      // Step A: Strip away old lines completely to wipe out deleted rows
+
+      // Step A: Strip away old lines completely to wipe out deleted or stale rows
       await tx.transferOrderLine.deleteMany({
-        where: { transferOrderId: id }
+        where: { transferOrderId: id },
       });
 
-      // Step B: Re-insert lines with clean formatting and explicit null transforms for empty strings
-      const dynamicLines = lines.map((line: any) => ({
-        productId: line.productId,
-        // Convert empty selection fields safely to null for clean relation indexes
-        sourceSublocationId: line.sourceSublocationId === "" ? null : line.sourceSublocationId,
-        targetSublocationId: line.targetSublocationId === "" ? null : line.targetSublocationId,
-        quantity: line.quantity, // Decimals are safely map-cast via Prisma strings/numbers input
-      }));
+      // Step B: Expand multi-bin sourceAllocations into discrete DB records
+      const dynamicLines: Array<{
+        productId: string;
+        sourceSublocationId: string | null;
+        targetSublocationId: string | null;
+        quantity: number;
+      }> = [];
+
+      for (const line of lines) {
+        const targetSubId = line.targetSublocationId === "" ? null : line.targetSublocationId;
+
+        // If multi-bin allocation exists, map each bin as a separate line record
+        if (Array.isArray(line.sourceAllocations) && line.sourceAllocations.length > 0) {
+          for (const alloc of line.sourceAllocations) {
+            const allocQty = Number(alloc.quantity);
+            if (allocQty > 0) {
+              dynamicLines.push({
+                productId: line.productId,
+                sourceSublocationId: alloc.sublocationId === "" ? null : alloc.sublocationId,
+                targetSublocationId: targetSubId,
+                quantity: allocQty,
+              });
+            }
+          }
+        } else {
+          // Fallback single-bin transfer mapping
+          dynamicLines.push({
+            productId: line.productId,
+            sourceSublocationId: line.sourceSublocationId === "" ? null : line.sourceSublocationId,
+            targetSublocationId: targetSubId,
+            quantity: Number(line.quantity) || 0,
+          });
+        }
+      }
 
       // Step C: Execute top-level updates and append fresh operational components
       return await tx.transferOrder.update({
@@ -69,13 +97,13 @@ export async function PATCH(
           remarks: remarks || null,
           lines: {
             createMany: {
-              data: dynamicLines
-            }
-          }
+              data: dynamicLines,
+            },
+          },
         },
         include: {
-          lines: true
-        }
+          lines: true,
+        },
       });
     });
 
@@ -143,7 +171,7 @@ export async function DELETE(
     //   });
     // });
 
-    await prisma.transferOrder.softDelete(id);
+    // await prisma.transferOrder.softDelete(id);
 
 
     return NextResponse.json(
