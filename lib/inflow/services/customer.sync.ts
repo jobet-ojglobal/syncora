@@ -18,27 +18,83 @@ export async function syncCustomer(
 ) {
   const cleanEmail = customer.email?.trim().toLowerCase();
 
+  const verifiedLocations = caches?.verifiedLocationIds ?? new Set<string>();
+  const verifiedPaymentTerms = caches?.verifiedPaymentTermsIds ?? new Set<string>();
+
   /**
    * STEP 1: Rich Foreign Key Healing (Locations & Terms)
    */
-  if (customer.defaultLocation?.locationId && !caches.verifiedLocationIds.has(customer.defaultLocation.locationId)) {
-    await ensureLocationShell(tx, {
-      inflowId: customer.defaultLocation.locationId,
-      name: customer.defaultLocation.name || "Default Warehouse",
-      isActive: customer.defaultLocation.isActive,
-      isDefault: customer.defaultLocation.isDefault,
-      address: customer.defaultLocation.address,
-    });
-    caches.verifiedLocationIds.add(customer.defaultLocation.locationId);
+  // if (customer.defaultLocation?.locationId && !caches.verifiedLocationIds.has(customer.defaultLocation.locationId)) {
+  //   await ensureLocationShell(tx, {
+  //     inflowId: customer.defaultLocation.locationId,
+  //     name: customer.defaultLocation.name || "Default Warehouse",
+  //     isActive: customer.defaultLocation.isActive,
+  //     isDefault: customer.defaultLocation.isDefault,
+  //     address: customer.defaultLocation.address,
+  //   });
+  //   caches.verifiedLocationIds.add(customer.defaultLocation.locationId);
+  // }
+
+  let validDefaultLocationId: string | null = null;
+  if (customer.defaultLocation?.locationId) {
+    if (verifiedLocations.has(customer.defaultLocation?.locationId)) {
+      validDefaultLocationId = customer.defaultLocation?.locationId;
+    } else {
+      const localLoc = await tx.location.findUnique({
+        where: { inflowId: customer.defaultLocation?.locationId },
+        select: { inflowId: true },
+      });
+
+      if (localLoc) {
+        validDefaultLocationId = localLoc.inflowId;
+        verifiedLocations.add(localLoc.inflowId);
+      } else if (customer.defaultLocation) {
+        console.warn(
+          `[Sync Notification] Target Location "${customer.defaultLocation?.locationId}" missing locally. Creating Location Shell JIT...`
+        );
+        const syncedLoc = await ensureLocationShell(tx, customer.defaultLocation);
+        if (syncedLoc?.inflowId) {
+          validDefaultLocationId = syncedLoc.inflowId;
+          verifiedLocations.add(syncedLoc.inflowId);
+        }
+      }
+    }
   }
 
-  if (customer.defaultPaymentTerms?.paymentTermsId && !caches.verifiedPaymentTermsIds.has(customer.defaultPaymentTerms.paymentTermsId)) {
-    await ensurePaymentTermsShell(tx, {
-      inflowId: customer.defaultPaymentTerms.paymentTermsId,
-      name: customer.defaultPaymentTerms.name || "Standard Terms",
-    });
-    caches.verifiedPaymentTermsIds.add(customer.defaultPaymentTerms.paymentTermsId);
-  }
+
+  // if (customer.defaultPaymentTerms?.paymentTermsId && !caches.verifiedPaymentTermsIds.has(customer.defaultPaymentTerms.paymentTermsId)) {
+  //   await ensurePaymentTermsShell(tx, {
+  //     inflowId: customer.defaultPaymentTerms.paymentTermsId,
+  //     name: customer.defaultPaymentTerms.name || "Standard Terms",
+  //   });
+  //   caches.verifiedPaymentTermsIds.add(customer.defaultPaymentTerms.paymentTermsId);
+  // }
+
+  let validPaymentTermId: string | null = null;
+    if (customer.defaultPaymentTermsId) {
+      if (verifiedPaymentTerms.has(customer.defaultPaymentTermsId)) {
+        validPaymentTermId = customer.defaultPaymentTermsId;
+      } else {
+        const localPaymentTerm = await tx.paymentTerm.findUnique({
+          where: { inflowId: customer.defaultPaymentTermsId },
+          select: { inflowId: true }
+        });
+        
+        if (localPaymentTerm) {
+          validPaymentTermId = localPaymentTerm.inflowId;
+          verifiedPaymentTerms.add(localPaymentTerm.inflowId);
+        } else if (customer.defaultPaymentTerms) {
+          console.warn(
+            `[Sync Notification] Payment Terms "${customer.defaultPaymentTermsId}" missing locally. Syncing JIT...`
+          );
+          const newPayment = await ensurePaymentTermsShell(tx, customer.defaultPaymentTerms);
+          if (newPayment?.inflowId) {
+            validPaymentTermId = newPayment.inflowId;
+            verifiedPaymentTerms.add(newPayment.inflowId);
+          }
+        }
+      }
+    }
 
   /**
    * STEP 1.5: SELF-HEALING FOREIGN KEY GUARDS (Team Members)
@@ -213,8 +269,8 @@ export async function syncCustomer(
       defaultCarrier: customer.defaultCarrier,
       defaultPaymentMethod: customer.defaultPaymentMethod,
       discount: customer.discount ? new Prisma.Decimal(customer.discount) : null,
-      defaultLocationId: customer.defaultLocation?.locationId || customer.defaultLocationId,
-      defaultPaymentTermsId: customer.defaultPaymentTerms?.paymentTermsId || customer.defaultPaymentTermsId,
+      defaultLocationId: validDefaultLocationId,
+      defaultPaymentTermsId: validPaymentTermId,
       pricingSchemeId: validPricingSchemeId,
       taxingSchemeId: validTaxingSchemeId,
       defaultSalesRepTeamMemberId: validSalesRepId,
@@ -228,8 +284,8 @@ export async function syncCustomer(
       defaultCarrier: customer.defaultCarrier,
       defaultPaymentMethod: customer.defaultPaymentMethod,
       discount: customer.discount ? new Prisma.Decimal(customer.discount) : null,
-      defaultLocationId: customer.defaultLocation?.locationId || customer.defaultLocationId,
-      defaultPaymentTermsId: customer.defaultPaymentTerms?.paymentTermsId || customer.defaultPaymentTermsId,
+      defaultLocationId: validDefaultLocationId,
+      defaultPaymentTermsId: validPaymentTermId,
       pricingSchemeId: validPricingSchemeId,
       taxingSchemeId: validTaxingSchemeId,
       defaultSalesRepTeamMemberId: validSalesRepId,

@@ -3,3 +3,15 @@ C:\Users\Ron\.ssh\github_work
 ssh-keygen -t ed25519 -C "guartejobet01@gmail.com"
 ~/.ssh/github_personal
 C:\Users\Ron\.ssh\github_personal
+
+git config --global --list
+
+user.name=Jobet Guarte
+user.email=281866459+jobet-ojglobal@users.noreply.github.com
+
+user.name=astutefalcon
+user.email= 284168292+astutefalcon@users.noreply.github.com
+
+
+git config --global user.name
+git config --global user.email
