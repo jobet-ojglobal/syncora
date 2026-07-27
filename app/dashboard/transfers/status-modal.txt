@@ -1,0 +1,95 @@
+
+<Dialog open={!!activeAction} onOpenChange={(open) => !open && setActiveAction(null)}>
+        <DialogContent className="max-w-xl">
+          <DialogHeader>
+            <DialogTitle>{activeAction?.title}</DialogTitle>
+            <DialogDescription className="text-xs">
+              {activeAction?.description}
+            </DialogDescription>
+          </DialogHeader>
+
+          {activeAction && (
+            <div className="space-y-4 my-2 text-xs">
+              
+              {/* Detailed Receiving Inputs if target state is RECEIVED */}
+              {activeAction.targetStatus === "RECEIVED" && (
+                <div className="space-y-2 border rounded-lg p-3 bg-slate-50/50 dark:bg-slate-900/50">
+                  <Label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
+                    Verify Incoming Line Quantities
+                  </Label>
+                  <div className="border rounded-md bg-background overflow-hidden max-h-48 overflow-y-auto">
+                    <table className="w-full text-left text-xs">
+                      <thead className="bg-muted/40 border-b text-[10px] uppercase font-semibold">
+                        <tr>
+                          <th className="p-2">Item</th>
+                          <th className="p-2 text-center">Shipped</th>
+                          <th className="p-2 w-32 text-right">Qty Received</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y">
+                        {activeAction.order.lines.map((line) => (
+                          <tr key={line.id}>
+                            <td className="p-2 font-medium">
+                              {line.productName}
+                              <span className="block text-[10px] text-muted-foreground font-mono">{line.productSku}</span>
+                            </td>
+                            <td className="p-2 text-center font-mono font-semibold">{line.quantity}</td>
+                            <td className="p-2">
+                              <Input
+                                type="number"
+                                step="any"
+                                min="0"
+                                max={line.quantity}
+                                value={receivedLinesState[line.id]?.quantityReceived ?? line.quantity}
+                                onChange={(e) => {
+                                  const val = parseFloat(e.target.value) || 0;
+                                  setReceivedLinesState((prev) => ({
+                                    ...prev,
+                                    [line.id]: {
+                                      ...prev[line.id],
+                                      quantityReceived: val,
+                                    },
+                                  }));
+                                }}
+                                className="h-7 text-xs font-mono text-right"
+                              />
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+
+              {/* Remarks Field */}
+              <div className="space-y-1.5">
+                <Label htmlFor="action-remarks" className="text-xs font-semibold">
+                  Update Manifest Remarks / Status Notes (Optional)
+                </Label>
+                <Textarea
+                  id="action-remarks"
+                  placeholder="Add notes regarding stock condition, dispatch driver, or verification findings..."
+                  value={actionRemarks}
+                  onChange={(e) => setActionRemarks(e.target.value)}
+                  className="text-xs min-h-[70px]"
+                />
+              </div>
+            </div>
+          )}
+
+          <DialogFooter className="gap-2">
+            <Button size="sm" variant="outline" onClick={() => setActiveAction(null)} disabled={isSubmitting}>
+              Cancel
+            </Button>
+            <Button
+              size="sm"
+              onClick={handleExecuteStatusUpdate}
+              disabled={isSubmitting}
+              className={activeAction?.targetStatus === "CANCELLED" ? "bg-destructive text-destructive-foreground hover:bg-destructive/90" : ""}
+            >
+              {isSubmitting ? "Processing..." : "Confirm Status Update"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>

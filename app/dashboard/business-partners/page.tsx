@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Plus, Search, UserCheck, ShieldCheck, Landmark, Edit3, CheckCircle2, XCircle, ShoppingBag, MapPin, Contact2, Truck, HelpCircle, Eye, View } from "lucide-react";
+import { Plus, Search, UserCheck, ShieldCheck, Landmark, Edit3, CheckCircle2, XCircle, ShoppingBag, MapPin, Contact2, Truck, HelpCircle, Eye, View, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/components/ui/tooltip";
@@ -54,20 +54,30 @@ export default function BusinessPartnerListPage() {
   useEffect(() => {
     const timer = setTimeout(() => {
       setDebouncedSearch(searchQuery);
-      setPageIndex(0);
+      setPageIndex(0); // Reset to first page on search
     }, 300);
     return () => clearTimeout(timer);
   }, [searchQuery]);
 
-  const { data: payload, error, isLoading, mutate } = useSWR(
+  // Handler for updating role filter & resetting pagination
+  const handleRoleChange = (newRole: "ALL" | "CUSTOMER" | "VENDOR") => {
+    setRoleFilter(newRole);
+    setPageIndex(0);
+  };
+
+  const { data: payload, error, isLoading, isValidating, mutate } = useSWR(
     `/api/admin/business-partners/filtered?search=${debouncedSearch}&role=${roleFilter}&page=${pageIndex}&limit=${PAGE_SIZE}`,
     fetcher,
-    { keepPreviousData: true, revalidateOnFocus: true  }
+    { keepPreviousData: true, revalidateOnFocus: true }
   );
 
   const directory: BusinessPartnerRow[] = payload?.data || [];
   const totalRecords = payload?.totalRecords || 0;
   const pageCount = payload?.pageCount || 0;
+
+  const handleRefresh = async () => {
+    await mutate();
+  };
 
   if (error) {
     return (
@@ -87,11 +97,18 @@ export default function BusinessPartnerListPage() {
           description="Manage master corporate profiles, toggle structural roles, inspect integrated multi-currency balances, and direct transactional mappings." 
           icon={Contact2}
         >
-          <Button asChild size="sm" className="gap-1.5 shrink-0 text-xs">
-            <Link href="/dashboard/business-partners/create">
-              <Plus className="w-4 h-4" /> Onboard Business Partner
-            </Link>
-          </Button>
+          
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" onClick={handleRefresh} disabled={isLoading || isValidating}>
+              <RefreshCw className={`h-3.5 w-3.5 mr-1.5 ${(isLoading || isValidating) ? "animate-spin" : ""}`} />
+              Sync
+            </Button>
+            <Button asChild size="sm" className="gap-1.5 shrink-0 text-xs">
+              <Link href="/dashboard/business-partners/create">
+                <Plus className="w-4 h-4" /> Onboard Business Partner
+              </Link>
+            </Button>
+          </div>
         </PageHeader>
 
         {/* Filter and Search controls */}
@@ -111,10 +128,7 @@ export default function BusinessPartnerListPage() {
             {(["ALL", "CUSTOMER", "VENDOR"] as const).map((role) => (
               <button
                 key={role}
-                onClick={() => {
-                  setRoleFilter(role);
-                  setPageIndex(0);
-                }}
+                onClick={() => handleRoleChange(role)}
                 className={`px-3 py-1.5 rounded-md capitalize transition-all ${
                   roleFilter === role ? "bg-card text-foreground shadow-xs" : "text-muted-foreground hover:text-foreground"
                 }`}

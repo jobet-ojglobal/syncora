@@ -42,13 +42,21 @@ export async function POST(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     const locationId = searchParams.get("locationId"); // maps to inflowId
+    const payload = await request.json();
+    const eventType = payload.eventType || payload.action || "unknown";
 
     if (!locationId) {
       throw new Error("Missing locationId identification parameter context.");
     }
 
-    const payload = await request.json();
-    const eventType = payload.eventType || payload.action || "unknown";
+    const location = await prisma.location.findUnique({
+      where: { inflowId: locationId },
+      select: { inflowId: true, name: true, url: true }
+    })
+
+    if (!location) {
+      return NextResponse.json({ success: false, error: "Location not found." }, { status: 404 });
+    }
 
     // 1. Fetch the exact webhook record to satisfy the DB foreign key constraint
     const webhookParent = await prisma.locationWebhook.findFirst({
@@ -85,7 +93,7 @@ export async function POST(request: NextRequest) {
               loggedEventId: loggedEvent.id,
               dataId: payload.inflowId || batchID,
               source_key: payload.source_key || null,
-              locationId, 
+              location, 
               data: { locationId: batchID }
             },
             {
@@ -111,7 +119,7 @@ export async function POST(request: NextRequest) {
               loggedEventId: loggedEvent.id,
               dataId: payload.inflowId,
               source_key: payload.source_key || null,
-              locationId, 
+              location, 
               data: { currencyId }
             },
             {
@@ -140,7 +148,7 @@ export async function POST(request: NextRequest) {
               loggedEventId: loggedEvent.id,
               dataId: payload.inflowId,
               source_key: payload.source_key || null,
-              locationId, 
+              location, 
               data: { taxingSchemeId }
             },
             {
@@ -166,7 +174,7 @@ export async function POST(request: NextRequest) {
               loggedEventId: loggedEvent.id,
               dataId: batchID,
               source_key: payload.source_key || null,
-              locationId, 
+              location, 
               data: { salesId: batchID }
             },
             {
@@ -191,7 +199,7 @@ export async function POST(request: NextRequest) {
               loggedEventId: loggedEvent.id,
               dataId: payload.inflowId || batchID,
               source_key: payload.source_key || null,
-              locationId, 
+              location, 
               data: { customerId: batchID }
             },
             {
@@ -219,7 +227,7 @@ export async function POST(request: NextRequest) {
               loggedEventId: loggedEvent.id,
               dataId: payload.inflowId || batchID,
               source_key: payload.source_key || null,
-              locationId, 
+              location, 
               data: { productId: batchID }
             },
             {
@@ -246,7 +254,7 @@ export async function POST(request: NextRequest) {
               loggedEventId: loggedEvent.id,
               dataId: payload.inflowId || batchID,
               source_key: payload.source_key || null,
-              locationId, 
+              location, 
               data: { imageId: batchID }
             },
             {
@@ -273,7 +281,7 @@ export async function POST(request: NextRequest) {
               loggedEventId: loggedEvent.id,
               dataId: payload.inflowId || batchID,
               source_key: payload.source_key || null,
-              locationId, 
+              location, 
               data: { categoryId: batchID }
             },
             {

@@ -8,6 +8,8 @@ import { syncTaxingScheme } from "./taxing-scheme.sync";
 import { getPricingScheme } from "../data/pricing-schemes";
 import { syncPricingScheme } from "./pricing-scheme.sync";
 import { syncTeamMember } from "./team-member.sync";
+import { prisma } from "@/lib/prisma";
+import { Customer } from "@/types/business-partner";
 
 
 type SyncCache = {
@@ -418,13 +420,7 @@ export async function syncCustomer(
       defaultShippingAddressId: customer.defaultShippingAddress?.customerAddressId,
     },
     // CRITICAL FIX: Tell prisma to return the freshly saved nested data fields
-    include: {
-      businessPartner: {
-        include: {
-          addresses: true
-        }
-      }
-    }
+    
   });
 
   /**
@@ -485,63 +481,78 @@ export async function syncCustomer(
     });
   }
 
+  const resCustomer = prisma.customer.findFirst({
+    where: { inflowId: syncedCustomer.inflowId },
+    include: {
+      businessPartner: {
+        include: {
+          addresses: true
+        }
+      },
+      balances: true, 
+      credits: true, 
+      dues: true
+    }
+  });
+
+  return resCustomer;
+}
+
+
   /**
    * STEP 7: Construct Outbound Representation
    */
-  const inflowPayload = {
-    id: syncedCustomer.id,
-    customerId: syncedCustomer.inflowId,
-    name: syncedCustomer.businessPartner.name,
-    contactName: syncedCustomer.businessPartner.contactName,
-    email: syncedCustomer.businessPartner.email,
-    phone: syncedCustomer.businessPartner.phone,
-    fax: syncedCustomer.businessPartner.fax,
-    website: syncedCustomer.businessPartner.website,
-    remarks: syncedCustomer.businessPartner.remarks,
-    discount: syncedCustomer.discount ? syncedCustomer.discount.toString() : null,
-    isActive: syncedCustomer.businessPartner.isActive,
-    taxExemptNumber: syncedCustomer.taxExemptNumber,
-    defaultLocationId: syncedCustomer.defaultLocationId,
-    defaultCarrier: syncedCustomer.defaultCarrier,
-    defaultPaymentMethod: syncedCustomer.defaultPaymentMethod,
-    defaultPaymentTermsId: syncedCustomer.defaultPaymentTermsId,
-    pricingSchemeId: syncedCustomer.pricingSchemeId,
-    taxingSchemeId: syncedCustomer.taxingSchemeId,
-    defaultSalesRepTeamMemberId: syncedCustomer.defaultSalesRepTeamMemberId,
-    defaultBillingAddressId: syncedCustomer.defaultBillingAddressId,
-    defaultShippingAddressId: syncedCustomer.defaultShippingAddressId,
-    addresses: syncedCustomer.businessPartner.addresses.map((addr: any) => ({
-      customerAddressId: addr.inflowId,
-      customerId: syncedCustomer.inflowId,
-      name: addr.name,
-      address: {
-        addressType: addr.addressType,
-        address1: addr.address1,
-        address2: addr.address2,
-        city: addr.city,
-        state: addr.state,
-        postalCode: addr.postalCode,
-        country: addr.country,
-        remarks: addr.remarks
-      }
-    })),
-    // Fixed: Read custom fields directly from the incoming webhook object since they aren't stored via database models
-    customFields: {
-      custom1: customer.customFields?.custom1 || "",
-      custom2: customer.customFields?.custom2 || "",
-      custom3: customer.customFields?.custom3 || "",
-      custom4: customer.customFields?.custom4 || "",
-      custom5: customer.customFields?.custom5 || "",
-      custom6: customer.customFields?.custom6 || "",
-      custom7: customer.customFields?.custom7 || "",
-      custom8: customer.customFields?.custom8 || "",
-      custom9: customer.customFields?.custom9 || "",
-      custom10: customer.customFields?.custom10 || "",
-    }
-  };
-
-  return inflowPayload;
-}
+  // const inflowPayload = {
+  //   id: syncedCustomer.id,
+  //   customerId: syncedCustomer.inflowId,
+  //   name: syncedCustomer.businessPartner.name,
+  //   contactName: syncedCustomer.businessPartner.contactName,
+  //   email: syncedCustomer.businessPartner.email,
+  //   phone: syncedCustomer.businessPartner.phone,
+  //   fax: syncedCustomer.businessPartner.fax,
+  //   website: syncedCustomer.businessPartner.website,
+  //   remarks: syncedCustomer.businessPartner.remarks,
+  //   discount: syncedCustomer.discount ? syncedCustomer.discount.toString() : null,
+  //   isActive: syncedCustomer.businessPartner.isActive,
+  //   taxExemptNumber: syncedCustomer.taxExemptNumber,
+  //   defaultLocationId: syncedCustomer.defaultLocationId,
+  //   defaultCarrier: syncedCustomer.defaultCarrier,
+  //   defaultPaymentMethod: syncedCustomer.defaultPaymentMethod,
+  //   defaultPaymentTermsId: syncedCustomer.defaultPaymentTermsId,
+  //   pricingSchemeId: syncedCustomer.pricingSchemeId,
+  //   taxingSchemeId: syncedCustomer.taxingSchemeId,
+  //   defaultSalesRepTeamMemberId: syncedCustomer.defaultSalesRepTeamMemberId,
+  //   defaultBillingAddressId: syncedCustomer.defaultBillingAddressId,
+  //   defaultShippingAddressId: syncedCustomer.defaultShippingAddressId,
+  //   addresses: syncedCustomer.businessPartner.addresses.map((addr: any) => ({
+  //     customerAddressId: addr.inflowId,
+  //     customerId: syncedCustomer.inflowId,
+  //     name: addr.name,
+  //     address: {
+  //       addressType: addr.addressType,
+  //       address1: addr.address1,
+  //       address2: addr.address2,
+  //       city: addr.city,
+  //       state: addr.state,
+  //       postalCode: addr.postalCode,
+  //       country: addr.country,
+  //       remarks: addr.remarks
+  //     }
+  //   })),
+  //   // Fixed: Read custom fields directly from the incoming webhook object since they aren't stored via database models
+  //   customFields: {
+  //     custom1: customer.customFields?.custom1 || "",
+  //     custom2: customer.customFields?.custom2 || "",
+  //     custom3: customer.customFields?.custom3 || "",
+  //     custom4: customer.customFields?.custom4 || "",
+  //     custom5: customer.customFields?.custom5 || "",
+  //     custom6: customer.customFields?.custom6 || "",
+  //     custom7: customer.customFields?.custom7 || "",
+  //     custom8: customer.customFields?.custom8 || "",
+  //     custom9: customer.customFields?.custom9 || "",
+  //     custom10: customer.customFields?.custom10 || "",
+  //   }
+  // };
 
 // // lib/inflow/services/customer.sync.ts
 

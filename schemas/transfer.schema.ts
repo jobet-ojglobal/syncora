@@ -71,6 +71,68 @@ export const transferOrderSchema = z
 export type TransferOrderInput = z.input<typeof transferOrderSchema>;
 export type TransferOrderOutput = z.output<typeof transferOrderSchema>;
 
+// Status Update Form
+export const statusUpdateSchema = z
+  .object({
+    status: z.enum([
+      "DRAFT",
+      "PENDING",
+      "IN_TRANSIT",
+      "RECEIVED",
+      "PARTIALLY_RECEIVED",
+      "RECEIVED_DISCREPANCY",
+      "CANCELLED",
+    ]),
+    remarks: z.string().optional().nullable(),
+  })
+  .refine(
+    (data) => {
+      // Require remarks when cancelling or reporting a discrepancy
+      if (
+        (data.status === "CANCELLED" || data.status === "RECEIVED_DISCREPANCY") &&
+        (!data.remarks || data.remarks.trim() === "")
+      ) {
+        return false;
+      }
+      return true;
+    },
+    {
+      message: "Remarks are required when cancelling or reporting a discrepancy.",
+      path: ["remarks"],
+    }
+  );
+
+export type StatusUpdateFormValues = z.infer<typeof statusUpdateSchema>;
+
+// schemas/receiving.ts
+
+const lineItemSchema = z
+  .object({
+    lineId: z.string(),
+    shippedQuantity: z.number(),
+    quantityReceived: z.number({ error: "Must be a number" })
+      .min(0, "Cannot be negative"),
+    discrepancyReason: z.string().optional().nullable(),
+  })
+  .superRefine((data, ctx) => {
+    const diff = data.quantityReceived - data.shippedQuantity;
+    // Require discrepancyReason whenever there is a variance
+    if (diff !== 0 && (!data.discrepancyReason || data.discrepancyReason.trim() === "")) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Reason required when variance exists",
+        path: ["discrepancyReason"],
+      });
+    }
+  });
+
+export const receivingFormSchema = z.object({
+  remarks: z.string().optional().nullable(),
+  lines: z.array(lineItemSchema),
+});
+
+export type ReceivingFormValues = z.infer<typeof receivingFormSchema>;
+
 // export const transferOrderSchema = z.object({
 //   id: z.string().min(1),
 //   transferNumber: z.string().min(1, "Transfer tracking sequence number is required"),

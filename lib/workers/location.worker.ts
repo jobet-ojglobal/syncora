@@ -6,6 +6,8 @@ import { CustomerSyncResult, InflowCustomerWebhookService } from "../locations/s
 import { MappingWebhookService } from "../locations/services/mapping.service";
 import { BranchClient } from "../locations/location.client";
 import { NotificationService } from "@/services/notification.service";
+import { CloudSyncDispatcher } from "../queues/businer-partner.helper";
+import { splitBusinessPartnerPayload } from "@/helpers/businessPartnerSplitPayload";
 
 // import { locationApi } from "@/lib/location/location.client";
 // import { CustomerSyncResult } from "@/lib/location/webhooks/webhook-customer.service";
@@ -15,7 +17,11 @@ import { NotificationService } from "@/services/notification.service";
 interface LocationWebhookJobData {
   source: string;
   dataId: string;
-  locationId: string; 
+  location: {
+    inflowId: string;
+    name: string;
+    url: string;
+  }; 
   loggedEventId: string;
   source_key?: string;
   data?: any
@@ -24,13 +30,11 @@ interface LocationWebhookJobData {
 const locationWorker = new Worker<LocationWebhookJobData>(
   "location_sync", // Ties this worker explicitly to the location_sync queue
   async (job: Job<LocationWebhookJobData>) => {
-    const { source, dataId, loggedEventId, locationId, source_key, data } = job.data;
+    const { source, dataId, loggedEventId, location, source_key, data } = job.data;
 
-    console.log(`[Location Worker] Processing job ${job.id} for source: ${source}`);
+    const { url: locationUrl, inflowId: locationId } = location;
 
-    const location = await prisma.location.findUnique({ where: { inflowId: locationId }})
-
-    const locationUrl = (location?.url && location.url.trim() !== "") ? location.url : null;
+    console.log(`[Location Worker] Processing job ${job.id} for source: ${source} from location: ${location.name}`);
 
     try {
       let result;
@@ -77,25 +81,25 @@ const locationWorker = new Worker<LocationWebhookJobData>(
       }
 
       if (result?.success) {
-        console.log(`[Location Worker] Dispatching downstream job for ID: ${dataId}`);
+        console.log(`[Location Worker] Dispatching downstream job for ID: ${dataId} from Location: `);
         if (source === "customer") {
           const customerResult = result as CustomerSyncResult;
-          
+
           if (customerResult.inflowPayload) {
-            // await getMidSyncQueue().add(
-            //   "customer_sync_job",
-            //   {
-            //     source: "UPSERT_CLOUD_CUSTOMER",
-            //     model: "CUSTOMER",
-            //     payload: customerResult.inflowPayload, // 3. TypeScript is happy now!
-            //     timestamp: new Date().toISOString()
-            //   },
-            //   { 
-            //     attempts: 3, 
-            //     backoff: { type: "exponential", delay: 2000 },
-            //     removeOnComplete: true
-            //   }
-            // );
+
+            const { businessPartner, ...payload } = customerResult.inflowPayload;
+              // return { businessPartner, savedAddresses, customerPayloadData, vendorPayloadData };
+
+            const result = {  
+              businessPartner,
+              savedAddresses: businessPartner?.addresses,
+              customerPayloadData: payload,
+              vendorPayloadData: null
+            } 
+
+            const splitPayloads = splitBusinessPartnerPayload(result);
+
+            await CloudSyncDispatcher.dispatchSplitBusinessPartnerSyncJobs(splitPayloads);
           }
         }
 

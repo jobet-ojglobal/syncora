@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma"; // Adjust this path to your client instance
 import { transferOrderSchema } from "@/schemas/transfer.schema";
 import { TransferOrderStatus } from "@/generated/prisma/enums";
+import { TransferOrderRow } from "@/types/transfer-dto.type";
 
 /**
  * 📄 FETCH ALL TRANSFER MANIFESTS WITH CONDENSED AGGREGATES
@@ -115,6 +116,10 @@ export async function GET() {
       include: {
         sourceLocation: { select: { name: true } },
         targetLocation: { select: { name: true } },
+        // If you have user relations defined in your schema, un-comment these:
+        // requestedBy: { select: { name: true } },
+        // approvedBy: { select: { name: true } },
+        // receivedBy: { select: { name: true } },
         lines: {
           include: {
             product: { select: { name: true, sku: true } },
@@ -126,25 +131,41 @@ export async function GET() {
       orderBy: { createdAt: "desc" },
     });
 
-    const parsedOrders = orders.map((order) => ({
+    const parsedOrders: TransferOrderRow[] = orders.map((order) => ({
       id: order.id,
       transferNumber: order.transferNumber,
-      sourceLocationName: order.sourceLocation.name,
-      targetLocationName: order.targetLocation.name,
-      status: order.status,
-      remarks: order.remarks,
-      linesCount: order.lines.length,
+      sourceLocationId: order.sourceLocationId,
+      sourceLocationName: order.sourceLocation?.name ?? "N/A",
+      targetLocationId: order.targetLocationId,
+      targetLocationName: order.targetLocation?.name ?? "N/A",
+      status: order.status as TransferOrderRow["status"],
+      remarks: order.remarks ?? null,
+      createdAt: order.createdAt.toISOString(),
       transferredAt: order.transferredAt ? order.transferredAt.toISOString() : null,
       receivedAt: order.receivedAt ? order.receivedAt.toISOString() : null,
-      createdAt: order.createdAt.toISOString(),
-      // Format lines inner sub-payload for the expander view panel
+      // Maps to requestedById since schema uses requestedById instead of createdById
+      createdByName: (order as Record<string, any>).requestedBy?.name ?? null,
+      approvedByName: (order as Record<string, any>).approvedBy?.name ?? null,
+      receivedByName: (order as Record<string, any>).receivedBy?.name ?? null,
       lines: order.lines.map((l) => ({
         id: l.id,
-        productName: l.product.name,
-        productSku: l.product.sku || "N/A",
-        sourceBinName: l.sourceSublocation?.name || "Bulk Floor",
-        targetBinName: l.targetSublocation?.name || "Bulk Floor",
+        productId: l.productId,
+        productName: l.product?.name ?? "Unknown Product",
+        productSku: l.product?.sku ?? "N/A",
         quantity: Number(l.quantity),
+        quantityReceived:
+          l.quantityReceived !== null && l.quantityReceived !== undefined
+            ? Number(l.quantityReceived)
+            : null,
+        discrepancyQuantity:
+          l.discrepancyQuantity !== null && l.discrepancyQuantity !== undefined
+            ? Number(l.discrepancyQuantity)
+            : null,
+        discrepancyReason: l.discrepancyReason ?? null,
+        sourceSublocationId: l.sourceSublocationId ?? null,
+        sourceSublocationName: l.sourceSublocation?.name ?? null,
+        targetSublocationId: l.targetSublocationId ?? null,
+        targetSublocationName: l.targetSublocation?.name ?? null,
       })),
     }));
 

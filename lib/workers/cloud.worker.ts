@@ -6,6 +6,9 @@ import { InflowSalesOrderWebhookService } from "@/lib/inflow/webhooks/webhook-sa
 import { InflowCustomerWebhookService, CustomerSyncResult } from "@/lib/inflow/webhooks/webhook-customer.service";
 import { InflowProductWebhookService } from "@/lib/inflow/webhooks/webhook-product.service";
 import { getMidSyncQueue } from "../queues/sync.queue";
+import { LocalSyncDispatcher } from "../queues/local-dispatcher.helper";
+import { CustomerSyncPayload, splitBusinessPartnerPayload } from "@/helpers/businessPartnerSplitPayload";
+import { WebhookService } from "@/services/webhook.service";
 
 
 interface CloudWebhookJobData {
@@ -67,20 +70,43 @@ const cloudWorker = new Worker<CloudWebhookJobData>(
           
           if (customerResult.inflowPayload) {
             console.log(`[Cloud Worker] Dispatching customer downstream job to midSyncQueue for ID: ${dataId}`);
-            await getMidSyncQueue().add(
-              "customer_sync_job",
-              {
-                source: "UPSERT_LOCAL_CUSTOMER",
-                model: "CUSTOMER",
-                payload: customerResult.inflowPayload, // 3. TypeScript is happy now!
-                timestamp: new Date().toISOString()
-              },
-              { 
-                attempts: 3, 
-                backoff: { type: "exponential", delay: 2000 },
-                removeOnComplete: true
-              }
+            const { businessPartner, ...payload } = customerResult.inflowPayload;
+            // return { businessPartner, savedAddresses, customerPayloadData, vendorPayloadData };
+
+            const result = {  
+              businessPartner,
+              savedAddresses: businessPartner?.addresses,
+              customerPayloadData: payload,
+              vendorPayloadData: null
+            } 
+
+            const splitPayloads = splitBusinessPartnerPayload(
+              result
             );
+
+            const localJobs = await LocalSyncDispatcher.prepareLocalBusinessPartnerSyncJobs(
+              customerResult.inflowPayload?.businessPartnerId,
+              ["a87dfdcb-10af-4cb2-a8e5-0fb37ed75682", "ee762546-27e5-46c6-9b8b-6bddc37f3ccc"],
+              splitPayloads,
+              prisma,
+              WebhookService
+            );
+
+        
+            // Map and execute queue insertions concurrently
+            if (localJobs.length > 0) {
+              const localQueue = getMidSyncQueue();
+              await Promise.all(
+                localJobs.map(job => 
+                  localQueue.add(
+                    job.name, 
+                    job.data, 
+                    { attempts: 3, backoff: { type: "exponential", delay: 2000 }, removeOnComplete: true }
+                  )
+                )
+              );
+            }
+           
           }
         }
       }
