@@ -1618,6 +1618,10 @@ model TransferOrderLine {
   quantity              Decimal @db.Decimal(18,4)
   quantityReceived      Decimal?
 
+  // --- Discrepancy Tracking Fields ---
+  discrepancyQuantity Decimal? @db.Decimal(18, 4) // Stores (quantityReceived - quantity)
+  discrepancyReason   String?  // e.g., "DAMAGED_IN_TRANSIT", "MISSING_BOX", "VENDOR_SHORTAGE"
+
   transferOrder         TransferOrder @relation(fields: [transferOrderId],references: [id], onDelete: Cascade)
   product               Product @relation(fields: [productId],references: [inflowId], onDelete: Cascade)
   sourceSublocation     Sublocation? @relation("TransferSourceSublocation",fields: [sourceSublocationId], references: [id], onDelete: Cascade)
@@ -1635,7 +1639,9 @@ enum TransferOrderStatus {
   DRAFT
   PENDING
   IN_TRANSIT
-  RECEIVED
+  RECEIVED            // Fully received with zero discrepancy
+  PARTIALLY_RECEIVED  // Received, but items are missing/short
+  RECEIVED_DISCREPANCY// Received with overage or discrepancies needing audit
   CANCELLED
 }
 

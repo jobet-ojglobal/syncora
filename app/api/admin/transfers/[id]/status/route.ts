@@ -7,15 +7,21 @@ import {
   InventoryReferenceType,
 } from "@/generated/prisma/client";
 
-// Input validation schema for status transitions
 const statusChangeSchema = z.object({
-  status: z.enum(["PENDING", "IN_TRANSIT", "RECEIVED", "CANCELLED"]),
-  // Optional payload when receiving partial/full line quantities
+  status: z.enum([
+    "PENDING",
+    "IN_TRANSIT",
+    "RECEIVED",
+    "PARTIALLY_RECEIVED",
+    "RECEIVED_DISCREPANCY",
+    "CANCELLED",
+  ]),
   receivedLines: z
     .array(
       z.object({
         lineId: z.string(),
         quantityReceived: z.number().min(0),
+        discrepancyReason: z.string().optional().nullable(),
         targetSublocationId: z.string().optional().nullable(),
       })
     )
@@ -48,11 +54,10 @@ export async function PATCH(
 
     const { status: targetStatus, receivedLines, remarks } = validationResult.data;
 
-    // TODO: Retrieve actual user ID from session context
+    // TODO: Replace with authenticated user session context
     const currentUserId = "cc920c31-bcb2-4264-9946-4b7693c9c7e0";
 
     const result = await prisma.$transaction(async (tx) => {
-      // 1. Fetch current transfer order state with line items
       const existing = await tx.transferOrder.findUnique({
         where: { id },
         include: { lines: true },
@@ -64,18 +69,17 @@ export async function PATCH(
 
       const currentStatus = existing.status;
 
-      // Prevent redundant status update
-      if (currentStatus === targetStatus) {
-        throw new Error(`Transfer Order is already in ${targetStatus} status.`);
-      }
-
-      // Prevent edits on finished orders
-      if (currentStatus === "RECEIVED" || currentStatus === "CANCELLED") {
-        throw new Error(`Cannot transition a Transfer Order that is already ${currentStatus}.`);
+      if (
+        currentStatus === "RECEIVED" ||
+        currentStatus === "PARTIALLY_RECEIVED" ||
+        currentStatus === "RECEIVED_DISCREPANCY" ||
+        currentStatus === "CANCELLED"
+      ) {
+        throw new Error(`Cannot transition a Transfer Order that is already closed (${currentStatus}).`);
       }
 
       // =========================================================================
-      // STATE TRANSITION 1: DRAFT / PENDING -> IN_TRANSIT (Transfer Out Departure)
+      // TRANSITION 1: DRAFT / PENDING -> IN_TRANSIT
       // =========================================================================
       if (targetStatus === "IN_TRANSIT") {
         if (currentStatus !== "DRAFT" && currentStatus !== "PENDING") {
@@ -85,7 +89,6 @@ export async function PATCH(
         for (const line of existing.lines) {
           const qtyToTransfer = Number(line.quantity);
 
-          // Find or fail source inventory record
           const sourceInv = await tx.inventory.findUnique({
             where: {
               productId_locationId: {
@@ -107,7 +110,6 @@ export async function PATCH(
           const afterOnHand = beforeOnHand - qtyToTransfer;
           const afterAvail = beforeAvail - qtyToTransfer;
 
-          // Deduct quantity from Source Inventory
           await tx.inventory.update({
             where: { id: sourceInv.id },
             data: {
@@ -117,7 +119,6 @@ export async function PATCH(
             },
           });
 
-          // Deduct stock from specific Source Sublocation / Bin if assigned
           if (line.sourceSublocationId) {
             await tx.inventoryBin.updateMany({
               where: {
@@ -130,7 +131,6 @@ export async function PATCH(
             });
           }
 
-          // Create TRANSFER_OUT ledger transaction record
           await tx.inventoryLedger.create({
             data: {
               productId: line.productId,
@@ -148,7 +148,6 @@ export async function PATCH(
           });
         }
 
-        // Update Transfer Order Header
         return await tx.transferOrder.update({
           where: { id },
           data: {
@@ -161,30 +160,52 @@ export async function PATCH(
       }
 
       // =========================================================================
-      // STATE TRANSITION 2: IN_TRANSIT -> RECEIVED (Transfer In Arrival)
+      // TRANSITION 2: IN_TRANSIT -> RECEIVING (RECEIVED / PARTIALLY_RECEIVED / RECEIVED_DISCREPANCY)
       // =========================================================================
-      if (targetStatus === "RECEIVED") {
+      if (
+        targetStatus === "RECEIVED" ||
+        targetStatus === "PARTIALLY_RECEIVED" ||
+        targetStatus === "RECEIVED_DISCREPANCY"
+      ) {
         if (currentStatus !== "IN_TRANSIT") {
-          throw new Error(`Transfer Order must be IN_TRANSIT before it can be RECEIVED.`);
+          throw new Error(`Transfer Order must be IN_TRANSIT before stock can be received.`);
         }
 
-        for (const line of existing.lines) {
-          // Check if explicit arrival quantity was supplied per line, else default to line quantity
-          const lineUpdatePayload = receivedLines?.find((rl) => rl.lineId === line.id);
-          const qtyReceived = lineUpdatePayload?.quantityReceived ?? Number(line.quantity);
-          const targetSublocId = lineUpdatePayload?.targetSublocationId || line.targetSublocationId;
+        let hasShortage = false;
+        let hasOverage = false;
+        const discrepancySummary: string[] = [];
 
-          // Update received quantity on the line record
+        for (const line of existing.lines) {
+          const lineUpdatePayload = receivedLines?.find((rl) => rl.lineId === line.id);
+          const qtyShipped = Number(line.quantity);
+          const qtyReceived = lineUpdatePayload?.quantityReceived ?? qtyShipped;
+          const targetSublocId = lineUpdatePayload?.targetSublocationId || line.targetSublocationId;
+          const reason = lineUpdatePayload?.discrepancyReason || null;
+
+          const discrepancyQty = qtyReceived - qtyShipped;
+
+          if (discrepancyQty < 0) hasShortage = true;
+          if (discrepancyQty > 0) hasOverage = true;
+
+          // Update transfer line with explicit receiving & discrepancy tracking
           await tx.transferOrderLine.update({
             where: { id: line.id },
             data: {
               quantityReceived: qtyReceived,
+              discrepancyQuantity: discrepancyQty,
+              discrepancyReason: discrepancyQty !== 0 ? reason : null,
               ...(targetSublocId ? { targetSublocationId: targetSublocId } : {}),
             },
           });
 
+          if (discrepancyQty !== 0) {
+            discrepancySummary.push(
+              `Item ${line.productId}: Shipped ${qtyShipped}, Received ${qtyReceived} (${discrepancyQty > 0 ? `+${discrepancyQty}` : discrepancyQty}) [Reason: ${reason || "UNSPECIFIED"}]`
+            );
+          }
+
+          // 1. Credit physical received quantity to target inventory
           if (qtyReceived > 0) {
-            // Upsert Target Inventory Record
             const targetInv = await tx.inventory.upsert({
               where: {
                 productId_locationId: {
@@ -209,7 +230,6 @@ export async function PATCH(
             const currentQty = Number(targetInv.quantityOnHand);
             const beforeOnHand = currentQty - qtyReceived;
 
-            // Increment Target Sublocation Bin if specified
             if (targetSublocId) {
               await tx.inventoryBin.upsert({
                 where: {
@@ -229,7 +249,6 @@ export async function PATCH(
               });
             }
 
-            // Create TRANSFER_IN ledger transaction record
             await tx.inventoryLedger.create({
               data: {
                 productId: line.productId,
@@ -246,25 +265,54 @@ export async function PATCH(
               },
             });
           }
+
+          // 2. Audit Ledger Entry for Shortages/Discrepancies
+          if (discrepancyQty < 0) {
+            await tx.inventoryLedger.create({
+              data: {
+                productId: line.productId,
+                locationId: existing.sourceLocationId,
+                sublocationId: line.sourceSublocationId,
+                transactionType: InventoryTransactionType.ADJUSTMENT,
+                referenceType: InventoryReferenceType.TRANSFER_ORDER,
+                referenceId: id,
+                performedById: currentUserId,
+                quantityChange: 0,
+                quantityBefore: 0,
+                quantityAfter: 0,
+                remarks: `[TRANSFER SHORTAGE: ${reason || "UNKNOWN"}] ${Math.abs(discrepancyQty)} unit(s) unfulfilled from ${existing.transferNumber}`,
+              },
+            });
+          }
         }
 
-        // Update Transfer Order Header
+        // Determine Final Calculated Status based on discrepancies
+        let finalStatus: TransferOrderStatus = TransferOrderStatus.RECEIVED;
+        if (hasShortage && !hasOverage) {
+          finalStatus = TransferOrderStatus.PARTIALLY_RECEIVED;
+        } else if (hasOverage || (hasShortage && hasOverage)) {
+          finalStatus = TransferOrderStatus.RECEIVED_DISCREPANCY;
+        }
+
+        const updatedRemarks = discrepancySummary.length > 0
+          ? `${remarks ? `${remarks}\n` : ""}[DISCREPANCY AUDIT]: ${discrepancySummary.join("; ")}`
+          : remarks;
+
         return await tx.transferOrder.update({
           where: { id },
           data: {
-            status: "RECEIVED",
+            status: finalStatus,
             receivedAt: new Date(),
             receivedById: currentUserId,
-            ...(remarks ? { remarks } : {}),
+            ...(updatedRemarks ? { remarks: updatedRemarks } : {}),
           },
         });
       }
 
       // =========================================================================
-      // STATE TRANSITION 3: ANY -> CANCELLED (Rollback stock if already IN_TRANSIT)
+      // TRANSITION 3: CANCELLED
       // =========================================================================
       if (targetStatus === "CANCELLED") {
-        // If transitioning from IN_TRANSIT, return deducted stock back to Source
         if (currentStatus === "IN_TRANSIT") {
           for (const line of existing.lines) {
             const qtyToReturn = Number(line.quantity);
@@ -282,7 +330,6 @@ export async function PATCH(
               const beforeOnHand = Number(sourceInv.quantityOnHand);
               const afterOnHand = beforeOnHand + qtyToReturn;
 
-              // Restore inventory quantities
               await tx.inventory.update({
                 where: { id: sourceInv.id },
                 data: {
@@ -292,7 +339,6 @@ export async function PATCH(
                 },
               });
 
-              // Restore Bin quantities
               if (line.sourceSublocationId) {
                 await tx.inventoryBin.updateMany({
                   where: {
@@ -305,7 +351,6 @@ export async function PATCH(
                 });
               }
 
-              // Record reversal Ledger Entry
               await tx.inventoryLedger.create({
                 data: {
                   productId: line.productId,
@@ -334,7 +379,6 @@ export async function PATCH(
         });
       }
 
-      // Fallback for draft/pending status changes without stock movements
       return await tx.transferOrder.update({
         where: { id },
         data: {
@@ -353,6 +397,362 @@ export async function PATCH(
     );
   }
 }
+
+// import { NextResponse } from "next/server";
+// import { prisma } from "@/lib/prisma";
+// import { z } from "zod";
+// import {
+//   TransferOrderStatus,
+//   InventoryTransactionType,
+//   InventoryReferenceType,
+// } from "@/generated/prisma/client";
+
+// // Input validation schema for status transitions
+// const statusChangeSchema = z.object({
+//   status: z.enum(["PENDING", "IN_TRANSIT", "RECEIVED", "CANCELLED"]),
+//   // Optional payload when receiving partial/full line quantities
+//   receivedLines: z
+//     .array(
+//       z.object({
+//         lineId: z.string(),
+//         quantityReceived: z.number().min(0),
+//         targetSublocationId: z.string().optional().nullable(),
+//       })
+//     )
+//     .optional(),
+//   remarks: z.string().optional(),
+// });
+
+// export async function PATCH(
+//   req: Request,
+//   { params }: { params: { id: string } }
+// ) {
+//   try {
+//     const body = await req.json();
+//     const { id } = await params;
+
+//     if (!id) {
+//       return NextResponse.json(
+//         { error: "Transfer tracking identification parameter is required." },
+//         { status: 400 }
+//       );
+//     }
+
+//     const validationResult = statusChangeSchema.safeParse(body);
+//     if (!validationResult.success) {
+//       return NextResponse.json(
+//         { error: "Invalid status transition payload", details: validationResult.error.flatten() },
+//         { status: 400 }
+//       );
+//     }
+
+//     const { status: targetStatus, receivedLines, remarks } = validationResult.data;
+
+//     // TODO: Retrieve actual user ID from session context
+//     const currentUserId = "cc920c31-bcb2-4264-9946-4b7693c9c7e0";
+
+//     const result = await prisma.$transaction(async (tx) => {
+//       // 1. Fetch current transfer order state with line items
+//       const existing = await tx.transferOrder.findUnique({
+//         where: { id },
+//         include: { lines: true },
+//       });
+
+//       if (!existing) {
+//         throw new Error("Transfer Order not found.");
+//       }
+
+//       const currentStatus = existing.status;
+
+//       // Prevent redundant status update
+//       if (currentStatus === targetStatus) {
+//         throw new Error(`Transfer Order is already in ${targetStatus} status.`);
+//       }
+
+//       // Prevent edits on finished orders
+//       if (currentStatus === "RECEIVED" || currentStatus === "CANCELLED") {
+//         throw new Error(`Cannot transition a Transfer Order that is already ${currentStatus}.`);
+//       }
+
+//       // =========================================================================
+//       // STATE TRANSITION 1: DRAFT / PENDING -> IN_TRANSIT (Transfer Out Departure)
+//       // =========================================================================
+//       if (targetStatus === "IN_TRANSIT") {
+//         if (currentStatus !== "DRAFT" && currentStatus !== "PENDING") {
+//           throw new Error(`Cannot transition to IN_TRANSIT from ${currentStatus}.`);
+//         }
+
+//         for (const line of existing.lines) {
+//           const qtyToTransfer = Number(line.quantity);
+
+//           // Find or fail source inventory record
+//           const sourceInv = await tx.inventory.findUnique({
+//             where: {
+//               productId_locationId: {
+//                 productId: line.productId,
+//                 locationId: existing.sourceLocationId,
+//               },
+//             },
+//           });
+
+//           const beforeOnHand = sourceInv?.quantityOnHand?.toNumber() ?? 0;
+//           const beforeAvail = sourceInv?.quantityAvailable?.toNumber() ?? 0;
+
+//           if (!sourceInv || beforeOnHand < qtyToTransfer) {
+//             throw new Error(
+//               `Insufficient stock for product ${line.productId} at source location. Available: ${beforeOnHand}, Required: ${qtyToTransfer}`
+//             );
+//           }
+
+//           const afterOnHand = beforeOnHand - qtyToTransfer;
+//           const afterAvail = beforeAvail - qtyToTransfer;
+
+//           // Deduct quantity from Source Inventory
+//           await tx.inventory.update({
+//             where: { id: sourceInv.id },
+//             data: {
+//               quantityOnHand: afterOnHand,
+//               quantityAvailable: afterAvail,
+//               lastMovementAt: new Date(),
+//             },
+//           });
+
+//           // Deduct stock from specific Source Sublocation / Bin if assigned
+//           if (line.sourceSublocationId) {
+//             await tx.inventoryBin.updateMany({
+//               where: {
+//                 inventoryId: sourceInv.id,
+//                 sublocationId: line.sourceSublocationId,
+//               },
+//               data: {
+//                 quantity: { decrement: qtyToTransfer },
+//               },
+//             });
+//           }
+
+//           // Create TRANSFER_OUT ledger transaction record
+//           await tx.inventoryLedger.create({
+//             data: {
+//               productId: line.productId,
+//               locationId: existing.sourceLocationId,
+//               sublocationId: line.sourceSublocationId,
+//               transactionType: InventoryTransactionType.TRANSFER_OUT,
+//               referenceType: InventoryReferenceType.TRANSFER_ORDER,
+//               referenceId: id,
+//               performedById: currentUserId,
+//               quantityChange: -qtyToTransfer,
+//               quantityBefore: beforeOnHand,
+//               quantityAfter: afterOnHand,
+//               remarks: remarks || `Dispatched to Location ${existing.targetLocationId}`,
+//             },
+//           });
+//         }
+
+//         // Update Transfer Order Header
+//         return await tx.transferOrder.update({
+//           where: { id },
+//           data: {
+//             status: "IN_TRANSIT",
+//             transferredAt: new Date(),
+//             approvedById: currentUserId,
+//             ...(remarks ? { remarks } : {}),
+//           },
+//         });
+//       }
+
+//       // =========================================================================
+//       // STATE TRANSITION 2: IN_TRANSIT -> RECEIVED (Transfer In Arrival)
+//       // =========================================================================
+//       if (targetStatus === "RECEIVED") {
+//         if (currentStatus !== "IN_TRANSIT") {
+//           throw new Error(`Transfer Order must be IN_TRANSIT before it can be RECEIVED.`);
+//         }
+
+//         for (const line of existing.lines) {
+//           // Check if explicit arrival quantity was supplied per line, else default to line quantity
+//           const lineUpdatePayload = receivedLines?.find((rl) => rl.lineId === line.id);
+//           const qtyReceived = lineUpdatePayload?.quantityReceived ?? Number(line.quantity);
+//           const targetSublocId = lineUpdatePayload?.targetSublocationId || line.targetSublocationId;
+
+//           // Update received quantity on the line record
+//           await tx.transferOrderLine.update({
+//             where: { id: line.id },
+//             data: {
+//               quantityReceived: qtyReceived,
+//               ...(targetSublocId ? { targetSublocationId: targetSublocId } : {}),
+//             },
+//           });
+
+//           if (qtyReceived > 0) {
+//             // Upsert Target Inventory Record
+//             const targetInv = await tx.inventory.upsert({
+//               where: {
+//                 productId_locationId: {
+//                   productId: line.productId,
+//                   locationId: existing.targetLocationId,
+//                 },
+//               },
+//               create: {
+//                 productId: line.productId,
+//                 locationId: existing.targetLocationId,
+//                 quantityOnHand: qtyReceived,
+//                 quantityAvailable: qtyReceived,
+//                 lastMovementAt: new Date(),
+//               },
+//               update: {
+//                 quantityOnHand: { increment: qtyReceived },
+//                 quantityAvailable: { increment: qtyReceived },
+//                 lastMovementAt: new Date(),
+//               },
+//             });
+
+//             const currentQty = Number(targetInv.quantityOnHand);
+//             const beforeOnHand = currentQty - qtyReceived;
+
+//             // Increment Target Sublocation Bin if specified
+//             if (targetSublocId) {
+//               await tx.inventoryBin.upsert({
+//                 where: {
+//                   inventoryId_sublocationId: {
+//                     inventoryId: targetInv.id,
+//                     sublocationId: targetSublocId,
+//                   },
+//                 },
+//                 create: {
+//                   inventoryId: targetInv.id,
+//                   sublocationId: targetSublocId,
+//                   quantity: qtyReceived,
+//                 },
+//                 update: {
+//                   quantity: { increment: qtyReceived },
+//                 },
+//               });
+//             }
+
+//             // Create TRANSFER_IN ledger transaction record
+//             await tx.inventoryLedger.create({
+//               data: {
+//                 productId: line.productId,
+//                 locationId: existing.targetLocationId,
+//                 sublocationId: targetSublocId,
+//                 transactionType: InventoryTransactionType.TRANSFER_IN,
+//                 referenceType: InventoryReferenceType.TRANSFER_ORDER,
+//                 referenceId: id,
+//                 performedById: currentUserId,
+//                 quantityChange: qtyReceived,
+//                 quantityBefore: beforeOnHand,
+//                 quantityAfter: currentQty,
+//                 remarks: remarks || `Received from Location ${existing.sourceLocationId}`,
+//               },
+//             });
+//           }
+//         }
+
+//         // Update Transfer Order Header
+//         return await tx.transferOrder.update({
+//           where: { id },
+//           data: {
+//             status: "RECEIVED",
+//             receivedAt: new Date(),
+//             receivedById: currentUserId,
+//             ...(remarks ? { remarks } : {}),
+//           },
+//         });
+//       }
+
+//       // =========================================================================
+//       // STATE TRANSITION 3: ANY -> CANCELLED (Rollback stock if already IN_TRANSIT)
+//       // =========================================================================
+//       if (targetStatus === "CANCELLED") {
+//         // If transitioning from IN_TRANSIT, return deducted stock back to Source
+//         if (currentStatus === "IN_TRANSIT") {
+//           for (const line of existing.lines) {
+//             const qtyToReturn = Number(line.quantity);
+
+//             const sourceInv = await tx.inventory.findUnique({
+//               where: {
+//                 productId_locationId: {
+//                   productId: line.productId,
+//                   locationId: existing.sourceLocationId,
+//                 },
+//               },
+//             });
+
+//             if (sourceInv) {
+//               const beforeOnHand = Number(sourceInv.quantityOnHand);
+//               const afterOnHand = beforeOnHand + qtyToReturn;
+
+//               // Restore inventory quantities
+//               await tx.inventory.update({
+//                 where: { id: sourceInv.id },
+//                 data: {
+//                   quantityOnHand: afterOnHand,
+//                   quantityAvailable: Number(sourceInv.quantityAvailable ?? 0) + qtyToReturn,
+//                   lastMovementAt: new Date(),
+//                 },
+//               });
+
+//               // Restore Bin quantities
+//               if (line.sourceSublocationId) {
+//                 await tx.inventoryBin.updateMany({
+//                   where: {
+//                     inventoryId: sourceInv.id,
+//                     sublocationId: line.sourceSublocationId,
+//                   },
+//                   data: {
+//                     quantity: { increment: qtyToReturn },
+//                   },
+//                 });
+//               }
+
+//               // Record reversal Ledger Entry
+//               await tx.inventoryLedger.create({
+//                 data: {
+//                   productId: line.productId,
+//                   locationId: existing.sourceLocationId,
+//                   sublocationId: line.sourceSublocationId,
+//                   transactionType: InventoryTransactionType.ADJUSTMENT,
+//                   referenceType: InventoryReferenceType.TRANSFER_ORDER,
+//                   referenceId: id,
+//                   performedById: currentUserId,
+//                   quantityChange: qtyToReturn,
+//                   quantityBefore: beforeOnHand,
+//                   quantityAfter: afterOnHand,
+//                   remarks: `Transfer Order ${existing.transferNumber} Cancelled - Stock Restored`,
+//                 },
+//               });
+//             }
+//           }
+//         }
+
+//         return await tx.transferOrder.update({
+//           where: { id },
+//           data: {
+//             status: "CANCELLED",
+//             ...(remarks ? { remarks } : {}),
+//           },
+//         });
+//       }
+
+//       // Fallback for draft/pending status changes without stock movements
+//       return await tx.transferOrder.update({
+//         where: { id },
+//         data: {
+//           status: targetStatus as TransferOrderStatus,
+//           ...(remarks ? { remarks } : {}),
+//         },
+//       });
+//     });
+
+//     return NextResponse.json({ success: true, data: result });
+//   } catch (error: any) {
+//     console.error("[TRANSFER_ORDER_STATUS_ERROR]", error);
+//     return NextResponse.json(
+//       { error: error.message || "Failed to process status change." },
+//       { status: 500 }
+//     );
+//   }
+// }
 
 // import { NextRequest, NextResponse } from "next/server";
 // import { prisma } from "@/lib/prisma";

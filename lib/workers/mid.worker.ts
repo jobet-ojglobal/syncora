@@ -65,11 +65,9 @@ const midWorker = new Worker<MidWebhookJobData>(
             break;
           case "BUSINESS_PARTNER_UPSERT_LOCAL": 
             if(model === "Vendor") {
-              console.log(payload)
               result = { success: true}
-              // await upsertCloudVendor(payload);
+              // await upsertLocalVendor(payload);
             } else if (model === "Customer") {
-              console.log(payload)
               result = await upsertLocalCustomer(payload, locationUrl);
             }
             break;

@@ -35,39 +35,50 @@ export const LocationWorkspaceProvider = ({ children }: { children: React.ReactN
   );
 
   const [currentLocationId, setCurrentLocationId] = useState<string>("");
+  const [isBrowserOnline, setIsBrowserOnline] = useState<boolean>(false);
 
-  // 2. Track user's actual network status
-  const [isBrowserOnline, setIsBrowserOnline] = useState<boolean>(
-    typeof window !== "undefined" ? window.navigator.onLine : true
-  );
-
+  // Sync client-side network state on mount (prevents SSR hydration warnings)
   useEffect(() => {
-    const handleOnline = () => { setIsBrowserOnline(true); mutate(); };
+    if (typeof window !== "undefined") {
+      setIsBrowserOnline(window.navigator.onLine);
+    }
+
+    const handleOnline = () => {
+      setIsBrowserOnline(true);
+      mutate();
+    };
     const handleOffline = () => setIsBrowserOnline(false);
 
     window.addEventListener("online", handleOnline);
     window.addEventListener("offline", handleOffline);
+
     return () => {
       window.removeEventListener("online", handleOnline);
       window.removeEventListener("offline", handleOffline);
     };
   }, [mutate]);
 
-  // 3. Fallback automatically to selection index 0 if not explicitly defined
+  // Sync selected location ID with local storage / default fallback
   useEffect(() => {
-    if (locations && locations.length > 0 && !currentLocationId) {
-      setCurrentLocationId(locations[0].id);
+    if (locations && locations.length > 0) {
+      const savedId = localStorage.getItem("selectedLocationId");
+      if (savedId && locations.some((loc) => loc.id === savedId)) {
+        setCurrentLocationId(savedId);
+      } else if (!currentLocationId) {
+        setCurrentLocationId(locations[0].id);
+      }
     }
-  }, [locations, currentLocationId]);
-
-  const activeLocation = useMemo(() => {
-    if (!locations) return null;
-    return locations.find((loc) => loc.id === currentLocationId) || locations[0] || null;
   }, [locations, currentLocationId]);
 
   const changeLocation = (id: string) => {
     setCurrentLocationId(id);
+    localStorage.setItem("selectedLocationId", id);
   };
+
+  const activeLocation = useMemo(() => {
+    if (!locations || locations.length === 0) return null;
+    return locations.find((loc) => loc.id === currentLocationId) || locations[0];
+  }, [locations, currentLocationId]);
 
   return (
     <LocationWorkspaceContext.Provider

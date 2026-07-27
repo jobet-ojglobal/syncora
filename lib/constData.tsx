@@ -288,6 +288,11 @@ export const data = {
           url: "/dashboard/inventory/snapshots",
           icon: Camera,
         },
+        {
+          title: "Inventory Ledger",
+          url: "/dashboard/inventory/ledger",
+          icon: Briefcase,
+        },
       ],
     },
     {

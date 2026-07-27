@@ -250,7 +250,7 @@ export async function POST(request: NextRequest) {
     const splitPayloads = splitBusinessPartnerPayload(result);
 
     // Dispatch job to background syncing queue (e.g., Cloud sync)
-    // await CloudSyncDispatcher.dispatchSplitBusinessPartnerSyncJobs(splitPayloads);
+    await CloudSyncDispatcher.dispatchSplitBusinessPartnerSyncJobs(splitPayloads);
 
     // Dispatch job to background syncing queue (e.g., Local sync)
     const localJobs = await LocalSyncDispatcher.prepareLocalBusinessPartnerSyncJobs(
