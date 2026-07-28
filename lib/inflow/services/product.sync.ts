@@ -1,4 +1,4 @@
-import { Prisma, Product, ProductPriceType } from "@/generated/prisma/client";
+import { Prisma, Product, ProductPriceType, ProductType } from "@/generated/prisma/client";
 import { genInflowUniqueSlug } from "@/helpers/genUniqueSlug";
 import { InflowLocation, InflowProduct } from "../types";
 import { 
@@ -14,7 +14,7 @@ import {
 import { syncTeamMember } from "./team-member.sync";
 import { syncVendor } from "./vendor.sync";
 import { ensureCategoryShell, ensureLocationShell, ensureOperationTypeShell, ensurePricingSchemeShell, ensureProductShell, ensureTaxCodeShell, ensureTaxingSchemeShell, ensureVendorShell } from "./ensure.service";
-import { syncLocation } from "./location.sync";
+import { productTypeSwitcher } from "@/helpers/product.helper";
 
 type Tx = Prisma.TransactionClient;
 
@@ -176,7 +176,7 @@ export async function syncProduct(
       description: product.description,
       categoryId: validCategoryId,
       brandId,
-      itemType: product.itemType,
+      itemType: productTypeSwitcher(product.itemType),
       autoAssemble: product.autoAssemble,
       isActive: product.isActive,
       isManufacturable: product.isManufacturable,

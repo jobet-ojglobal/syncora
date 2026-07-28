@@ -21,7 +21,7 @@ export async function GET(
     }
 
     // Fetch active products that do NOT already have an inventory record at this location
-    const products = await prisma.product.findMany({
+    const productCatalogs = await prisma.product.findMany({
       where: {
         isActive: true,
         deletedAt: null,
@@ -34,9 +34,19 @@ export async function GET(
       select: {
         inflowId: true,
         name: true,
+        images: true,
+        sku: true,
+        trackSerials: true
       },
       orderBy: { name: "asc" },
     });
+
+    const products = productCatalogs.map((p) => ({
+      ...p,
+      image: p.images[0]?.thumbUrl || p.images[0]?.originalUrl || null,
+    }))
+
+
 
     return NextResponse.json({ products });
   } catch (error) {

@@ -141,7 +141,6 @@ model User {
   image         String?
   
   role          UserRole  @default(Customer)
-  adjustments   InventoryAdjustment[]
 
   // --- RELATIONSHIP TO INFLOW TEAM MEMBER ---
   teamMemberId  String?   @unique
@@ -295,6 +294,12 @@ model ProductVariantLocationMap {
   @@map("product_variant_location_map")
 }
 
+enum ProductType {
+  StockedProduct
+  NonstockedProduct
+  Service
+}
+
 model Product {
   id                      String   @id @default(cuid())
   inflowId                String   @unique
@@ -302,7 +307,7 @@ model Product {
   name                    String
   slug                    String   @unique 
   description             String?
-  itemType                String?
+  itemType                ProductType?
   autoAssemble            Boolean @default(false)
   isActive                Boolean @default(true)
   isManufacturable        Boolean @default(false)
@@ -339,7 +344,7 @@ model Product {
   tags              ProductTag[]
   features          ProductFeature[]
   inventories       Inventory[]
-  // inventoryBins     InventoryBin[]
+  inventoryItems    InventoryItem[]
   adjustmentLines   InventoryAdjustmentLine[]
   costAdjustments   ProductCostAdjustment[]
   inventoryLedger   InventoryLedger[]
@@ -1124,6 +1129,7 @@ model Location {
   
   address             LocationAddress?
   inventories         Inventory[]
+  inventoryItems      InventoryItem[]
   sublocations        Sublocation[]
   adjustmentLines     InventoryAdjustmentLine[]
   inventoryLedger     InventoryLedger[]
@@ -1217,6 +1223,8 @@ model Sublocation {
   localMappings       SublocationLocationMap[]
   inventoryLedgers    InventoryLedger[]
 
+  inventoryItems      InventoryItem[]
+
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
@@ -1273,38 +1281,40 @@ model Inventory {
   @@map("inventory")
 }
 
-// model InventoryItem {
-//   id            String      @id @default(cuid())
-//   productId     String
-//   locationId    String
-//   sublocationId String?
-//   serialNumber  String      @unique
-//   status        SerialStatus @default(IN_STOCK)
+model InventoryItem {
+  id            String      @id @default(cuid())
+  productId     String
+  locationId    String
+  sublocationId String?
+  serialNumber  String      @unique
+  status        SerialStatus @default(IN_STOCK)
 
-//   product       Product     @relation(fields: [productId], references: [inflowId], onDelete: Cascade)
-//   location      Location    @relation(fields: [locationId], references: [inflowId], onDelete: Cascade)
-//   sublocation   Sublocation? @relation(fields: [sublocationId], references: [id], onDelete: SetNull)
+  product       Product     @relation(fields: [productId], references: [inflowId], onDelete: Cascade)
+  location      Location    @relation(fields: [locationId], references: [inflowId], onDelete: Cascade)
+  sublocation   Sublocation? @relation(fields: [sublocationId], references: [id], onDelete: SetNull)
 
-//   createdAt     DateTime    @default(now())
-//   updatedAt     DateTime    @updatedAt
+  ledgerEntries InventoryLedger[]
+  adjustmentSerials     InventoryAdjustmentSerial[]
 
-//   @@index([productId, locationId])
-//   @@map("inventory_item")
-// }
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
 
-// enum SerialStatus {
-//   IN_STOCK
-//   RESERVED
-//   SOLD
-//   DAMAGED
-// }
+  @@index([productId, locationId])
+  @@map("inventory_item")
+}
+
+enum SerialStatus {
+  IN_STOCK
+  RESERVED
+  SOLD
+  DAMAGED
+}
 
 model InventoryBin {
   id            String      @id @default(cuid())
   inventoryId   String
   sublocationId String
   quantity      Decimal     @db.Decimal(18, 4)
-  serialNumber  String?
 
   inventory     Inventory   @relation(fields: [inventoryId], references: [id], onDelete: Cascade)
   sublocation   Sublocation @relation(fields: [sublocationId], references: [id], onDelete: Cascade)
@@ -1323,23 +1333,6 @@ model InventoryBin {
   // product             Product @relation(fields: [productId], references: [inflowId], onDelete: Cascade)
   // @@unique([productId,sublocationId])
 
-model InventoryAdjustment {
-  id                String   @id @default(cuid())
-  adjustmentNumber  String   @unique
-  reason            InventoryAdjustmentReason
-  notes             String?
-
-  performedById     String
-  performedBy       User     @relation(fields: [performedById], references: [id], onDelete: Cascade)
-
-  lines             InventoryAdjustmentLine[]
-  status            AdjustmentStatus
-
-  createdAt         DateTime @default(now())
-
-  @@map("inventory_adjustment")
-}
-
 enum InventoryAdjustmentReason {
   STOCK_COUNT
   DAMAGE
@@ -1351,65 +1344,112 @@ enum InventoryAdjustmentReason {
   MANUAL
 }
 
-enum  AdjustmentStatus {
+enum AdjustmentStatus {
   DRAFT
   POSTED
   VOIDED
 }
 
+model InventoryAdjustment {
+  id                String                    @id @default(cuid())
+  adjustmentNumber  String                    @unique
+  reason            InventoryAdjustmentReason
+  notes             String?
+
+  performedById     String
+  performedBy       TeamMember?              @relation(fields: [performedById], references: [inflowId])
+
+  lines             InventoryAdjustmentLine[]
+  status            AdjustmentStatus          @default(DRAFT)
+
+  createdAt         DateTime                  @default(now())
+  updatedAt         DateTime                  @updatedAt
+
+  @@map("inventory_adjustment")
+}
+
 model InventoryAdjustmentLine {
-  id                    String @id @default(cuid())
-  adjustmentId          String
-  inventoryId           String?
-  productId             String
-  locationId            String
-  sublocationId         String?
-  quantityBefore        Decimal @db.Decimal(18,4)
-  quantityAdjusted      Decimal @db.Decimal(18,4)
-  quantityAfter         Decimal @db.Decimal(18,4)
-  reason                String?
+  id               String   @id @default(cuid())
+  adjustmentId     String
+  inventoryId      String?
+  productId        String
+  locationId       String
+  sublocationId    String?  // null = Unassigned / Floor stock
 
-  adjustment            InventoryAdjustment @relation(fields: [adjustmentId], references: [id], onDelete: Cascade)
-  product               Product @relation(fields: [productId], references: [inflowId], onDelete: Cascade)
-  location              Location @relation(fields: [locationId], references: [inflowId], onDelete: Cascade)
-  sublocation           Sublocation? @relation(fields: [sublocationId], references: [id], onDelete: Cascade)
+  quantityBefore   Decimal  @db.Decimal(18, 4)
+  quantityAdjusted Decimal  @db.Decimal(18, 4) // Can be positive (+) or negative (-)
+  quantityAfter    Decimal  @db.Decimal(18, 4)
+  reason           String?
 
-  createdAt             DateTime @default(now())
+  adjustment       InventoryAdjustment       @relation(fields: [adjustmentId], references: [id], onDelete: Cascade)
+  product          Product                   @relation(fields: [productId], references: [inflowId], onDelete: Restrict)
+  location         Location                  @relation(fields: [locationId], references: [inflowId], onDelete: Restrict)
+  sublocation      Sublocation?              @relation(fields: [sublocationId], references: [id], onDelete: SetNull)
 
+  // Track exact serial numbers modified by this adjustment line
+  serials          InventoryAdjustmentSerial[]
+
+  createdAt        DateTime                  @default(now())
+
+  @@index([adjustmentId])
   @@index([productId])
   @@index([locationId])
-
+  @@index([sublocationId])
   @@map("inventory_adjustment_line")
+}
+
+model InventoryAdjustmentSerial {
+  id                   String                  @id @default(cuid())
+  adjustmentLineId     String
+  inventoryItemId      String?                 // Linked if existing serial
+  serialNumber         String                  // Serial string value
+
+  adjustmentLine       InventoryAdjustmentLine @relation(fields: [adjustmentLineId], references: [id], onDelete: Cascade)
+  inventoryItem        InventoryItem?          @relation(fields: [inventoryItemId], references: [id], onDelete: SetNull)
+
+  @@index([adjustmentLineId])
+  @@index([serialNumber])
+  @@map("inventory_adjustment_serial")
 }
 
 // Inventory Ledgers
 
 model InventoryLedger {
-  id                String @id @default(cuid())
-  productId         String
-  locationId        String
-  sublocationId     String?
-  transactionType   InventoryTransactionType
-  referenceType     InventoryReferenceType?
-  referenceId       String?
-  performedById     String?
+  id               String                   @id @default(cuid())
+  productId        String
+  locationId       String
+  sublocationId    String?                  // null = Unassigned / Floor stock
   
-  remarks String?
-  unitCost Decimal?
-  batchNumber String?
-  serialNumber String?
-  
-  quantityChange    Decimal @db.Decimal(18,4)
-  quantityBefore    Decimal @db.Decimal(18,4)
-  quantityAfter     Decimal @db.Decimal(18,4)
+  transactionType  InventoryTransactionType
+  referenceType    InventoryReferenceType?
+  referenceId      String?
+  performedById    String?
 
-  product           Product @relation(fields: [productId], references: [inflowId], onDelete: Cascade)
-  location          Location @relation(fields: [locationId], references: [inflowId], onDelete: Cascade)
-  performedBy       TeamMember? @relation(fields:[performedById], references: [inflowId])
-  sublocation Sublocation? @relation(fields: [sublocationId], references: [id], onDelete: SetNull)
+  fromLocationId   String?
+  toLocationId     String?
+  fromSublocationId String?
+  toSublocationId  String?
 
+  batchNumber      String?
+  inventoryItemId  String?                  // Set if transaction relates to a specific serial
+  uomName          String?
 
-  createdAt         DateTime @default(now())
+  quantityChange   Decimal                  @db.Decimal(18, 4)
+  quantityBefore   Decimal                  @db.Decimal(18, 4)
+  quantityAfter    Decimal                  @db.Decimal(18, 4)
+
+  unitCost         Decimal?                 @db.Decimal(18, 5)
+  totalCost        Decimal?                 @db.Decimal(18, 5)
+
+  remarks          String?
+
+  product          Product                  @relation(fields: [productId], references: [inflowId], onDelete: Restrict)
+  location         Location                 @relation(fields: [locationId], references: [inflowId], onDelete: Restrict)
+  sublocation      Sublocation?             @relation(fields: [sublocationId], references: [id], onDelete: SetNull)
+  performedBy      TeamMember?              @relation(fields: [performedById], references: [inflowId], onDelete: SetNull)
+  inventoryItem    InventoryItem?           @relation(fields: [inventoryItemId], references: [id], onDelete: SetNull)
+
+  createdAt        DateTime                 @default(now())
 
   @@index([productId, createdAt])
   @@index([locationId, createdAt])
@@ -1418,8 +1458,7 @@ model InventoryLedger {
   @@index([createdAt])
   @@index([productId, locationId, createdAt])
   @@index([sublocationId])
-
-  @@map("inventoryLedger")
+  @@map("inventory_ledger")
 }
 
 enum InventoryReferenceType {
@@ -1432,38 +1471,29 @@ enum InventoryReferenceType {
 }
 
 enum InventoryTransactionType {
-    PURCHASE
-    PURCHASE_RETURN
-    SALE
-    SALES_RETURN
-    TRANSFER_IN
-    TRANSFER_OUT
-    ADJUSTMENT
-    STOCK_COUNT
-    PRODUCTION_IN
-    PRODUCTION_OUT
-    OPENING_BALANCE
+  PURCHASE
+  PURCHASE_RETURN
+  SALE
+  SALES_RETURN
+  TRANSFER_IN
+  TRANSFER_OUT
+  ADJUSTMENT
+  STOCK_COUNT
+  PRODUCTION_IN
+  PRODUCTION_OUT
+  OPENING_BALANCE
 }
+
+  // lotId String?
+
+  // lot ProductLot? @relation(
+  //     fields: [lotId],
+  //     references: [id],
+  //     onDelete: SetNull
+  // )
 
 // INFLOW CLOUD ADJUSTMENT REASON
 
-model AdjustmentReason {
-  id            String   @id @default(cuid())
-  inflowId      String   @unique
-  name          String
-  isActive      Boolean  @default(true)
-  isInternal    Boolean  @default(false)
-
-  stockAdjustments  StockAdjustment[]
-
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-  deletedAt     DateTime?
-
-  @@index([name])
-
-  @@map("adjustment_reason")
-}
 
 // localMappings   AdjustmentReasonLocationMap[]
 
@@ -1483,6 +1513,23 @@ model AdjustmentReason {
 
 
 // CLOUD STOCK ADJUSTMENT
+model AdjustmentReason {
+  id            String   @id @default(cuid())
+  inflowId      String   @unique
+  name          String
+  isActive      Boolean  @default(true)
+  isInternal    Boolean  @default(false)
+
+  stockAdjustments  StockAdjustment[]
+
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  deletedAt     DateTime?
+
+  @@index([name])
+
+  @@map("adjustment_reason")
+}
 
 model StockAdjustment {
   id                     String   @id @default(cuid())
@@ -1617,6 +1664,7 @@ model TransferOrderLine {
   targetSublocationId   String?
   quantity              Decimal @db.Decimal(18,4)
   quantityReceived      Decimal?
+  description           String?
 
   // --- Discrepancy Tracking Fields ---
   discrepancyQuantity Decimal? @db.Decimal(18, 4) // Stores (quantityReceived - quantity)
@@ -1680,6 +1728,8 @@ model TeamMember {
   stockAdjustmentAttachements  StockAdjustmentAttachment[]
 
   inventoryLedgers   InventoryLedger[] 
+  adjustments   InventoryAdjustment[]
+
 
   user                User?
 

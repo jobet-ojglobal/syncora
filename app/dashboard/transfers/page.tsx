@@ -10,7 +10,8 @@ import {
   ChevronRight,
   Building2,
   MessageSquare,
-  FileSpreadsheet
+  FileSpreadsheet,
+  Pencil
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -435,7 +436,7 @@ export default function TransferOrdersListPage() {
                         </td>
                         <td className="p-3 text-right">
                           <div className="flex items-center justify-end gap-1.5">
-                            <TooltipProvider>
+                            {/* <TooltipProvider>
                               <Tooltip>
                                 <TooltipTrigger asChild>
                                   <Button
@@ -449,9 +450,22 @@ export default function TransferOrdersListPage() {
                                 </TooltipTrigger>
                                 <TooltipContent>Inspect Manifest</TooltipContent>
                               </Tooltip>
-                            </TooltipProvider>
+                            </TooltipProvider> */}
 
-                            {(order.status === "DRAFT" || order.status === "PENDING") && (
+                            {order.status === "DRAFT" && (
+                              <Button
+                                size="sm"
+                                className="h-7 text-[11px] gap-1"
+                                asChild
+                              >
+                                <Link href={`/dashboard/transfers/${order.id}/edit`}>
+                                  <Pencil className="h-3.5 w-3.5" />
+                                  Edit Manifest
+                                </Link>
+                              </Button>
+                            )}
+
+                            { order.status === "PENDING" && (
                               <Button
                                 size="sm"
                                 className="h-7 text-[11px] gap-1"
@@ -489,7 +503,7 @@ export default function TransferOrdersListPage() {
                               </Button>
                             )}
 
-                            { order.status !== "RECEIVED" &&
+                            { order.status !== "IN_TRANSIT" && order.status !== "RECEIVED" &&
                               order.status !== "PARTIALLY_RECEIVED" &&
                               order.status !== "RECEIVED_DISCREPANCY" &&
                               order.status !== "CANCELLED" && (
@@ -791,16 +805,40 @@ export default function TransferOrdersListPage() {
             </DialogDescription>
           </DialogHeader>
 
+          
+
           {activeAction && (
-            <TransferStatusUpdateForm
-              activeAction={activeAction}
-              onSubmit={handleFormSubmit}
-              onCancel={() => setActiveAction(null)}
-            />
+            <>
+              {/* Route Card */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 border border-dashed rounded-lg p-3 bg-muted/20">
+                <div className="space-y-1">
+                  <span className="text-[10px] uppercase font-bold text-muted-foreground">
+                    Origin (Source)
+                  </span>
+                  <div className="font-semibold text-sm flex items-center gap-1.5">
+                    <Building2 className="h-4 w-4 text-primary" />
+                    {activeAction.order.sourceLocationName}
+                  </div>
+                </div>
+                <div className="space-y-1">
+                  <span className="text-[10px] uppercase font-bold text-muted-foreground">
+                    Destination (Target)
+                  </span>
+                  <div className="font-semibold text-sm flex items-center gap-1.5">
+                    <Building2 className="h-4 w-4 text-primary" />
+                    {activeAction.order.targetLocationName}
+                  </div>
+                </div>
+              </div>
+              <TransferStatusUpdateForm
+                activeAction={activeAction}
+                onSubmit={handleFormSubmit}
+                onCancel={() => setActiveAction(null)}
+              />
+            </>
           )}
         </DialogContent>
       </Dialog>
-      
     </div>
   );
 }

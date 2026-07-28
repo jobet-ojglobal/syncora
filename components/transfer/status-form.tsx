@@ -39,6 +39,8 @@ const ALL_STATUS_OPTIONS = [
   { label: "Cancelled", value: "CANCELLED" },
 ];
 
+const RECEIVING_STATUSES = ["RECEIVED", "PARTIALLY_RECEIVED", "RECEIVED_DISCREPANCY"];
+
 // Schema definitions
 const lineSchema = z.object({
   lineId: z.string(),
@@ -54,10 +56,12 @@ export const unifiedStatusUpdateSchema = z
     lines: z.array(lineSchema).optional(),
   })
   .superRefine((data, ctx) => {
-    // Check if any line has a discrepancy
-    const hasLineDiscrepancy = data.lines?.some(
-      (line) => line.quantityReceived !== line.shippedQuantity
-    );
+    const isReceivingStatus = RECEIVING_STATUSES.includes(data.status);
+
+    // Only check for line discrepancy when receiving items
+    const hasLineDiscrepancy =
+      isReceivingStatus &&
+      data.lines?.some((line) => line.quantityReceived !== line.shippedQuantity);
 
     const requiresRemarks =
       data.status === "CANCELLED" ||
@@ -65,25 +69,19 @@ export const unifiedStatusUpdateSchema = z
       data.status === "PARTIALLY_RECEIVED" ||
       hasLineDiscrepancy;
 
-    // 1. Remarks required if status is Cancelled/Discrepancy OR if any line item has variance
+    // 1. Remarks required if status is Cancelled/Discrepancy OR if receiving with variances
     if (requiresRemarks && (!data.remarks || !data.remarks.trim())) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         path: ["remarks"],
-        message:
-          hasLineDiscrepancy
-            ? "Remarks are required because line item variances were detected."
-            : "Remarks are required for this status change.",
+        message: hasLineDiscrepancy
+          ? "Remarks are required because line item variances were detected."
+          : "Remarks are required for this status change.",
       });
     }
 
     // 2. Validate line discrepancy reasons when receiving or reporting discrepancy
-    if (
-      (data.status === "RECEIVED" ||
-        data.status === "PARTIALLY_RECEIVED" ||
-        data.status === "RECEIVED_DISCREPANCY") &&
-      data.lines
-    ) {
+    if (isReceivingStatus && data.lines) {
       data.lines.forEach((line, index) => {
         const diff = line.quantityReceived - line.shippedQuantity;
         if (diff !== 0 && (!line.discrepancyReason || !line.discrepancyReason.trim())) {
@@ -112,7 +110,7 @@ export interface ActiveActionPayload {
   targetStatus: string;
   order: {
     id: string;
-    status?: string; // Included order status for transitions
+    status?: string;
     remarks?: string | null;
     lines: TransferOrderLineItem[];
   };
@@ -150,33 +148,23 @@ export function TransferStatusUpdateForm({
   const watchedLines = useWatch({ control, name: "lines" });
   const { fields } = useFieldArray({ control, name: "lines" });
 
-  // Dynamically calculate if line items form should show
-  const isReceivingAction =
-    selectedStatus === "RECEIVED" ||
-    selectedStatus === "PARTIALLY_RECEIVED" ||
-    selectedStatus === "RECEIVED_DISCREPANCY";
+  const isReceivingAction = RECEIVING_STATUSES.includes(selectedStatus);
 
-  // Check if any watched line has a quantity mismatch
-  const hasLineDiscrepancy = watchedLines?.some(
-    (line) => Number(line?.quantityReceived) !== Number(line?.shippedQuantity)
-  );
+  // Check line discrepancy strictly during receiving states
+  const hasLineDiscrepancy =
+    isReceivingAction &&
+    watchedLines?.some(
+      (line) => Number(line?.quantityReceived) !== Number(line?.shippedQuantity)
+    );
 
-  // Dynamic status options based on current order status
+  // Dynamic status options based on current order status (Excludes current status)
   const currentOrderStatus = activeAction.order.status || activeAction.targetStatus;
   const allowedStatuses = ALLOWED_TRANSITIONS[currentOrderStatus] || [activeAction.targetStatus];
 
-  // const filteredStatusOptions = ALL_STATUS_OPTIONS.filter(
-  //   (opt) => opt.value === currentOrderStatus || allowedStatuses.includes(opt.value)
-  // );
+  const filteredStatusOptions = ALL_STATUS_OPTIONS.filter((opt) =>
+    allowedStatuses.includes(opt.value)
+  );
 
-  const filteredStatusOptions = ALL_STATUS_OPTIONS.filter((opt) => {
-    if (currentOrderStatus === "IN_TRANSIT" && opt.value === "IN_TRANSIT") {
-      return false;
-    }
-    return opt.value === currentOrderStatus || allowedStatuses.includes(opt.value);
-  });
-
-  // Remarks are required for specific statuses or when variances exist
   const isRemarksRequired =
     selectedStatus === "CANCELLED" ||
     selectedStatus === "RECEIVED_DISCREPANCY" ||
@@ -404,29 +392,3 @@ export function TransferStatusUpdateForm({
     </form>
   );
 }
-
-{/* <DialogFooter>
-            <DialogClose asChild>
-              <Button 
-                size="sm"
-                variant="outline"
-                onClick={() => setActiveAction(null)}
-                disabled={isSubmitting}
-                >
-                  Cancel
-                </Button>
-            </DialogClose>
-            <Button 
-              type="submit"
-              size="sm"
-              onClick={handleExecuteStatusUpdate}
-              disabled={isSubmitting}
-              className={
-                activeAction?.targetStatus === "CANCELLED"
-                  ? "bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                  : ""
-              }
-            >
-              {isSubmitting ? "Processing..." : "Confirm Status & Audit Logs"}
-            </Button>
-          </DialogFooter> */}

@@ -18,26 +18,51 @@ export async function GET() {
 
 
 // Helper to safely filter valid bin items
-function lineDataBins(bins: Array<{ sublocationId: string; quantity: number | string }>) {
-  return bins.filter((bin) => Boolean(bin.sublocationId));
-}
+// function lineDataBins(bins: Array<{ sublocationId: string; quantity: number | string }>) {
+//   return bins.filter((bin) => Boolean(bin.sublocationId));
+// }
 
 // ==========================================
-// POST: Batch Create / Bulk Upsert Inventory & Bin Allocations
+// POST: Batch Create / Bulk Upsert Inventory, Bin Allocations, Serials & Ledger
 // ==========================================
+
+// Helper to filter and sanitize bin structures
+function lineDataBins(bins: any[] | undefined) {
+  if (!Array.isArray(bins)) return [];
+  return bins.filter(
+    (b) => b && typeof b.sublocationId === "string" && b.sublocationId.trim() !== ""
+  );
+}
+
 export async function POST(request: Request) {
   try {
     const body = await request.json();
 
     // 1. Validate request body with Zod
     const validatedData = inventorySchema.parse(body);
-    const { locationId, lines } = validatedData;
+    const { locationId, lines, remarks } = validatedData;
 
     // 2. Perform atomic database updates inside a transaction
     const results = await prisma.$transaction(async (tx) => {
       const processedInventories: string[] = [];
 
       for (const line of lines) {
+        // Fetch existing inventory balance before mutation for Ledger logging
+        const existingInventory = await tx.inventory.findUnique({
+          where: {
+            productId_locationId: {
+              productId: line.productId,
+              locationId: locationId,
+            },
+          },
+        });
+
+        const quantityBefore = existingInventory
+          ? Number(existingInventory.quantityOnHand)
+          : 0;
+        const quantityAfter = Number(line.quantityOnHand);
+        const quantityChange = quantityAfter - quantityBefore;
+
         // A. Upsert parent Inventory record for (productId + locationId)
         const inventory = await tx.inventory.upsert({
           where: {
@@ -52,11 +77,15 @@ export async function POST(request: Request) {
             quantityOnHand: line.quantityOnHand,
             quantityReserved: line.quantityReserved,
             quantityAvailable: line.quantityAvailable,
+            lastCountedAt: new Date(),
+            lastMovementAt: quantityChange !== 0 ? new Date() : undefined,
           },
           update: {
             quantityOnHand: line.quantityOnHand,
             quantityReserved: line.quantityReserved,
             quantityAvailable: line.quantityAvailable,
+            lastCountedAt: new Date(),
+            ...(quantityChange !== 0 ? { lastMovementAt: new Date() } : {}),
           },
         });
 
@@ -91,10 +120,104 @@ export async function POST(request: Request) {
           });
         }
 
+        // D. Reconcile Serial Numbers (InventoryItem) & Granular Bin Allocations
+        if (line.trackSerials) {
+          const incomingSerials = (line.serials || [])
+            .map((s) => s.trim())
+            .filter(Boolean);
+
+          // Build a lookup map of Serial Number -> Sublocation ID
+          const serialToSublocationMap = new Map<string, string>();
+          for (const bin of validBins) {
+            if (Array.isArray(bin.serials)) {
+              for (const binSerial of bin.serials) {
+                const cleanedSerial = binSerial.trim();
+                if (cleanedSerial) {
+                  serialToSublocationMap.set(cleanedSerial, bin.sublocationId);
+                }
+              }
+            }
+          }
+
+          // Fetch existing inventory serial items
+          const existingSerialItems = await tx.inventoryItem.findMany({
+            where: {
+              productId: line.productId,
+              locationId: locationId,
+            },
+          });
+
+          const existingSerialNumbers = existingSerialItems.map((item) => item.serialNumber);
+
+          // Identify serials to create vs. delete
+          const serialsToCreate = incomingSerials.filter(
+            (sn) => !existingSerialNumbers.includes(sn)
+          );
+          const serialsToDelete = existingSerialItems.filter(
+            (item) => !incomingSerials.includes(item.serialNumber) && item.status === "IN_STOCK"
+          );
+
+          // 1. Delete removed in-stock serial items
+          if (serialsToDelete.length > 0) {
+            await tx.inventoryItem.deleteMany({
+              where: {
+                id: { in: serialsToDelete.map((item) => item.id) },
+              },
+            });
+          }
+
+          // 2. Create new serial items
+          // If a serial is in a bin, assign that sublocationId; otherwise set to null (unassigned/floor)
+          if (serialsToCreate.length > 0) {
+            await tx.inventoryItem.createMany({
+              data: serialsToCreate.map((sn) => ({
+                productId: line.productId,
+                locationId: locationId,
+                sublocationId: serialToSublocationMap.get(sn) || null,
+                serialNumber: sn,
+                status: "IN_STOCK",
+              })),
+            });
+          }
+
+          // 3. Sync sublocation assignments for existing preserved serials
+          for (const sn of incomingSerials) {
+            if (existingSerialNumbers.includes(sn)) {
+              const targetSublocationId = serialToSublocationMap.get(sn) || null;
+              await tx.inventoryItem.updateMany({
+                where: {
+                  productId: line.productId,
+                  locationId: locationId,
+                  serialNumber: sn,
+                },
+                data: {
+                  sublocationId: targetSublocationId,
+                },
+              });
+            }
+          }
+        }
+
+        // E. Audit Trail: Create InventoryLedger transaction record on stock changes
+        if (quantityChange !== 0) {
+          await tx.inventoryLedger.create({
+            data: {
+              productId: line.productId,
+              locationId: locationId,
+              transactionType: existingInventory ? "ADJUSTMENT" : "OPENING_BALANCE",
+              referenceType: "ADJUSTMENT",
+              quantityChange: quantityChange,
+              quantityBefore: quantityBefore,
+              quantityAfter: quantityAfter,
+              remarks: remarks || "Manual stock allocation & bin update",
+            },
+          });
+        }
+
         processedInventories.push(inventory.id);
       }
 
-      // Return refreshed full inventory state for these products
+      // Return refreshed full inventory state with bins and product relation
       return await tx.inventory.findMany({
         where: {
           id: { in: processedInventories },
@@ -136,6 +259,331 @@ export async function POST(request: Request) {
     );
   }
 }
+
+// export async function POST(request: Request) {
+//   try {
+//     const body = await request.json();
+
+//     // 1. Validate request body with Zod
+//     const validatedData = inventorySchema.parse(body);
+//     const { locationId, lines, remarks } = validatedData;
+
+//     // 2. Perform atomic database updates inside a transaction
+//     const results = await prisma.$transaction(async (tx) => {
+//       const processedInventories: string[] = [];
+
+//       for (const line of lines) {
+//         // Fetch existing inventory balance before mutation for Ledger logging
+//         const existingInventory = await tx.inventory.findUnique({
+//           where: {
+//             productId_locationId: {
+//               productId: line.productId,
+//               locationId: locationId,
+//             },
+//           },
+//         });
+
+//         const quantityBefore = existingInventory
+//           ? Number(existingInventory.quantityOnHand)
+//           : 0;
+//         const quantityAfter = Number(line.quantityOnHand);
+//         const quantityChange = quantityAfter - quantityBefore;
+
+//         // A. Upsert parent Inventory record for (productId + locationId)
+//         const inventory = await tx.inventory.upsert({
+//           where: {
+//             productId_locationId: {
+//               productId: line.productId,
+//               locationId: locationId,
+//             },
+//           },
+//           create: {
+//             productId: line.productId,
+//             locationId: locationId,
+//             quantityOnHand: line.quantityOnHand,
+//             quantityReserved: line.quantityReserved,
+//             quantityAvailable: line.quantityAvailable,
+//             lastCountedAt: new Date(),
+//             lastMovementAt: quantityChange !== 0 ? new Date() : undefined,
+//           },
+//           update: {
+//             quantityOnHand: line.quantityOnHand,
+//             quantityReserved: line.quantityReserved,
+//             quantityAvailable: line.quantityAvailable,
+//             lastCountedAt: new Date(),
+//             ...(quantityChange !== 0 ? { lastMovementAt: new Date() } : {}),
+//           },
+//         });
+
+//         const validBins = lineDataBins(line.bins);
+//         const activeSublocationIds = validBins.map((b) => b.sublocationId);
+
+//         // B. Clear removed bin allocations for this product inventory
+//         await tx.inventoryBin.deleteMany({
+//           where: {
+//             inventoryId: inventory.id,
+//             sublocationId: { notIn: activeSublocationIds },
+//           },
+//         });
+
+//         // C. Upsert InventoryBin allocations using compound key (inventoryId_sublocationId)
+//         for (const bin of validBins) {
+//           await tx.inventoryBin.upsert({
+//             where: {
+//               inventoryId_sublocationId: {
+//                 inventoryId: inventory.id,
+//                 sublocationId: bin.sublocationId,
+//               },
+//             },
+//             create: {
+//               inventoryId: inventory.id,
+//               sublocationId: bin.sublocationId,
+//               quantity: bin.quantity,
+//             },
+//             update: {
+//               quantity: bin.quantity,
+//             },
+//           });
+//         }
+
+//         // D. Reconcile Serial Numbers (InventoryItem) if trackSerials is enabled
+//         if (line.trackSerials) {
+//           const incomingSerials = line.serials.map((s) => s.trim()).filter(Boolean);
+
+//           // Get existing items for this product + location
+//           const existingSerialItems = await tx.inventoryItem.findMany({
+//             where: {
+//               productId: line.productId,
+//               locationId: locationId,
+//             },
+//           });
+
+//           const existingSerialNumbers = existingSerialItems.map((item) => item.serialNumber);
+
+//           // Identify serials to create and serials to delete/remove
+//           const serialsToCreate = incomingSerials.filter(
+//             (sn) => !existingSerialNumbers.includes(sn)
+//           );
+//           const serialsToDelete = existingSerialItems.filter(
+//             (item) => !incomingSerials.includes(item.serialNumber) && item.status === "IN_STOCK"
+//           );
+
+//           // Delete/Remove in-stock serials no longer submitted
+//           if (serialsToDelete.length > 0) {
+//             await tx.inventoryItem.deleteMany({
+//               where: {
+//                 id: { in: serialsToDelete.map((item) => item.id) },
+//               },
+//             });
+//           }
+
+//           // Pick primary sublocation ID if bins are defined
+//           const primarySublocationId = validBins.length > 0 ? validBins[0].sublocationId : null;
+
+//           // Create new InventoryItems for newly added serial numbers
+//           if (serialsToCreate.length > 0) {
+//             await tx.inventoryItem.createMany({
+//               data: serialsToCreate.map((sn) => ({
+//                 productId: line.productId,
+//                 locationId: locationId,
+//                 sublocationId: primarySublocationId,
+//                 serialNumber: sn,
+//                 status: "IN_STOCK",
+//               })),
+//             });
+//           }
+
+//           // Sync sublocation for existing preserved serial items
+//           if (primarySublocationId) {
+//             await tx.inventoryItem.updateMany({
+//               where: {
+//                 productId: line.productId,
+//                 locationId: locationId,
+//                 serialNumber: { in: incomingSerials },
+//               },
+//               data: {
+//                 sublocationId: primarySublocationId,
+//               },
+//             });
+//           }
+//         }
+
+//         // E. Audit Trail: Create InventoryLedger transaction record on stock changes
+//         if (quantityChange !== 0) {
+//           await tx.inventoryLedger.create({
+//             data: {
+//               productId: line.productId,
+//               locationId: locationId,
+//               transactionType: existingInventory ? "ADJUSTMENT" : "OPENING_BALANCE",
+//               referenceType: "ADJUSTMENT",
+//               quantityChange: quantityChange,
+//               quantityBefore: quantityBefore,
+//               quantityAfter: quantityAfter,
+//               remarks: remarks || "Manual stock allocation & bin update",
+//             },
+//           });
+//         }
+
+//         processedInventories.push(inventory.id);
+//       }
+
+//       // Return refreshed full inventory state with bins and product relation
+//       return await tx.inventory.findMany({
+//         where: {
+//           id: { in: processedInventories },
+//         },
+//         include: {
+//           bins: {
+//             include: {
+//               sublocation: true,
+//             },
+//           },
+//           product: true,
+//         },
+//       });
+//     });
+
+//     return NextResponse.json(
+//       {
+//         message: "Inventory balances updated successfully",
+//         data: results,
+//       },
+//       { status: 201 }
+//     );
+//   } catch (error) {
+//     if (error instanceof z.ZodError) {
+//       return NextResponse.json(
+//         {
+//           error: "Validation failed",
+//           details: error.flatten().fieldErrors,
+//           issues: error.issues,
+//         },
+//         { status: 400 }
+//       );
+//     }
+
+//     console.error("[INVENTORY_POST_ERROR]", error);
+//     return NextResponse.json(
+//       { error: error instanceof Error ? error.message : "Internal Server Error" },
+//       { status: 500 }
+//     );
+//   }
+// }
+
+// ==========================================
+// POST: Batch Create / Bulk Upsert Inventory & Bin Allocations
+// ==========================================
+// export async function POST(request: Request) {
+//   try {
+//     const body = await request.json();
+
+//     // 1. Validate request body with Zod
+//     const validatedData = inventorySchema.parse(body);
+//     const { locationId, lines } = validatedData;
+
+//     // 2. Perform atomic database updates inside a transaction
+//     const results = await prisma.$transaction(async (tx) => {
+//       const processedInventories: string[] = [];
+
+//       for (const line of lines) {
+//         // A. Upsert parent Inventory record for (productId + locationId)
+//         const inventory = await tx.inventory.upsert({
+//           where: {
+//             productId_locationId: {
+//               productId: line.productId,
+//               locationId: locationId,
+//             },
+//           },
+//           create: {
+//             productId: line.productId,
+//             locationId: locationId,
+//             quantityOnHand: line.quantityOnHand,
+//             quantityReserved: line.quantityReserved,
+//             quantityAvailable: line.quantityAvailable,
+//           },
+//           update: {
+//             quantityOnHand: line.quantityOnHand,
+//             quantityReserved: line.quantityReserved,
+//             quantityAvailable: line.quantityAvailable,
+//           },
+//         });
+
+//         const validBins = lineDataBins(line.bins);
+//         const activeSublocationIds = validBins.map((b) => b.sublocationId);
+
+//         // B. Clear removed bin allocations for this product inventory
+//         await tx.inventoryBin.deleteMany({
+//           where: {
+//             inventoryId: inventory.id,
+//             sublocationId: { notIn: activeSublocationIds },
+//           },
+//         });
+
+//         // C. Upsert InventoryBin allocations using compound key (inventoryId_sublocationId)
+//         for (const bin of validBins) {
+//           await tx.inventoryBin.upsert({
+//             where: {
+//               inventoryId_sublocationId: {
+//                 inventoryId: inventory.id,
+//                 sublocationId: bin.sublocationId,
+//               },
+//             },
+//             create: {
+//               inventoryId: inventory.id,
+//               sublocationId: bin.sublocationId,
+//               quantity: bin.quantity,
+//             },
+//             update: {
+//               quantity: bin.quantity,
+//             },
+//           });
+//         }
+
+//         processedInventories.push(inventory.id);
+//       }
+
+//       // Return refreshed full inventory state for these products
+//       return await tx.inventory.findMany({
+//         where: {
+//           id: { in: processedInventories },
+//         },
+//         include: {
+//           bins: {
+//             include: {
+//               sublocation: true,
+//             },
+//           },
+//           product: true,
+//         },
+//       });
+//     });
+
+//     return NextResponse.json(
+//       {
+//         message: "Inventory balances updated successfully",
+//         data: results,
+//       },
+//       { status: 201 }
+//     );
+//   } catch (error) {
+//     if (error instanceof z.ZodError) {
+//       return NextResponse.json(
+//         {
+//           error: "Validation failed",
+//           details: error.flatten().fieldErrors,
+//           issues: error.issues,
+//         },
+//         { status: 400 }
+//       );
+//     }
+
+//     console.error("[INVENTORY_POST_ERROR]", error);
+//     return NextResponse.json(
+//       { error: error instanceof Error ? error.message : "Internal Server Error" },
+//       { status: 500 }
+//     );
+//   }
+// }
 
 // ==========================================
 // PATCH: Update Specific Inventory Record / Sublocation Allocations

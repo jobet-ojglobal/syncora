@@ -11,6 +11,16 @@ import { useRouter } from "next/navigation";
 import { Field, FieldGroup, FieldLabel, FieldLegend, FieldSet } from "@/components/ui/field";
 import { ProductLineCard } from "./product-line-card";
 import { InventoryLineModal } from "./inventory-line-modal";
+import { FormSelect } from "../shared/form-select";
+import { FormTextarea } from "../shared/form-textarea";
+
+interface LookupItem {
+  inflowId: string;
+  name: string;
+  image: string | null;
+  sku: string;
+  trackSerials: boolean;
+}
 
 interface SelectionOption {
   inflowId: string;
@@ -34,7 +44,7 @@ export function InventoryFormV2({ locations, initialData }: InventoryFormProps) 
   const [modalOpen, setModalOpen] = useState(false);
 
   // Facility-dependent state
-  const [products, setProducts] = useState<SelectionOption[]>([]);
+  const [products, setProducts] = useState<LookupItem[]>([]);
   const [sublocations, setSublocations] = useState<SublocationOption[]>([]);
   const [isLoadingLocationData, setIsLoadingLocationData] = useState(false);
 
@@ -48,6 +58,7 @@ export function InventoryFormV2({ locations, initialData }: InventoryFormProps) 
         initialData?.lines?.map((line: any) => ({
           id: line.id,
           productId: line.productId,
+          trackSerials: line.trackSerials || false,
           quantityOnHand: Number(line.quantityOnHand) || 0,
           quantityReserved: Number(line.quantityReserved) || 0,
           quantityAvailable: Number(line.quantityAvailable) || 0,
@@ -56,7 +67,9 @@ export function InventoryFormV2({ locations, initialData }: InventoryFormProps) 
               id: bin.id,
               sublocationId: bin.sublocationId || "",
               quantity: Number(bin.quantity) || 0,
+              serials: bin.serials || []
             })) || [],
+          serials: line.serials || []
         })) || [],
     },
   });
@@ -154,6 +167,7 @@ export function InventoryFormV2({ locations, initialData }: InventoryFormProps) 
             finalBins.push({
               sublocationId: bulkSublocation.id,
               quantity: unassigned,
+              serials: []
             });
           }
         }
@@ -210,34 +224,21 @@ export function InventoryFormV2({ locations, initialData }: InventoryFormProps) 
 
           {/* Location Selector */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
-            <Field>
-              <FieldLabel className="text-xs font-semibold flex items-center gap-1">
-                <Warehouse className="w-3.5 h-3.5 text-muted-foreground" />
-                Target Facility Terminal *
-              </FieldLabel>
-              <div className="relative">
-                <select
-                  disabled={isEditMode || lineFields.length > 0}
-                  className="w-full text-xs h-9 rounded-md border border-input bg-background px-3 disabled:opacity-60"
-                  {...register("locationId")}
-                >
-                  <option value="">-- Choose Storage Facility --</option>
-                  {locations.map((loc) => (
-                    <option key={loc.inflowId} value={loc.inflowId}>
-                      {loc.name}
-                    </option>
-                  ))}
-                </select>
-                {isLoadingLocationData && (
-                  <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
-                    <Loader2 className="w-3.5 h-3.5 animate-spin text-muted-foreground" />
-                  </div>
-                )}
-              </div>
-              {errors.locationId && (
-                <span className="text-xs text-destructive">{errors.locationId.message}</span>
-              )}
-            </Field>
+
+            <FormSelect
+              name="locationId"
+              control={control}
+              label="Target Facility Terminal"
+              labelIcon={Warehouse}
+              placeholder="Choose Storage Facility"
+              options={locations.map(loc => ({
+                id: loc.inflowId,
+                name: loc.name
+              }))}
+              required
+              emptyMessage="No locations available"
+              classNameLabel="text-xs font-semibold"
+            />
           </div>
         </FieldSet>
 
@@ -295,12 +296,19 @@ export function InventoryFormV2({ locations, initialData }: InventoryFormProps) 
                   errors={errors}
                   products={products}
                   sublocations={sublocations}
-                  onRemoveLine={() => removeLine(lineIndex)}
+                  onRemoveLine={(idx) => removeLine(idx)}
                 />
               ))}
             </div>
           )}
         </FieldSet>
+
+        <FormTextarea
+          name="remarks"
+          control={control}
+          label="Remarks / Comments"
+          placeholder="Optional"
+        />
 
         {/* Footer Actions */}
         <div className="flex items-center justify-between border-t pt-4">
@@ -328,6 +336,8 @@ export function InventoryFormV2({ locations, initialData }: InventoryFormProps) 
         </div>
       </FieldGroup>
 
+      
+
       {/* Modal */}
       {modalOpen && (
         <InventoryLineModal
@@ -341,9 +351,11 @@ export function InventoryFormV2({ locations, initialData }: InventoryFormProps) 
               if (item.productId) {
                 appendLine({
                   productId: item.productId,
+                  trackSerials: !!products.find((p) => p.inflowId === item.productId)?.trackSerials,
                   quantityOnHand: 0,
                   quantityReserved: 0,
                   quantityAvailable: 0,
+                  serials: [],
                   bins: [], // Initial empty bins array for nested allocations
                 });
               }

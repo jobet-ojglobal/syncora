@@ -43,6 +43,7 @@ import Image from "next/image";
 import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from "../ui/input-group";
 import { DynamicAlert } from "../shared/alert";
 import ProductProfileForm from "../shared/form-product-image";
+import { FormInput } from "../shared/form-input";
 
 interface BrandLookupOption {
   id: string;
@@ -143,7 +144,7 @@ export function ProductForm({  brands, uoms, groups: productGroups, pricingSchem
 
   // 1. Pre-calculate all pricing schemes mapped over initial values
   const initialPrices = useMemo(() => {
-    // If we have existing data rows, group them by scheme to preserve them
+  //   // If we have existing data rows, group them by scheme to preserve them
     if (initialData?.prices && initialData.prices.length > 0) {
       return initialData.prices.map((p: any) => ({
         inflowId: p.inflowId,
@@ -154,19 +155,21 @@ export function ProductForm({  brands, uoms, groups: productGroups, pricingSchem
       }));
     }
 
-    // If it's a brand new product, cleanly loop through all platform schemes 
-    // so the operator doesn't have to hit "Append Tier" 5 times manually.
-    if (pricingSchemes && pricingSchemes.length > 0) {
-      return pricingSchemes.map((scheme) => ({
-        pricingSchemeId: scheme.inflowId,
-        priceType: "FixedPrice" as "FixedPrice" | "FixedMarkup" | "Dynamic" | "Tiered",
-        unitPrice: 0,
-        fixedMarkup: 0,
-      }));
-    }
+    return [];
 
-    // Bare minimum fallback array structure
-    return [{ pricingSchemeId: "", priceType: "FixedPrice" as "FixedPrice" | "FixedMarkup" | "Dynamic" | "Tiered", unitPrice: 0, fixedMarkup: 0 }];
+  //   // If it's a brand new product, cleanly loop through all platform schemes 
+  //   // so the operator doesn't have to hit "Append Tier" 5 times manually.
+  //   // if (pricingSchemes && pricingSchemes.length > 0) {
+  //   //   return pricingSchemes.map((scheme) => ({
+  //   //     pricingSchemeId: scheme.inflowId,
+  //   //     priceType: "FixedPrice" as "FixedPrice" | "FixedMarkup" | "Dynamic" | "Tiered",
+  //   //     unitPrice: 0,
+  //   //     fixedMarkup: 0,
+  //   //   }));
+  //   // }
+
+  //   // Bare minimum fallback array structure
+  //   return [{ pricingSchemeId: "", priceType: "FixedPrice" as "FixedPrice" | "FixedMarkup" | "Dynamic" | "Tiered", unitPrice: 0, fixedMarkup: 0 }];
   }, [initialData, pricingSchemes]);
 
   const form = useForm<ProductInput>({
@@ -178,7 +181,7 @@ export function ProductForm({  brands, uoms, groups: productGroups, pricingSchem
       sku: initialData?.sku || "",
       name: initialData?.name || "",
       description: initialData?.description || "",
-      itemType: initialData?.itemType || "Stock",
+      itemType: initialData?.itemType || "",
       brandId: initialData?.brandId || "",
       categoryId: initialData?.categoryId || "",
       autoAssemble: initialData?.autoAssemble ?? false,
@@ -200,6 +203,7 @@ export function ProductForm({  brands, uoms, groups: productGroups, pricingSchem
       initialCost: initialData?.initialCost ? Number(initialData.initialCost) : 0,
       // 2. Pass our clean computed matrix here 🌟
       prices: initialPrices,
+      // prices: [],
 
       originCountry: initialData?.originCountry || "",
       hsTariffNumber: initialData?.hsTariffNumber || "",
@@ -236,15 +240,17 @@ export function ProductForm({  brands, uoms, groups: productGroups, pricingSchem
     control,
     name: "images"
   });
-   const { fields: barcodeFields, append: appendBarcode, remove: removeBarcode } = useFieldArray({
+  const { fields: barcodeFields, append: appendBarcode, remove: removeBarcode } = useFieldArray({
     control,
     name: "barcodes"
   });
+  
   
   // Watch the matrix relationship variables
   const watchedGroupId = useWatch({ control, name: "productGroupId" });
   const watchedVariantSignature = useWatch({ control, name: "variantSignature" });
   const watchedImages = useWatch({ control, name: "images" });
+  const watchedItemType = useWatch({ control, name: "itemType" });
 
   const selectedGroupDetails = useMemo(() => {
     if (!watchedGroupId || !productGroups) return null;
@@ -361,6 +367,15 @@ export function ProductForm({  brands, uoms, groups: productGroups, pricingSchem
   const onSubmit = async (values: ProductInput) => {
 
     console.log("Submitting values:", values);
+
+    if(values.itemType !== "StockedProduct") {
+      values.trackExpiry = false;
+      values.trackLots = false;
+      values.trackSerials = false;
+      values.shelfLifeDays = undefined;
+      values.sellBeforeExpiryDays = undefined;
+      values.expiryNotificationDays = undefined;
+    }
     
     try {
       const endpoint = "/api/admin/products";
@@ -683,9 +698,8 @@ export function ProductForm({  brands, uoms, groups: productGroups, pricingSchem
                         <SelectValue placeholder="Select Item Type" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="Stock">Stock Product</SelectItem>
-                        <SelectItem value="Serialized">Unique Serialized Asset</SelectItem>
-                        <SelectItem value="NonStock">Non-Stock Product</SelectItem>
+                        <SelectItem value="StockedProduct">Stock Product</SelectItem>
+                        <SelectItem value="NonstockedProduct">Non-Stock Product</SelectItem>
                         <SelectItem value="Service">Service</SelectItem>
                       </SelectContent>
                     </Select>
@@ -715,6 +729,54 @@ export function ProductForm({  brands, uoms, groups: productGroups, pricingSchem
             </FieldSet>
 
           </div>
+
+          {/* Traceability Control Flags */}
+          { watchedItemType === "StockedProduct" && (
+            <div className="bg-card border rounded-xl p-5 space-y-4 shadow-xs">
+              <div className="space-y-0.5 flex items-center justify-between border-b pb-2">
+                <FieldLegend className="flex items-center gap-2 text-sm font-semibold ">
+                  <Calendar className="w-4 h-4 text-primary" /> 
+                  Traceability Control Flags
+                </FieldLegend>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-3">
+                <div className="flex items-center justify-between border p-3 rounded-xl bg-muted/10 gap-4">
+                  <div><FieldLabel className="mb-0 text-xs font-semibold">Lot Tracking</FieldLabel></div>
+                  <Controller control={control} name="trackLots" render={({ field }) => <Switch checked={field.value} onCheckedChange={field.onChange} />} />
+                </div>
+                <div className="flex items-center justify-between border p-3 rounded-xl bg-muted/10 gap-4">
+                  <div><FieldLabel className="mb-0 text-xs font-semibold">Serial Tracking</FieldLabel></div>
+                  <Controller control={control} name="trackSerials" render={({ field }) => <Switch checked={field.value} onCheckedChange={field.onChange} />} />
+                </div>
+                <div className="flex items-center justify-between border p-3 rounded-xl bg-muted/10 gap-4">
+                  <div><FieldLabel className="mb-0 text-xs font-semibold">Expiry Tracking</FieldLabel></div>
+                  <Controller control={control} name="trackExpiry" render={({ field }) => <Switch checked={field.value} onCheckedChange={field.onChange} />} />
+                </div>
+              </div>
+          
+
+              {watchedTrackExpiry && (
+                <FieldSet className="grid grid-cols-1 sm:grid-cols-3 gap-4 border p-4 rounded-xl bg-amber-50/20 border-amber-200/60 transition-all">
+                  <FieldLegend className="col-span-1 sm:col-span-3 flex items-center gap-2 text-amber-800 font-medium text-xs uppercase tracking-wider">
+                    <Hourglass className="w-3.5 h-3.5 text-amber-600" /> Shelf Life & Expiration Offsets
+                  </FieldLegend>
+                  <Field>
+                    <FieldLabel>Total Shelf Life (Days)</FieldLabel>
+                    <Input type="number" placeholder="0" {...register("shelfLifeDays", { valueAsNumber: true })} />
+                  </Field>
+                  <Field>
+                    <FieldLabel>Sell Before Offset (Days)</FieldLabel>
+                    <Input type="number" placeholder="0" {...register("sellBeforeExpiryDays", { valueAsNumber: true })} />
+                  </Field>
+                  <Field>
+                    <FieldLabel>Notification Alert (Days)</FieldLabel>
+                    <Input type="number" placeholder="0" {...register("expiryNotificationDays", { valueAsNumber: true })} />
+                  </Field>
+                </FieldSet>
+              )}
+            </div>
+          )}
           
           {/* Dimensions & Logistics Metrics Section */}
           <div className="bg-card border rounded-xl p-5 space-y-4 shadow-xs">
@@ -754,50 +816,7 @@ export function ProductForm({  brands, uoms, groups: productGroups, pricingSchem
             </div>
           </div>
 
-          {/* Traceability Control Flags */}
-          <div className="bg-card border rounded-xl p-5 space-y-4 shadow-xs">
-            <div className="space-y-0.5 flex items-center justify-between border-b pb-2">
-              <FieldLegend className="flex items-center gap-2 text-sm font-semibold ">
-                <Calendar className="w-4 h-4 text-primary" /> 
-                Traceability Control Flags
-              </FieldLegend>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-3">
-              <div className="flex items-center justify-between border p-3 rounded-xl bg-muted/10 gap-4">
-                <div><FieldLabel className="mb-0 text-xs font-semibold">Lot Tracking</FieldLabel></div>
-                <Controller control={control} name="trackLots" render={({ field }) => <Switch checked={field.value} onCheckedChange={field.onChange} />} />
-              </div>
-              <div className="flex items-center justify-between border p-3 rounded-xl bg-muted/10 gap-4">
-                <div><FieldLabel className="mb-0 text-xs font-semibold">Serial Tracking</FieldLabel></div>
-                <Controller control={control} name="trackSerials" render={({ field }) => <Switch checked={field.value} onCheckedChange={field.onChange} />} />
-              </div>
-              <div className="flex items-center justify-between border p-3 rounded-xl bg-muted/10 gap-4">
-                <div><FieldLabel className="mb-0 text-xs font-semibold">Expiry Tracking</FieldLabel></div>
-                <Controller control={control} name="trackExpiry" render={({ field }) => <Switch checked={field.value} onCheckedChange={field.onChange} />} />
-              </div>
-            </div>
-
-            {watchedTrackExpiry && (
-              <FieldSet className="grid grid-cols-1 sm:grid-cols-3 gap-4 border p-4 rounded-xl bg-amber-50/20 border-amber-200/60 transition-all">
-                <FieldLegend className="col-span-1 sm:col-span-3 flex items-center gap-2 text-amber-800 font-medium text-xs uppercase tracking-wider">
-                  <Hourglass className="w-3.5 h-3.5 text-amber-600" /> Shelf Life & Expiration Offsets
-                </FieldLegend>
-                <Field>
-                  <FieldLabel>Total Shelf Life (Days)</FieldLabel>
-                  <Input type="number" placeholder="0" {...register("shelfLifeDays", { valueAsNumber: true })} />
-                </Field>
-                <Field>
-                  <FieldLabel>Sell Before Offset (Days)</FieldLabel>
-                  <Input type="number" placeholder="0" {...register("sellBeforeExpiryDays", { valueAsNumber: true })} />
-                </Field>
-                <Field>
-                  <FieldLabel>Notification Alert (Days)</FieldLabel>
-                  <Input type="number" placeholder="0" {...register("expiryNotificationDays", { valueAsNumber: true })} />
-                </Field>
-              </FieldSet>
-            )}
-          </div>
+          
 
           {/* Operational Multi-tier */}
           <div className="bg-card border rounded-xl p-5 space-y-4 shadow-xs">
@@ -1060,7 +1079,17 @@ export function ProductForm({  brands, uoms, groups: productGroups, pricingSchem
             
             {/* Pricing Items */}
             <div className="space-y-3">
-              <Controller 
+              <FormInput
+                name="initialCost"
+                control={control}
+                label="Standard Base Cost ($)"
+                required
+                type="number"
+                step="0.00001"
+                placeholder="0.00"
+                classNameField="md:col-span-1"
+              />
+              {/* <Controller 
                 control={control} 
                 name="initialCost" 
                 render={({ field, fieldState }) => (
@@ -1080,7 +1109,7 @@ export function ProductForm({  brands, uoms, groups: productGroups, pricingSchem
                     </FieldContent>
                   </Field>
                 )}
-              />
+              /> */}
               <FieldLabel>Price Matrix Lines Mapping</FieldLabel>
               {priceFields.length === 0 ? (
                 <div className="flex flex-col items-center justify-center p-8 border border-dashed rounded-xl bg-muted/5 text-muted-foreground text-center">

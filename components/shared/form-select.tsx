@@ -4,6 +4,7 @@ import React from "react";
 import { Control, Controller, FieldPath, FieldValues } from "react-hook-form";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Field, FieldContent, FieldError, FieldLabel } from "@/components/ui/field"; 
+import { LucideIcon } from "lucide-react";
 
 interface SelectOption {
   id: string;
@@ -24,7 +25,9 @@ interface FormSelectProps<
   disabled?: boolean;
   classNameLabel?: string;
   classNameField?: string;
+  classNameInput?: string;
   required?: boolean;
+  labelIcon?: LucideIcon
 }
 
 // 2. Remove the default values inside the function declarations as well
@@ -35,11 +38,13 @@ export function FormSelect<
   name,
   control,
   label,
+  labelIcon: IconLabel,
   placeholder = "Select...",
   options,
   emptyMessage = "No options available",
   classNameLabel = "",
   classNameField = "",
+  classNameInput = "",
   disabled = false,
   required = false
 }: FormSelectProps<TFieldValues, TName>) {
@@ -51,11 +56,18 @@ export function FormSelect<
       control={control}
       render={({ field, fieldState }) => (
         <Field data-invalid={fieldState.invalid} className={classNameField}>
-          { label ? 
+          { (label && !IconLabel) ? 
             <FieldLabel htmlFor={selectId} className={classNameLabel}>
               {label} {required && <b className="text-red-500">*</b>}
-            </FieldLabel> : "" 
+            </FieldLabel> : (label && IconLabel) ?  
+            <FieldLabel htmlFor={selectId} className={`flex items-center gap-1 ${classNameLabel}`} >
+                <IconLabel className="w-3.5 h-3.5 text-muted-foreground" />
+                Target Facility Terminal *
+              </FieldLabel>
+               : "" 
           }
+
+          
           <FieldContent className="relative">
             <Select
               name={field.name}
@@ -66,7 +78,7 @@ export function FormSelect<
               <SelectTrigger
                 id={selectId}
                 aria-invalid={fieldState.invalid}
-                className="w-full text-xs font-medium h-9"
+                className={`w-full text-xs font-medium h-9 ${classNameInput}`}
               >
                 <SelectValue  placeholder={placeholder} />
               </SelectTrigger>

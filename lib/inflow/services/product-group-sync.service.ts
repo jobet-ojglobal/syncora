@@ -24,8 +24,8 @@ export class ProductGroupSyncService {
     let totalProcessed = 0;
 
     const baseIncludes = ["options.optionValues"];
-    const cleanIncludes = (includes ?? []).filter((item) => item !== "coreGroupData");
-    const hasCoreGroupData = (includes ?? []).includes("coreGroupData");
+    const cleanIncludes = (includes ?? []).filter((item) => item !== "coreData");
+    const hasCoreGroupData = (includes ?? []).includes("coreData");
     const mergedIncludes = [...baseIncludes, ...(cleanIncludes || [])];
 
     // Runtime cache across service execution

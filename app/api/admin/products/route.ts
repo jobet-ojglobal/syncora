@@ -2,7 +2,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { genUniqueSlug } from "@/helpers/genUniqueSlug";
-import { Prisma } from "@/generated/prisma/client";
+import { Prisma, ProductType } from "@/generated/prisma/client";
 import { getMidSyncQueue } from "@/lib/queues/sync.queue";
 import { WebhookService } from "@/services/webhook.service";
 import { UI_TO_API_ITEM_TYPE } from "@/types/local-location.type";
@@ -322,6 +322,8 @@ export async function POST(request: NextRequest) {
         }));
     }
 
+    
+
     // A. Create root product document item node
     const newProduct = await tx.product.create({
       data: {
@@ -330,7 +332,7 @@ export async function POST(request: NextRequest) {
         name: name.trim(),
         slug: slug.trim(),
         description: description?.trim() || null,
-        itemType,
+        itemType: itemType as ProductType || null,
         brandId: brandId || null,
         categoryId: categoryId || null,
         autoAssemble: !!autoAssemble,
