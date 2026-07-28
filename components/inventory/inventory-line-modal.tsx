@@ -1,16 +1,19 @@
 "use client";
 
 import React, { useState, useEffect, useMemo } from "react";
-import { Search, CheckCircle2, Circle, PackagePlus, CheckSquare, Square } from "lucide-react";
+import { Search, CheckCircle2, Circle, PackagePlus, CheckSquare, Square, ImageIcon } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 
-export interface LookupItem {
+interface LookupItem {
   inflowId: string;
   name: string;
+  image: string | null;
+  sku: string;
+  trackSerials: boolean;
 }
 
 interface InventoryLineModalProps {
@@ -153,7 +156,7 @@ export function InventoryLineModal({
           </div>
 
           {/* Product Catalog List */}
-          <div className="border rounded-xl flex flex-col flex-1 bg-card overflow-hidden min-h-[300px]">
+          <div className="border rounded-xl flex flex-col flex-1 bg-card  max-h-300 overflow-y-auto ">
             <ScrollArea className="flex-1 divide-y">
               {filteredProducts.length === 0 ? (
                 <div className="p-8 text-center text-xs text-muted-foreground font-medium">
@@ -184,20 +187,37 @@ export function InventoryLineModal({
                         )}
                       </div>
 
+                      <div className="w-10 h-10 bg-muted border rounded-lg overflow-hidden flex items-center justify-center shrink-0 relative">
+                        {product.image ? (
+                          <img src={product.image} alt={product.name} className="w-full h-full object-cover" />
+                        ) : (
+                          <ImageIcon className="w-4 h-4 text-muted-foreground/50" />
+                        )}
+                      </div>
+
                       <div className="flex flex-col min-w-0 flex-1">
                         <div className="flex items-center gap-2">
                           <span className="font-medium text-foreground truncate">
                             {product.name}
                           </span>
+                         
                           {isAlreadyAdded && (
                             <Badge variant="secondary" className="text-[9px] px-1.5 py-0 h-4">
                               Already Added
                             </Badge>
                           )}
+                          
                         </div>
-                        <span className="text-[10px] text-muted-foreground font-mono">
-                          ID: {product.inflowId}
-                        </span>
+                        <div className="flex items-center gap-2">
+                          <span className="text-[10px] text-muted-foreground font-mono">
+                            SKU: {product.sku}
+                          </span>
+                          {product.trackSerials && (
+                            <Badge className="bg-indigo-50 text-indigo-600 hover:bg-indigo-50 border border-indigo-200 text-[8px] py-0 h-4 px-1">
+                                SERIALS
+                            </Badge>
+                          )}
+                        </div>
                       </div>
                     </div>
                   );

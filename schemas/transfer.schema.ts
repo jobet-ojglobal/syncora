@@ -11,9 +11,8 @@ export const transferOrderSchema = z
     id: z.string().optional(),
     sourceLocationId: z.string().min(1, "Please choose a departure source terminal"),
     targetLocationId: z.string().min(1, "Please choose an arrival destination hub"),
-    status: z.enum(["DRAFT", "PENDING", "IN_TRANSIT", "RECEIVED", "CANCELLED"]),
-    remarks: z.string().nullish(),
-
+    status: z.enum(["DRAFT", "PENDING", "IN_TRANSIT", "RECEIVED", "PARTIALLY_RECEIVED", "RECEIVED_DISCREPANCY",  "CANCELLED"]),
+    remarks: z.string().nullish(), 
     lines: z
       .array(
         z.object({

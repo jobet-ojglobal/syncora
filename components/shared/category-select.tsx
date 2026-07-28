@@ -137,7 +137,7 @@ export function CategorySelect({ value, onChange, className }: CategorySelectPro
             ) : selectedCategory ? (
               selectedCategory.name
             ) : (
-              <span className="text-muted-foreground">Choose department placement...</span>
+              <span className="text-muted-foreground">Select a category...</span>
             )}
             <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
           </Button>

@@ -8,6 +8,7 @@ import { notFound } from "next/navigation";
 import { InventoryForm } from "@/components/inventory/inventory-form.adjustment";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/user";
+import { InventoryFormV2 } from "@/components/inventory/inventory-multi-form";
 
 
 async function getInventory(id: string) {
@@ -82,7 +83,7 @@ export default async function InventoryAdjustmentPage({ params }: Props) {
         title="Inventory Adjustment"
         description="Update inventory" 
       />
-      <InventoryForm 
+      {/* <InventoryForm 
         currentUser={currentUser}
         initialData={inventory} 
         products={products.map((p) => ({
@@ -93,7 +94,14 @@ export default async function InventoryAdjustmentPage({ params }: Props) {
           inflowId: l.inflowId,
           name: l.name,
         }))}
-        sublocations={sublocations} />
+        sublocations={sublocations} /> */}
+        <InventoryFormV2
+          locations={locations.map((l) => ({
+            inflowId: l.inflowId,
+            name: l.name,
+          }))}
+          initialData={inventory}
+        />
     </div>
   );
 }

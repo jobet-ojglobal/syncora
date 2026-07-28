@@ -18,7 +18,7 @@ export default async function NewInventoryPage() {
   });
 
   return (
-    <div className="w-full max-w-2xl mx-auto p-6 space-y-6">
+    <div className="w-full max-w-4xl mx-auto p-6 space-y-6">
       {/* HEADER */}
       <Link
         href="/dashboard/inventory"

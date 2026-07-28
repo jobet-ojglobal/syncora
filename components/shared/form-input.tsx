@@ -17,6 +17,7 @@ interface FormInputProps<
   icon?: LucideIcon;
   classNameLabel?: string;
   classNameField?: string;
+  classNameInput?: string;
 }
 
 export function FormInput<
@@ -32,6 +33,7 @@ export function FormInput<
   placeholder = "",
   classNameLabel = "",
   classNameField = "",
+  classNameInput = "",
   ...props
 }: FormInputProps<TFieldValues, TName>) {
   const inputId = `form-input-${name}`;
@@ -57,7 +59,7 @@ export function FormInput<
               type={type}
               placeholder={placeholder}
               aria-invalid={fieldState.invalid}
-              className={`${Icon ? "pl-9" : ""} h-8 text-xs`}
+              className={`${Icon ? "pl-9" : ""} h-8 text-xs ${classNameInput}`}
               value={value ?? ""}
               onChange={(e) => {
                 const val = e.target.value;

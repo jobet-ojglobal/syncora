@@ -1,77 +1,307 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma"; // Adjust according to your Prisma client path
-import { inventoryAdjustmentSchema } from "@/schemas/inventory.adjustment.schema";
+import { prisma } from "@/lib/prisma";
+import { createAdjustmentSchema } from "@/schemas/inventory.adjustment.schema";
+import { SerialStatus } from "@/generated/prisma/enums";
 
-export async function POST(req: Request) {
+async function generateAdjustmentNumber(tx: any): Promise<string> {
+  const count = await tx.inventoryAdjustment.count();
+  const year = new Date().getFullYear();
+  return `ADJ-${year}-${String(count + 1).padStart(5, "0")}`;
+}
+
+export async function POST(request: Request) {
   try {
-    const body = await req.json();
-    const validatedData = inventoryAdjustmentSchema.parse(body);
+    const body = await request.json();
+    const validated = createAdjustmentSchema.parse(body);
 
-    // Execute atomic transaction for inventory adjustments
     const result = await prisma.$transaction(async (tx) => {
-      // 1. Create adjustment log entry
-      const adjustmentHeader = await tx.inventoryAdjustment.create({
+      const adjustmentNumber = await generateAdjustmentNumber(tx);
+
+      // 1. Create parent InventoryAdjustment header
+      const adjustment = await tx.inventoryAdjustment.create({
         data: {
-          locationId: validatedData.locationId,
-          reason: validatedData.reason,
-          remarks: validatedData.remarks,
-          lines: {
-            create: validatedData.lines.map((line) => ({
-              productId: line.productId,
-              sublocationId: line.sublocationId || null,
-              previousQuantity: line.currentQuantity,
-              newQuantity: line.adjustedQuantity,
-              delta: line.delta,
-              reasonNote: line.reasonNote,
-            })),
-          },
+          adjustmentNumber,
+          reason: validated.reason,
+          notes: validated.notes,
+          performedById: validated.performedById,
+          status: validated.status,
         },
       });
 
-      // 2. Adjust physical inventory balances
-      for (const line of validatedData.lines) {
-        await tx.inventoryItem.upsert({
+      // Process each line entry
+      for (const line of validated.lines) {
+        // Fetch existing inventory record (if any)
+        const existingInventory = await tx.inventory.findUnique({
           where: {
             productId_locationId: {
               productId: line.productId,
-              locationId: validatedData.locationId,
+              locationId: line.locationId,
             },
-          },
-          update: {
-            quantityOnHand: {
-              increment: line.delta,
-            },
-          },
-          create: {
-            productId: line.productId,
-            locationId: validatedData.locationId,
-            quantityOnHand: line.adjustedQuantity,
           },
         });
 
-        // 3. Record audit ledger transaction
-        await tx.inventoryLedger.create({
+        const quantityBefore = existingInventory
+          ? Number(existingInventory.quantityOnHand)
+          : 0;
+        const quantityAdjusted = Number(line.quantityAdjusted);
+        const quantityAfter = quantityBefore + quantityAdjusted;
+
+        if (validated.status === "POSTED" && quantityAfter < 0) {
+          throw new Error(
+            `Adjustment for product ID ${line.productId} results in negative stock on hand (${quantityAfter}).`
+          );
+        }
+
+        // 2. Create InventoryAdjustmentLine with before/after snapshot
+        const adjustmentLine = await tx.inventoryAdjustmentLine.create({
           data: {
+            adjustmentId: adjustment.id,
+            inventoryId: existingInventory?.id ?? null,
             productId: line.productId,
-            locationId: validatedData.locationId,
+            locationId: line.locationId,
             sublocationId: line.sublocationId || null,
-            transactionType: "ADJUSTMENT",
-            quantityChange: line.delta,
-            referenceId: adjustmentHeader.id,
-            notes: line.reasonNote || validatedData.remarks,
+            quantityBefore,
+            quantityAdjusted,
+            quantityAfter,
+            reason: line.reason || null,
           },
         });
+
+        // 3. Attach Serial numbers linked to line
+        if (line.serials && line.serials.length > 0) {
+          await tx.inventoryAdjustmentSerial.createMany({
+            data: line.serials.map((s) => ({
+              adjustmentLineId: adjustmentLine.id,
+              inventoryItemId: s.inventoryItemId || null,
+              serialNumber: s.serialNumber,
+            })),
+          });
+        }
+
+        // --- Apply Ledger & Stock Updates only when POSTED ---
+        if (validated.status === "POSTED") {
+          const reserved = existingInventory
+            ? Number(existingInventory.quantityReserved)
+            : 0;
+          const newAvailable = quantityAfter - reserved;
+
+          // A. Upsert Main Inventory
+          const updatedInventory = await tx.inventory.upsert({
+            where: {
+              productId_locationId: {
+                productId: line.productId,
+                locationId: line.locationId,
+              },
+            },
+            create: {
+              productId: line.productId,
+              locationId: line.locationId,
+              quantityOnHand: quantityAfter,
+              quantityReserved: 0,
+              quantityAvailable: quantityAfter,
+              lastCountedAt:
+                validated.reason === "STOCK_COUNT" ? new Date() : undefined,
+              lastMovementAt: new Date(),
+            },
+            update: {
+              quantityOnHand: { increment: quantityAdjusted },
+              quantityAvailable: newAvailable,
+              ...(validated.reason === "STOCK_COUNT"
+                ? { lastCountedAt: new Date() }
+                : {}),
+              lastMovementAt: new Date(),
+            },
+          });
+
+          // Update adjustmentLine with inventoryId if created
+          if (!existingInventory) {
+            await tx.inventoryAdjustmentLine.update({
+              where: { id: adjustmentLine.id },
+              data: { inventoryId: updatedInventory.id },
+            });
+          }
+
+          // B. Sublocation / Bin Stock Update
+          if (line.sublocationId) {
+            await tx.inventoryBin.upsert({
+              where: {
+                inventoryId_sublocationId: {
+                  inventoryId: updatedInventory.id,
+                  sublocationId: line.sublocationId,
+                },
+              },
+              create: {
+                inventoryId: updatedInventory.id,
+                sublocationId: line.sublocationId,
+                quantity: Math.max(0, quantityAdjusted),
+              },
+              update: {
+                quantity: { increment: quantityAdjusted },
+              },
+            });
+          }
+
+          // C. Serial Number Adjustments
+          if (line.serials && line.serials.length > 0) {
+            if (quantityAdjusted < 0) {
+              // Stock reduction: mark items as DAMAGED/LOST or delete
+              const serialStrings = line.serials.map((s) => s.serialNumber);
+              await tx.inventoryItem.updateMany({
+                where: {
+                  productId: line.productId,
+                  locationId: line.locationId,
+                  serialNumber: { in: serialStrings },
+                  status: "IN_STOCK",
+                },
+                data: {
+                  status: "DAMAGED",
+                },
+              });
+      
+            } else if (quantityAdjusted > 0) {
+              // Stock addition: insert new serial numbers
+              for (const s of line.serials) {
+                await tx.inventoryItem.upsert({
+                  where: {
+                    productId: line.productId,
+                    serialNumber: s.serialNumber,
+                  },
+                  create: {
+                    productId: line.productId,
+                    locationId: line.locationId,
+                    sublocationId: line.sublocationId || null,
+                    serialNumber: s.serialNumber,
+                    status: "IN_STOCK",
+                  },
+                  update: {
+                    locationId: line.locationId,
+                    sublocationId: line.sublocationId || null,
+                    status: "IN_STOCK",
+                  },
+                });
+              }
+            }
+          }
+
+          // D. Audit Ledger Entry
+          await tx.inventoryLedger.create({
+            data: {
+              productId: line.productId,
+              locationId: line.locationId,
+              transactionType: "ADJUSTMENT",
+              // referenceType: validated.reason,
+              referenceId: adjustment.id,
+              quantityChange: quantityAdjusted,
+              quantityBefore,
+              quantityAfter,
+              remarks: line.reason || validated.notes || `Reason: ${validated.reason}`,
+            },
+          });
+        }
       }
 
-      return adjustmentHeader;
+      return tx.inventoryAdjustment.findUnique({
+        where: { id: adjustment.id },
+        include: {
+          lines: {
+            include: {
+              product: true,
+              location: true,
+              sublocation: true,
+              serials: true,
+            },
+          },
+        },
+      });
     });
 
-    return NextResponse.json({ success: true, data: result }, { status: 201 });
-  } catch (error: any) {
-    console.error("Adjustment processing error:", error);
     return NextResponse.json(
-      { error: error.message || "Failed to process stock adjustment" },
-      { status: 400 }
+      { message: "Adjustment processed successfully", data: result },
+      { status: 201 }
+    );
+  } catch (error) {
+    console.error("[ADJUSTMENT_POST_ERROR]", error);
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : "Internal server error" },
+      { status: 500 }
     );
   }
 }
+
+// import { NextResponse } from "next/server";
+// import { prisma } from "@/lib/prisma"; // Adjust according to your Prisma client path
+// import { inventoryAdjustmentSchema } from "@/schemas/inventory.adjustment.schema";
+
+// export async function POST(req: Request) {
+//   try {
+//     const body = await req.json();
+//     const validatedData = inventoryAdjustmentSchema.parse(body);
+
+//     // Execute atomic transaction for inventory adjustments
+//     const result = await prisma.$transaction(async (tx) => {
+//       // 1. Create adjustment log entry
+//       const adjustmentHeader = await tx.inventoryAdjustment.create({
+//         data: {
+//           locationId: validatedData.locationId,
+//           reason: validatedData.reason,
+//           remarks: validatedData.remarks,
+//           lines: {
+//             create: validatedData.lines.map((line) => ({
+//               productId: line.productId,
+//               sublocationId: line.sublocationId || null,
+//               previousQuantity: line.currentQuantity,
+//               newQuantity: line.adjustedQuantity,
+//               delta: line.delta,
+//               reasonNote: line.reasonNote,
+//             })),
+//           },
+//         },
+//       });
+
+//       // 2. Adjust physical inventory balances
+//       for (const line of validatedData.lines) {
+//         await tx.inventoryItem.upsert({
+//           where: {
+//             productId_locationId: {
+//               productId: line.productId,
+//               locationId: validatedData.locationId,
+//             },
+//           },
+//           update: {
+//             quantityOnHand: {
+//               increment: line.delta,
+//             },
+//           },
+//           create: {
+//             productId: line.productId,
+//             locationId: validatedData.locationId,
+//             quantityOnHand: line.adjustedQuantity,
+//           },
+//         });
+
+//         // 3. Record audit ledger transaction
+//         await tx.inventoryLedger.create({
+//           data: {
+//             productId: line.productId,
+//             locationId: validatedData.locationId,
+//             sublocationId: line.sublocationId || null,
+//             transactionType: "ADJUSTMENT",
+//             quantityChange: line.delta,
+//             referenceId: adjustmentHeader.id,
+//             notes: line.reasonNote || validatedData.remarks,
+//           },
+//         });
+//       }
+
+//       return adjustmentHeader;
+//     });
+
+//     return NextResponse.json({ success: true, data: result }, { status: 201 });
+//   } catch (error: any) {
+//     console.error("Adjustment processing error:", error);
+//     return NextResponse.json(
+//       { error: error.message || "Failed to process stock adjustment" },
+//       { status: 400 }
+//     );
+//   }
+// }

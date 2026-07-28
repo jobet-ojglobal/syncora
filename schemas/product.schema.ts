@@ -8,7 +8,7 @@ export const productSchema = z.object({
   sku: z.string().min(1, "SKU reference identifier is required").max(100),
   name: z.string().min(1, "Product name is required").max(255),
   description: z.string().nullable().optional(),
-  itemType: z.string().nullable().optional(),
+  itemType: z.string().min(1, "Item type name is required"),
   brandId: z.string().nullable().optional().or(z.literal("")),
   categoryId: z.string().nullable().optional().or(z.literal("")),
   
@@ -39,7 +39,7 @@ export const productSchema = z.object({
   standardUomName: z.string().min(1, "Base system UOM is required"),
 
   // 💰 Financial Costing & Pricing Elements
-  initialCost: z.number().min(0, "Cost basis cannot be negative"),
+  initialCost: z.number("Base cost is required").min(0, "Cost basis cannot be negative"),
   prices: z.array(
     z.object({
       inflowId: z.string().optional(),

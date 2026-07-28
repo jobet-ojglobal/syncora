@@ -76,3 +76,19 @@ VendorItemLocationMap
 VendorDueLocationMap
 VendorBalanceLocationMap
 VendorCreditLocationMap
+
+
+
+Product
+    │
+    ├── Inventory (per location)
+    │       quantityOnHand
+    │       quantityAvailable
+    │
+    ├── InventoryBin (quantity per bin)
+    │
+    └── InventoryItem (one row per serial)
+            serialNumber
+            locationId
+            sublocationId
+            status
