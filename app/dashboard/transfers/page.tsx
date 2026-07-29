@@ -436,7 +436,7 @@ export default function TransferOrdersListPage() {
                         </td>
                         <td className="p-3 text-right">
                           <div className="flex items-center justify-end gap-1.5">
-                            {/* <TooltipProvider>
+                            <TooltipProvider>
                               <Tooltip>
                                 <TooltipTrigger asChild>
                                   <Button
@@ -450,7 +450,7 @@ export default function TransferOrdersListPage() {
                                 </TooltipTrigger>
                                 <TooltipContent>Inspect Manifest</TooltipContent>
                               </Tooltip>
-                            </TooltipProvider> */}
+                            </TooltipProvider>
 
                             {order.status === "DRAFT" && (
                               <Button

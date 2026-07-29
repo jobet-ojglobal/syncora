@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
+import Image from "next/image";
 
 interface LookupItem {
   inflowId: string;
@@ -189,7 +190,7 @@ export function InventoryLineModal({
 
                       <div className="w-10 h-10 bg-muted border rounded-lg overflow-hidden flex items-center justify-center shrink-0 relative">
                         {product.image ? (
-                          <img src={product.image} alt={product.name} className="w-full h-full object-cover" />
+                          <Image src={product.image} alt={product.name} className="w-full h-full object-cover" width={10} height={10} />
                         ) : (
                           <ImageIcon className="w-4 h-4 text-muted-foreground/50" />
                         )}

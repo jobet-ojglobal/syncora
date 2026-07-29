@@ -1,6 +1,132 @@
 import { prisma } from "@/lib/prisma";
 import { NextRequest, NextResponse } from "next/server";
 
+// ==========================================
+// GET: Fetch Single Inventory by ID for Update Form
+// ==========================================
+
+export async function GET(
+  request: Request,
+  { params }: { params: { id: string } }
+) {
+  try {
+    const { id } = params;
+
+    if (!id) {
+      return NextResponse.json(
+        { error: "Inventory ID is required" },
+        { status: 400 }
+      );
+    }
+
+    // Fetch single inventory record with all related nested structures
+    const inventory = await prisma.inventory.findUnique({
+      where: { id },
+      include: {
+        product: {
+          select: {
+            id: true,
+            inflowId: true,
+            name: true,
+            sku: true, // Assuming product has SKU/code fields
+          },
+        },
+        location: {
+          select: {
+            id: true,
+            inflowId: true,
+            name: true,
+          },
+        },
+        bins: {
+          include: {
+            sublocation: {
+              select: {
+                id: true,
+                name: true,
+              },
+            },
+            inventoryBinItems: {
+              where: {
+                status: "IN_STOCK",
+              },
+              select: {
+                id: true,
+                serialNumber: true,
+                status: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    if (!inventory) {
+      return NextResponse.json(
+        { error: "Inventory record not found" },
+        { status: 404 }
+      );
+    }
+
+    // Also fetch all serial items assigned to this product & location
+    // that might NOT be in a bin (unassigned/floor stock)
+    const unassignedSerials = await prisma.inventoryBinItem.findMany({
+      where: {
+        productId: inventory.productId,
+        locationId: inventory.locationId,
+        inventoryBinId: null,
+        status: "IN_STOCK",
+      },
+      select: {
+        id: true,
+        serialNumber: true,
+        status: true,
+      },
+    });
+
+    // Format payload specifically structured to simplify client-side form state
+    const formData = {
+      inventoryId: inventory.id,
+      productId: inventory.productId,
+      productName: inventory.product.name,
+      locationId: inventory.locationId,
+      locationName: inventory.location.name,
+      quantityOnHand: Number(inventory.quantityOnHand),
+      quantityReserved: Number(inventory.quantityReserved ?? 0),
+      quantityAvailable: Number(inventory.quantityAvailable ?? 0),
+      reorderThreshold: Number(inventory.reorderThreshold),
+      reorderQuantity: Number(inventory.reorderQuantity),
+      isAutoReorderEnabled: inventory.isAutoReorderEnabled,
+      preferredSourceLocationId: inventory.preferredSourceLocationId,
+      bins: inventory.bins.map((bin) => ({
+        binId: bin.id,
+        sublocationId: bin.sublocationId,
+        sublocationName: bin.sublocation.name,
+        quantity: Number(bin.quantity),
+        serials: bin.inventoryBinItems.map((item) => item.serialNumber),
+      })),
+      unassignedSerials: unassignedSerials.map((item) => item.serialNumber),
+      allInStockSerials: [
+        ...inventory.bins.flatMap((bin) =>
+          bin.inventoryBinItems.map((item) => item.serialNumber)
+        ),
+        ...unassignedSerials.map((item) => item.serialNumber),
+      ],
+    };
+
+    return NextResponse.json({ data: formData }, { status: 200 });
+  } catch (error) {
+    console.error("[INVENTORY_GET_SINGLE_ERROR]", error);
+    return NextResponse.json(
+      {
+        error:
+          error instanceof Error ? error.message : "Internal Server Error",
+      },
+      { status: 500 }
+    );
+  }
+}
+
 export async function DELETE(request: NextRequest) {
   try {
     const { inflowId } = await request.json(); // Map directly into your targeting identification parameters

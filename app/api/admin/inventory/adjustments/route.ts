@@ -313,9 +313,9 @@ export async function POST(request: Request) {
           for (const serial of line.serials) {
             if (line.quantityAdjusted > 0) {
               // Stock increase -> create or mark IN_STOCK
-              await tx.inventoryItem.upsert({
+              await tx.inventoryBinItem.upsert({
                 where: {
-                  productId_locationId_serialNumber: {
+                  productId: {
                     productId: line.productId,
                     locationId: line.locationId,
                     serialNumber: serial.serialNumber,
@@ -324,18 +324,18 @@ export async function POST(request: Request) {
                 create: {
                   productId: line.productId,
                   locationId: line.locationId,
-                  sublocationId: sublocationId, // Binned or null for floor
+                  inventoryBinId: sublocationId, // Binned or null for floor
                   serialNumber: serial.serialNumber,
                   status: "IN_STOCK",
                 },
                 update: {
                   status: "IN_STOCK",
-                  sublocationId: sublocationId,
+                  inventoryBinId: sublocationId,
                 },
               });
             } else if (line.quantityAdjusted < 0) {
               // Stock decrease -> soft remove or delete
-              await tx.inventoryItem.deleteMany({
+              await tx.inventoryBinItem.deleteMany({
                 where: {
                   productId: line.productId,
                   locationId: line.locationId,

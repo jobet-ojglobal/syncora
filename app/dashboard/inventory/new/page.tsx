@@ -5,17 +5,19 @@ import { prisma } from "@/lib/prisma";
 import { InventoryFormV2 } from "@/components/inventory/inventory-multi-form";
 
 export default async function NewInventoryPage() {
-  const locations = await prisma.location.findMany({
-    where: {
-      isActive: true,
-      deletedAt: null,
-    },
-    select: {
-      inflowId: true,
-      name: true,
-    },
-    orderBy: { name: "asc" },
-  });
+  const [locations] = await Promise.all([
+    prisma.location.findMany({
+      where: {
+        isActive: true,
+        deletedAt: null,
+      },
+      select: {
+        inflowId: true,
+        name: true,
+      },
+      orderBy: { name: "asc" },
+    }),
+  ]);
 
   return (
     <div className="w-full max-w-4xl mx-auto p-6 space-y-6">
