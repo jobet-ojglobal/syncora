@@ -12,6 +12,151 @@ export interface LedgerFilterParams {
 }
 
 export class InventoryService {
+
+  static async getInventoryInitialData(inventoryId: string) {
+    const inventory = await prisma.inventory.findUnique({
+      where: { id: inventoryId },
+      select: {
+        id: true,
+        productId: true,
+        locationId: true,
+        quantityOnHand: true,
+        quantityReserved: true,
+        quantityAvailable: true,
+        product: {
+          select: {
+            inflowId: true,
+            name: true,
+            sku: true,
+            trackSerials: true,
+            images: {
+              orderBy: { position: "asc" },
+              take: 1,
+              select: { thumbUrl: true, originalUrl: true },
+            },
+          },
+        },
+        location: {
+          select: {
+            inflowId: true,
+            name: true,
+            sublocations: {
+              select: { id: true, name: true, locationId: true },
+            },
+          },
+        },
+        bins: {
+          include: {
+            sublocation: {
+              select: {
+                id: true,
+                name: true,
+              },
+            },
+            inventoryBinItems: {
+              where: {
+                status: "IN_STOCK",
+              },
+              select: {
+                id: true,
+                serialNumber: true,
+                status: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    if (!inventory) {
+      return null;
+    }
+
+    // 1. Fetch unassigned serial numbers (inventoryBinId is null)
+    const unassignedItems = await prisma.inventoryBinItem.findMany({
+      where: {
+        productId: inventory.productId,
+        locationId: inventory.locationId,
+        inventoryBinId: null,
+        status: "IN_STOCK",
+      },
+      select: {
+        serialNumber: true,
+      },
+    });
+
+    const unassignedSerials = unassignedItems
+      .map((item) => item.serialNumber)
+      .filter((sn): sn is string => Boolean(sn));
+
+    const formattedProduct = {
+      inflowId: inventory.product.inflowId,
+      name: inventory.product.name,
+      sku: inventory.product.sku,
+      thumbnail:
+        inventory.product.images[0]?.thumbUrl ||
+        inventory.product.images[0]?.originalUrl ||
+        null,
+      trackSerials: inventory.product.trackSerials,
+    };
+
+    // 2. Map Assigned Bins only
+    const bins = (inventory.bins || []).map((bin) => {
+      const binSerials = (bin.inventoryBinItems || [])
+        .map((item) => item.serialNumber)
+        .filter((sn): sn is string => Boolean(sn));
+
+      return {
+        id: bin.id,
+        sublocationId: bin.sublocationId || bin.sublocation?.id || "",
+        sublocationName: bin.sublocation?.name || "",
+        quantity: Number(bin.quantity) || 0,
+        serials: binSerials,
+      };
+    });
+
+    // 3. Extract Root Quantities from Inventory
+    const totalOnHand = Number(inventory.quantityOnHand) || 0;
+    const reservedQty = Number(inventory.quantityReserved) || 0;
+    const availableQty =
+      inventory.quantityAvailable !== null
+        ? Number(inventory.quantityAvailable)
+        : Math.max(0, totalOnHand - reservedQty);
+
+    // 4. Combine all binned serials + unassigned serials for the line item
+    const binnedSerials = bins.flatMap((bin) => bin.serials);
+    const allSerials = Array.from(
+      new Set([...binnedSerials, ...unassignedSerials])
+    );
+
+    // 5. Map to Adjustment Line Schema
+    const lineItem = {
+      id: inventory.id,
+      product: formattedProduct,
+      quantityBefore: totalOnHand,
+      quantityOnHand: totalOnHand, // Full total (includes floor stock)
+      quantityReserved: reservedQty,
+      quantityAvailable: availableQty,
+      bins: bins,                  // Real bins only
+      serials: allSerials,          // Binned + Unassigned serials
+    };
+
+    // 6. Return complete Form Payload
+    const formData = {
+      id: undefined,
+      inventoryId: inventory.id,
+      locationId: inventory.locationId || "",
+      performedById: "",
+      reasonId: "",
+      notes: "",
+      status: "DRAFT" as const,
+      lines: [lineItem],
+      location: inventory.location,
+    };
+
+    return formData;
+  }
+
   static async getLedgerEntries(params: LedgerFilterParams) {
     const {
       productId,
@@ -36,7 +181,6 @@ export class InventoryService {
           { product: { slug: { contains: search, mode: "insensitive" } } },
           { remarks: { contains: search, mode: "insensitive" } },
           { batchNumber: { contains: search, mode: "insensitive" } },
-          { serialNumber: { contains: search, mode: "insensitive" } },
         ],
       }),
     };
@@ -81,8 +225,16 @@ export class InventoryService {
       include: {
         product: {
           select: {
+            inflowId: true,
             name: true,
             slug: true,
+            sku: true,
+            trackSerials: true,
+            images: {
+              orderBy: { position: "asc" },
+              take: 1,
+              select: { thumbUrl: true, originalUrl: true },
+            },
           },
         },
         location: {
@@ -130,14 +282,26 @@ export class InventoryService {
         (inTransitMap[key] || 0) + Number(line.quantity);
     });
 
+    
+
     return stockItems.map((item) => {
       const lookupKey = `${item.productId}_${item.locationId}`;
 
+      const formattedProduct = {
+          inflowId: item.product.inflowId,
+          name: item.product.name,
+          sku: item.product.sku,
+          slug: item.product.slug,
+          thumbnail:
+            item.product.images[0]?.thumbUrl ||
+            item.product.images[0]?.originalUrl ||
+            null,
+          trackSerials: item.product.trackSerials,
+        };
+
       return {
         id: item.id,
-        productId: item.productId,
-        productName: item.product.name,
-        productSlug: item.product.slug,
+        product: formattedProduct,
 
         locationId: item.locationId,
         locationName: item.location.name,
@@ -193,5 +357,4 @@ export class InventoryService {
     }));
   }
 }
-
 

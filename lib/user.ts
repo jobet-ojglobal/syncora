@@ -9,7 +9,7 @@ export const getCurrentUser = async () => {
     // });
     // return session?.user || null;
     return {
-        id: '123',
+        id: '132',
         name: "Test User"
     }
 }

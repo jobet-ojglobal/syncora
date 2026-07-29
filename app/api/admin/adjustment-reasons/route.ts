@@ -23,11 +23,6 @@ export async function GET(req: Request) {
             }
           : {}),
       },
-      include: {
-        _count: {
-          select: { localMappings: true }, // Count location mappings if needed
-        },
-      },
       orderBy: { createdAt: "desc" },
     });
 

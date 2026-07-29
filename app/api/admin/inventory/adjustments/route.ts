@@ -313,9 +313,15 @@ export async function POST(request: Request) {
           for (const serial of line.serials) {
             if (line.quantityAdjusted > 0) {
               // Stock increase -> create or mark IN_STOCK
+<<<<<<< HEAD
               await tx.inventoryItem.upsert({
                 where: {
                   productId_locationId_serialNumber: {
+=======
+              await tx.inventoryBinItem.upsert({
+                where: {
+                  productId: {
+>>>>>>> 4f3e478e359a814e5626cd9876600434acbd2fac
                     productId: line.productId,
                     locationId: line.locationId,
                     serialNumber: serial.serialNumber,
@@ -324,18 +330,30 @@ export async function POST(request: Request) {
                 create: {
                   productId: line.productId,
                   locationId: line.locationId,
+<<<<<<< HEAD
                   sublocationId: sublocationId, // Binned or null for floor
+=======
+                  inventoryBinId: sublocationId, // Binned or null for floor
+>>>>>>> 4f3e478e359a814e5626cd9876600434acbd2fac
                   serialNumber: serial.serialNumber,
                   status: "IN_STOCK",
                 },
                 update: {
                   status: "IN_STOCK",
+<<<<<<< HEAD
                   sublocationId: sublocationId,
+=======
+                  inventoryBinId: sublocationId,
+>>>>>>> 4f3e478e359a814e5626cd9876600434acbd2fac
                 },
               });
             } else if (line.quantityAdjusted < 0) {
               // Stock decrease -> soft remove or delete
+<<<<<<< HEAD
               await tx.inventoryItem.deleteMany({
+=======
+              await tx.inventoryBinItem.deleteMany({
+>>>>>>> 4f3e478e359a814e5626cd9876600434acbd2fac
                 where: {
                   productId: line.productId,
                   locationId: line.locationId,

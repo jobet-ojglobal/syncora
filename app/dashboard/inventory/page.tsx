@@ -3,11 +3,12 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Plus, Search, Warehouse, Package, Layers, AlertTriangle, Edit, Info, Truck } from "lucide-react";
+import { Plus, Search, Warehouse, Package, Layers, AlertTriangle, Edit, Info, Truck, ImageIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { DeleteButton } from "@/components/shared/delete-button";
+import Image from "next/image";
 
 interface BinDetail {
   id: string;
@@ -15,11 +16,18 @@ interface BinDetail {
   quantity: number;
 }
 
+interface Product {
+  inflowId: string;
+  name: string;
+  sku: string;
+  slug: string;
+  thumbnail: string | null;
+  trackSerials: boolean;
+}
+
 interface InventoryStockRow {
   id: string;
-  productId: string;
-  productName: string;
-  productSlug: string;
+  product: Product;
   locationId: string;
   locationName: string;
   quantityOnHand: number;
@@ -57,8 +65,8 @@ export default function InventoryList() {
   const filteredItems = inventory.filter((item) => {
     const normQuery = searchQuery.toLowerCase();
     return (
-      item.productName.toLowerCase().includes(normQuery) ||
-      item.productSlug.toLowerCase().includes(normQuery) ||
+      item.product.name.toLowerCase().includes(normQuery) ||
+      item.product.slug.toLowerCase().includes(normQuery) ||
       item.locationName.toLowerCase().includes(normQuery)
     );
   });
@@ -155,14 +163,19 @@ export default function InventoryList() {
                       {/* Product Column */}
                       <td className="p-4 max-w-[220px]">
                         <div className="flex items-center gap-2.5">
-                          <div className="w-7 h-7 bg-muted border rounded-md flex items-center justify-center shrink-0">
-                            <Package className="w-3.5 h-3.5 text-muted-foreground/80" />
+                          <div className="w-10 h-10 bg-muted border rounded-lg overflow-hidden flex items-center justify-center shrink-0 relative">
+                            {item.product.thumbnail ? (
+                              <Image src={item.product.thumbnail} alt={item.product.name} className="w-full h-full object-cover" width={10} height={10} />
+                            ) : (
+                              <Package className="w-4 h-4 text-muted-foreground/50" />
+                            )}
                           </div>
                           <div className="min-w-0">
-                            <span className="font-semibold text-foreground block truncate">{item.productName}</span>
-                            <span className="font-mono text-[10px] text-muted-foreground block truncate">{item.productSlug}</span>
+                            <span className="font-semibold text-foreground block truncate">{item.product.name}</span>
+                            <span className="font-mono text-[10px] text-muted-foreground block truncate">{item.product.slug}</span>
                           </div>
                         </div>
+
                       </td>
 
                       {/* Location Column */}
@@ -235,13 +248,18 @@ export default function InventoryList() {
                       <td className="p-4">
                         <div className="flex items-center justify-end gap-1">
                           <Button asChild variant="ghost" size="sm" className="h-7 px-2 font-semibold gap-1">
-                            <Link href={`/dashboard/inventory/${item.id}/edit`}>
+                            <Link href={`/dashboard/inventory/${item.id}/adjust`}>
                               <Edit className="w-3 h-3" /> Adjust
+                            </Link>
+                          </Button>
+                          <Button asChild variant="ghost" size="sm" className="h-7 px-2 font-semibold gap-1">
+                            <Link href={`/dashboard/inventory/${item.id}/edit`}>
+                              <Edit className="w-3 h-3" /> Edit
                             </Link>
                           </Button>
                           <DeleteButton
                             itemId={item.id}
-                            itemName={`Inventory line (${item.productSlug})`}
+                            itemName={`Inventory line (${item.product.slug})`}
                             endpointUrl={`/api/admin/inventory/${item.id}`}
                             onSuccess={fetchInventory}
                             variant="icon"
@@ -268,7 +286,7 @@ export default function InventoryList() {
               <div className="flex items-start justify-between border-b pb-3">
                 <div>
                   <h3 className="text-sm font-bold text-foreground">Storage Layout Inspection</h3>
-                  <p className="text-[11px] text-muted-foreground font-mono mt-0.5">{activeInspectionItem.productSlug}</p>
+                  <p className="text-[11px] text-muted-foreground font-mono mt-0.5">{activeInspectionItem.product.slug}</p>
                 </div>
                 <Badge variant="outline" className="text-[10px] py-0 h-5 border-blue-200 text-blue-600 bg-blue-50">
                   {activeInspectionItem.locationName}

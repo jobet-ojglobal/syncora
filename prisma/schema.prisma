@@ -344,7 +344,11 @@ model Product {
   tags              ProductTag[]
   features          ProductFeature[]
   inventories       Inventory[]
+<<<<<<< HEAD
   inventoryItems    InventoryItem[]
+=======
+  inventoryBinItems    InventoryBinItem[]
+>>>>>>> 4f3e478e359a814e5626cd9876600434acbd2fac
   adjustmentLines   InventoryAdjustmentLine[]
   costAdjustments   ProductCostAdjustment[]
   inventoryLedger   InventoryLedger[]
@@ -1129,7 +1133,11 @@ model Location {
   
   address             LocationAddress?
   inventories         Inventory[]
+<<<<<<< HEAD
   inventoryItems      InventoryItem[]
+=======
+  inventoryBinItems   InventoryBinItem[]
+>>>>>>> 4f3e478e359a814e5626cd9876600434acbd2fac
   sublocations        Sublocation[]
   adjustmentLines     InventoryAdjustmentLine[]
   inventoryLedger     InventoryLedger[]
@@ -1219,7 +1227,6 @@ model Sublocation {
   sourceTransferLines TransferOrderLine[] @relation("TransferSourceSublocation")
   targetTransferLines TransferOrderLine[] @relation("TransferTargetSublocation")
   
-  adjustmentLines     InventoryAdjustmentLine[]
   localMappings       SublocationLocationMap[]
   inventoryLedgers    InventoryLedger[]
 
@@ -1281,6 +1288,7 @@ model Inventory {
   @@map("inventory")
 }
 
+<<<<<<< HEAD
 model InventoryItem {
   id            String      @id @default(cuid())
   productId     String
@@ -1310,6 +1318,8 @@ enum SerialStatus {
   DAMAGED
 }
 
+=======
+>>>>>>> 4f3e478e359a814e5626cd9876600434acbd2fac
 model InventoryBin {
   id            String      @id @default(cuid())
   inventoryId   String
@@ -1318,6 +1328,12 @@ model InventoryBin {
 
   inventory     Inventory   @relation(fields: [inventoryId], references: [id], onDelete: Cascade)
   sublocation   Sublocation @relation(fields: [sublocationId], references: [id], onDelete: Cascade)
+
+  adjustmentSerialsFrom InventoryAdjustmentSerial[] @relation("AdjustmentSerialFromBin")
+  adjustmentSerialsTo InventoryAdjustmentSerial[] @relation("AdjustmentSerialToBin")
+
+  inventoryBinItems     InventoryBinItem[]
+  adjustmentLines       InventoryAdjustmentLine[]
 
   createdAt     DateTime    @default(now())
   updatedAt     DateTime    @updatedAt
@@ -1329,10 +1345,42 @@ model InventoryBin {
   @@map("inventory_bin")
 }
 
+model InventoryBinItem {
+  id            String      @id @default(cuid())
+  productId     String
+  locationId    String
+  inventoryBinId  String?
+  serialNumber  String      @unique
+  status        SerialStatus @default(IN_STOCK)
+
+  product       Product     @relation(fields: [productId], references: [inflowId], onDelete: Cascade)
+  location      Location    @relation(fields: [locationId], references: [inflowId], onDelete: Cascade)
+  inventoryBin  InventoryBin? @relation(fields: [inventoryBinId], references: [id], onDelete: SetNull)
+
+  ledgerEntries InventoryLedger[]
+  adjustmentSerials     InventoryAdjustmentSerial[]
+
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  @@index([productId, locationId])
+  @@map("inventory_bin_item")
+}
+
+enum SerialStatus {
+  IN_STOCK
+  RESERVED
+  SOLD
+  DAMAGED
+}
+
+
+
   // productId      String
   // product             Product @relation(fields: [productId], references: [inflowId], onDelete: Cascade)
   // @@unique([productId,sublocationId])
 
+<<<<<<< HEAD
 enum InventoryAdjustmentReason {
   STOCK_COUNT
   DAMAGE
@@ -1342,6 +1390,36 @@ enum InventoryAdjustmentReason {
   RETURN
   CORRECTION
   MANUAL
+=======
+// enum InventoryAdjustmentReason {
+//   STOCK_COUNT
+//   DAMAGE
+//   LOSS
+//   THEFT
+//   EXPIRED
+//   RETURN
+//   CORRECTION
+//   MANUAL
+// }
+
+model AdjustmentReason {
+  id            String   @id @default(cuid())
+  inflowId      String   @unique
+  name          String
+  isActive      Boolean  @default(true)
+  isInternal    Boolean  @default(false)
+
+  stockAdjustments  StockAdjustment[]
+  inventoryAdjustments    InventoryAdjustment[]
+
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  deletedAt     DateTime?
+
+  @@index([name])
+
+  @@map("adjustment_reason")
+>>>>>>> 4f3e478e359a814e5626cd9876600434acbd2fac
 }
 
 enum AdjustmentStatus {
@@ -1351,6 +1429,7 @@ enum AdjustmentStatus {
 }
 
 model InventoryAdjustment {
+<<<<<<< HEAD
   id                String                    @id @default(cuid())
   adjustmentNumber  String                    @unique
   reason            InventoryAdjustmentReason
@@ -1358,6 +1437,17 @@ model InventoryAdjustment {
 
   performedById     String
   performedBy       TeamMember?              @relation(fields: [performedById], references: [inflowId])
+=======
+  id                    String                    @id @default(cuid())
+  adjustmentNumber      String                    @unique
+  adjustmentReasonId    String?
+  notes                 String?
+
+  performedById     String
+  performedBy       TeamMember?               @relation(fields: [performedById], references: [inflowId])
+
+  adjustmentReason  AdjustmentReason?         @relation(fields: [adjustmentReasonId], references: [inflowId])
+>>>>>>> 4f3e478e359a814e5626cd9876600434acbd2fac
 
   lines             InventoryAdjustmentLine[]
   status            AdjustmentStatus          @default(DRAFT)
@@ -1368,13 +1458,21 @@ model InventoryAdjustment {
   @@map("inventory_adjustment")
 }
 
+<<<<<<< HEAD
+=======
+
+>>>>>>> 4f3e478e359a814e5626cd9876600434acbd2fac
 model InventoryAdjustmentLine {
   id               String   @id @default(cuid())
   adjustmentId     String
   inventoryId      String?
   productId        String
   locationId       String
+<<<<<<< HEAD
   sublocationId    String?  // null = Unassigned / Floor stock
+=======
+  inventoryBinId   String? 
+>>>>>>> 4f3e478e359a814e5626cd9876600434acbd2fac
 
   quantityBefore   Decimal  @db.Decimal(18, 4)
   quantityAdjusted Decimal  @db.Decimal(18, 4) // Can be positive (+) or negative (-)
@@ -1384,7 +1482,11 @@ model InventoryAdjustmentLine {
   adjustment       InventoryAdjustment       @relation(fields: [adjustmentId], references: [id], onDelete: Cascade)
   product          Product                   @relation(fields: [productId], references: [inflowId], onDelete: Restrict)
   location         Location                  @relation(fields: [locationId], references: [inflowId], onDelete: Restrict)
+<<<<<<< HEAD
   sublocation      Sublocation?              @relation(fields: [sublocationId], references: [id], onDelete: SetNull)
+=======
+  inventoryBin     InventoryBin?              @relation(fields: [inventoryBinId], references: [id], onDelete: SetNull)
+>>>>>>> 4f3e478e359a814e5626cd9876600434acbd2fac
 
   // Track exact serial numbers modified by this adjustment line
   serials          InventoryAdjustmentSerial[]
@@ -1394,6 +1496,7 @@ model InventoryAdjustmentLine {
   @@index([adjustmentId])
   @@index([productId])
   @@index([locationId])
+<<<<<<< HEAD
   @@index([sublocationId])
   @@map("inventory_adjustment_line")
 }
@@ -1412,6 +1515,58 @@ model InventoryAdjustmentSerial {
   @@map("inventory_adjustment_serial")
 }
 
+=======
+  @@index([inventoryBinId])
+  @@map("inventory_adjustment_line")
+}
+
+// model InventoryAdjustmentSerial {
+//   id                   String                  @id @default(cuid())
+//   adjustmentLineId     String
+//   inventoryBinItemId   String?                 // Linked if existing serial
+//   serialNumber         String                  // Serial string value
+//   action               InventorySerialAdjustmentAction
+
+//   adjustmentLine       InventoryAdjustmentLine @relation(fields: [adjustmentLineId], references: [id], onDelete: Cascade)
+//   inventoryBinItem     InventoryBinItem?          @relation(fields: [inventoryBinItemId], references: [id], onDelete: SetNull)
+
+//   @@index([adjustmentLineId])
+//   @@index([serialNumber])
+//   @@map("inventory_adjustment_serial")
+// }
+
+model InventoryAdjustmentSerial {
+  id                  String @id @default(cuid())
+  adjustmentLineId    String
+  inventoryBinItemId  String?
+  serialNumber        String
+  action              InventorySerialAdjustmentAction
+
+  fromInventoryBinId  String?
+  toInventoryBinId    String?
+
+  adjustmentLine      InventoryAdjustmentLine @relation(fields: [adjustmentLineId], references: [id], onDelete: Cascade)
+  inventoryBinItem    InventoryBinItem? @relation(fields: [inventoryBinItemId], references: [id], onDelete: SetNull)
+  fromInventoryBin    InventoryBin? @relation("AdjustmentSerialFromBin", fields: [fromInventoryBinId], references: [id], onDelete: SetNull)
+  toInventoryBin      InventoryBin? @relation("AdjustmentSerialToBin", fields: [toInventoryBinId], references: [id], onDelete: SetNull)
+
+  @@index([adjustmentLineId])
+  @@index([inventoryBinItemId])
+  @@index([fromInventoryBinId])
+  @@index([toInventoryBinId])
+  @@index([serialNumber])
+
+  @@map("inventory_adjustment_serial")
+}
+
+enum InventorySerialAdjustmentAction {
+  ADD
+  REMOVE
+  MOVE
+  VERIFY
+}
+
+>>>>>>> 4f3e478e359a814e5626cd9876600434acbd2fac
 // Inventory Ledgers
 
 model InventoryLedger {
@@ -1431,7 +1586,11 @@ model InventoryLedger {
   toSublocationId  String?
 
   batchNumber      String?
+<<<<<<< HEAD
   inventoryItemId  String?                  // Set if transaction relates to a specific serial
+=======
+  inventoryBinItemId  String?                  // Set if transaction relates to a specific serial
+>>>>>>> 4f3e478e359a814e5626cd9876600434acbd2fac
   uomName          String?
 
   quantityChange   Decimal                  @db.Decimal(18, 4)
@@ -1447,7 +1606,11 @@ model InventoryLedger {
   location         Location                 @relation(fields: [locationId], references: [inflowId], onDelete: Restrict)
   sublocation      Sublocation?             @relation(fields: [sublocationId], references: [id], onDelete: SetNull)
   performedBy      TeamMember?              @relation(fields: [performedById], references: [inflowId], onDelete: SetNull)
+<<<<<<< HEAD
   inventoryItem    InventoryItem?           @relation(fields: [inventoryItemId], references: [id], onDelete: SetNull)
+=======
+  inventoryBinItem    InventoryBinItem?           @relation(fields: [inventoryBinItemId], references: [id], onDelete: SetNull)
+>>>>>>> 4f3e478e359a814e5626cd9876600434acbd2fac
 
   createdAt        DateTime                 @default(now())
 
@@ -1530,6 +1693,7 @@ model AdjustmentReason {
 
   @@map("adjustment_reason")
 }
+
 
 model StockAdjustment {
   id                     String   @id @default(cuid())
