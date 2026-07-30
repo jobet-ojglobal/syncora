@@ -5,12 +5,18 @@ import { NextRequest, NextResponse } from "next/server";
 // GET: Fetch Single Inventory by ID for Update Form
 // ==========================================
 
+interface Props {
+  params: Promise<{
+    id: string;
+  }>;
+}
+
 export async function GET(
-  request: Request,
-  { params }: { params: { id: string } }
+  request: NextRequest,
+  { params }: Props
 ) {
   try {
-    const { id } = params;
+    const { id } = await params;
 
     if (!id) {
       return NextResponse.json(

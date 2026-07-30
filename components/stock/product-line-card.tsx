@@ -13,11 +13,12 @@ import { StockAdjustmentInput } from "@/schemas/stock-adjustment.schema";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Field, FieldLabel } from "@/components/ui/field";
-import { Trash2, Plus, Info, ImageIcon, X, AlertCircle, Check, Tag } from "lucide-react";
+import { Trash2, Plus, Info, ImageIcon, X, AlertCircle, Check, Tag, Loader2, Wand2 } from "lucide-react";
 import { FormSelect } from "../shared/form-select";
 import { FormInput } from "../shared/form-input";
 import Image from "next/image";
 import { toast } from "sonner";
+import { autoDistributeSerialsToBins, filterUniqueSerials, generateSequentialSerials } from "@/utils/serial.utility";
 
 interface Product {
   inflowId: string;
@@ -44,14 +45,16 @@ interface ProductLineCardProps {
   quantityBefore: number;
 }
 
-// Example reason options - adjust to match your domain options
 const REASON_OPTIONS = [
-  { id: "CYCLE_COUNT", name: "Cycle Count Variance" },
-  { id: "DAMAGED", name: "Damaged Stock" },
-  { id: "SCRAP", name: "Scrap / Waste" },
-  { id: "FOUND_STOCK", name: "Found Inventory" },
-  { id: "DATA_ENTRY_CORRECTION", name: "Correction / Reconciliation" },
-];
+  { id: "STOCK_COUNT", name: "Restock" },
+  { id: "DAMAGE", name: "Damaged" },
+  { id: "LOSS", name: "Write-off" },
+  { id: "THEFT", name: "Stolen" },
+  { id: "EXPIRED", name: "Expired" },
+  { id: "RETURN", name: "Return" },
+  { id: "CORRECTION", name: "Correction" },
+  { id: "MANUAL", name: "Other" },
+]
 
 export function ProductLineCard({
   lineIndex,
@@ -64,6 +67,9 @@ export function ProductLineCard({
   quantityBefore,
 }: ProductLineCardProps) {
   const [serialInput, setSerialInput] = useState("");
+  const [isVerifyingSerials, setIsVerifyingSerials] = useState(false);
+
+  const [autofillPrefix, setAutofillPrefix] = useState("SN-");
 
   // Nested Field Array for Bins
   const { fields: binFields, append: appendBin, remove: removeBin } = useFieldArray({
@@ -114,30 +120,117 @@ export function ProductLineCard({
     setValue(`lines.${lineIndex}.quantityAvailable`, binTotal - reserved, { shouldValidate: true });
   };
 
-  // Helper to append unique, cleaned serial numbers
-  const addSerials = (rawTokens: string[]) => {
-    const cleaned = rawTokens
-      .map((s) => s.trim())
-      .filter((s) => s.length > 0);
+  /**
+   * Check backend for existing active serial numbers in DB before accepting them
+   */
+  const checkSerialsInBackend = async (candidates: string[]): Promise<string[]> => {
+    if (!product?.inflowId || candidates.length === 0) return [];
+
+    try {
+      const response = await fetch("/api/admin/inventory/serials/verify-existing", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          productId: product.inflowId,
+          serials: candidates,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to verify serial numbers against inventory");
+      }
+
+      const data = await response.json();
+      // Expecting { existingSerials: string[] } from API
+      return data.existingSerials || [];
+    } catch (err) {
+      toast.error("Could not verify serial uniqueness with server");
+      return [];
+    }
+  };
+
+  /**
+   * Process & add unique serials locally + validate with server
+   */
+  const addSerials = async (rawTokens: string[]) => {
+    if (isVerifyingSerials) return;
+
+    // 1. Sanitize & local deduplication
+    const cleaned = Array.from(
+      new Set(rawTokens.map((s) => s.trim()).filter((s) => s.length > 0))
+    );
 
     if (cleaned.length === 0) return;
 
     const existingSet = new Set(serials);
-    const updated = [...serials];
+    const newCandidates: string[] = [];
 
+    // Filter out locally added duplicates
     for (const item of cleaned) {
-      if (!existingSet.has(item)) {
-        if (updated.length >= onHand) {
-          toast.error(`Serial capacity reached. Total On-Hand is ${onHand}.`);
-          break;
-        }
-        existingSet.add(item);
-        updated.push(item);
+      if (existingSet.has(item)) {
+        toast.warning(`Serial "${item}" is already added to this item.`);
+      } else {
+        newCandidates.push(item);
       }
     }
 
-    setValue(`lines.${lineIndex}.serials`, updated, { shouldValidate: true });
+    if (newCandidates.length === 0) return;
+
+    // Check capacity limit
+    if (serials.length + newCandidates.length > onHand) {
+      toast.error(`Cannot exceed On-Hand capacity of ${onHand} serials.`);
+      return;
+    }
+
+    // 2. Server validation for DB existence
+    setIsVerifyingSerials(true);
+    const existingInDb = await checkSerialsInBackend(newCandidates);
+    setIsVerifyingSerials(false);
+
+    if (existingInDb.length > 0) {
+      toast.error(
+        `The following serials already exist in database: ${existingInDb.join(", ")}`
+      );
+    }
+
+    // 3. Filter out existing DB serials and append valid ones
+    const dbSet = new Set(existingInDb);
+    const validToAdd = newCandidates.filter((sn) => !dbSet.has(sn));
+
+    if (validToAdd.length > 0) {
+      setValue(`lines.${lineIndex}.serials`, [...serials, ...validToAdd], {
+        shouldValidate: true,
+        shouldDirty: true,
+      });
+      setSerialInput("");
+      toast.success(`Added ${validToAdd.length} serial(s).`);
+    }
   };
+
+  // Helper to append unique, cleaned serial numbers
+  // const addSerials = (rawTokens: string[]) => {
+  //   const cleaned = rawTokens
+  //     .map((s) => s.trim())
+  //     .filter((s) => s.length > 0);
+
+  //   if (cleaned.length === 0) return;
+
+  //   const existingSet = new Set(serials);
+  //   const updated = [...serials];
+
+  //   for (const item of cleaned) {
+  //     if (!existingSet.has(item)) {
+  //       if (updated.length >= onHand) {
+  //         toast.error(`Serial capacity reached. Total On-Hand is ${onHand}.`);
+  //         break;
+  //       }
+  //       existingSet.add(item);
+  //       updated.push(item);
+  //     }
+  //   }
+
+  //   setValue(`lines.${lineIndex}.serials`, updated, { shouldValidate: true });
+  // };
 
   // Handle keydown for Space, Enter, and Comma
   const handleKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
@@ -172,6 +265,64 @@ export function ProductLineCard({
     });
 
     setValue(`lines.${lineIndex}.serials`, updated, { shouldValidate: true });
+  };
+
+  /**
+   * Autofills remaining serial slots up to On-Hand quantity
+   */
+  const handleAutofillSerials = async () => {
+    const remainingNeeded = onHand - serials.length;
+
+    if (remainingNeeded <= 0) {
+      toast.info("Master serial pool is already full.");
+      return;
+    }
+
+    // 1. Generate sequential candidates
+    const rawCandidates = generateSequentialSerials(remainingNeeded, {
+      prefix: autofillPrefix || "SN-",
+      startingIndex: serials.length + 1,
+      digitPadding: 4,
+    });
+
+    // 2. Filter locally existing serials
+    const uniqueCandidates = filterUniqueSerials(rawCandidates, serials);
+
+    if (uniqueCandidates.length === 0) {
+      toast.warning("No unique serials could be generated with the current pattern.");
+      return;
+    }
+
+    // 3. Optional: Check backend for DB conflicts
+    setIsVerifyingSerials(true);
+    const dbExisting = await checkSerialsInBackend(uniqueCandidates);
+    setIsVerifyingSerials(false);
+
+    const validToAdd = filterUniqueSerials(uniqueCandidates, dbExisting);
+
+    if (validToAdd.length === 0) {
+      toast.error("Generated serial numbers conflict with existing database records.");
+      return;
+    }
+
+    const updatedMasterSerials = [...serials, ...validToAdd];
+
+    // 4. Update master serial list in form
+    setValue(`lines.${lineIndex}.serials`, updatedMasterSerials, {
+      shouldValidate: true,
+      shouldDirty: true,
+    });
+
+    // 5. Automatically assign newly generated serials to mapped storage bins
+    if (watchedBins.length > 0) {
+      const updatedBins = autoDistributeSerialsToBins(watchedBins, updatedMasterSerials);
+      setValue(`lines.${lineIndex}.bins`, updatedBins, {
+        shouldValidate: true,
+        shouldDirty: true,
+      });
+    }
+
+    toast.success(`Autofilled ${validToAdd.length} serial(s) and assigned to bins.`);
   };
 
   return (
@@ -250,6 +401,7 @@ export function ProductLineCard({
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <FormSelect
             name={`lines.${lineIndex}.reason`}
+            label="Adjustment Line Reason"
             control={control}
             options={REASON_OPTIONS}
             placeholder="Select Adjustment Reason"
@@ -261,7 +413,7 @@ export function ProductLineCard({
             <FieldLabel className="text-muted-foreground text-xs font-semibold">
               Quantity Before
             </FieldLabel>
-            <div className="h-9 px-3 flex items-center font-mono text-xs font-semibold rounded-md border bg-muted/30 border-border text-foreground">
+            <div className="h-8 px-3 flex items-center font-mono text-xs font-semibold rounded-md border bg-muted/30 border-border text-foreground">
               {quantityBefore.toFixed(4)}
             </div>
           </Field>
@@ -272,7 +424,7 @@ export function ProductLineCard({
               Calculated Adjustment (+/-)
             </FieldLabel>
             <div
-              className={`h-9 px-3 flex items-center font-mono text-xs font-bold rounded-md border ${
+              className={`h-8 px-3 flex items-center font-mono text-xs font-bold rounded-md border ${
                 calculatedAdjusted < 0
                   ? "bg-destructive/10 text-destructive border-destructive/20"
                   : calculatedAdjusted > 0
@@ -289,7 +441,7 @@ export function ProductLineCard({
             <FieldLabel className="text-foreground text-xs font-semibold">
               New On-Hand Target
             </FieldLabel>
-            <div className="h-9 px-3 flex items-center font-mono text-xs font-bold rounded-md border bg-background border-border text-foreground">
+            <div className="h-8 px-3 flex items-center font-mono text-xs font-bold rounded-md border bg-background border-border text-foreground">
               {onHand.toFixed(4)}
             </div>
           </Field>
@@ -324,7 +476,7 @@ export function ProductLineCard({
               Quantity Available (Calculated)
             </FieldLabel>
             <div
-              className={`h-9 px-3 flex items-center font-mono text-xs font-bold rounded-md border ${
+              className={`h-8 px-3 flex items-center font-mono text-xs font-bold rounded-md border ${
                 calculatedAvailable < 0
                   ? "bg-destructive/10 text-destructive border-destructive/20"
                   : "bg-emerald-50 dark:bg-emerald-950/20 text-emerald-600 dark:text-emerald-400 border-emerald-500/20"
@@ -371,33 +523,63 @@ export function ProductLineCard({
               onKeyDown={handleKeyDown}
               onPaste={handlePaste}
               placeholder="Type or paste serials (separated by space, comma, or newline)..."
-              disabled={serials.length >= onHand}
+              disabled={serials.length >= onHand || isVerifyingSerials}
               className="text-xs h-8 bg-background max-w-md"
             />
             <Button
               type="button"
               variant="secondary"
-              disabled={!serialInput.trim() || serials.length >= onHand}
+              disabled={!serialInput.trim() || serials.length >= onHand || isVerifyingSerials}
               onClick={() => {
                 if (serialInput.trim()) {
                   addSerials([serialInput]);
-                  setSerialInput("");
                 }
               }}
               className="h-8 text-xs font-semibold px-3 shrink-0"
             >
-              Add Serial
+              {isVerifyingSerials ? (
+                <>
+                  <Loader2 className="w-3 h-3 animate-spin mr-1" /> Checking...
+                </>
+              ) : (
+                "Add Serial"
+              )}
             </Button>
+
+            <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1 border rounded-md px-2 bg-background h-8">
+                <span className="text-[11px] text-muted-foreground font-medium shrink-0">
+                  Prefix:
+                </span>
+                <input
+                  type="text"
+                  value={autofillPrefix}
+                  onChange={(e) => setAutofillPrefix(e.target.value)}
+                  className="w-14 text-xs bg-transparent outline-none font-mono"
+                  placeholder="SN-"
+                />
+              </div>
+
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={serials.length >= onHand || isVerifyingSerials}
+                onClick={handleAutofillSerials}
+                className="h-8 text-xs gap-1.5 font-medium border-dashed"
+              >
+                <Wand2 className="w-3.5 h-3.5 text-purple-500" />
+                Autofill Remaining ({onHand - serials.length})
+              </Button>
+            </div>
           </div>
 
-          {/* Display Zod Validation Error for Line Serials */}
           {errors.lines?.[lineIndex]?.serials && (
             <p className="text-xs font-medium text-destructive mt-1">
               {errors.lines[lineIndex]?.serials?.message}
             </p>
           )}
 
-          {/* Serial Chips Display */}
           {serials.length > 0 && (
             <div className="flex flex-wrap gap-1.5 pt-1 max-h-32 overflow-y-auto">
               {serials.map((sn, sIdx) => {
@@ -427,6 +609,8 @@ export function ProductLineCard({
           )}
         </div>
       )}
+
+
 
       {/* Unassigned / Bulk Banner */}
       <div className="flex items-center justify-between text-xs py-2 px-4 bg-muted/30 border-b">
@@ -598,6 +782,96 @@ export function ProductLineCard({
     </div>
   );
 }
+
+
+// {isSerialTracked && (
+//         <div className="p-4 border-b bg-muted/10 space-y-3">
+//           <div className="flex items-center justify-between">
+//             <span className="text-xs font-semibold text-foreground flex items-center gap-1.5">
+//               Master Serial Pool
+//               <span
+//                 className={`text-[11px] font-mono font-bold px-1.5 py-0.5 rounded ${
+//                   serials.length === onHand
+//                     ? "bg-emerald-100 dark:bg-emerald-950 text-emerald-600"
+//                     : serials.length > onHand
+//                     ? "bg-destructive/10 text-destructive"
+//                     : "bg-amber-100 dark:bg-amber-950 text-amber-600"
+//                 }`}
+//               >
+//                 {serials.length} / {onHand}
+//               </span>
+//             </span>
+//             {serials.length !== onHand && (
+//               <span className="text-[11px] text-amber-600 dark:text-amber-400 flex items-center gap-1">
+//                 <AlertCircle className="w-3 h-3" />
+//                 {serials.length < onHand
+//                   ? `Need ${onHand - serials.length} more serial(s)`
+//                   : `Exceeds On-Hand limit by ${serials.length - onHand}`}
+//               </span>
+//             )}
+//           </div>
+
+//           <div className="flex gap-2">
+//             <Input
+//               value={serialInput}
+//               onChange={(e) => setSerialInput(e.target.value)}
+//               onKeyDown={handleKeyDown}
+//               onPaste={handlePaste}
+//               placeholder="Type or paste serials (separated by space, comma, or newline)..."
+//               disabled={serials.length >= onHand}
+//               className="text-xs h-8 bg-background max-w-md"
+//             />
+//             <Button
+//               type="button"
+//               variant="secondary"
+//               disabled={!serialInput.trim() || serials.length >= onHand}
+//               onClick={() => {
+//                 if (serialInput.trim()) {
+//                   addSerials([serialInput]);
+//                   setSerialInput("");
+//                 }
+//               }}
+//               className="h-8 text-xs font-semibold px-3 shrink-0"
+//             >
+//               Add Serial
+//             </Button>
+//           </div>
+
+//           {errors.lines?.[lineIndex]?.serials && (
+//             <p className="text-xs font-medium text-destructive mt-1">
+//               {errors.lines[lineIndex]?.serials?.message}
+//             </p>
+//           )}
+
+//           {serials.length > 0 && (
+//             <div className="flex flex-wrap gap-1.5 pt-1 max-h-32 overflow-y-auto">
+//               {serials.map((sn, sIdx) => {
+//                 const isAssignedToBin = allAssignedBinSerials.includes(sn);
+//                 return (
+//                   <span
+//                     key={`${sn}-${sIdx}`}
+//                     className={`inline-flex items-center gap-1 px-2 py-0.5 text-[11px] font-mono border rounded-md shadow-2xs group ${
+//                       isAssignedToBin
+//                         ? "bg-blue-50 dark:bg-blue-950/30 border-blue-300 dark:border-blue-800 text-blue-700 dark:text-blue-300"
+//                         : "bg-background border-border"
+//                     }`}
+//                   >
+//                     <Tag className="w-2.5 h-2.5 opacity-60" />
+//                     {sn}
+//                     <button
+//                       type="button"
+//                       onClick={() => removeSerial(sIdx)}
+//                       className="text-muted-foreground hover:text-destructive transition-colors ml-0.5"
+//                     >
+//                       <X className="w-3 h-3" />
+//                     </button>
+//                   </span>
+//                 );
+//               })}
+//             </div>
+//           )}
+//         </div>
+//       )}
 
 // "use client";
 

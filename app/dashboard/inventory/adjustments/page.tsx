@@ -2,10 +2,26 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Plus, Search, SlidersHorizontal, Eye, ArrowUpRight, ArrowDownLeft, RotateCcw } from "lucide-react";
+import { 
+  Plus, 
+  Search, 
+  SlidersHorizontal, 
+  Eye, 
+  Pencil, 
+  ArrowUpRight, 
+  ArrowDownLeft, 
+  RotateCcw 
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import PageHeader from "@/components/layout/dashboard/PageHeader";
 import { DataTablePagination } from "@/components/shared/data-table-pagination";
 import useSWR from "swr";
@@ -13,15 +29,16 @@ import useSWR from "swr";
 export interface InventoryAdjustmentRow {
   id: string;
   referenceNo: string;
-  reason: "Damaged" | "Stolen" | "Correction" | "Restock" | "Write-off" | "Other";
+  reason: string;
   status: "Draft" | "Approved" | "Cancelled";
+  rawStatus: "DRAFT" | "POSTED" | "VOIDED";
   adjustedBy: {
     name: string;
     email: string;
   };
   warehouseName: string;
   totalItemsAdjusted: number;
-  netQuantityDelta: number; // positive for addition, negative for reduction
+  netQuantityDelta: number;
   createdAt: string;
 }
 
@@ -33,11 +50,22 @@ const fetcher = (url: string) =>
 
 export default function InventoryAdjustmentsListPage() {
   const [searchQuery, setSearchQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState<string>("ALL");
   const [pageIndex, setPageIndex] = useState(0);
   const PAGE_SIZE = 10;
 
+  const queryParams = new URLSearchParams({
+    search: searchQuery,
+    page: pageIndex.toString(),
+    limit: PAGE_SIZE.toString(),
+  });
+
+  if (statusFilter !== "ALL") {
+    queryParams.append("status", statusFilter);
+  }
+
   const { data: payload, error, isLoading } = useSWR(
-    `/api/admin/inventory/adjustments?search=${encodeURIComponent(searchQuery)}&page=${pageIndex}&limit=${PAGE_SIZE}`,
+    `/api/admin/inventory/adjustments?${queryParams.toString()}`,
     fetcher,
     { keepPreviousData: true }
   );
@@ -48,6 +76,11 @@ export default function InventoryAdjustmentsListPage() {
 
   const handleSearchChange = (value: string) => {
     setSearchQuery(value);
+    setPageIndex(0);
+  };
+
+  const handleStatusChange = (value: string) => {
+    setStatusFilter(value);
     setPageIndex(0);
   };
 
@@ -97,14 +130,31 @@ export default function InventoryAdjustmentsListPage() {
         </Button>
       </PageHeader>
 
-      <div className="w-full sm:max-w-md relative">
-        <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground/70" />
-        <Input
-          placeholder="Search by reference #, warehouse, or user..."
-          value={searchQuery}
-          onChange={(e) => handleSearchChange(e.target.value)}
-          className="pl-9 text-xs h-9"
-        />
+      {/* Toolbar Filters */}
+      <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center justify-between">
+        <div className="w-full sm:max-w-md relative">
+          <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground/70" />
+          <Input
+            placeholder="Search reference #, warehouse, product, SKU, user..."
+            value={searchQuery}
+            onChange={(e) => handleSearchChange(e.target.value)}
+            className="pl-9 text-xs h-9"
+          />
+        </div>
+
+        <div className="w-full sm:w-44">
+          <Select value={statusFilter} onValueChange={handleStatusChange}>
+            <SelectTrigger className="h-9 text-xs">
+              <SelectValue placeholder="Filter by status" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="ALL">All Statuses</SelectItem>
+              <SelectItem value="DRAFT">Draft</SelectItem>
+              <SelectItem value="POSTED">Approved</SelectItem>
+              <SelectItem value="VOIDED">Cancelled</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
       </div>
 
       {isLoading && !payload ? (
@@ -130,7 +180,7 @@ export default function InventoryAdjustmentsListPage() {
                     <th className="p-4 w-[130px] text-right">Net Qty Shift</th>
                     <th className="p-4 pl-6">Adjusted By</th>
                     <th className="p-4 pl-6 w-[160px]">Timestamp</th>
-                    <th className="p-4 text-right pr-5 w-[80px]">Actions</th>
+                    <th className="p-4 text-right pr-5 w-[100px]">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border/60 text-xs font-medium">
@@ -187,11 +237,35 @@ export default function InventoryAdjustmentsListPage() {
                         })}
                       </td>
                       <td className="p-4 pr-5 text-right">
-                        <Button asChild variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-foreground">
-                          <Link href={`/dashboard/inventory/adjustments/${row.id}`}>
-                            <Eye className="w-3.5 h-3.5" />
-                          </Link>
-                        </Button>
+                        <div className="flex items-center justify-end gap-1">
+                          {/* Edit Action - Only show for DRAFT adjustments */}
+                          {row.rawStatus === "DRAFT" && (
+                            <Button
+                              asChild
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 text-muted-foreground hover:text-foreground"
+                              title="Edit Adjustment Draft"
+                            >
+                              <Link href={`/dashboard/inventory/adjustments/${row.id}/edit`}>
+                                <Pencil className="w-3.5 h-3.5" />
+                              </Link>
+                            </Button>
+                          )}
+                          
+                          {/* View Action */}
+                          <Button
+                            asChild
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 text-muted-foreground hover:text-foreground"
+                            title="View Details"
+                          >
+                            <Link href={`/dashboard/inventory/adjustments/${row.id}`}>
+                              <Eye className="w-3.5 h-3.5" />
+                            </Link>
+                          </Button>
+                        </div>
                       </td>
                     </tr>
                   ))}

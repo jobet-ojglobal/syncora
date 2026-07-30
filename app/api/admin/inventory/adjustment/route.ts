@@ -7,6 +7,7 @@ import {
   AdjustmentStatus,
   InventorySerialAdjustmentAction,
   Prisma,
+  InventoryAdjustmentLineReason,
 } from "@/generated/prisma/client";
 import { ZodError } from "zod";
 
@@ -36,7 +37,7 @@ export async function POST(req: Request) {
       id: existingAdjustmentId,
       reasonId,
       locationId,
-      notes,
+      remarks,
       status,
       lines,
     } = validatedData;
@@ -73,7 +74,7 @@ export async function POST(req: Request) {
             where: { id: existingAdjustmentId },
             data: {
               adjustmentReasonId: reasonId || null,
-              notes: notes || null,
+              remarks: remarks || null,
               performedById,
               status: status as AdjustmentStatus,
             },
@@ -87,7 +88,7 @@ export async function POST(req: Request) {
               adjustmentReasonId: reasonId || null,
               performedById,
               status: status as AdjustmentStatus,
-              notes: notes || null,
+              remarks: remarks || null,
             },
           });
         }
@@ -120,7 +121,7 @@ export async function POST(req: Request) {
               quantityBefore: currentQtyBefore,
               quantityAdjusted: netAdjustmentQty,
               quantityAfter: totalTargetQty,
-              reason: line.reason || null,
+              reason: line.reason as InventoryAdjustmentLineReason || null,
             },
           });
 
@@ -266,7 +267,7 @@ export async function POST(req: Request) {
                 quantityBefore: previousBinQty,
                 quantityAfter: targetBinQty,
                 remarks:
-                  notes ||
+                  remarks ||
                   `Stock Adjustment posted (${adjustment.adjustmentNumber})`,
               });
             }
@@ -286,7 +287,7 @@ export async function POST(req: Request) {
               quantityBefore: currentOnHand,
               quantityAfter: targetOnHand,
               remarks:
-                notes ||
+                remarks ||
                 `Stock Adjustment posted (${adjustment.adjustmentNumber})`,
             });
           }
@@ -483,7 +484,7 @@ export async function POST(req: Request) {
 //       id: existingAdjustmentId,
 //       reasonId,
 //       locationId,
-//       notes,
+//       remarks,
 //       status,
 //       lines,
 //     } = validatedData;
@@ -518,7 +519,7 @@ export async function POST(req: Request) {
 //           where: { id: existingAdjustmentId },
 //           data: {
 //             adjustmentReasonId: reasonId || null,
-//             notes: notes || null,
+//             remarks: remarks || null,
 //             performedById,
 //             status: status as AdjustmentStatus,
 //           },
@@ -532,7 +533,7 @@ export async function POST(req: Request) {
 //             adjustmentReasonId: reasonId || null,
 //             performedById,
 //             status: status as AdjustmentStatus,
-//             notes: notes || null,
+//             remarks: remarks || null,
 //           },
 //         });
 //       }
@@ -696,7 +697,7 @@ export async function POST(req: Request) {
 //                 quantityBefore: previousBinQty,
 //                 quantityAfter: targetBinQty,
 //                 remarks:
-//                   notes ||
+//                   remarks ||
 //                   `Stock Adjustment posted (${adjustment.adjustmentNumber})`,
 //               },
 //             });
@@ -718,7 +719,7 @@ export async function POST(req: Request) {
 //               quantityBefore: currentOnHand,
 //               quantityAfter: targetOnHand,
 //               remarks:
-//                 notes ||
+//                 remarks ||
 //                 `Stock Adjustment posted (${adjustment.adjustmentNumber})`,
 //             },
 //           });

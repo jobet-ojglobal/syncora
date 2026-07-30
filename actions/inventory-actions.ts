@@ -10,7 +10,7 @@ const adjustmentSchema = z.object({
   adjustmentType: z.enum(["SET", "DELTA"]), // SET to fixed amount, or DELTA (+/- change)
   quantity: z.number(),
   inventoryBinId: z.string().optional().nullable(),
-  reason: z.string().min(1, "Please provide a reason for this adjustment."),
+  remarks: z.string().min(1, "Please provide a reason for this adjustment."),
   performedById: z.string().optional(), // Pass user ID if auth is integrated
 });
 
@@ -26,7 +26,7 @@ export async function adjustStockAction(input: AdjustmentInput) {
     };
   }
 
-  const { inventoryId, adjustmentType, quantity, inventoryBinId, reason, performedById } = validation.data;
+  const { inventoryId, adjustmentType, quantity, inventoryBinId, remarks, performedById } = validation.data;
 
   try {
     await prisma.$transaction(async (tx) => {
@@ -98,7 +98,7 @@ export async function adjustStockAction(input: AdjustmentInput) {
       const adjustment = await tx.inventoryAdjustment.create({
         data: {
           adjustmentNumber,
-          notes: reason,
+          remarks,
           status: AdjustmentStatus.POSTED,
           performedById: performedById ?? "system", // Fallback if no user context
           lines: {
@@ -110,7 +110,7 @@ export async function adjustStockAction(input: AdjustmentInput) {
               quantityBefore: currentOnHand,
               quantityAdjusted: deltaQuantity,
               quantityAfter: newOnHand,
-              reason,
+              remarks,
             },
           },
         },
@@ -128,7 +128,7 @@ export async function adjustStockAction(input: AdjustmentInput) {
           quantityChange: deltaQuantity,
           quantityBefore: currentOnHand,
           quantityAfter: newOnHand,
-          remarks: `Quick Adjustment: ${reason}`,
+          remarks: `Quick Adjustment: ${remarks}`,
         },
       });
     });

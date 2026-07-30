@@ -1,3 +1,5 @@
+// app\api\admin\inventory\adjust\route.ts
+
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { createAdjustmentSchema } from "@/schemas/inventory.adjustment.schema";

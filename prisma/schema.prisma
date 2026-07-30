@@ -1291,12 +1291,11 @@ model InventoryBin {
   adjustmentSerialsTo InventoryAdjustmentSerial[] @relation("AdjustmentSerialToBin")
 
   inventoryBinItems     InventoryBinItem[]
-  adjustmentLines       InventoryAdjustmentLine[]
+  // adjustmentLines       InventoryAdjustmentLine[]
 
   createdAt     DateTime    @default(now())
   updatedAt     DateTime    @updatedAt
 
-  // 🚀 Updated unique constraint without productId:
   @@unique([inventoryId, sublocationId])
   @@index([inventoryId])
   @@index([sublocationId])
@@ -1332,8 +1331,6 @@ enum SerialStatus {
   DAMAGED
 }
 
-
-
 model AdjustmentReason {
   id            String   @id @default(cuid())
   inflowId      String   @unique
@@ -1363,10 +1360,13 @@ model InventoryAdjustment {
   id                    String                    @id @default(cuid())
   adjustmentNumber      String                    @unique
   adjustmentReasonId    String?
-  notes                 String?
+  remarks               String?
 
   performedById     String
-  performedBy       TeamMember?               @relation(fields: [performedById], references: [inflowId])
+  performedBy       TeamMember?               @relation("PerformedAdjustment", fields: [performedById], references: [inflowId])
+
+  lastModifiedById     String?
+  lastModifiedBy       TeamMember?            @relation("ModifiedAdjustment", fields: [lastModifiedById], references: [inflowId])
 
   adjustmentReason  AdjustmentReason?         @relation(fields: [adjustmentReasonId], references: [inflowId])
 
@@ -1386,17 +1386,17 @@ model InventoryAdjustmentLine {
   inventoryId      String?
   productId        String
   locationId       String
-  inventoryBinId   String? 
+  // inventoryBinId   String? 
 
   quantityBefore   Decimal  @db.Decimal(18, 4)
   quantityAdjusted Decimal  @db.Decimal(18, 4) // Can be positive (+) or negative (-)
   quantityAfter    Decimal  @db.Decimal(18, 4)
-  reason           String?
+  reason           InventoryAdjustmentLineReason?
 
   adjustment       InventoryAdjustment       @relation(fields: [adjustmentId], references: [id], onDelete: Cascade)
   product          Product                   @relation(fields: [productId], references: [inflowId], onDelete: Restrict)
   location         Location                  @relation(fields: [locationId], references: [inflowId], onDelete: Restrict)
-  inventoryBin     InventoryBin?              @relation(fields: [inventoryBinId], references: [id], onDelete: SetNull)
+  // inventoryBin     InventoryBin?              @relation(fields: [inventoryBinId], references: [id], onDelete: SetNull)
 
   // Track exact serial numbers modified by this adjustment line
   serials          InventoryAdjustmentSerial[]
@@ -1406,9 +1406,21 @@ model InventoryAdjustmentLine {
   @@index([adjustmentId])
   @@index([productId])
   @@index([locationId])
-  @@index([inventoryBinId])
+  // @@index([inventoryBinId])
   @@map("inventory_adjustment_line")
 }
+
+enum InventoryAdjustmentLineReason {
+  STOCK_COUNT
+  DAMAGE
+  LOSS
+  THEFT
+  EXPIRED
+  RETURN
+  CORRECTION
+  MANUAL
+}
+
 
 model InventoryAdjustmentSerial {
   id                  String @id @default(cuid())
@@ -1773,7 +1785,9 @@ model TeamMember {
   stockAdjustmentAttachements  StockAdjustmentAttachment[]
 
   inventoryLedgers   InventoryLedger[] 
-  adjustments   InventoryAdjustment[]
+
+  adjustments InventoryAdjustment[] @relation("PerformedAdjustment")
+  modifiedAdjustments InventoryAdjustment[] @relation("ModifiedAdjustment")
 
 
   user                User?
