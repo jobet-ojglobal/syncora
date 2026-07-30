@@ -220,7 +220,7 @@ export class InventoryService {
     };
   }
 
-  static async getInventoryLedgerWthIntransit() {
+  static async getGlobalInventory() {
     const stockItems = await prisma.inventory.findMany({
       include: {
         product: {

@@ -1334,21 +1334,6 @@ enum SerialStatus {
 
 
 
-  // productId      String
-  // product             Product @relation(fields: [productId], references: [inflowId], onDelete: Cascade)
-  // @@unique([productId,sublocationId])
-
-// enum InventoryAdjustmentReason {
-//   STOCK_COUNT
-//   DAMAGE
-//   LOSS
-//   THEFT
-//   EXPIRED
-//   RETURN
-//   CORRECTION
-//   MANUAL
-// }
-
 model AdjustmentReason {
   id            String   @id @default(cuid())
   inflowId      String   @unique
@@ -1424,21 +1409,6 @@ model InventoryAdjustmentLine {
   @@index([inventoryBinId])
   @@map("inventory_adjustment_line")
 }
-
-// model InventoryAdjustmentSerial {
-//   id                   String                  @id @default(cuid())
-//   adjustmentLineId     String
-//   inventoryBinItemId   String?                 // Linked if existing serial
-//   serialNumber         String                  // Serial string value
-//   action               InventorySerialAdjustmentAction
-
-//   adjustmentLine       InventoryAdjustmentLine @relation(fields: [adjustmentLineId], references: [id], onDelete: Cascade)
-//   inventoryBinItem     InventoryBinItem?          @relation(fields: [inventoryBinItemId], references: [id], onDelete: SetNull)
-
-//   @@index([adjustmentLineId])
-//   @@index([serialNumber])
-//   @@map("inventory_adjustment_serial")
-// }
 
 model InventoryAdjustmentSerial {
   id                  String @id @default(cuid())
@@ -1542,6 +1512,38 @@ enum InventoryTransactionType {
   PRODUCTION_OUT
   OPENING_BALANCE
 }
+
+
+// productId      String
+// product             Product @relation(fields: [productId], references: [inflowId], onDelete: Cascade)
+// @@unique([productId,sublocationId])
+
+// enum InventoryAdjustmentReason {
+//   STOCK_COUNT
+//   DAMAGE
+//   LOSS
+//   THEFT
+//   EXPIRED
+//   RETURN
+//   CORRECTION
+//   MANUAL
+// }
+
+
+// model InventoryAdjustmentSerial {
+//   id                   String                  @id @default(cuid())
+//   adjustmentLineId     String
+//   inventoryBinItemId   String?                 // Linked if existing serial
+//   serialNumber         String                  // Serial string value
+//   action               InventorySerialAdjustmentAction
+
+//   adjustmentLine       InventoryAdjustmentLine @relation(fields: [adjustmentLineId], references: [id], onDelete: Cascade)
+//   inventoryBinItem     InventoryBinItem?          @relation(fields: [inventoryBinItemId], references: [id], onDelete: SetNull)
+
+//   @@index([adjustmentLineId])
+//   @@index([serialNumber])
+//   @@map("inventory_adjustment_serial")
+// }
 
   // lotId String?
 

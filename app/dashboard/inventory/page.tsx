@@ -3,7 +3,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Plus, Search, Warehouse, Package, Layers, AlertTriangle, Edit, Info, Truck, ImageIcon } from "lucide-react";
+import { Plus, Search, Warehouse, Package, Layers, AlertTriangle, Edit, Info, Truck, ImageIcon, View } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -247,23 +247,16 @@ export default function InventoryList() {
                       {/* Actions Controls */}
                       <td className="p-4">
                         <div className="flex items-center justify-end gap-1">
-                          <Button asChild variant="ghost" size="sm" className="h-7 px-2 font-semibold gap-1">
+                          <Button asChild variant="ghost" size="sm" className="h-7 px-2 text-muted-foreground hover:text-foreground gap-1">
+                            <Link href={`/dashboard/inventory/${item.id}`} title="View">
+                              <View className="w-3 h-3" /> View
+                            </Link>
+                          </Button>
+                          <Button asChild variant="ghost" size="sm" className="h-7 px-2 text-muted-foreground hover:text-foreground gap-1">
                             <Link href={`/dashboard/inventory/${item.id}/adjust`}>
                               <Edit className="w-3 h-3" /> Adjust
                             </Link>
                           </Button>
-                          <Button asChild variant="ghost" size="sm" className="h-7 px-2 font-semibold gap-1">
-                            <Link href={`/dashboard/inventory/${item.id}/edit`}>
-                              <Edit className="w-3 h-3" /> Edit
-                            </Link>
-                          </Button>
-                          <DeleteButton
-                            itemId={item.id}
-                            itemName={`Inventory line (${item.product.slug})`}
-                            endpointUrl={`/api/admin/inventory/${item.id}`}
-                            onSuccess={fetchInventory}
-                            variant="icon"
-                          />
                         </div>
                       </td>
                     </tr>
@@ -371,3 +364,12 @@ export default function InventoryList() {
     </div>
   );
 }
+
+
+{/* <DeleteButton
+  itemId={item.id}
+  itemName={`Inventory line (${item.product.slug})`}
+  endpointUrl={`/api/admin/inventory/${item.id}`}
+  onSuccess={fetchInventory}
+  variant="icon"
+/> */}
