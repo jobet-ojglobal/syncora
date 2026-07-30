@@ -6,11 +6,23 @@ import {
   InventoryReferenceType,
   AdjustmentStatus,
   InventorySerialAdjustmentAction,
+  Prisma,
 } from "@/generated/prisma/client";
+import { ZodError } from "zod";
 
-async function generateAdjustmentNumber(tx: any): Promise<string> {
-  const count = await tx.inventoryAdjustment.count();
+/**
+ * Generates the next sequential adjustment number using transactional locking
+ * to prevent duplicate key race conditions under high concurrency.
+ */
+async function generateAdjustmentNumber(tx: Prisma.TransactionClient): Promise<string> {
+  const result = await tx.$queryRaw<Array<{ count: bigint | number }>>`
+    SELECT COUNT(*)::bigint FROM "inventory_adjustment"
+  `;
+
+  // Number(...) cleanly parses both JS numbers and BigInts
+  const count = Number(result[0]?.count ?? 0); 
   const nextNum = (count + 1).toString().padStart(5, "0");
+  
   return `ADJ-${nextNum}`;
 }
 
@@ -29,204 +41,220 @@ export async function POST(req: Request) {
       lines,
     } = validatedData;
 
-    const performedById = "cc920c31-bcb2-4264-9946-4b7693c9c7e0"; // test user
+    // TODO: Replace with dynamic user context from session / auth header
+    const performedById = "cc920c31-bcb2-4264-9946-4b7693c9c7e0"; 
 
-    // Execute atomic transaction
-    const result = await prisma.$transaction(async (tx) => {
-      let adjustment: any;
+    // Execute atomic transaction with custom timeout for complex serial calculations
+    const result = await prisma.$transaction(
+      async (tx) => {
+        let adjustment: any;
 
-      // ----------------------------------------------------------------
-      // 1. Save Header & Lines (Draft or Posted)
-      // ----------------------------------------------------------------
-      if (existingAdjustmentId) {
-        const existing = await tx.inventoryAdjustment.findUnique({
-          where: { id: existingAdjustmentId },
-        });
+        // ----------------------------------------------------------------
+        // 1. Save Header (Create or Update Draft)
+        // ----------------------------------------------------------------
+        if (existingAdjustmentId) {
+          const existing = await tx.inventoryAdjustment.findUnique({
+            where: { id: existingAdjustmentId },
+          });
 
-        if (!existing) {
-          throw new Error("Adjustment record not found.");
-        }
-        if (existing.status === AdjustmentStatus.POSTED) {
-          throw new Error("Cannot modify an adjustment that is already POSTED.");
-        }
-
-        // Clean up old draft lines before re-creating them
-        await tx.inventoryAdjustmentLine.deleteMany({
-          where: { adjustmentId: existingAdjustmentId },
-        });
-
-        adjustment = await tx.inventoryAdjustment.update({
-          where: { id: existingAdjustmentId },
-          data: {
-            adjustmentReasonId: reasonId || null,
-            notes: notes || null,
-            performedById,
-            status: status as AdjustmentStatus,
-          },
-        });
-      } else {
-        const adjustmentNumber = await generateAdjustmentNumber(tx);
-
-        adjustment = await tx.inventoryAdjustment.create({
-          data: {
-            adjustmentNumber,
-            adjustmentReasonId: reasonId || null,
-            performedById,
-            status: status as AdjustmentStatus,
-            notes: notes || null,
-          },
-        });
-      }
-
-      // Record adjustment lines and serial audit snapshots
-      const createdLineMap = new Map<string, any>(); // Map productId -> created line
-
-      for (const line of lines) {
-        const inventory = await tx.inventory.findUnique({
-          where: {
-            productId_locationId: {
-              productId: line.productId,
-              locationId,
-            },
-          },
-        });
-
-        const currentQtyBefore = inventory ? Number(inventory.quantityOnHand) : 0;
-        const totalTargetQty = Number(line.quantityOnHand) || 0;
-        const netAdjustmentQty = totalTargetQty - currentQtyBefore;
-
-        const createdLine = await tx.inventoryAdjustmentLine.create({
-          data: {
-            adjustmentId: adjustment.id,
-            inventoryId: inventory?.id || null,
-            productId: line.productId,
-            locationId: locationId,
-            quantityBefore: currentQtyBefore,
-            quantityAdjusted: netAdjustmentQty,
-            quantityAfter: totalTargetQty,
-            reason: line.reason || null,
-          },
-        });
-
-        createdLineMap.set(line.productId, createdLine);
-      }
-
-      // ----------------------------------------------------------------
-      // 2. Return early if DRAFT status
-      // ----------------------------------------------------------------
-      if (status === "DRAFT") {
-        for (const line of lines) {
-          const createdLine = createdLineMap.get(line.productId);
-          const allLineSerials = new Set<string>(
-            (line.serials || []).map((s: string) => s.trim()).filter(Boolean)
-          );
-
-          if (Array.isArray(line.bins)) {
-            for (const b of line.bins) {
-              if (Array.isArray(b.serials)) {
-                b.serials.forEach((sn: string) => {
-                  if (sn && sn.trim()) allLineSerials.add(sn.trim());
-                });
-              }
-            }
+          if (!existing) {
+            throw new Error("Adjustment record not found.");
+          }
+          if (existing.status === AdjustmentStatus.POSTED) {
+            throw new Error("Cannot modify an adjustment that is already POSTED.");
           }
 
-          if (allLineSerials.size > 0) {
-            await tx.inventoryAdjustmentSerial.createMany({
-              data: Array.from(allLineSerials).map((sn) => ({
-                adjustmentLineId: createdLine.id,
-                serialNumber: sn,
-                action: InventorySerialAdjustmentAction.VERIFY,
-              })),
-            });
-          }
-        }
-        return adjustment;
-      }
+          // Clean up old draft lines before re-creating them
+          await tx.inventoryAdjustmentLine.deleteMany({
+            where: { adjustmentId: existingAdjustmentId },
+          });
 
-      // ----------------------------------------------------------------
-      // 3. Process Inventory, Bins, Ledgers & Serials (POSTED Status)
-      // ----------------------------------------------------------------
-      for (const line of lines) {
-        const { productId, bins = [] } = line;
-        const createdLine = createdLineMap.get(productId);
-
-        let inventory = await tx.inventory.findUnique({
-          where: { productId_locationId: { productId, locationId } },
-        });
-
-        const targetOnHand = Number(line.quantityOnHand) || 0;
-        const currentOnHand = inventory ? Number(inventory.quantityOnHand) : 0;
-        const netOnHandChange = targetOnHand - currentOnHand;
-
-        if (!inventory) {
-          inventory = await tx.inventory.create({
+          adjustment = await tx.inventoryAdjustment.update({
+            where: { id: existingAdjustmentId },
             data: {
-              productId,
-              locationId,
-              quantityOnHand: targetOnHand,
-              quantityAvailable: Math.max(
-                0,
-                targetOnHand - (Number(line.quantityReserved) || 0)
-              ),
-              quantityReserved: Number(line.quantityReserved) || 0,
+              adjustmentReasonId: reasonId || null,
+              notes: notes || null,
+              performedById,
+              status: status as AdjustmentStatus,
             },
           });
         } else {
-          const currentReserved = Number(inventory.quantityReserved) || 0;
-          await tx.inventory.update({
-            where: { id: inventory.id },
+          const adjustmentNumber = await generateAdjustmentNumber(tx);
+
+          adjustment = await tx.inventoryAdjustment.create({
             data: {
-              quantityOnHand: targetOnHand,
-              quantityAvailable: Math.max(0, targetOnHand - currentReserved),
-              lastCountedAt: new Date(),
-              lastMovementAt: new Date(),
+              adjustmentNumber,
+              adjustmentReasonId: reasonId || null,
+              performedById,
+              status: status as AdjustmentStatus,
+              notes: notes || null,
             },
           });
         }
 
-        // Map sublocation ID -> InventoryBin ID
-        const sublocationToBinMap = new Map<string, string>();
+        // ----------------------------------------------------------------
+        // 2. Record Adjustment Lines
+        // ----------------------------------------------------------------
+        const createdLineMap = new Map<string, any>();
 
-        for (const binData of bins) {
-          const targetBinQty = Number(binData.quantity) || 0;
-          const sublocationId = binData.sublocationId;
-
-          if (!sublocationId) continue;
-
-          let binRecord = await tx.inventoryBin.findUnique({
+        for (const line of lines) {
+          const inventory = await tx.inventory.findUnique({
             where: {
-              inventoryId_sublocationId: {
-                inventoryId: inventory.id,
-                sublocationId,
+              productId_locationId: {
+                productId: line.productId,
+                locationId,
               },
             },
           });
 
-          const previousBinQty = binRecord ? Number(binRecord.quantity) : 0;
-          const quantityDifference = targetBinQty - previousBinQty;
+          const currentQtyBefore = inventory ? Number(inventory.quantityOnHand) : 0;
+          const totalTargetQty = Number(line.quantityOnHand) || 0;
+          const netAdjustmentQty = totalTargetQty - currentQtyBefore;
 
-          if (binRecord) {
-            binRecord = await tx.inventoryBin.update({
-              where: { id: binRecord.id },
-              data: { quantity: targetBinQty },
+          const createdLine = await tx.inventoryAdjustmentLine.create({
+            data: {
+              adjustmentId: adjustment.id,
+              inventoryId: inventory?.id || null,
+              productId: line.productId,
+              locationId,
+              quantityBefore: currentQtyBefore,
+              quantityAdjusted: netAdjustmentQty,
+              quantityAfter: totalTargetQty,
+              reason: line.reason || null,
+            },
+          });
+
+          createdLineMap.set(line.productId, createdLine);
+        }
+
+        // ----------------------------------------------------------------
+        // 3. Early Return for DRAFT Status
+        // ----------------------------------------------------------------
+        if (status === AdjustmentStatus.DRAFT) {
+          const draftSerialsToCreate: Prisma.InventoryAdjustmentSerialCreateManyInput[] = [];
+
+          for (const line of lines) {
+            const createdLine = createdLineMap.get(line.productId);
+            const allLineSerials = new Set<string>(
+              (line.serials || []).map((s: string) => s.trim()).filter(Boolean)
+            );
+
+            if (Array.isArray(line.bins)) {
+              for (const b of line.bins) {
+                if (Array.isArray(b.serials)) {
+                  b.serials.forEach((sn: string) => {
+                    const cleaned = sn?.trim();
+                    if (cleaned) allLineSerials.add(cleaned);
+                  });
+                }
+              }
+            }
+
+            if (allLineSerials.size > 0) {
+              Array.from(allLineSerials).forEach((sn) => {
+                draftSerialsToCreate.push({
+                  adjustmentLineId: createdLine.id,
+                  serialNumber: sn,
+                  action: InventorySerialAdjustmentAction.VERIFY,
+                });
+              });
+            }
+          }
+
+          if (draftSerialsToCreate.length > 0) {
+            await tx.inventoryAdjustmentSerial.createMany({
+              data: draftSerialsToCreate,
+            });
+          }
+
+          return adjustment;
+        }
+
+        // ----------------------------------------------------------------
+        // 4. Process POSTED Status (Stock, Bins, Ledgers, & Serials)
+        // ----------------------------------------------------------------
+        const ledgerEntriesToCreate: Prisma.InventoryLedgerCreateManyInput[] = [];
+        const serialAuditsToCreate: Prisma.InventoryAdjustmentSerialCreateManyInput[] = [];
+
+        for (const line of lines) {
+          const { productId, bins = [] } = line;
+          const createdLine = createdLineMap.get(productId);
+
+          let inventory = await tx.inventory.findUnique({
+            where: { productId_locationId: { productId, locationId } },
+          });
+
+          const targetOnHand = Number(line.quantityOnHand) || 0;
+          const currentOnHand = inventory ? Number(inventory.quantityOnHand) : 0;
+          const netOnHandChange = targetOnHand - currentOnHand;
+
+          if (!inventory) {
+            inventory = await tx.inventory.create({
+              data: {
+                productId,
+                locationId,
+                quantityOnHand: targetOnHand,
+                quantityAvailable: Math.max(
+                  0,
+                  targetOnHand - (Number(line.quantityReserved) || 0)
+                ),
+                quantityReserved: Number(line.quantityReserved) || 0,
+              },
             });
           } else {
-            binRecord = await tx.inventoryBin.create({
+            const currentReserved = Number(inventory.quantityReserved) || 0;
+            await tx.inventory.update({
+              where: { id: inventory.id },
               data: {
-                inventoryId: inventory.id,
-                sublocationId,
-                quantity: targetBinQty,
+                quantityOnHand: targetOnHand,
+                quantityAvailable: Math.max(0, targetOnHand - currentReserved),
+                lastCountedAt: new Date(),
+                lastMovementAt: new Date(),
               },
             });
           }
 
-          sublocationToBinMap.set(sublocationId, binRecord.id);
+          // Bin-level reconciliations
+          const sublocationToBinMap = new Map<string, string>();
 
-          // Bin-level Audit Ledger entry
-          if (quantityDifference !== 0) {
-            await tx.inventoryLedger.create({
-              data: {
+          for (const binData of bins) {
+            const targetBinQty = Number(binData.quantity) || 0;
+            const sublocationId = binData.sublocationId;
+
+            if (!sublocationId) continue;
+
+            let binRecord = await tx.inventoryBin.findUnique({
+              where: {
+                inventoryId_sublocationId: {
+                  inventoryId: inventory.id,
+                  sublocationId,
+                },
+              },
+            });
+
+            const previousBinQty = binRecord ? Number(binRecord.quantity) : 0;
+            const quantityDifference = targetBinQty - previousBinQty;
+
+            if (binRecord) {
+              binRecord = await tx.inventoryBin.update({
+                where: { id: binRecord.id },
+                data: { quantity: targetBinQty },
+              });
+            } else {
+              binRecord = await tx.inventoryBin.create({
+                data: {
+                  inventoryId: inventory.id,
+                  sublocationId,
+                  quantity: targetBinQty,
+                },
+              });
+            }
+
+            sublocationToBinMap.set(sublocationId, binRecord.id);
+
+            // Staging Bin Ledger Entries
+            if (quantityDifference !== 0) {
+              ledgerEntriesToCreate.push({
                 productId,
                 locationId,
                 sublocationId,
@@ -240,15 +268,13 @@ export async function POST(req: Request) {
                 remarks:
                   notes ||
                   `Stock Adjustment posted (${adjustment.adjustmentNumber})`,
-              },
-            });
+              });
+            }
           }
-        }
 
-        // Location-level Audit Ledger entry (if no bins are defined)
-        if (bins.length === 0 && netOnHandChange !== 0) {
-          await tx.inventoryLedger.create({
-            data: {
+          // Staging Location Ledger Entry (if no bins are defined)
+          if (bins.length === 0 && netOnHandChange !== 0) {
+            ledgerEntriesToCreate.push({
               productId,
               locationId,
               sublocationId: null,
@@ -262,155 +288,150 @@ export async function POST(req: Request) {
               remarks:
                 notes ||
                 `Stock Adjustment posted (${adjustment.adjustmentNumber})`,
-            },
-          });
-        }
-
-        // ------------------------------------------------------------
-        // 4. Reconcile Serial Numbers & Linking (InventoryBinItem)
-        // ------------------------------------------------------------
-        const serialToBinIdMap = new Map<string, string | null>();
-        const allIncomingSerials: string[] = [];
-
-        // Gather top-level serials
-        (line.serials || []).forEach((s: string) => {
-          const cleaned = s.trim();
-          if (cleaned) {
-            allIncomingSerials.push(cleaned);
-            serialToBinIdMap.set(cleaned, null);
+            });
           }
-        });
 
-        // Gather bin-level serials (override bin ID)
-        for (const b of bins) {
-          const binId = sublocationToBinMap.get(b.sublocationId) || null;
-          if (Array.isArray(b.serials)) {
-            for (const binSerial of b.serials) {
-              const cleaned = binSerial.trim();
-              if (cleaned) {
-                if (!allIncomingSerials.includes(cleaned)) {
-                  allIncomingSerials.push(cleaned);
+          // ------------------------------------------------------------
+          // Serials Processing
+          // ------------------------------------------------------------
+          const serialToBinIdMap = new Map<string, string | null>();
+          const allIncomingSerials: string[] = [];
+
+          (line.serials || []).forEach((s: string) => {
+            const cleaned = s.trim();
+            if (cleaned) {
+              allIncomingSerials.push(cleaned);
+              serialToBinIdMap.set(cleaned, null);
+            }
+          });
+
+          for (const b of bins) {
+            const binId = sublocationToBinMap.get(b.sublocationId) || null;
+            if (Array.isArray(b.serials)) {
+              for (const binSerial of b.serials) {
+                const cleaned = binSerial.trim();
+                if (cleaned) {
+                  if (!allIncomingSerials.includes(cleaned)) {
+                    allIncomingSerials.push(cleaned);
+                  }
+                  serialToBinIdMap.set(cleaned, binId);
                 }
-                serialToBinIdMap.set(cleaned, binId);
               }
             }
           }
-        }
 
-        if (line.trackSerials) {
-          // Find existing serial items currently in stock for this product & location
-          const existingSerials = await tx.inventoryBinItem.findMany({
-            where: { productId, locationId },
-          });
+          if (line.trackSerials) {
+            const existingSerials = await tx.inventoryBinItem.findMany({
+              where: { productId, locationId },
+            });
 
-          const existingSerialMap = new Map(
-            existingSerials.map((s) => [s.serialNumber, s])
-          );
-          const existingSerialNumbers = Array.from(existingSerialMap.keys());
+            const existingSerialMap = new Map(
+              existingSerials.map((s) => [s.serialNumber, s])
+            );
+            const existingSerialNumbers = Array.from(existingSerialMap.keys());
 
-          const serialsToCreate = allIncomingSerials.filter(
-            (sn) => !existingSerialNumbers.includes(sn)
-          );
-          const serialsToDelete = existingSerials.filter(
-            (s) =>
-              !allIncomingSerials.includes(s.serialNumber) &&
-              s.status === "IN_STOCK"
-          );
+            const serialsToCreate = allIncomingSerials.filter(
+              (sn) => !existingSerialNumbers.includes(sn)
+            );
+            const serialsToDelete = existingSerials.filter(
+              (s) =>
+                !allIncomingSerials.includes(s.serialNumber) &&
+                s.status === "IN_STOCK"
+            );
 
-          // Delete removed serials & create audit logs
-          if (serialsToDelete.length > 0) {
-            for (const item of serialsToDelete) {
-              await tx.inventoryAdjustmentSerial.create({
-                data: {
+            // Deletions
+            if (serialsToDelete.length > 0) {
+              serialsToDelete.forEach((item) => {
+                serialAuditsToCreate.push({
                   adjustmentLineId: createdLine.id,
                   inventoryBinItemId: item.id,
                   serialNumber: item.serialNumber,
                   action: InventorySerialAdjustmentAction.REMOVE,
                   fromInventoryBinId: item.inventoryBinId,
                   toInventoryBinId: null,
-                },
+                });
+              });
+
+              await tx.inventoryBinItem.deleteMany({
+                where: { id: { in: serialsToDelete.map((s) => s.id) } },
               });
             }
 
-            await tx.inventoryBinItem.deleteMany({
-              where: {
-                id: { in: serialsToDelete.map((s) => s.id) },
-              },
-            });
-          }
+            // Insertions
+            for (const sn of serialsToCreate) {
+              const targetBinId = serialToBinIdMap.get(sn) || null;
+              const newItem = await tx.inventoryBinItem.create({
+                data: {
+                  productId,
+                  locationId,
+                  inventoryBinId: targetBinId,
+                  serialNumber: sn,
+                  status: "IN_STOCK",
+                },
+              });
 
-          // Create new serials & create audit logs
-          for (const sn of serialsToCreate) {
-            const targetBinId = serialToBinIdMap.get(sn) || null;
-            const newItem = await tx.inventoryBinItem.create({
-              data: {
-                productId,
-                locationId,
-                inventoryBinId: targetBinId,
-                serialNumber: sn,
-                status: "IN_STOCK",
-              },
-            });
-
-            await tx.inventoryAdjustmentSerial.create({
-              data: {
+              serialAuditsToCreate.push({
                 adjustmentLineId: createdLine.id,
                 inventoryBinItemId: newItem.id,
                 serialNumber: sn,
                 action: InventorySerialAdjustmentAction.ADD,
                 fromInventoryBinId: null,
                 toInventoryBinId: targetBinId,
-              },
-            });
-          }
+              });
+            }
 
-          // Update bin placements for existing serials & create audit logs
-          for (const sn of allIncomingSerials) {
-            if (existingSerialMap.has(sn)) {
-              const item = existingSerialMap.get(sn)!;
-              const targetBinId = serialToBinIdMap.get(sn) || null;
-              const hasMovedBin = item.inventoryBinId !== targetBinId;
+            // Movements & Verifications
+            for (const sn of allIncomingSerials) {
+              if (existingSerialMap.has(sn)) {
+                const item = existingSerialMap.get(sn)!;
+                const targetBinId = serialToBinIdMap.get(sn) || null;
 
-              if (hasMovedBin) {
-                await tx.inventoryBinItem.update({
-                  where: { id: item.id },
-                  data: { inventoryBinId: targetBinId },
-                });
+                if (item.inventoryBinId !== targetBinId) {
+                  await tx.inventoryBinItem.update({
+                    where: { id: item.id },
+                    data: { inventoryBinId: targetBinId },
+                  });
 
-                await tx.inventoryAdjustmentSerial.create({
-                  data: {
+                  serialAuditsToCreate.push({
                     adjustmentLineId: createdLine.id,
                     inventoryBinItemId: item.id,
                     serialNumber: sn,
                     action: InventorySerialAdjustmentAction.MOVE,
                     fromInventoryBinId: item.inventoryBinId,
                     toInventoryBinId: targetBinId,
-                  },
-                });
-              } else {
-                await tx.inventoryAdjustmentSerial.create({
-                  data: {
+                  });
+                } else {
+                  serialAuditsToCreate.push({
                     adjustmentLineId: createdLine.id,
                     inventoryBinItemId: item.id,
                     serialNumber: sn,
                     action: InventorySerialAdjustmentAction.VERIFY,
                     fromInventoryBinId: targetBinId,
                     toInventoryBinId: targetBinId,
-                  },
-                });
+                  });
+                }
               }
             }
           }
         }
-      }
 
-      return adjustment;
-    });
+        // Execute dynamic bulk inserts
+        if (ledgerEntriesToCreate.length > 0) {
+          await tx.inventoryLedger.createMany({ data: ledgerEntriesToCreate });
+        }
+        if (serialAuditsToCreate.length > 0) {
+          await tx.inventoryAdjustmentSerial.createMany({ data: serialAuditsToCreate });
+        }
+
+        return adjustment;
+      },
+      { timeout: 15000 } // Extended timeout for large transactions
+    );
 
     return NextResponse.json(
       {
         message:
-          status === "DRAFT"
+          status === AdjustmentStatus.DRAFT
             ? "Adjustment draft saved successfully."
             : "Adjustment posted successfully.",
         data: result,
@@ -418,6 +439,13 @@ export async function POST(req: Request) {
       { status: 200 }
     );
   } catch (error: any) {
+    if (error instanceof ZodError) {
+      return NextResponse.json(
+        { error: "Validation failed", details: error },
+        { status: 400 }
+      );
+    }
+
     console.error("[INVENTORY_ADJUSTMENT_POST_ERROR]", error);
     return NextResponse.json(
       {

@@ -7,9 +7,9 @@ import { inventorySchema } from "@/schemas/inventory.multi.schema";
 
 export async function GET() {
   try {
-    const parsedStock = await InventoryService.getInventoryLedgerWthIntransit();
+    const globalInventory = await InventoryService.getGlobalInventory();
 
-    return NextResponse.json(parsedStock, { status: 200 });
+    return NextResponse.json(globalInventory, { status: 200 });
   } catch (error) {
     console.error("Master stock ledger pipeline failure:", error);
     return NextResponse.json({ error: "Internal inventory ledger query failure." }, { status: 500 });

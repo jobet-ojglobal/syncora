@@ -272,12 +272,12 @@ export default function BusinessPartnerListPage() {
                       <td className="p-4 pr-5 text-right">
                         <div className="flex items-center justify-end gap-1">
                           <Button asChild variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-foreground">
-                            <Link href={`/dashboard/business-partners/${partner.id}`}>
+                            <Link href={`/dashboard/business-partners/${partner.id}`} title="View">
                               <View className="w-3.5 h-3.5" />
                             </Link>
                           </Button>
                           <Button asChild variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-foreground">
-                            <Link href={`/dashboard/business-partners/${partner.id}/edit`}>
+                            <Link href={`/dashboard/business-partners/${partner.id}/edit`} title="Edit">
                               <Edit3 className="w-3.5 h-3.5" />
                             </Link>
                           </Button>
