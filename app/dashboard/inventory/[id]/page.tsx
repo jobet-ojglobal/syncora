@@ -273,7 +273,7 @@ export default async function InventoryDetailsPage({
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-4">
           <Button variant="outline" size="icon" asChild>
-            <Link href="/dashboard/inventory">
+            <Link href="/dashboard/inventory/stocks">
               <ArrowLeft className="h-4 w-4" />
               <span className="sr-only">Back to Inventory</span>
             </Link>
@@ -427,6 +427,22 @@ export default async function InventoryDetailsPage({
                   </TableRow>
                 </TableHeader>
                 <TableBody>
+                  {bulkAreaQty > 0 && (
+                    <TableRow className="bg-muted/40 font-medium">
+                      <TableCell className="text-muted-foreground">
+                        📦 Bulk Area / Unassigned
+                      </TableCell>
+                      <TableCell className="text-xs text-muted-foreground font-mono">
+                        FLOOR
+                      </TableCell>
+                      <TableCell className="text-right font-semibold text-amber-600 dark:text-amber-400">
+                        {bulkAreaQty.toLocaleString()}
+                      </TableCell>
+                      <TableCell className="text-right text-xs text-muted-foreground">
+                        Unbinned
+                      </TableCell>
+                    </TableRow>
+                  )}
                   {inventory.bins.length === 0 ? (
                     <TableRow>
                       <TableCell colSpan={4} className="text-center text-muted-foreground py-8">
@@ -451,22 +467,7 @@ export default async function InventoryDetailsPage({
                       </TableRow>
                     ))
                   )}
-                  {bulkAreaQty > 0 && (
-                    <TableRow className="bg-muted/40 font-medium">
-                      <TableCell className="text-muted-foreground">
-                        📦 Bulk Area / Unassigned
-                      </TableCell>
-                      <TableCell className="text-xs text-muted-foreground font-mono">
-                        FLOOR
-                      </TableCell>
-                      <TableCell className="text-right font-semibold text-amber-600 dark:text-amber-400">
-                        {bulkAreaQty.toLocaleString()}
-                      </TableCell>
-                      <TableCell className="text-right text-xs text-muted-foreground">
-                        Unbinned
-                      </TableCell>
-                    </TableRow>
-                  )}
+                  
                 </TableBody>
               </Table>
             </CardContent>

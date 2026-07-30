@@ -4,10 +4,10 @@ import { prisma } from "@/lib/prisma";
 import { Card, CardContent } from "@/components/ui/card";
 import { StockAdjustmentForm } from "@/components/stock/stock-adjustment-form";
 import { getCurrentUser } from "@/lib/user";
-import { InventoryService } from "@/services/inventory.service";
 import PageHeader from "@/components/layout/dashboard/PageHeader";
 import Link from "next/link";
 import { ArrowLeft, SlidersHorizontal } from "lucide-react";
+import { AdjustmentService } from "@/services/adjustment.service";
 
 interface PageProps {
   params: Promise<{
@@ -40,7 +40,7 @@ export default async function InventoryAdjustmentPage({ params }: PageProps) {
   const currentUser = await getCurrentUser()
     
   const [ initialData, adjustmentReasons] = await Promise.all([
-    InventoryService.getInventoryInitialData(id),
+    AdjustmentService.getInventoryInitialData(id),
     prisma.adjustmentReason.findMany({
       where: {
         deletedAt: null,
@@ -60,11 +60,11 @@ export default async function InventoryAdjustmentPage({ params }: PageProps) {
     <div className="w-full max-w-5xl mx-auto p-6 space-y-6">
       {/* Navigation Back Link */}
       <Link
-        href="/dashboard/inventory"
+        href="/dashboard/inventory/stocks"
         className="mb-2 inline-flex items-center gap-2 text-xs font-medium text-slate-600 hover:text-slate-900 transition-colors"
       >
         <ArrowLeft className="h-4 w-4" />
-        Back to Adjustments
+        Back to Stocks
       </Link>
 
       {/* Header */}

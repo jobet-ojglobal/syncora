@@ -264,6 +264,11 @@ export const data = {
           icon: Eye,
         },
         {
+          title: "Stocks",
+          url: "/dashboard/inventory/stocks",
+          icon: Layers,
+        },
+        {
           title: "Low Stock",
           url: "/dashboard/inventory/low-stock",
           icon: AlertTriangle,

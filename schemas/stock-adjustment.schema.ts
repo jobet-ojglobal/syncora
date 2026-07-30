@@ -99,14 +99,14 @@ export const adjustmentLineSchema = z
 
 export const stockAdjustmentSchema = z.object({
   id: z.string().optional(),
-  inventoryId: z.string().min(1, "Target facility is required"),
+  inventoryId: z.string().optional().nullable(),
   locationId: z.string().min(1, "Target facility is required"),
   lines: z
     .array(adjustmentLineSchema)
     .min(1, "At least one product line is required"),
   performedById: z.string().min(1, "Performed by user is required"),
   reasonId: z.string().min(1, "AdjustmentReason is required"),
-  notes: z.string().optional().nullable(),
+  remarks: z.string().optional().nullable(),
   status: z.enum(["DRAFT", "POSTED"]),
 });
 

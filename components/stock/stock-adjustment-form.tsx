@@ -86,7 +86,7 @@ interface InventoryFormProps {
     locationId: string;
     performedById: string;
     reasonId: string;
-    notes: string;
+    remarks: string;
     status: "DRAFT" | "POSTED";
     lines: LineItem[];
     location: LocationItem;
@@ -127,7 +127,7 @@ export function StockAdjustmentForm({
           }))
         : [],
       reasonId: initialData?.reasonId || "",
-      notes: initialData?.notes || "",
+      remarks: initialData?.remarks || "",
       performedById:
         initialData?.performedById || currentUser?.id || "user_system_agent",
       status: initialData?.status || "DRAFT",
@@ -397,9 +397,9 @@ export function StockAdjustmentForm({
             </div>
 
             <FormTextarea
-              name="notes"
+              name="remarks"
               control={control}
-              label="Justification Notes & Operational Description"
+              label="Justification remarks & Operational Description"
               placeholder="Provide context explaining why these adjustments are being made (e.g. 'Cycle count variance discovery in Aisle B')..."
             />
           </FieldSet>
@@ -608,7 +608,7 @@ export function StockAdjustmentForm({
 //     locationId: string;
 //     performedById: string;
 //     reasonId: string;
-//     notes: string;
+//     remarks: string;
 //     status: "DRAFT" | "POSTED" ;
 //     lines: LineItem[]
 //     location: LocationItem
@@ -643,7 +643,7 @@ export function StockAdjustmentForm({
 //         serials: line.serials,
 //       })) : [],
 //       reasonId: initialData?.reasonId || "",
-//       notes: initialData?.notes || "",
+//       remarks: initialData?.remarks || "",
 //       performedById:
 //         initialData?.performedById ||
 //         currentUser?.id ||
@@ -867,9 +867,9 @@ export function StockAdjustmentForm({
 //           </div>
 
 //           <FormTextarea
-//             name="notes"
+//             name="remarks"
 //             control={control}
-//             label="Justification Notes & Operational Description"
+//             label="Justification remarks & Operational Description"
 //             placeholder="Provide context explaining why these adjustments are being made (e.g. 'Cycle count variance discovery in Aisle B'..."
 //           />
 //         </FieldSet>

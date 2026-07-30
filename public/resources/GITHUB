@@ -24,8 +24,8 @@ git config --list --show-origin
 
 
 # Work GitHub account to be the contributor
-git pull personal main
-git commit --allow-empty -m "Sync from personal"
+git pull origin main
+
 git config user.name "Jobet G"
 git config user.email "281866459+jobet-ojglobal@users.noreply.github.com"
 git push work main

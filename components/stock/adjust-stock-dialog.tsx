@@ -73,7 +73,7 @@ export function AdjustStockDialog({
         adjustmentType,
         quantity: parsedQty,
         inventoryBinId: selectedBinId === "none" ? null : selectedBinId,
-        reason,
+        remarks,
       });
 
       if (!res.success) {

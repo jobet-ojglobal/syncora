@@ -1333,12 +1333,11 @@ model InventoryBin {
   adjustmentSerialsTo InventoryAdjustmentSerial[] @relation("AdjustmentSerialToBin")
 
   inventoryBinItems     InventoryBinItem[]
-  adjustmentLines       InventoryAdjustmentLine[]
+  // adjustmentLines       InventoryAdjustmentLine[]
 
   createdAt     DateTime    @default(now())
   updatedAt     DateTime    @updatedAt
 
-  // 🚀 Updated unique constraint without productId:
   @@unique([inventoryId, sublocationId])
   @@index([inventoryId])
   @@index([sublocationId])
@@ -1374,6 +1373,7 @@ enum SerialStatus {
   DAMAGED
 }
 
+<<<<<<< HEAD
 
 
 <<<<<<< HEAD
@@ -1405,6 +1405,8 @@ enum InventoryAdjustmentReason {
 
 =======
 >>>>>>> 558b7f0a0f5120b0b02d67182fb9dea2d80ab114
+=======
+>>>>>>> dd9bab295ca918cde8394134d9371c7d168b5954
 model AdjustmentReason {
   id            String   @id @default(cuid())
   inflowId      String   @unique
@@ -1444,10 +1446,13 @@ model InventoryAdjustment {
   id                    String                    @id @default(cuid())
   adjustmentNumber      String                    @unique
   adjustmentReasonId    String?
-  notes                 String?
+  remarks               String?
 
   performedById     String
-  performedBy       TeamMember?               @relation(fields: [performedById], references: [inflowId])
+  performedBy       TeamMember?               @relation("PerformedAdjustment", fields: [performedById], references: [inflowId])
+
+  lastModifiedById     String?
+  lastModifiedBy       TeamMember?            @relation("ModifiedAdjustment", fields: [lastModifiedById], references: [inflowId])
 
   adjustmentReason  AdjustmentReason?         @relation(fields: [adjustmentReasonId], references: [inflowId])
 >>>>>>> 4f3e478e359a814e5626cd9876600434acbd2fac
@@ -1472,24 +1477,32 @@ model InventoryAdjustmentLine {
   productId        String
   locationId       String
 <<<<<<< HEAD
+<<<<<<< HEAD
   sublocationId    String?  // null = Unassigned / Floor stock
 =======
   inventoryBinId   String? 
 >>>>>>> 4f3e478e359a814e5626cd9876600434acbd2fac
+=======
+  // inventoryBinId   String? 
+>>>>>>> dd9bab295ca918cde8394134d9371c7d168b5954
 
   quantityBefore   Decimal  @db.Decimal(18, 4)
   quantityAdjusted Decimal  @db.Decimal(18, 4) // Can be positive (+) or negative (-)
   quantityAfter    Decimal  @db.Decimal(18, 4)
-  reason           String?
+  reason           InventoryAdjustmentLineReason?
 
   adjustment       InventoryAdjustment       @relation(fields: [adjustmentId], references: [id], onDelete: Cascade)
   product          Product                   @relation(fields: [productId], references: [inflowId], onDelete: Restrict)
   location         Location                  @relation(fields: [locationId], references: [inflowId], onDelete: Restrict)
 <<<<<<< HEAD
+<<<<<<< HEAD
   sublocation      Sublocation?              @relation(fields: [sublocationId], references: [id], onDelete: SetNull)
 =======
   inventoryBin     InventoryBin?              @relation(fields: [inventoryBinId], references: [id], onDelete: SetNull)
 >>>>>>> 4f3e478e359a814e5626cd9876600434acbd2fac
+=======
+  // inventoryBin     InventoryBin?              @relation(fields: [inventoryBinId], references: [id], onDelete: SetNull)
+>>>>>>> dd9bab295ca918cde8394134d9371c7d168b5954
 
   // Track exact serial numbers modified by this adjustment line
   serials          InventoryAdjustmentSerial[]
@@ -1499,6 +1512,7 @@ model InventoryAdjustmentLine {
   @@index([adjustmentId])
   @@index([productId])
   @@index([locationId])
+<<<<<<< HEAD
 <<<<<<< HEAD
   @@index([sublocationId])
   @@map("inventory_adjustment_line")
@@ -1520,8 +1534,23 @@ model InventoryAdjustmentSerial {
 
 =======
   @@index([inventoryBinId])
+=======
+  // @@index([inventoryBinId])
+>>>>>>> dd9bab295ca918cde8394134d9371c7d168b5954
   @@map("inventory_adjustment_line")
 }
+
+enum InventoryAdjustmentLineReason {
+  STOCK_COUNT
+  DAMAGE
+  LOSS
+  THEFT
+  EXPIRED
+  RETURN
+  CORRECTION
+  MANUAL
+}
+
 
 model InventoryAdjustmentSerial {
   id                  String @id @default(cuid())
@@ -1912,7 +1941,9 @@ model TeamMember {
   stockAdjustmentAttachements  StockAdjustmentAttachment[]
 
   inventoryLedgers   InventoryLedger[] 
-  adjustments   InventoryAdjustment[]
+
+  adjustments InventoryAdjustment[] @relation("PerformedAdjustment")
+  modifiedAdjustments InventoryAdjustment[] @relation("ModifiedAdjustment")
 
 
   user                User?
