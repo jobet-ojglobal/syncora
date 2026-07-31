@@ -4,15 +4,7 @@ import { prisma } from "@/lib/prisma"; // Adjust path to your Prisma client inst
 export async function POST(req: Request) {
   try {
     const body = await req.json();
-    const { productId, serials } = body;
-
-    // 1. Validation
-    if (!productId || typeof productId !== "string") {
-      return NextResponse.json(
-        { error: "productId is required" },
-        { status: 400 }
-      );
-    }
+    const { serials } = body;
 
     if (!Array.isArray(serials) || serials.length === 0) {
       return NextResponse.json({ existingSerials: [] });
@@ -37,7 +29,6 @@ export async function POST(req: Request) {
     // If ANY serial status means it cannot be re-added, omit the `status` condition.
     const existingItems = await prisma.inventoryBinItem.findMany({
       where: {
-        productId: productId,
         serialNumber: {
           in: cleanSerials,
         },

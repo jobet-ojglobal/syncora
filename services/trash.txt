@@ -1,0 +1,682 @@
+   static async getAdjustmentDataForEdit(adjustmentId: string) {
+    const adjustment = await prisma.inventoryAdjustment.findFirst({
+      where: {
+        id: adjustmentId,
+        status: AdjustmentStatus.DRAFT,
+      },
+      include: {
+        lines: {
+          include: {
+            product: {
+              select: {
+                inflowId: true,
+                name: true,
+                sku: true,
+                trackSerials: true,
+                images: {
+                  orderBy: { position: "asc" },
+                  take: 1,
+                  select: { thumbUrl: true, originalUrl: true },
+                },
+              },
+            },
+            location: {
+              select: {
+                inflowId: true,
+                name: true,
+                sublocations: {
+                  select: { id: true, name: true, locationId: true },
+                },
+              },
+            },
+            serials: {
+              select: {
+                serialNumber: true,
+                inventoryBinItemId: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    if (!adjustment) {
+      return null;
+    }
+
+    const primaryLine = adjustment.lines[0];
+
+    // Process each line concurrently
+    const processedLines = await Promise.all(
+      adjustment.lines.map(async (line) => {
+        // 1. Fetch live Inventory record (for stock balances) along with its Bins
+        const liveInventory = await prisma.inventory.findUnique({
+          where: {
+            productId_locationId: {
+              productId: line.productId,
+              locationId: line.locationId,
+            },
+          },
+          include: {
+            bins: {
+              include: {
+                sublocation: true,
+                inventoryBinItems: {
+                  where: { status: "IN_STOCK" },
+                  select: { serialNumber: true },
+                },
+              },
+            },
+          },
+        });
+
+        // 2. Fetch unassigned items (items without an assigned bin)
+        const unassignedItems = await prisma.inventoryBinItem.findMany({
+          where: {
+            productId: line.productId,
+            locationId: line.locationId,
+            inventoryBinId: null,
+            status: "IN_STOCK",
+          },
+          select: { id: true, serialNumber: true },
+        });
+
+        const unassignedSerials = unassignedItems
+          .map((item) => item.serialNumber)
+          .filter((sn): sn is string => Boolean(sn));
+
+        // 3. Map bins attached to this inventory record
+        const mappedBins = (liveInventory?.bins || []).map((bin) => ({
+          id: bin.id,
+          sublocationId: bin.sublocationId || bin.sublocation?.id || "",
+          quantity: Number(bin.quantity) || 0,
+          serials: (bin.inventoryBinItems || [])
+            .map((item) => item.serialNumber)
+            .filter((sn): sn is string => Boolean(sn)),
+        }));
+
+        // 4. Append virtual "Unassigned" bin bucket if unassigned serials exist
+        if (unassignedItems.length > 0) {
+          mappedBins.push({
+            id: "unassigned",
+            sublocationId: "",
+            quantity: unassignedItems.length,
+            serials: unassignedSerials,
+          });
+        }
+
+        const qtyBefore = Number(line.quantityBefore);
+        const qtyAdjusted = Number(line.quantityAdjusted);
+
+        return {
+          id: line.id,
+          product: {
+            inflowId: line.product.inflowId,
+            name: line.product.name,
+            sku: line.product.sku,
+            thumbnail:
+              line.product.images[0]?.thumbUrl ||
+              line.product.images[0]?.originalUrl ||
+              null,
+            trackSerials: line.product.trackSerials,
+          },
+          quantityBefore: qtyBefore,
+          quantityAdjusted: qtyAdjusted,
+          quantityOnHand: Number(liveInventory?.quantityOnHand ?? line.quantityAfter),
+          quantityReserved: Number(liveInventory?.quantityReserved ?? 0),
+          quantityAvailable: Number(liveInventory?.quantityAvailable ?? line.quantityAfter),
+          bins: mappedBins,
+          serials: line.serials
+            .map((s) => s.serialNumber)
+            .filter((sn): sn is string => Boolean(sn)),
+          reason: line.reason || "",
+        };
+      })
+    );
+
+    return {
+      id: adjustment.id,
+      inventoryId: primaryLine?.inventoryId || null,
+      locationId: primaryLine?.locationId || "",
+      performedById: adjustment.performedById,
+      reasonId: adjustment.adjustmentReasonId || "",
+      remarks: adjustment.remarks || "",
+      status: adjustment.status,
+      location: primaryLine?.location
+        ? {
+            inflowId: primaryLine.location.inflowId,
+            name: primaryLine.location.name,
+            sublocations: primaryLine.location.sublocations.map((sub) => ({
+              id: sub.id,
+              name: sub.name,
+              locationId: sub.locationId,
+            })),
+          }
+        : {
+            inflowId: "",
+            name: "",
+            sublocations: [],
+          },
+      lines: processedLines,
+    };
+  }
+  
+ // static async getAdjustmentForEdit(adjustmentId: string) {
+  //   const adjustment = await prisma.inventoryAdjustment.findFirst({
+  //     where: {
+  //       id: adjustmentId,
+  //       status: AdjustmentStatus.DRAFT,
+  //     },
+  //     include: {
+  //       lines: {
+  //         include: {
+  //           product: {
+  //             select: {
+  //               inflowId: true,
+  //               name: true,
+  //               sku: true,
+  //               trackSerials: true,
+  //               images: {
+  //                 orderBy: { position: "asc" },
+  //                 take: 1,
+  //                 select: { thumbUrl: true, originalUrl: true },
+  //               },
+  //             },
+  //           },
+  //           location: {
+  //             select: {
+  //               inflowId: true,
+  //               name: true,
+  //               sublocations: {
+  //                 select: { id: true, name: true, locationId: true },
+  //               },
+  //             },
+  //           },
+  //           serials: {
+  //             include: {
+  //               inventoryBinItem: {
+  //                 select: {
+  //                   id: true,
+  //                   serialNumber: true,
+  //                   status: true,
+  //                 },
+  //               },
+  //               fromInventoryBin: {
+  //                 include: {
+  //                   sublocation: {
+  //                     select: {
+  //                       id: true,
+  //                       name: true,
+  //                     },
+  //                   },
+  //                 },
+  //               },
+  //               toInventoryBin: {
+  //                 include: {
+  //                   sublocation: {
+  //                     select: {
+  //                       id: true,
+  //                       name: true,
+  //                     },
+  //                   },
+  //                 },
+  //               },
+  //             },
+  //           },
+  //         },
+  //       },
+  //     },
+  //   });
+
+  //   if (!adjustment) {
+  //     return null;
+  //   }
+
+  //   // Extract the primary location from the first line (if available)
+  //   const primaryLine = adjustment.lines[0];
+
+  //   return {
+  //     id: adjustment.id,
+  //     inventoryId: primaryLine?.inventoryId || null,
+  //     locationId: primaryLine?.locationId || "",
+  //     performedById: adjustment.performedById,
+  //     reasonId: adjustment.adjustmentReasonId || "",
+  //     remarks: adjustment.remarks || "",
+  //     status: adjustment.status,
+  //     location: primaryLine?.location
+  //       ? {
+  //           inflowId: primaryLine.location.inflowId,
+  //           name: primaryLine.location.name,
+  //           sublocations: primaryLine.location.sublocations.map((sub) => ({
+  //             id: sub.id,
+  //             name: sub.name,
+  //             locationId: sub.locationId,
+  //           })),
+  //         }
+  //       : {
+  //           inflowId: "",
+  //           name: "",
+  //           sublocations: [],
+  //         },
+  //     lines: adjustment.lines.map((line) => {
+  //       // Compute quantities or fallback to decimal conversion
+  //       const qtyBefore = Number(line.quantityBefore);
+  //       const qtyAdjusted = Number(line.quantityAdjusted);
+
+  //       const binsMap = new Map<string, Bins>();
+
+  //       for (const serial of line.serials) {
+  //         const selectedBin =
+  //           serial.action === "ADD" || serial.action === "MOVE" || serial.action === "VERIFY"
+  //             ? serial.toInventoryBin
+  //             : serial.fromInventoryBin;
+
+  //         if (!selectedBin) continue;
+
+  //         if (!binsMap.has(selectedBin.id)) {
+  //           binsMap.set(selectedBin.id, {
+  //             id: selectedBin.id,
+  //             sublocationId: selectedBin.sublocationId,
+  //             quantity: 0,
+  //             serials: [],
+  //           });
+  //         }
+
+  //         const bin = binsMap.get(selectedBin.id)!;
+
+  //         bin.serials.push(serial.serialNumber);
+  //         bin.quantity = bin.serials.length;
+  //       }
+
+  //       return {
+  //         id: line.id,
+  //         product: {
+  //           inflowId: line.product.inflowId,
+  //           name: line.product.name,
+  //           sku: line.product.sku,
+  //           thumbnail:
+  //             line.product.images[0]?.thumbUrl ??
+  //             line.product.images[0]?.originalUrl ??
+  //             null,
+  //           trackSerials: line.product.trackSerials,
+  //         },
+  //         quantityBefore: qtyBefore,
+  //         quantityAdjusted: qtyAdjusted,
+  //         quantityOnHand: Number(line.quantityAfter),
+  //         quantityReserved: Number(line.quantityReserved),
+  //         quantityAvailable: Number(line.quantityAfter),
+  //         bins: [...binsMap.values()],
+  //         serials: line.serials.map((s) => s.serialNumber),
+  //         reason: line.reason || "",
+  //       };
+  //     }),
+  //   };
+  // }
+
+  static async getAdjustmentForEdit2(adjustmentId: string) {
+    const adjustment = await prisma.inventoryAdjustment.findFirst({
+      where: {
+        id: adjustmentId,
+        status: AdjustmentStatus.DRAFT,
+      },
+      include: {
+        lines: {
+          include: {
+            product: {
+              select: {
+                inflowId: true,
+                name: true,
+                sku: true,
+                trackSerials: true,
+                images: {
+                  orderBy: { position: "asc" },
+                  take: 1,
+                  select: { thumbUrl: true, originalUrl: true },
+                },
+              },
+            },
+            location: {
+              select: {
+                inflowId: true,
+                name: true,
+                sublocations: {
+                  select: { id: true, name: true, locationId: true },
+                },
+              },
+            },
+            // Include primary line bin for non-serialized items
+            inventoryBin: {
+              include: {
+                sublocation: {
+                  select: { id: true, name: true },
+                },
+              },
+            },
+            serials: {
+              include: {
+                inventoryBinItem: {
+                  select: {
+                    id: true,
+                    serialNumber: true,
+                    status: true,
+                  },
+                },
+                fromInventoryBin: {
+                  include: {
+                    sublocation: {
+                      select: { id: true, name: true },
+                    },
+                  },
+                },
+                toInventoryBin: {
+                  include: {
+                    sublocation: {
+                      select: { id: true, name: true },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+
+    if (!adjustment) {
+      return null;
+    }
+
+    const primaryLine = adjustment.lines[0];
+
+    return {
+      id: adjustment.id,
+      inventoryId: primaryLine?.inventoryId || null,
+      locationId: primaryLine?.locationId || "",
+      performedById: adjustment.performedById,
+      reasonId: adjustment.adjustmentReasonId || "",
+      remarks: adjustment.remarks || "",
+      status: adjustment.status,
+      location: primaryLine?.location
+        ? {
+            inflowId: primaryLine.location.inflowId,
+            name: primaryLine.location.name,
+            sublocations: primaryLine.location.sublocations.map((sub) => ({
+              id: sub.id,
+              name: sub.name,
+              locationId: sub.locationId,
+            })),
+          }
+        : {
+            inflowId: "",
+            name: "",
+            sublocations: [],
+          },
+      lines: adjustment.lines.map((line) => {
+        const qtyBefore = Number(line.quantityBefore);
+        const qtyAdjusted = Number(line.quantityAdjusted);
+
+        const binsMap = new Map<
+          string,
+          {
+            id: string;
+            sublocationId: string;
+            sublocationName?: string;
+            quantity: number;
+            serials: string[];
+          }
+        >();
+
+        const uniqueSerialsSet = new Set<string>();
+
+        // 1. Process Serialized Bins & Serials
+        for (const serial of line.serials) {
+          if (serial.serialNumber) {
+            uniqueSerialsSet.add(serial.serialNumber);
+          }
+
+          const selectedBin =
+            serial.action === "ADD" ||
+            serial.action === "MOVE" ||
+            serial.action === "VERIFY"
+              ? serial.toInventoryBin ?? serial.fromInventoryBin
+              : serial.fromInventoryBin ?? serial.toInventoryBin;
+
+          if (!selectedBin) continue;
+
+          if (!binsMap.has(selectedBin.id)) {
+            binsMap.set(selectedBin.id, {
+              id: selectedBin.id,
+              sublocationId: selectedBin.sublocationId,
+              sublocationName: selectedBin.sublocation?.name,
+              quantity: 0,
+              serials: [],
+            });
+          }
+
+          const bin = binsMap.get(selectedBin.id)!;
+
+          if (serial.serialNumber && !bin.serials.includes(serial.serialNumber)) {
+            bin.serials.push(serial.serialNumber);
+            bin.quantity = bin.serials.length;
+          }
+        }
+
+        // 2. Process Non-Serialized Line Bin (fallback when serials array is empty)
+        if (line.inventoryBin && binsMap.size === 0) {
+          binsMap.set(line.inventoryBin.id, {
+            id: line.inventoryBin.id,
+            sublocationId: line.inventoryBin.sublocationId,
+            sublocationName: line.inventoryBin.sublocation?.name,
+            quantity: qtyAdjusted,
+            serials: [],
+          });
+        }
+
+        return {
+          id: line.id,
+          inventoryBinId: line.inventoryBinId,
+          product: {
+            inflowId: line.product.inflowId,
+            name: line.product.name,
+            sku: line.product.sku,
+            thumbnail:
+              line.product.images[0]?.thumbUrl ??
+              line.product.images[0]?.originalUrl ??
+              null,
+            trackSerials: line.product.trackSerials,
+          },
+          quantityBefore: qtyBefore,
+          quantityAdjusted: qtyAdjusted,
+          quantityOnHand: Number(line.quantityAfter),
+          quantityReserved: Number(line.quantityReserved),
+          quantityAvailable: Number(line.quantityAfter),
+          bins: Array.from(binsMap.values()),
+          serials: Array.from(uniqueSerialsSet),
+          reason: line.reason || "",
+        };
+      }),
+    };
+  }
+  
+  /**
+   * Fetches an existing InventoryAdjustment draft by ID and formats it
+   * into the initial form state required by the edit form.
+   */
+  static async getAdjustmentData(adjustmentId: string) {
+    // 1. Fetch adjustment with lines, products, locations, bins, and serials
+    const adjustment = await prisma.inventoryAdjustment.findUnique({
+      where: { id: adjustmentId },
+      include: {
+        adjustmentReason: true,
+        lines: {
+          include: {
+            product: {
+              select: {
+                inflowId: true,
+                name: true,
+                sku: true,
+                trackSerials: true,
+                images: {
+                  orderBy: { position: "asc" },
+                  take: 1,
+                  select: { thumbUrl: true, originalUrl: true },
+                },
+              },
+            },
+            location: {
+              select: {
+                inflowId: true,
+                name: true,
+                sublocations: {
+                  select: { id: true, name: true, locationId: true },
+                },
+              },
+            },
+            serials: {
+              include: {
+                inventoryBinItem: {
+                  select: {
+                    id: true,
+                    serialNumber: true,
+                    status: true,
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+
+    if (!adjustment) {
+      return null;
+    }
+
+    // 2. Prevent editing non-draft records
+    if (adjustment.status !== "DRAFT") {
+      throw new Error("Only draft adjustments can be edited.");
+    }
+
+
+    
+
+    // Extract primary locationId from the first line item
+    const primaryLocationId = adjustment.lines[0]?.locationId || "";
+    const primaryLocation = adjustment.lines[0]?.location || null;
+
+    // 3. Process line items and combine with live inventory counts
+    const lines = await Promise.all(
+      adjustment.lines.map(async (line) => {
+        // Fetch current live inventory for real-time baseline metrics
+        const liveInventory = await prisma.inventory.findUnique({
+          where: {
+            productId_locationId: {
+              productId: line.productId,
+              locationId: line.locationId,
+            },
+          },
+          include: {
+            bins: {
+              include: {
+                sublocation: { select: { id: true, name: true } },
+                inventoryBinItems: {
+                  where: { status: "IN_STOCK" },
+                  select: { serialNumber: true },
+                },
+              },
+            },
+          },
+        });
+
+        // Current live stock figures
+        const currentOnHand = liveInventory
+          ? Number(liveInventory.quantityOnHand)
+          : Number(line.quantityBefore);
+        const currentReserved = liveInventory
+          ? Number(liveInventory.quantityReserved || 0)
+          : 0;
+        const currentAvailable = liveInventory
+          ? Number(liveInventory.quantityAvailable ?? Math.max(0, currentOnHand - currentReserved))
+          : currentOnHand;
+
+        
+        // Format product images & metadata
+        const formattedProduct = {
+          inflowId: line.product.inflowId,
+          name: line.product.name,
+          sku: line.product.sku,
+          thumbnail:
+            line.product.images[0]?.thumbUrl ||
+            line.product.images[0]?.originalUrl ||
+            null,
+          trackSerials: line.product.trackSerials,
+        };
+
+         // Fetch unassigned serial numbers currently in stock
+        const unassignedItems = await prisma.inventoryBinItem.findMany({
+          where: {
+            productId: line.productId,
+            locationId: line.locationId,
+            inventoryBinId: null,
+            status: "IN_STOCK",
+          },
+          select: { serialNumber: true },
+        });
+
+        const unassignedSerials = unassignedItems
+          .map((item) => item.serialNumber)
+          .filter((sn): sn is string => Boolean(sn));
+
+        // Format current bins
+        const bins = (liveInventory?.bins || []).map((bin) => ({
+          id: bin.id,
+          sublocationId: bin.sublocationId || bin.sublocation?.id || "",
+          sublocationName: bin.sublocation?.name || "",
+          quantity: Number(bin.quantity) || 0,
+          serials: (bin.inventoryBinItems || [])
+            .map((item) => item.serialNumber)
+            .filter((sn): sn is string => Boolean(sn)),
+        }));
+
+        // Combine binned + unassigned serial numbers
+        const binnedSerials = bins.flatMap((b) => b.serials);
+        const availableSerials = Array.from(
+          new Set([...binnedSerials, ...unassignedSerials])
+        );
+
+        // Format serials assigned specifically inside this adjustment line
+        const selectedSerials = line.serials.map((s) => s.serialNumber);
+
+        return {
+          id: line.id,
+          inventoryId: line.inventoryId,
+          productId: line.productId,
+          locationId: line.locationId,
+          product: formattedProduct,
+          quantityBefore: Number(line.quantityBefore),
+          quantityAdjusted: Number(line.quantityAdjusted),
+          quantityOnHand: currentOnHand,
+          quantityReserved: currentReserved,
+          quantityAvailable: currentAvailable,
+          reason: line.reason || null,
+          bins,
+          serials: availableSerials,
+          selectedSerials,
+        };
+      })
+    );
+
+    // 4. Return formatted adjustment form payload
+    return {
+      id: adjustment.id,
+      adjustmentNumber: adjustment.adjustmentNumber,
+      inventoryId: lines[0]?.inventoryId || undefined,
+      locationId: primaryLocationId,
+      performedById: adjustment.performedById,
+      reasonId: adjustment.adjustmentReasonId || "",
+      remarks: adjustment.remarks || "",
+      status: adjustment.status as AdjustmentStatus,
+      lines,
+      location: primaryLocation,
+    };
+  }

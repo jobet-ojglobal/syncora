@@ -71,18 +71,20 @@ interface LineItem {
   id: string;
   product: Product;
   quantityBefore: number;
+  quantityAdjusted: number;
   quantityOnHand: number;
   quantityReserved: number;
   quantityAvailable: number;
   bins: Bins[];
   serials: string[];
+  reason: string;
 }
 
 interface InventoryFormProps {
   adjustmentReasons: ReasonOptions[];
   initialData?: {
     id?: string;
-    inventoryId: string;
+    inventoryId: string | null;
     locationId: string;
     performedById: string;
     reasonId: string;
@@ -118,12 +120,13 @@ export function StockAdjustmentForm({
             id: line.id,
             productId: line.product.inflowId,
             quantityOnHand: line.quantityOnHand,
-            quantityAdjusted: 0,
+            quantityAdjusted: line.quantityAdjusted,
             quantityReserved: line.quantityReserved,
             quantityAvailable: line.quantityAvailable,
             trackSerials: line.product.trackSerials,
             bins: line.bins,
             serials: line.serials,
+            reason: line.reason,
           }))
         : [],
       reasonId: initialData?.reasonId || "",
@@ -148,6 +151,32 @@ export function StockAdjustmentForm({
   });
 
   const watchedLocationId = useWatch({ control, name: "locationId" });
+
+  useEffect(() => {
+    if (initialData) {
+      reset({
+        id: initialData.id || undefined,
+        inventoryId: initialData.inventoryId,
+        locationId: initialData.locationId || "",
+        lines: initialData.lines.map((line) => ({
+          id: line.id,
+          productId: line.product.inflowId,
+          quantityOnHand: line.quantityOnHand,
+          quantityAdjusted: line.quantityAdjusted,
+          quantityReserved: line.quantityReserved,
+          quantityAvailable: line.quantityAvailable,
+          trackSerials: line.product.trackSerials,
+          bins: line.bins || [],
+          serials: line.serials || [],
+          reason: line.reason || null,
+        })),
+        reasonId: initialData.reasonId || "",
+        remarks: initialData.remarks || "",
+        performedById: initialData.performedById || currentUser?.id || "user_system_agent",
+        status: initialData.status || "DRAFT",
+      });
+    }
+  }, [initialData, reset, currentUser]);
 
   // Browser Exit Warning (Unsaved changes guard)
   useEffect(() => {
@@ -247,7 +276,8 @@ export function StockAdjustmentForm({
             ? "Stock Levels Updated"
             : "Inventory Adjustment Posted Successfully"
         );
-        router.push("/dashboard/inventory");
+        router.push("/dashboard/adjustments");
+        router.back()
         router.refresh();
       } catch (err: any) {
         toast.error("Process Deviation Error", { description: err.message });

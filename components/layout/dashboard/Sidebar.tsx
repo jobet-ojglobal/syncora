@@ -17,18 +17,18 @@ import { useLocationWorkspace } from "@/context/LocationWorkspaceContext"
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const router = useRouter();
-  const { locations, currentLocationId, isLoading, changeLocation } = useLocationWorkspace();
+  // const { locations, currentLocationId, isLoading, changeLocation } = useLocationWorkspace();
 
-  const handleLocationWorkspaceChange = (locationId: string) => {
-    changeLocation(locationId);
-    console.log(`Switched active data stream to inflow node: ${locationId}`);
-    router.push(`/dashboard/locations/${locationId}`);
-  };
+  // const handleLocationWorkspaceChange = (locationId: string) => {
+  //   changeLocation(locationId);
+  //   console.log(`Switched active data stream to inflow node: ${locationId}`);
+  //   router.push(`/dashboard/locations/${locationId}`);
+  // };
 
   return (
     <Sidebar collapsible="icon" {...props}>
       <SidebarHeader className="border-b border-sidebar-border">
-        {isLoading || !locations ? (
+        {/* {isLoading || !locations ? (
           <div className="h-12 flex items-center px-4 text-xs text-muted-foreground animate-pulse">
             Loading active workspaces...
           </div>
@@ -38,7 +38,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
             currentLocationId={currentLocationId}
             onLocationChange={handleLocationWorkspaceChange}
           />
-        )}
+        )} */}
       </SidebarHeader>
       
       <SidebarContent className="pt-2">

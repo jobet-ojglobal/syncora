@@ -67,29 +67,29 @@ export function AdjustStockDialog({
       return;
     }
 
-    startTransition(async () => {
-      const res = await adjustStockAction({
-        inventoryId,
-        adjustmentType,
-        quantity: parsedQty,
-        inventoryBinId: selectedBinId === "none" ? null : selectedBinId,
-        remarks,
-      });
+    // startTransition(async () => {
+    //   const res = await adjustStockAction({
+    //     inventoryId,
+    //     adjustmentType,
+    //     quantity: parsedQty,
+    //     inventoryBinId: selectedBinId === "none" ? null : selectedBinId,
+    //     remarks,
+    //   });
 
-      if (!res.success) {
-        // if (res.error?._form) {
-        //   setError(res.error._form[0]);
-        // } else {
-        //   setError("An unexpected error occurred.");
-        // }
-      } else {
-        setOpen(false);
-        // Reset form
-        setQuantity("0");
-        setReason("");
-        setSelectedBinId("none");
-      }
-    });
+    //   if (!res.success) {
+    //     // if (res.error?._form) {
+    //     //   setError(res.error._form[0]);
+    //     // } else {
+    //     //   setError("An unexpected error occurred.");
+    //     // }
+    //   } else {
+    //     setOpen(false);
+    //     // Reset form
+    //     setQuantity("0");
+    //     setReason("");
+    //     setSelectedBinId("none");
+    //   }
+    // });
   };
 
   return (

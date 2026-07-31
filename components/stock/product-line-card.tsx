@@ -124,14 +124,13 @@ export function ProductLineCard({
    * Check backend for existing active serial numbers in DB before accepting them
    */
   const checkSerialsInBackend = async (candidates: string[]): Promise<string[]> => {
-    if (!product?.inflowId || candidates.length === 0) return [];
+    if (candidates.length === 0) return [];
 
     try {
       const response = await fetch("/api/admin/inventory/serials/verify-existing", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          productId: product.inflowId,
           serials: candidates,
         }),
       });
