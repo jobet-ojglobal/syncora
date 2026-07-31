@@ -5,6 +5,7 @@ export class AdjustmentService {
   /**
    * Fetches an existing Inventory draft by ID and formats it
    * into the initial form state required by the create form.
+   * Important !
    */
   static async getInventoryInitialData(inventoryId: string) {
     const inventory = await prisma.inventory.findUnique({
@@ -133,6 +134,7 @@ export class AdjustmentService {
       quantityAvailable: availableQty,
       bins: bins,                  // Real bins only
       serials: allSerials,          // Binned + Unassigned serials
+      reason: ""
     };
 
     // 6. Return complete Form Payload
@@ -153,6 +155,7 @@ export class AdjustmentService {
 
   /**
    * Fetches and crafts initial data for editing a draft inventory adjustment.
+   * Important !
    */
   static async getAdjustmentForEdit(adjustmentId: string) {
     const adjustment = await prisma.inventoryAdjustment.findFirst({
@@ -286,6 +289,200 @@ export class AdjustmentService {
           reason: line.reason || "",
         };
       }),
+    };
+  }
+
+  /**
+ * Fetches and crafts initial data for editing a draft inventory adjustment,
+ * re-synchronizing stale baseline counts against live inventory data.
+ * Important !
+ */
+  static async getAdjustmentForEditLiveInv(adjustmentId: string) {
+    const adjustment = await prisma.inventoryAdjustment.findFirst({
+      where: {
+        id: adjustmentId,
+        status: AdjustmentStatus.DRAFT,
+      },
+      include: {
+        lines: {
+          include: {
+            product: {
+              select: {
+                inflowId: true,
+                name: true,
+                sku: true,
+                trackSerials: true,
+                images: {
+                  orderBy: { position: "asc" },
+                  take: 1,
+                  select: { thumbUrl: true, originalUrl: true },
+                },
+              },
+            },
+            location: {
+              select: {
+                inflowId: true,
+                name: true,
+                sublocations: {
+                  select: { id: true, name: true, locationId: true },
+                },
+              },
+            },
+            // 1. Fetch Draft Bins along with their specific linked Serials
+            draftBins: {
+              include: {
+                sublocation: {
+                  select: { id: true, name: true },
+                },
+                serials: {
+                  select: {
+                    id: true,
+                    serialNumber: true,
+                  },
+                },
+              },
+            },
+            // 2. Fetch all Line-level Serials
+            serials: {
+              select: {
+                id: true,
+                serialNumber: true,
+                draftBinId: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    if (!adjustment) {
+      return null;
+    }
+
+    if (adjustment.status !== AdjustmentStatus.DRAFT) {
+      throw new Error("Only draft adjustments can be edited.");
+    }
+
+    // Extract primary location from the first line
+    const primaryLine = adjustment.lines[0];
+
+    // ----------------------------------------------------------------
+    // Fetch LIVE Inventory for all products/locations in this draft
+    // ----------------------------------------------------------------
+    const liveInventoryRecords = await prisma.inventory.findMany({
+      where: {
+        OR: adjustment.lines.map((l) => ({
+          productId: l.productId,
+          locationId: l.locationId,
+        })),
+      },
+      select: {
+        productId: true,
+        locationId: true,
+        quantityOnHand: true,
+        quantityReserved: true,
+        quantityAvailable: true,
+      },
+    });
+
+    // Create a quick lookup map key: `productId_locationId`
+    const liveInventoryMap = new Map(
+      liveInventoryRecords.map((inv) => [
+        `${inv.productId}_${inv.locationId}`,
+        inv,
+      ])
+    );
+
+    let isOutdated = false;
+
+    const formattedLines = adjustment.lines.map((line) => {
+      const liveInvKey = `${line.productId}_${line.locationId}`;
+      const liveInv = liveInventoryMap.get(liveInvKey);
+
+      // Live counts (fallback to 0 if inventory record doesn't exist yet)
+      const currentLiveOnHand = liveInv ? Number(liveInv.quantityOnHand) : 0;
+      const currentLiveReserved = liveInv ? Number(liveInv.quantityReserved) : 0;
+      const currentLiveAvailable = liveInv ? Number(liveInv.quantityAvailable) : currentLiveOnHand;
+
+      const draftQtyBefore = Number(line.quantityBefore);
+      const draftQtyAdjusted = Number(line.quantityAdjusted);
+
+      // Check if background posted transactions altered the baseline stock
+      const isLineStale = draftQtyBefore !== currentLiveOnHand;
+      if (isLineStale) {
+        isOutdated = true;
+      }
+
+      // Recalculate target quantity on hand based on the live stock + draft adjustment delta
+      const updatedTargetOnHand = currentLiveOnHand + draftQtyAdjusted;
+
+      // Extract all serials for the overall line
+      const lineSerialNumbers = line.serials.map((s) => s.serialNumber);
+
+      // Map draft bins using their directly linked serials
+      const formattedBins = line.draftBins.map((bin) => ({
+        id: bin.id,
+        sublocationId: bin.sublocationId,
+        sublocationName: bin.sublocation?.name || "",
+        quantity: Number(bin.quantity),
+        serials: bin.serials.map((s) => s.serialNumber),
+      }));
+
+      return {
+        id: line.id,
+        productId: line.productId,
+        product: {
+          inflowId: line.product.inflowId,
+          name: line.product.name,
+          sku: line.product.sku,
+          thumbnail:
+            line.product.images[0]?.thumbUrl ??
+            line.product.images[0]?.originalUrl ??
+            null,
+          trackSerials: line.product.trackSerials,
+        },
+        // Baseline values are updated to live values
+        quantityBefore: currentLiveOnHand,
+        quantityAdjusted: draftQtyAdjusted,
+        quantityOnHand: updatedTargetOnHand,
+        quantityReserved: currentLiveReserved,
+        quantityAvailable: currentLiveAvailable,
+        bins: formattedBins,
+        serials: lineSerialNumbers,
+        reason: line.reason || "",
+        // Line-level staleness flag for UI highlighting
+        isStale: isLineStale,
+        staleQtyBefore: isLineStale ? draftQtyBefore : null,
+      };
+    });
+
+    return {
+      id: adjustment.id,
+      adjustmentNumber: adjustment.adjustmentNumber,
+      inventoryId: primaryLine?.inventoryId || null,
+      locationId: primaryLine?.locationId || "",
+      performedById: adjustment.performedById,
+      reasonId: adjustment.adjustmentReasonId || "",
+      remarks: adjustment.remarks || "",
+      status: adjustment.status as "DRAFT",
+      isOutdated, // Top-level flag telling frontend that background changes occurred
+      updatedAt: adjustment.updatedAt,
+      location: primaryLine?.location
+        ? {
+            inflowId: primaryLine.location.inflowId,
+            name: primaryLine.location.name,
+            sublocations: primaryLine.location.sublocations.map((sub) => ({
+              id: sub.id,
+              name: sub.name,
+              locationId: sub.locationId,
+            })),
+          }
+        : {
+            inflowId: "",
+            name: "",
+            sublocations: [],
+          },
+      lines: formattedLines,
     };
   }
  

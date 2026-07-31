@@ -203,7 +203,7 @@ export function InventoryFormV2({ locations, initialData }: InventoryFormProps) 
       }
 
       toast.success(isEditMode ? "Stock Levels Updated" : "Inventory Initialized Successfully");
-      router.push("/dashboard/inventory");
+      router.push("/dashboard/inventory/stocks");
       router.refresh();
     } catch (err: any) {
       toast.error("Process Deviation Error", { description: err.message });
