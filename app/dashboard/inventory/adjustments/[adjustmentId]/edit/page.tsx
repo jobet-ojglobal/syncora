@@ -40,7 +40,7 @@ export default async function InventoryAdjustmentPage({ params }: PageProps) {
   const currentUser = await getCurrentUser()
     
   const [ initialData, adjustmentReasons] = await Promise.all([
-    AdjustmentService.getAdjustmentData(adjustmentId),
+    AdjustmentService.getAdjustmentForEdit(adjustmentId),
     prisma.adjustmentReason.findMany({
       where: {
         deletedAt: null,

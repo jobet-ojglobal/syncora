@@ -1229,6 +1229,8 @@ model Sublocation {
   
   localMappings       SublocationLocationMap[]
   inventoryLedgers    InventoryLedger[]
+  
+  adjustmentLineBins  InventoryAdjustmentLineBin[]
 
   inventoryItems      InventoryItem[]
 
@@ -1333,7 +1335,7 @@ model InventoryBin {
   adjustmentSerialsTo InventoryAdjustmentSerial[] @relation("AdjustmentSerialToBin")
 
   inventoryBinItems     InventoryBinItem[]
-  // adjustmentLines       InventoryAdjustmentLine[]
+  adjustmentLines       InventoryAdjustmentLine[]
 
   createdAt     DateTime    @default(now())
   updatedAt     DateTime    @updatedAt
@@ -1478,6 +1480,7 @@ model InventoryAdjustmentLine {
   locationId       String
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
   sublocationId    String?  // null = Unassigned / Floor stock
 =======
   inventoryBinId   String? 
@@ -1485,15 +1488,21 @@ model InventoryAdjustmentLine {
 =======
   // inventoryBinId   String? 
 >>>>>>> dd9bab295ca918cde8394134d9371c7d168b5954
+=======
+  inventoryBinId   String? 
+>>>>>>> 2e67c95764e8874c8ff5004c90ed13dfb51dbf5b
 
   quantityBefore   Decimal  @db.Decimal(18, 4)
   quantityAdjusted Decimal  @db.Decimal(18, 4) // Can be positive (+) or negative (-)
   quantityAfter    Decimal  @db.Decimal(18, 4)
+  quantityReserved Decimal? @db.Decimal(18, 4)
+
   reason           InventoryAdjustmentLineReason?
 
   adjustment       InventoryAdjustment       @relation(fields: [adjustmentId], references: [id], onDelete: Cascade)
   product          Product                   @relation(fields: [productId], references: [inflowId], onDelete: Restrict)
   location         Location                  @relation(fields: [locationId], references: [inflowId], onDelete: Restrict)
+<<<<<<< HEAD
 <<<<<<< HEAD
 <<<<<<< HEAD
   sublocation      Sublocation?              @relation(fields: [sublocationId], references: [id], onDelete: SetNull)
@@ -1503,15 +1512,20 @@ model InventoryAdjustmentLine {
 =======
   // inventoryBin     InventoryBin?              @relation(fields: [inventoryBinId], references: [id], onDelete: SetNull)
 >>>>>>> dd9bab295ca918cde8394134d9371c7d168b5954
+=======
+  inventoryBin     InventoryBin?              @relation(fields: [inventoryBinId], references: [id], onDelete: SetNull)
+>>>>>>> 2e67c95764e8874c8ff5004c90ed13dfb51dbf5b
 
   // Track exact serial numbers modified by this adjustment line
   serials          InventoryAdjustmentSerial[]
+  draftBins        InventoryAdjustmentLineBin[]
 
   createdAt        DateTime                  @default(now())
 
   @@index([adjustmentId])
   @@index([productId])
   @@index([locationId])
+<<<<<<< HEAD
 <<<<<<< HEAD
 <<<<<<< HEAD
   @@index([sublocationId])
@@ -1537,6 +1551,9 @@ model InventoryAdjustmentSerial {
 =======
   // @@index([inventoryBinId])
 >>>>>>> dd9bab295ca918cde8394134d9371c7d168b5954
+=======
+  @@index([inventoryBinId])
+>>>>>>> 2e67c95764e8874c8ff5004c90ed13dfb51dbf5b
   @@map("inventory_adjustment_line")
 }
 
@@ -1551,10 +1568,26 @@ enum InventoryAdjustmentLineReason {
   MANUAL
 }
 
+model InventoryAdjustmentLineBin {
+  id                  String   @id @default(uuid())
+  adjustmentLineId    String
+  sublocationId       String
+  quantity            Decimal
+
+  adjustmentLine      InventoryAdjustmentLine @relation(fields: [adjustmentLineId], references: [id], onDelete: Cascade)
+  sublocation         Sublocation              @relation(fields: [sublocationId], references: [id])
+
+  serials          InventoryAdjustmentSerial[]
+
+  @@index([adjustmentLineId])
+  @@index([sublocationId])
+  @@map("inventory_adjustment_line_bin")
+}
 
 model InventoryAdjustmentSerial {
   id                  String @id @default(cuid())
   adjustmentLineId    String
+  draftBinId          String?
   inventoryBinItemId  String?
   serialNumber        String
   action              InventorySerialAdjustmentAction
@@ -1563,11 +1596,13 @@ model InventoryAdjustmentSerial {
   toInventoryBinId    String?
 
   adjustmentLine      InventoryAdjustmentLine @relation(fields: [adjustmentLineId], references: [id], onDelete: Cascade)
+  draftBin           InventoryAdjustmentLineBin? @relation(fields: [draftBinId], references: [id], onDelete: Cascade)
   inventoryBinItem    InventoryBinItem? @relation(fields: [inventoryBinItemId], references: [id], onDelete: SetNull)
   fromInventoryBin    InventoryBin? @relation("AdjustmentSerialFromBin", fields: [fromInventoryBinId], references: [id], onDelete: SetNull)
   toInventoryBin      InventoryBin? @relation("AdjustmentSerialToBin", fields: [toInventoryBinId], references: [id], onDelete: SetNull)
 
   @@index([adjustmentLineId])
+  @@index([draftBinId])
   @@index([inventoryBinItemId])
   @@index([fromInventoryBinId])
   @@index([toInventoryBinId])

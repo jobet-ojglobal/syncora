@@ -32,11 +32,6 @@ export async function GET(
             location: {
               select: { id: true, inflowId: true, name: true },
             },
-            inventoryBin: {
-              include: {
-                sublocation: { select: { name: true } },
-              },
-            },
             serials: {
               include: {
                 inventoryBinItem: true,

@@ -18,7 +18,7 @@ export default async function DashboardLayout({
   children: React.ReactNode;
 }) {
   return (
-    <LocationWorkspaceProvider>
+    // <LocationWorkspaceProvider>
       <SidebarProvider>
         <AppSidebar />
         <SidebarInset className="flex flex-col min-h-screen">
@@ -47,6 +47,6 @@ export default async function DashboardLayout({
           
         </SidebarInset>
       </SidebarProvider>
-    </LocationWorkspaceProvider>
+    // </LocationWorkspaceProvider>
   );
 }
