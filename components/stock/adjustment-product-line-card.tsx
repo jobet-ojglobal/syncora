@@ -56,7 +56,7 @@ const REASON_OPTIONS = [
   { id: "MANUAL", name: "Other" },
 ]
 
-export function ProductLineCard({
+export function AdjustmentProductLineCard({
   lineIndex,
   control,
   setValue,
@@ -206,30 +206,6 @@ export function ProductLineCard({
     }
   };
 
-  // Helper to append unique, cleaned serial numbers
-  // const addSerials = (rawTokens: string[]) => {
-  //   const cleaned = rawTokens
-  //     .map((s) => s.trim())
-  //     .filter((s) => s.length > 0);
-
-  //   if (cleaned.length === 0) return;
-
-  //   const existingSet = new Set(serials);
-  //   const updated = [...serials];
-
-  //   for (const item of cleaned) {
-  //     if (!existingSet.has(item)) {
-  //       if (updated.length >= onHand) {
-  //         toast.error(`Serial capacity reached. Total On-Hand is ${onHand}.`);
-  //         break;
-  //       }
-  //       existingSet.add(item);
-  //       updated.push(item);
-  //     }
-  //   }
-
-  //   setValue(`lines.${lineIndex}.serials`, updated, { shouldValidate: true });
-  // };
 
   // Handle keydown for Space, Enter, and Comma
   const handleKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
@@ -609,8 +585,6 @@ export function ProductLineCard({
         </div>
       )}
 
-
-
       {/* Unassigned / Bulk Banner */}
       <div className="flex items-center justify-between text-xs py-2 px-4 bg-muted/30 border-b">
         <span className="text-muted-foreground font-medium">Bulk / Unassigned Storage Area:</span>
@@ -770,6 +744,7 @@ export function ProductLineCard({
                           )}
                         </div>
                       )}
+                      
                     </div>
                   </td>
                 </tr>
@@ -781,6 +756,32 @@ export function ProductLineCard({
     </div>
   );
 }
+
+
+  // Helper to append unique, cleaned serial numbers
+  // const addSerials = (rawTokens: string[]) => {
+  //   const cleaned = rawTokens
+  //     .map((s) => s.trim())
+  //     .filter((s) => s.length > 0);
+
+  //   if (cleaned.length === 0) return;
+
+  //   const existingSet = new Set(serials);
+  //   const updated = [...serials];
+
+  //   for (const item of cleaned) {
+  //     if (!existingSet.has(item)) {
+  //       if (updated.length >= onHand) {
+  //         toast.error(`Serial capacity reached. Total On-Hand is ${onHand}.`);
+  //         break;
+  //       }
+  //       existingSet.add(item);
+  //       updated.push(item);
+  //     }
+  //   }
+
+  //   setValue(`lines.${lineIndex}.serials`, updated, { shouldValidate: true });
+  // };
 
 
 // {isSerialTracked && (

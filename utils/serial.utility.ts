@@ -1,3 +1,4 @@
+// utils\serial.utility.ts
 export interface BinWithSerialCapacity {
   sublocationId: string;
   quantity: number;

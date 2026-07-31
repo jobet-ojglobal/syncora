@@ -15,16 +15,45 @@ import { ZodError } from "zod";
  * Generates the next sequential adjustment number using transactional locking
  * to prevent duplicate key race conditions under high concurrency.
  */
+// async function generateAdjustmentNumber(tx: Prisma.TransactionClient): Promise<string> {
+//   const result = await tx.$queryRaw<Array<{ count: bigint | number }>>`
+//     SELECT COUNT(*)::bigint FROM "inventory_adjustment"
+//   `;
+
+//   // Number(...) cleanly parses both JS numbers and BigInts
+//   const count = Number(result[0]?.count ?? 0); 
+//   const nextNum = (count + 1).toString().padStart(5, "0");
+  
+//   return `ADJ-${nextNum}`;
+// }
+
+/**
+ * Generates the next sequential adjustment number using explicit table locking
+ * to prevent duplicate key race conditions under high concurrency.
+ */
 async function generateAdjustmentNumber(tx: Prisma.TransactionClient): Promise<string> {
-  const result = await tx.$queryRaw<Array<{ count: bigint | number }>>`
-    SELECT COUNT(*)::bigint FROM "inventory_adjustment"
+  // Explicitly lock the table in EXCLUSIVE mode for the duration of this transaction.
+  // Other concurrent transactions will wait until this transaction commits.
+  await tx.$executeRaw`
+    LOCK TABLE "inventory_adjustment" IN EXCLUSIVE MODE;
   `;
 
-  // Number(...) cleanly parses both JS numbers and BigInts
-  const count = Number(result[0]?.count ?? 0); 
-  const nextNum = (count + 1).toString().padStart(5, "0");
-  
+  // Fetch the current MAXIMUM numeric ID value instead of COUNT to safely handle deletes
+  const result = await tx.$queryRaw<Array<{ max_num: bigint | number | null }>>`
+    SELECT MAX(
+      NULLIF(
+        regexp_replace("adjustmentNumber", '^ADJ-', ''), 
+        ''
+      )::bigint
+    ) AS max_num 
+    FROM "inventory_adjustment"
+  `;
+
+  const currentMax = Number(result[0]?.max_num ?? 0);
+  const nextNum = (currentMax + 1).toString().padStart(5, "0");
+
   return `ADJ-${nextNum}`;
+
 }
 
 export async function POST(req: Request) {
@@ -49,6 +78,27 @@ export async function POST(req: Request) {
     const result = await prisma.$transaction(
       async (tx) => {
         let adjustment: any;
+
+        if (status === AdjustmentStatus.DRAFT && !existingAdjustmentId) {
+          const existingDraft = await tx.inventoryAdjustment.findFirst({
+            where: {
+              status: AdjustmentStatus.DRAFT,
+              lines: {
+                some: {
+                  locationId: locationId,
+                  productId: { in: lines.map((l) => l.productId) },
+                },
+              },
+            },
+            select: { id: true, adjustmentNumber: true },
+          });
+
+          if (existingDraft) {
+            throw new Error(
+              `An open draft (${existingDraft.adjustmentNumber}) already exists for these items at this location. Please edit the existing draft or post it before creating a new one.`
+            );
+          }
+        }
 
         // ----------------------------------------------------------------
         // 1. Save Header (Create or Update Draft)
@@ -140,6 +190,7 @@ export async function POST(req: Request) {
               quantityBefore: currentQtyBefore,
               quantityAdjusted: netAdjustmentQty,
               quantityAfter: totalTargetQty,
+              quantityReserved: line.quantityReserved,
               reason: (line.reason as InventoryAdjustmentLineReason) || null,
             },
           });
@@ -147,75 +198,15 @@ export async function POST(req: Request) {
           createdLines[i] = createdLine;
         }
 
-        // ----------------------------------------------------------------
-        // 3. Save DRAFT Sub-resources & Early Return
-        // ----------------------------------------------------------------
-        // if (status === AdjustmentStatus.DRAFT) {
-        //   const draftSerialsToCreate: Prisma.InventoryAdjustmentSerialCreateManyInput[] = [];
-        //   const draftBinsToCreate: Prisma.InventoryAdjustmentLineBinCreateManyInput[] = [];
 
-        //   for (let i = 0; i < lines.length; i++) {
-        //     const line = lines[i];
-        //     const createdLine = createdLines[i];
-
-        //     // A. Process Serials for Draft
-        //     const allLineSerials = new Set<string>(
-        //       (line.serials || []).map((s: string) => s.trim()).filter(Boolean)
-        //     );
-
-        //     if (Array.isArray(line.bins)) {
-        //       for (const b of line.bins) {
-        //         if (Array.isArray(b.serials)) {
-        //           b.serials.forEach((sn: string) => {
-        //             const cleaned = sn?.trim();
-        //             if (cleaned) allLineSerials.add(cleaned);
-        //           });
-        //         }
-        //       }
-        //     }
-
-        //     if (allLineSerials.size > 0) {
-        //       Array.from(allLineSerials).forEach((sn) => {
-        //         draftSerialsToCreate.push({
-        //           adjustmentLineId: createdLine.id,
-        //           serialNumber: sn,
-        //           action: InventorySerialAdjustmentAction.VERIFY,
-        //         });
-        //       });
-        //     }
-
-        //     // B. Process Bin Allocations for Draft
-        //     const { bins = [] } = line;
-        //     for (const binData of bins) {
-        //       if (!binData.sublocationId) continue;
-
-        //       draftBinsToCreate.push({
-        //         adjustmentLineId: createdLine.id,
-        //         sublocationId: binData.sublocationId,
-        //         quantity: Number(binData.quantity) || 0,
-        //       });
-        //     }
-        //   }
-
-        //   if (draftSerialsToCreate.length > 0) {
-        //     await tx.inventoryAdjustmentSerial.createMany({
-        //       data: draftSerialsToCreate,
-        //     });
-        //   }
-
-        //   if (draftBinsToCreate.length > 0) {
-        //     await tx.inventoryAdjustmentLineBin.createMany({
-        //       data: draftBinsToCreate,
-        //     });
-        //   }
-
-        //   return adjustment;
-        // }
+        
+        
 
         // ----------------------------------------------------------------
         // 3. Save DRAFT Sub-resources & Early Return
         // ----------------------------------------------------------------
         if (status === AdjustmentStatus.DRAFT) {
+          
           const draftSerialsToCreate: Prisma.InventoryAdjustmentSerialCreateManyInput[] = [];
 
           for (let i = 0; i < lines.length; i++) {
@@ -318,6 +309,7 @@ export async function POST(req: Request) {
               where: { id: inventory.id },
               data: {
                 quantityOnHand: targetOnHand,
+                quantityReserved: Number(line.quantityReserved) || 0,
                 quantityAvailable: Math.max(0, targetOnHand - currentReserved),
                 lastCountedAt: new Date(),
                 lastMovementAt: new Date(),
@@ -429,6 +421,101 @@ export async function POST(req: Request) {
             }
           }
 
+          // if (line.trackSerials) {
+          //   const existingSerials = await tx.inventoryBinItem.findMany({
+          //     where: { productId, locationId },
+          //   });
+
+          //   const existingSerialMap = new Map(
+          //     existingSerials.map((s) => [s.serialNumber, s])
+          //   );
+          //   const existingSerialNumbers = Array.from(existingSerialMap.keys());
+
+          //   const serialsToCreate = allIncomingSerials.filter(
+          //     (sn) => !existingSerialNumbers.includes(sn)
+          //   );
+          //   const serialsToDelete = existingSerials.filter(
+          //     (s) =>
+          //       !allIncomingSerials.includes(s.serialNumber) &&
+          //       s.status === "IN_STOCK"
+          //   );
+
+          //   // Deletions
+          //   if (serialsToDelete.length > 0) {
+          //     serialsToDelete.forEach((item) => {
+          //       serialAuditsToCreate.push({
+          //         adjustmentLineId: createdLine.id,
+          //         inventoryBinItemId: item.id,
+          //         serialNumber: item.serialNumber,
+          //         action: InventorySerialAdjustmentAction.REMOVE,
+          //         fromInventoryBinId: item.inventoryBinId,
+          //         toInventoryBinId: null,
+          //       });
+          //     });
+
+          //     await tx.inventoryBinItem.deleteMany({
+          //       where: { id: { in: serialsToDelete.map((s) => s.id) } },
+          //     });
+          //   }
+
+          //   // Insertions
+          //   for (const sn of serialsToCreate) {
+          //     const targetBinId = serialToBinIdMap.get(sn) || null;
+          //     const newItem = await tx.inventoryBinItem.create({
+          //       data: {
+          //         productId,
+          //         locationId,
+          //         inventoryBinId: targetBinId,
+          //         serialNumber: sn,
+          //         status: "IN_STOCK",
+          //       },
+          //     });
+
+          //     serialAuditsToCreate.push({
+          //       adjustmentLineId: createdLine.id,
+          //       inventoryBinItemId: newItem.id,
+          //       serialNumber: sn,
+          //       action: InventorySerialAdjustmentAction.ADD,
+          //       fromInventoryBinId: null,
+          //       toInventoryBinId: targetBinId,
+          //     });
+          //   }
+
+          //   // Movements & Verifications
+          //   for (const sn of allIncomingSerials) {
+          //     if (existingSerialMap.has(sn)) {
+          //       const item = existingSerialMap.get(sn)!;
+          //       const targetBinId = serialToBinIdMap.get(sn) || null;
+
+          //       if (item.inventoryBinId !== targetBinId) {
+          //         await tx.inventoryBinItem.update({
+          //           where: { id: item.id },
+          //           data: { inventoryBinId: targetBinId },
+          //         });
+
+          //         serialAuditsToCreate.push({
+          //           adjustmentLineId: createdLine.id,
+          //           inventoryBinItemId: item.id,
+          //           serialNumber: sn,
+          //           action: InventorySerialAdjustmentAction.MOVE,
+          //           fromInventoryBinId: item.inventoryBinId,
+          //           toInventoryBinId: targetBinId,
+          //         });
+          //       } else {
+          //         serialAuditsToCreate.push({
+          //           adjustmentLineId: createdLine.id,
+          //           inventoryBinItemId: item.id,
+          //           serialNumber: sn,
+          //           action: InventorySerialAdjustmentAction.VERIFY,
+          //           fromInventoryBinId: targetBinId,
+          //           toInventoryBinId: targetBinId,
+          //         });
+          //       }
+          //     }
+          //   }
+          // }
+
+          // Serials Processing
           if (line.trackSerials) {
             const existingSerials = await tx.inventoryBinItem.findMany({
               where: { productId, locationId },
@@ -448,25 +535,7 @@ export async function POST(req: Request) {
                 s.status === "IN_STOCK"
             );
 
-            // Deletions
-            if (serialsToDelete.length > 0) {
-              serialsToDelete.forEach((item) => {
-                serialAuditsToCreate.push({
-                  adjustmentLineId: createdLine.id,
-                  inventoryBinItemId: item.id,
-                  serialNumber: item.serialNumber,
-                  action: InventorySerialAdjustmentAction.REMOVE,
-                  fromInventoryBinId: item.inventoryBinId,
-                  toInventoryBinId: null,
-                });
-              });
-
-              await tx.inventoryBinItem.deleteMany({
-                where: { id: { in: serialsToDelete.map((s) => s.id) } },
-              });
-            }
-
-            // Insertions
+            // 1. Process Insertions First (Creates new InventoryBinItem records with valid IDs)
             for (const sn of serialsToCreate) {
               const targetBinId = serialToBinIdMap.get(sn) || null;
               const newItem = await tx.inventoryBinItem.create({
@@ -481,7 +550,7 @@ export async function POST(req: Request) {
 
               serialAuditsToCreate.push({
                 adjustmentLineId: createdLine.id,
-                inventoryBinItemId: newItem.id,
+                inventoryBinItemId: newItem.id, // Valid ID
                 serialNumber: sn,
                 action: InventorySerialAdjustmentAction.ADD,
                 fromInventoryBinId: null,
@@ -489,7 +558,7 @@ export async function POST(req: Request) {
               });
             }
 
-            // Movements & Verifications
+            // 2. Process Movements & Verifications for surviving serials
             for (const sn of allIncomingSerials) {
               if (existingSerialMap.has(sn)) {
                 const item = existingSerialMap.get(sn)!;
@@ -520,6 +589,28 @@ export async function POST(req: Request) {
                   });
                 }
               }
+            }
+
+            // 3. Process Deletions: Create audit entries set to NULL for inventoryBinItemId 
+            // (or defer deletion until after audit insertion)
+            if (serialsToDelete.length > 0) {
+              serialsToDelete.forEach((item) => {
+                serialAuditsToCreate.push({
+                  adjustmentLineId: createdLine.id,
+                  // Set to null or existing item ID depending on database schema constraints:
+                  // If inventoryBinItemId constraint on inventoryAdjustmentSerial has ON DELETE SET NULL / is optional:
+                  inventoryBinItemId: null, 
+                  serialNumber: item.serialNumber,
+                  action: InventorySerialAdjustmentAction.REMOVE,
+                  fromInventoryBinId: item.inventoryBinId,
+                  toInventoryBinId: null,
+                });
+              });
+
+              // Delete the inventory bin items after creating the audit intent
+              await tx.inventoryBinItem.deleteMany({
+                where: { id: { in: serialsToDelete.map((s) => s.id) } },
+              });
             }
           }
         }
@@ -566,6 +657,139 @@ export async function POST(req: Request) {
     );
   }
 }
+
+export async function PATCH(req: Request) {
+  try {
+    const body = await req.json();
+    const { adjustmentId, status, reason } = body;
+
+    if (!adjustmentId || !status) {
+      return NextResponse.json(
+        { error: "Adjustment ID and target status are required." },
+        { status: 400 }
+      );
+    }
+
+    // Validate allowed transition statuses
+    const allowedStatuses = [AdjustmentStatus.POSTED, AdjustmentStatus.VOIDED];
+    if (!allowedStatuses.includes(status)) {
+      return NextResponse.json(
+        { error: `Invalid target status. Must be one of: ${allowedStatuses.join(", ")}` },
+        { status: 400 }
+      );
+    }
+
+    // Fetch existing adjustment to verify state
+    const existingAdjustment = await prisma.inventoryAdjustment.findUnique({
+      where: { id: adjustmentId },
+      select: { id: true, status: true },
+    });
+
+    if (!existingAdjustment) {
+      return NextResponse.json(
+        { error: "Inventory adjustment record not found." },
+        { status: 404 }
+      );
+    }
+
+    // Guard rail: Only DRAFT adjustments can be status-updated or cancelled
+    if (existingAdjustment.status !== AdjustmentStatus.DRAFT) {
+      return NextResponse.json(
+        { error: `Cannot update adjustment. Current status is ${existingAdjustment.status}. Only DRAFT adjustments can be modified or voided.` },
+        { status: 422 }
+      );
+    }
+
+    // Perform status patch
+    const updatedAdjustment = await prisma.inventoryAdjustment.update({
+      where: { id: adjustmentId },
+      data: {
+        status: status,
+        remarks: reason ? `[${status}] ${reason}` : undefined,
+        updatedAt: new Date(),
+      },
+    });
+
+    return NextResponse.json({
+      success: true,
+      message: `Adjustment ${adjustmentId} status updated to ${status}.`,
+      data: updatedAdjustment,
+    });
+  } catch (error: any) {
+    console.error("Failed to patch adjustment status:", error);
+    return NextResponse.json(
+      { error: error.message || "Failed to patch adjustment status." },
+      { status: 500 }
+    );
+  }
+}
+
+
+        // ----------------------------------------------------------------
+        // 3. Save DRAFT Sub-resources & Early Return
+        // ----------------------------------------------------------------
+        // if (status === AdjustmentStatus.DRAFT) {
+        //   const draftSerialsToCreate: Prisma.InventoryAdjustmentSerialCreateManyInput[] = [];
+        //   const draftBinsToCreate: Prisma.InventoryAdjustmentLineBinCreateManyInput[] = [];
+
+        //   for (let i = 0; i < lines.length; i++) {
+        //     const line = lines[i];
+        //     const createdLine = createdLines[i];
+
+        //     // A. Process Serials for Draft
+        //     const allLineSerials = new Set<string>(
+        //       (line.serials || []).map((s: string) => s.trim()).filter(Boolean)
+        //     );
+
+        //     if (Array.isArray(line.bins)) {
+        //       for (const b of line.bins) {
+        //         if (Array.isArray(b.serials)) {
+        //           b.serials.forEach((sn: string) => {
+        //             const cleaned = sn?.trim();
+        //             if (cleaned) allLineSerials.add(cleaned);
+        //           });
+        //         }
+        //       }
+        //     }
+
+        //     if (allLineSerials.size > 0) {
+        //       Array.from(allLineSerials).forEach((sn) => {
+        //         draftSerialsToCreate.push({
+        //           adjustmentLineId: createdLine.id,
+        //           serialNumber: sn,
+        //           action: InventorySerialAdjustmentAction.VERIFY,
+        //         });
+        //       });
+        //     }
+
+        //     // B. Process Bin Allocations for Draft
+        //     const { bins = [] } = line;
+        //     for (const binData of bins) {
+        //       if (!binData.sublocationId) continue;
+
+        //       draftBinsToCreate.push({
+        //         adjustmentLineId: createdLine.id,
+        //         sublocationId: binData.sublocationId,
+        //         quantity: Number(binData.quantity) || 0,
+        //       });
+        //     }
+        //   }
+
+        //   if (draftSerialsToCreate.length > 0) {
+        //     await tx.inventoryAdjustmentSerial.createMany({
+        //       data: draftSerialsToCreate,
+        //     });
+        //   }
+
+        //   if (draftBinsToCreate.length > 0) {
+        //     await tx.inventoryAdjustmentLineBin.createMany({
+        //       data: draftBinsToCreate,
+        //     });
+        //   }
+
+        //   return adjustment;
+        // }
+
 
 // if (status === AdjustmentStatus.DRAFT) {
         //   const draftSerialsToCreate: Prisma.InventoryAdjustmentSerialCreateManyInput[] = [];

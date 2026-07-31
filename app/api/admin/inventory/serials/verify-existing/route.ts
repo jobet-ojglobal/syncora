@@ -1,16 +1,35 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma"; // Adjust path to your Prisma client instance
+import { prisma } from "@/lib/prisma";
 
 export async function POST(req: Request) {
   try {
     const body = await req.json();
-    const { serials } = body;
+    const { serials, prefix, productId } = body;
 
+    // Mode A: Search by Prefix and Product ID for sequence generation
+    if (prefix && typeof prefix === "string") {
+      const existingItems = await prisma.inventoryBinItem.findMany({
+        where: {
+          ...(productId ? { productId } : {}),
+          serialNumber: {
+            startsWith: prefix.trim(),
+          },
+        },
+        select: {
+          serialNumber: true,
+        },
+      });
+
+      return NextResponse.json({
+        existingSerials: existingItems.map((item) => item.serialNumber),
+      });
+    }
+
+    // Mode B: Exact-match array validation
     if (!Array.isArray(serials) || serials.length === 0) {
       return NextResponse.json({ existingSerials: [] });
     }
 
-    // 2. Clean & sanitize input candidate serials
     const cleanSerials = Array.from(
       new Set(
         serials
@@ -24,15 +43,11 @@ export async function POST(req: Request) {
       return NextResponse.json({ existingSerials: [] });
     }
 
-    // 3. Query existing active serials for this product
-    // Note: Adjust the status filter depending on your business rules.
-    // If ANY serial status means it cannot be re-added, omit the `status` condition.
     const existingItems = await prisma.inventoryBinItem.findMany({
       where: {
         serialNumber: {
           in: cleanSerials,
         },
-        // Optionally restrict to active inventory states:
         status: {
           in: ["IN_STOCK", "RESERVED"],
         },
@@ -42,10 +57,9 @@ export async function POST(req: Request) {
       },
     });
 
-    // 4. Extract array of found serial strings
-    const existingSerials = existingItems.map((item) => item.serialNumber);
-
-    return NextResponse.json({ existingSerials });
+    return NextResponse.json({
+      existingSerials: existingItems.map((item) => item.serialNumber),
+    });
   } catch (error) {
     console.error("[VERIFY_EXISTING_SERIALS_ERROR]", error);
     return NextResponse.json(
