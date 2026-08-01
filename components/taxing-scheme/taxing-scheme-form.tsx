@@ -3,13 +3,13 @@
 import { useForm, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { taxingSchemeSchema, TaxingSchemeInput } from "@/schemas/taxing-scheme.schema";
-import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Switch } from "@/components/ui/switch";
-import { Percent, Plus, Trash2, ArrowLeft, Receipt, Settings2, Scale } from "lucide-react";
+import { Plus, Trash2, ArrowLeft, Receipt, Settings2, Scale } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { Field, FieldGroup, FieldLabel, FieldLegend, FieldSet } from "@/components/ui/field";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { FormInput } from "../shared/form-input";
+import { FormSwitch } from "../shared/form-switch";
 
 interface TaxingSchemeFormProps {
   initialData?: TaxingSchemeInput | null;
@@ -59,7 +59,7 @@ export function TaxingSchemeForm({ initialData }: TaxingSchemeFormProps) {
       }
 
       toast.success(isEditMode ? "Taxing schema profile rules saved" : "New fiscal taxation scheme registered");
-      router.push("/dashboard/taxing-scheme");
+      router.push("/dashboard/settings/financial/taxing");
       router.refresh();
     } catch (err: any) {
       toast.error("Pipeline Sync Interrupted", { description: err.message });
@@ -71,236 +71,199 @@ export function TaxingSchemeForm({ initialData }: TaxingSchemeFormProps) {
   };
 
   return (
-    <form onSubmit={handleSubmit(onSubmit, onInvalid)} className="w-full max-w-5xl mx-auto p-6 bg-card border rounded-xl shadow-xs space-y-6">
-      <FieldGroup className="space-y-6">
-        
-        {/* SECTION 1: Base Scheme Definition Rules */}
-        <FieldSet className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-          <FieldLegend className="lg:col-span-12 flex items-center gap-2 border-b pb-3 text-sm font-semibold text-foreground tracking-tight">
-            <Receipt className="w-4 h-4 text-primary" />
-            Master Fiscal Taxation Group Setup
-          </FieldLegend>
-
-          {/* Scheme Name */}
-          <Field className="lg:col-span-6 flex flex-col space-y-2">
-            <FieldLabel className="text-xs font-medium text-muted-foreground">Taxing Scheme Collective Label *</FieldLabel>
-            <Input
-              className="h-10"
-              placeholder="e.g. North America Sales Tax"
-              {...register("name")}
-            />
-            {errors.name && (
-              <span className="text-xs font-medium text-destructive">
-                {errors.name.message}
-              </span>
-            )}
-          </Field>
-
-          {/* Publish */}
-          <Field className="lg:col-span-3 h-full">
-            <div className="border rounded-lg bg-muted/20 p-4 min-h-[74px] flex justify-between items-center gap-4">
-              <div className="space-y-0.5">
-                <p className="text-sm font-semibold text-foreground">
-                  Publish Group
-                </p>
-                <p className="text-xs text-muted-foreground leading-normal">
-                  Available for lookups
-                </p>
+    <form onSubmit={handleSubmit(onSubmit, onInvalid)} className="w-full text-xs font-medium space-y-6 ">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Left */}
+        <div className="lg:col-span-1 space-y-6">
+          <Card className="shadow-xs">
+            <CardHeader className="border-b pb-3 flex flex-row items-center justify-between space-y-0">
+              <div className="space-y-1">
+                <CardTitle className="text-sm font-semibold flex items-center gap-1.5">
+                  <Receipt className="w-4 h-4 text-primary" /> 
+                  Master Fiscal Taxation Group Setup
+                </CardTitle>
+                <CardDescription className="text-[11px]">Configure spatial deployment nodes, shipping markers, and tax profiles.</CardDescription>
               </div>
-              <Switch
-                className="shrink-0"
-                checked={watch("isActive")}
-                onCheckedChange={(value) => setValue("isActive", value)}
-              />
-            </div>
-          </Field>
+            </CardHeader>
+            <CardContent className="space-y-4" >
+                <FormInput
+                  name="name"
+                  control={control}
+                  label="Taxing Scheme Collective Label"
+                  placeholder="e.g. North America Sales Tax"
+                  classNameLabel="text-muted-foreground font-semibold"
+                  required
+                />
+                <FormSwitch
+                  name="isActive"
+                  control={control}
+                  variant="card"
+                  label="Active Status"
+                  description="Enable or disable this taxing scheme."
+                  className=" p-2.5"
+                />
+                <FormSwitch
+                  name="isDefault"
+                  control={control}
+                  variant="card"
+                  label="Default Scheme"
+                  description="Set this scheme as the default for new transactions."
+                  className=" p-2.5"
+                />
+              
+            </CardContent>
+          </Card>
+        </div>
 
-          {/* Default */}
-          <Field className="lg:col-span-3 h-full">
-            <div className="border rounded-lg bg-muted/20 p-4 min-h-[74px] flex justify-between items-center gap-4">
-              <div className="space-y-0.5">
-                <p className="text-sm font-semibold text-foreground">
-                  System Default
-                </p>
-                <p className="text-xs text-muted-foreground leading-normal">
-                  Auto-apply to new accounts
-                </p>
+        {/* Right */}
+        <div className="lg:col-span-2 space-y-6">
+          <Card className="shadow-xs">
+            <CardHeader className="border-b pb-3 flex flex-row items-center justify-between space-y-0">
+              <div className="space-y-1">
+                <CardTitle className="text-sm font-semibold flex items-center gap-1.5">
+                  <Scale className="w-4 h-4 text-primary" /> 
+                  Taxation Rate Tiers Configuration
+                </CardTitle>
+                <CardDescription className="text-[11px]">Define multi-tier tax rates, shipping applicability, and cascading rules.</CardDescription>
               </div>
-              <Switch
-                className="shrink-0"
-                checked={watch("isDefault")}
-                onCheckedChange={(value) => setValue("isDefault", value)}
-              />
-            </div>
-          </Field>
-        </FieldSet>
+            </CardHeader>
+            <CardContent className="space-y-6" >
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <FormInput
+                  name="tax1Name"
+                  control={control}
+                  label="Primary Tax Name"
+                  placeholder="e.g. VAT"
+                  classNameLabel="text-muted-foreground font-semibold"
+                  required
+                />
+                <FormInput
+                  name="tax2Name"
+                  control={control}
+                  label="Secondary Tax Name"
+                  placeholder="e.g. GST"
+                  classNameLabel="text-muted-foreground font-semibold"
+                />
+                <FormSwitch
+                  name="tax1OnShipping"
+                  control={control}
+                  variant="card"
+                  label="Apply to Shipping"
+                  description={`Enable if ${watchedTax1Name} should be applied to shipping costs.`}
+                  className=" p-2.5"
+                />
+                
+                <FormSwitch
+                  name="tax2OnShipping"
+                  control={control}
+                  variant="card"
+                  label="Apply to Shipping"
+                  description={`Enable if ${watchedTax2Name || "Tax 2"} should be applied to shipping costs.`}
+                  className=" p-2.5"
+                />
+                <FormSwitch
+                  name="calculateTax2OnTax1"
+                  control={control}
+                  variant="card"
+                  label="Cascading Tax Calculation"
+                  description={`Enable if ${watchedTax2Name || "Tax 2"} should be calculated on top of ${watchedTax1Name}.`}
+                  className="sm:col-span-2 p-2.5"
+                />
+              </div>
+            </CardContent>
+          </Card>
 
-        {/* SECTION 2: Split Tier Logic Configurations Engine */}
-        <FieldSet className="relative border rounded-xl p-6 bg-muted/5 mt-2">
-          <div className="absolute -top-5 -left-5 bg-background px-2.5 py-0.5 border rounded-md text-[10px] uppercase tracking-wider font-semibold text-muted-foreground flex items-center shadow-xs">
-            <Settings2 className="w-3 h-3 mr-1.5 text-primary" />
-            Multi-Tier Structural Rules
+          
+        </div>
+      </div>
+
+      <Card className="shadow-xs">
+        <CardHeader className="border-b pb-3 flex flex-row items-center justify-between space-y-0">
+          <div className="space-y-1">
+            <CardTitle className="text-sm font-semibold flex items-center gap-1.5">
+              <Settings2 className="w-4 h-4 text-primary" /> 
+              Tax Code Matrix & Delivery Freight Rules
+            </CardTitle>
+            <CardDescription className="text-[11px]">
+              Manage tax codes, their rates, and shipping applicability for this scheme.
+            </CardDescription>
           </div>
-
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 pt-2">
-            {/* Tier 1 */}
-            <div className="space-y-4 lg:border-r lg:pr-8  mt-8">
-              <Field className="space-y-2">
-                <FieldLabel className="text-xs font-semibold text-foreground">
-                  Tier 1 Primary Tax Reference Label
-                </FieldLabel>
-                <Input
-                  className="h-10"
-                  placeholder="GST"
-                  {...register("tax1Name")}
-                />
-              </Field>
-
-              <div className="border rounded-lg bg-background p-4 flex justify-between items-center gap-4 shadow-2xs">
-                <div className="space-y-0.5">
-                  <p className="font-semibold text-sm text-foreground">
-                    Assess Tier 1 on Delivery Freight
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    Include freight when computing Tier 1 tax.
-                  </p>
-                </div>
-                <Switch
-                  className="shrink-0"
-                  checked={watch("tax1OnShipping")}
-                  onCheckedChange={(value) => setValue("tax1OnShipping", value)}
-                />
+        </CardHeader>
+        
+        <CardContent className="space-y-4">
+          {taxCodeFields.length > 0 ? (
+            <div className="hidden md:grid grid-cols-12 gap-3 px-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/80 mb-1 items-center">
+              <div className={hasTier2 ? "col-span-4" : "col-span-6"}>
+                Tax Code Area/Zone Designation *
               </div>
-            </div>
-
-            {/* Tier 2 */}
-            <div className="space-y-4 mt-4">
-              <Field className="space-y-2">
-                <FieldLabel className="text-xs font-semibold text-foreground">
-                  Tier 2 Secondary Tax Reference Label
-                </FieldLabel>
-                <Input
-                  className="h-10"
-                  placeholder="PST"
-                  {...register("tax2Name")}
-                />
-              </Field>
-
-              <div className="border rounded-lg bg-background p-4 flex justify-between items-center gap-4 shadow-2xs">
-                <div className="space-y-0.5">
-                  <p className="font-semibold text-sm text-foreground">
-                    Assess Tier 2 on Delivery Freight
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    Include freight when computing Tier 2 tax.
-                  </p>
-                </div>
-                <Switch
-                  className="shrink-0"
-                  checked={watch("tax2OnShipping")}
-                  onCheckedChange={(value) => setValue("tax2OnShipping", value)}
-                />
+              <div className="col-span-3 text-right">
+                {watchedTax1Name || "Tax 1"} Rate (%)
               </div>
-
               {hasTier2 && (
-                <div className="border border-amber-500/20 rounded-lg bg-amber-500/5 p-4 flex justify-between items-center gap-4 animate-in fade-in slide-in-from-top-2 duration-200">
-                  <div className="space-y-0.5">
-                    <p className="font-semibold text-sm text-amber-800 dark:text-amber-400">
-                      Compound Tier 2
-                    </p>
-                    <p className="text-xs text-amber-700/80 dark:text-amber-500/90">
-                      Calculate Tier 2 using Subtotal + Tier 1.
-                    </p>
-                  </div>
-                  <Switch
-                    className="shrink-0"
-                    checked={watch("calculateTax2OnTax1")}
-                    onCheckedChange={(value) => setValue("calculateTax2OnTax1", value)}
+                <div className="col-span-3 text-right">
+                  {watchedTax2Name || "Tax 2"} Rate (%)
+                </div>
+              )}
+              <div className="col-span-1 text-center">Default</div>
+              <div className="col-span-1 text-center">Actions</div>
+            </div>
+          ) : (
+            <div className="flex flex-col items-center justify-center p-8 border border-dashed rounded-xl bg-muted/5 text-muted-foreground text-center">
+              <p className="text-xs text-muted-foreground/80 italic">
+                No tax codes defined yet. Use the button below to add a new tax code.
+              </p>
+            </div>
+          )}
+
+          {taxCodeFields.map((field, index) => (
+            <div 
+              key={field.id} 
+              className="grid grid-cols-1 md:grid-cols-12 gap-3 items-center border-b pb-4 last:border-b-0 last:pb-0"
+            >
+              {/* Tax Code Name */}
+              <div className={hasTier2 ? "md:col-span-4" : "md:col-span-6"}>
+                <FormInput
+                  name={`taxCodes.${index}.name`}
+                  control={control}
+                  placeholder="e.g. CA Sales Tax"
+                  hideLabelOnDesktop // Use custom label or pass standard prop to keep mobile friendly
+                  label="Tax Code Name"
+                  required
+                />
+              </div>
+
+              {/* Tax 1 Rate */}
+              <div className="md:col-span-3">
+                <FormInput
+                  name={`taxCodes.${index}.tax1Rate`}
+                  control={control}
+                  placeholder="0.00"
+                  type="number"
+                  step="0.01"
+                  label={`${watchedTax1Name || "Tax 1"} Rate (%)`}
+                  hideLabelOnDesktop
+                  required
+                />
+              </div>
+
+              {/* Tax 2 Rate (Conditional) */}
+              {hasTier2 && (
+                <div className="md:col-span-3">
+                  <FormInput
+                    name={`taxCodes.${index}.tax2Rate`}
+                    control={control}
+                    placeholder="0.00"
+                    type="number"
+                    step="0.01"
+                    label={`${watchedTax2Name || "Tax 2"} Rate (%)`}
+                    hideLabelOnDesktop
+                    required
                   />
                 </div>
               )}
-            </div>
-          </div>
-        </FieldSet>
 
-        {/* SECTION 3: Dynamic Regional Tax Codes Rates Matrix */}
-        <FieldSet className="space-y-4">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-t pt-3  pb-3">
-            <FieldLegend className="flex items-center gap-2 font-semibold text-foreground text-sm">
-              <Scale className="w-4 h-4 text-primary" /> Mapped Jurisdictional Breakdown Tax Codes
-            </FieldLegend>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => appendTaxCode({ name: "", isActive: true, tax1Rate: 0, tax2Rate: 0, isDefault: taxCodeFields.length === 0 })} // Auto-default the first one appended
-              className="h-8 text-xs gap-1.5 shadow-2xs hover:bg-muted font-medium"
-            >
-              <Plus className="w-3.5 h-3.5" /> Append Jurisdiction Rate Row
-            </Button>
-          </div>
-
-          <div className="space-y-2">
-            {/* Table Headers Setup Column */}
-            {taxCodeFields.length > 0 && (
-              <div className="hidden md:grid grid-cols-12 gap-4 px-3 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/80 mb-1">
-                <div className="col-span-4">Tax Code Area/Zone Designation *</div>
-                <div className="col-span-3 text-right pr-1">{watchedTax1Name} Rate (%)</div>
-                <div className="col-span-3 text-right pr-1">{hasTier2 ? `${watchedTax2Name} Rate (%)` : "Tier 2 (Disabled)"}</div>
-                <div className="col-span-1 text-center">Default</div> 
-                <div className="col-span-1 text-center">Actions</div>
-              </div>
-            )}
-
-            {taxCodeFields.map((field, index) => (
-              <div 
-                key={field.id} 
-                className="grid grid-cols-1 md:grid-cols-12 gap-3 items-center p-4 md:p-1.5 border md:border-transparent rounded-xl bg-muted/30 md:bg-transparent relative hover:md:bg-muted/30 md:rounded-lg transition-colors"
-              >
-                {/* Specific Tax Code designation */}
-                <div className="col-span-1 md:col-span-4"> {/* 👈 Reduced from col-span-5 to col-span-4 */}
-                  <span className="block md:hidden text-[10px] uppercase font-bold text-muted-foreground mb-1">Jurisdiction Label</span>
-                  <Input
-                    placeholder="e.g., NY-RETAIL"
-                    className="h-10 text-xs font-mono font-semibold bg-background"
-                    {...register(`taxCodes.${index}.name` as const)}
-                  />
-                  {errors.taxCodes?.[index]?.name && (
-                    <span className="text-[10px] font-medium text-destructive mt-1 block">{errors.taxCodes[index].name?.message}</span>
-                  )}
-                </div>
-
-                {/* Tax Rate 1 Input */}
-                <div className="col-span-1 md:col-span-3 relative">
-                  <span className="block md:hidden text-[10px] uppercase font-bold text-muted-foreground mb-1">{watchedTax1Name} (%)</span>
-                  <div className="relative">
-                    <Percent className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground/50" />
-                    <Input
-                      type="number"
-                      step="0.0001"
-                      placeholder="0.0000"
-                      className="h-10 text-xs text-right pr-3 pl-8 font-mono font-medium bg-background"
-                      {...register(`taxCodes.${index}.tax1Rate`, { valueAsNumber: true })}
-                    />
-                  </div>
-                </div>
-
-                {/* Tax Rate 2 Input */}
-                <div className="col-span-1 md:col-span-3 relative">
-                  <span className="block md:hidden text-[10px] uppercase font-bold text-muted-foreground mb-1">{hasTier2 ? watchedTax2Name : "Tier 2"} (%)</span>
-                  <div className="relative">
-                    <Percent className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground/50" />
-                    <Input
-                      type="number"
-                      step="0.0001"
-                      placeholder="0.0000"
-                      disabled={!hasTier2}
-                      className="h-10 text-xs text-right pr-3 pl-8 font-mono font-medium bg-background disabled:opacity-40 disabled:bg-muted/50"
-                      {...register(`taxCodes.${index}.tax2Rate`, { valueAsNumber: true })}
-                    />
-                  </div>
-                </div>
-
+              {/* Default Selection Switch/Checkbox */}
+              <div className="md:col-span-1 flex justify-center items-center py-1">
                 <div className="col-span-1 md:col-span-1 flex flex-col items-start md:items-center justify-center">
                   <span className="block md:hidden text-[10px] uppercase font-bold text-muted-foreground mb-1">Default Jurisdiction</span>
                   <input
@@ -315,45 +278,57 @@ export function TaxingSchemeForm({ initialData }: TaxingSchemeFormProps) {
                     }}
                   />
                 </div>
-
-                {/* Drop Action Column */}
-                <div className="col-span-1 md:col-span-1 text-right md:text-center mt-2 md:mt-0">
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => {
-                      const wasDefault = watch(`taxCodes.${index}.isDefault`);
-                      removeTaxCode(index);
-                      // If we deleted the default item, fall back safely to setting row 0 as default
-                      if (wasDefault && taxCodeFields.length > 1) {
-                        setValue(`taxCodes.0.isDefault`, true);
-                      }
-                    }}
-                    className="h-10 w-9 text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </Button>
-                </div>
               </div>
-            ))}
 
-            {taxCodeFields.length === 0 && (
-              <div className="text-center py-12 text-xs border border-dashed rounded-xl bg-muted/5 text-muted-foreground font-medium italic px-4 leading-relaxed">
-                No individual regional tax codes generated under this scheme. Provision at least one rate zone parameter row to handle transactional invoice line mappings.
+              {/* Action Button */}
+              <div className="md:col-span-1 flex justify-center items-center">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => removeTaxCode(index)}
+                  className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </Button>
               </div>
-            )}
-          </div>
-        </FieldSet>
+            </div>
+          ))}
 
-        {/* Core Actions Navigation Layout */}
-        <div className="flex items-center justify-end gap-3 border-t pt-5 mt-2">
-          <Button type="submit" disabled={isSubmitting} size="sm" className="min-w-[160px] shadow-sm font-medium">
-            {isSubmitting ? "Compiling ledger matrix..." : isEditMode ? "Save Scheme Adjustments" : "Deploy Taxing Scheme"}
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() =>
+              appendTaxCode({
+                name: "",
+                isActive: true,
+                tax1Rate: 0,
+                tax2Rate: 0,
+                isDefault: taxCodeFields.length === 0,
+              })
+            }
+            className="w-full mt-2"
+          >
+            <Plus className="w-4 h-4 mr-2" /> Add Tax Code
           </Button>
-        </div>
+        </CardContent>
+      </Card>
 
-      </FieldGroup>
+      <div className="flex items-center justify-end gap-2">
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={() => router.back()}
+        >
+          <ArrowLeft className="w-4 h-4 mr-1" />
+          Cancel
+        </Button>
+        <Button type="submit" size="sm" disabled={isSubmitting}>
+          {isSubmitting ? "Processing..." : isEditMode ? "Update Scheme" : "Create Scheme"}
+        </Button>
+      </div>
     </form>
   );
 }

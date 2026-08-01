@@ -4,7 +4,7 @@ import React from "react";
 import { Control, Controller, FieldPath, FieldValues } from "react-hook-form";
 import { LucideIcon } from "lucide-react";
 import { Input } from "@/components/ui/input";
-import { Field, FieldContent, FieldError, FieldLabel } from "@/components/ui/field"; // Adjust based on your paths
+import { Field, FieldContent, FieldDescription, FieldError, FieldLabel } from "@/components/ui/field"; // Adjust based on your paths
 
 interface FormInputProps<
   TFieldValues extends FieldValues = FieldValues,
@@ -13,11 +13,13 @@ interface FormInputProps<
   name: TName;
   control: Control<TFieldValues>;
   label?: string;
+  hideLabelOnDesktop?: boolean;
   required?: boolean;
   icon?: LucideIcon;
   classNameLabel?: string;
   classNameField?: string;
   classNameInput?: string;
+  description?: string;
 }
 
 export function FormInput<
@@ -27,6 +29,8 @@ export function FormInput<
   name,
   control,
   label,
+  description,
+  hideLabelOnDesktop = false,
   required = false,
   icon: Icon,
   type = "text",
@@ -44,7 +48,7 @@ export function FormInput<
       control={control}
       render={({ field: { onChange, value, ...fieldProps }, fieldState }) => (
         <Field data-invalid={fieldState.invalid} className={classNameField}>
-          { label ? 
+          { label && !hideLabelOnDesktop ? 
             <FieldLabel htmlFor={inputId} className={classNameLabel}>
               {label} {required && <b className="text-red-500">*</b>}
             </FieldLabel> : "" 
@@ -73,6 +77,11 @@ export function FormInput<
               {...props}
             />
           </FieldContent>
+          <FieldDescription className="text-xs text-muted-foreground">
+            {description || (props["aria-describedby"] && (
+              <span id={props["aria-describedby"]}>{props["aria-describedby"]}</span>
+            ))}
+          </FieldDescription>
           {fieldState.invalid && fieldState.error && (
             <FieldError className="text-xs" errors={[fieldState.error]} />
           )}

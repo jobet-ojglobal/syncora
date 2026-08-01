@@ -18,6 +18,10 @@ import {
   FieldSet,
 } from "@/components/ui/field";
 import { paymentTermsSchema } from "@/schemas/payment-term.schema";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { FormInput } from "../shared/form-input";
+import { FormSelect } from "../shared/form-select";
+import { FormSwitch } from "../shared/form-switch";
 
 interface PaymentTermsFormProps {
   initialData?: {
@@ -48,6 +52,7 @@ export function PaymentTermsForm({ initialData }: PaymentTermsFormProps) {
   });
 
   const { 
+    control,
     register, 
     setValue, 
     watch, 
@@ -84,7 +89,7 @@ export function PaymentTermsForm({ initialData }: PaymentTermsFormProps) {
       }
 
       toast.success(isEditMode ? "Maturity metrics parameters saved" : "New settlement terms rule deployed");
-      router.push("/dashboard/payment-terms");
+      router.push("/dashboard/settings/financial/payment-terms");
       router.refresh();
     } catch (err: any) {
       toast.error("Pipeline Write Aborted", { description: err.message });
@@ -92,103 +97,58 @@ export function PaymentTermsForm({ initialData }: PaymentTermsFormProps) {
   };
 
   return (
-    <form 
-      onSubmit={handleSubmit(onSubmit)} 
-      className="w-full mx-auto p-6 bg-card border rounded-xl shadow-xs space-y-6 text-xs"
-    >
-      <FieldGroup className="gap-6">
-        
-        <FieldSet className="space-y-4">
-          <FieldLegend className="flex items-center gap-2 font-semibold text-foreground text-sm border-b pb-2 w-full">
-            <Scale className="w-4 h-4 text-primary" /> Matrix Maturity Profile Configuration
-          </FieldLegend>
+    <form onSubmit={handleSubmit(onSubmit)} className="w-full text-xs font-medium space-y-6 ">
+      <Card className="shadow-xs">
+        <CardHeader className="border-b pb-3 flex flex-row items-center justify-between space-y-0">
+          <div className="space-y-1">
+            <CardTitle className="text-sm font-semibold flex items-center gap-1.5">
+              <Scale className="w-4 h-4 text-primary" /> 
+               Matrix Maturity Profile Configuration
+            </CardTitle>
+          </div>
+        </CardHeader>
+        <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4" >
+          <FormInput
+            name="name"
+            control={control}
+            label="Clear Display Term Title Name"
+            placeholder="Example: Net 30 Days Calendar Framework"
+            classNameLabel="text-muted-foreground font-semibold"
+            required
+          />
+          <FormInput
+            name="daysDue"
+            control={control}
+            label="Maturity Days Due"
+            placeholder="e.g., 30, 60, 90"
+            type="number"
+            classNameLabel="text-muted-foreground font-semibold"
+          />
+          <FormSwitch
+            name="isActive"
+            control={control}
+            variant="card"
+            label="Active Status"
+            description="Toggle to enable or disable this payment term rule in the system."
+            className="sm:col-span-3 p-2.5"
+          />
+        </CardContent>
+      </Card>
 
-          {/* NAME FIELD */}
-          <Field>
-            <FieldLabel>Clear Display Term Title Name *</FieldLabel>
-            <Input
-              {...register("name")}
-              placeholder="Example: Net 30 Days Calendar Framework"
-              className="h-9 text-xs"
-            />
-            <FieldDescription>
-              Public descriptive ledger name designation displayed on accounting checkout routers.
-            </FieldDescription>
-            {errors.name && <FieldError>{errors.name.message}</FieldError>}
-          </Field>
-
-          {/* DAYS DUE FIELD */}
-          <Field>
-            <FieldLabel>Days Delta Threshold Until Collection Maturity</FieldLabel>
-            <div className="relative">
-              <CalendarClock className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground/60" />
-              <Input
-                type="number"
-                {...register("daysDue")}
-                placeholder="Leave completely blank for immediate Due On Receipt styles"
-                className="pl-9 h-9 text-xs font-mono"
-              />
-            </div>
-            <FieldDescription>
-              The whole integer window used by aging accounts ledgers to flag dynamic receivables delinquency.
-            </FieldDescription>
-            {errors.daysDue && <FieldError>{errors.daysDue.message}</FieldError>}
-          </Field>
-
-          <FieldSeparator />
-
-          {/* STATUS SWITCH */}
-          <Field className="lg:col-span-3 h-full">
-            <div className="border rounded-lg bg-muted/20 p-4 min-h-[74px] flex justify-between items-center gap-4">
-              <div className="space-y-0.5">
-                <p className="text-sm font-semibold text-foreground">
-                  Operational Rule Status
-                </p>
-                <p className="text-xs text-muted-foreground leading-normal">
-                  Controls if dynamic checkout routers can inherit this baseline parameters tracking entry.
-                </p>
-              </div>
-              <Switch
-                className="shrink-0"
-                checked={watch("isActive")}
-                onCheckedChange={(value) => setValue("isActive", value)}
-              />
-            </div>
-          </Field>
-
-        </FieldSet>
-
-        {/* CONTROLS FOOTER */}
-        <div className="flex items-center justify-between border-t pt-4">
-          <Button 
-            type="button" 
-            variant="ghost" 
-            size="sm" 
-            onClick={() => router.back()} 
-            className="gap-1.5 text-xs"
-          >
-            <ArrowLeft className="w-4 h-4" /> Return to Terms Matrix
-          </Button>
-          
-          <Button 
-            type="submit" 
-            disabled={isSubmitting} 
-            size="sm" 
-            className="min-w-[160px] text-xs gap-1.5"
-          >
-            {isSubmitting ? (
-              <>
-                <Loader2 className="w-3.5 h-3.5 animate-spin" /> Committing Entry...
-              </>
-            ) : isEditMode ? (
-              "Save Parameter Changes"
-            ) : (
-              "Deploy Payment Rule"
-            )}
-          </Button>
-        </div>
-
-      </FieldGroup>
+      <div className="flex items-center justify-end gap-2">
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={() => router.back()}
+        >
+          <ArrowLeft className="w-4 h-4 mr-1" />
+          Cancel
+        </Button>
+        <Button type="submit" size="sm" disabled={isSubmitting}>
+          {isSubmitting ? "Processing..." : isEditMode ? "Update Scheme" : "Create Scheme"}
+        </Button>
+      </div>
     </form>
   );
 }

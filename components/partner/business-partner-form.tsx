@@ -613,49 +613,56 @@ export function BusinessPartnerForm({ initialData, catalogs }: BusinessPartnerFo
                   </div>
 
                   {/* Mutually Exclusive Status Flag Matrix Sub-Grid */}
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-2 border-t border-dashed">
-                    {isCustomer && (
-                      <>
-                        {/* Dynamic Billing Form Selector Grid Context */}
-                        <FormCheckbox
-                          name={`addresses.${index}.isDefaultBilling`}
-                          control={control}
-                          label="Default Customer Billing Node"
-                          icon={CreditCard}
-                          iconClassName="text-blue-500"
-                          onChange={(checked) => 
-                            handleAddressCheckboxMutex(index, "isDefaultBilling", checked)
-                          }
-                        />
+                  { isCustomer || isVendor ? (
+                    <div className="pt-2 space-y-2">
+                      <span className="text-[11px] font-semibold text-slate-700">Default Role Assignment Flags</span>
+                      <p className="text-[10px] text-muted-foreground">Select the default operational node for each role.</p>
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-2 border-t border-dashed">
+                        {isCustomer && (
+                          <>
+                            {/* Dynamic Billing Form Selector Grid Context */}
+                            <FormCheckbox
+                              name={`addresses.${index}.isDefaultBilling`}
+                              control={control}
+                              label="Default Customer Billing Node"
+                              icon={CreditCard}
+                              iconClassName="text-blue-500"
+                              onChange={(checked) => 
+                                handleAddressCheckboxMutex(index, "isDefaultBilling", checked)
+                              }
+                            />
 
-                        {/* Dynamic Shipping Form Selector Grid Context */}
-                        <FormCheckbox
-                          name={`addresses.${index}.isDefaultShipping`}
-                          control={control}
-                          label="Default Customer Shipping Anchor"
-                          icon={Truck}
-                          iconClassName="text-indigo-500"
-                          onChange={(checked) => 
-                            handleAddressCheckboxMutex(index, "isDefaultShipping", checked)
-                          }
-                        />
-                      </>
-                    )}
-
-                    {isVendor && (
-                      /* Dynamic Vendor Procurement Selector Panel Context */
-                      <FormCheckbox
-                        name={`addresses.${index}.isDefaultVendorAddress`}
-                        control={control}
-                        label="Default Procurement Order Node"
-                        icon={ClipboardList}
-                        iconClassName="text-amber-500"
-                        onChange={(checked) => 
-                          handleAddressCheckboxMutex(index, "isDefaultVendorAddress", checked)
-                        }
-                      />
-                    )}
-                  </div>
+                            {/* Dynamic Shipping Form Selector Grid Context */}
+                            <FormCheckbox
+                              name={`addresses.${index}.isDefaultShipping`}
+                              control={control}
+                              label="Default Customer Shipping Anchor"
+                              icon={Truck}
+                              iconClassName="text-indigo-500"
+                              onChange={(checked) => 
+                                handleAddressCheckboxMutex(index, "isDefaultShipping", checked)
+                              }
+                            />
+                          </>
+                        )}
+                        {isVendor && (
+                          /* Dynamic Vendor Procurement Selector Panel Context */
+                          <FormCheckbox
+                            name={`addresses.${index}.isDefaultVendorAddress`}
+                            control={control}
+                            label="Default Procurement Order Node"
+                            icon={ClipboardList}
+                            iconClassName="text-amber-500"
+                            onChange={(checked) => 
+                              handleAddressCheckboxMutex(index, "isDefaultVendorAddress", checked)
+                            }
+                          />
+                        )}
+                      </div>
+                    </div>
+                    
+                  ) : null }
+                 
 
                 </div>
               ))}

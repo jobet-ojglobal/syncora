@@ -66,8 +66,6 @@ export function FormSelect<
               </FieldLabel>
                : "" 
           }
-
-          
           <FieldContent className="relative">
             <Select
               name={field.name}

@@ -14,6 +14,7 @@ import {
   Clock,
   ImageIcon,
   ArrowRight,
+  Eye,
 } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
@@ -576,12 +577,12 @@ export default async function InventoryDetailsPage({
                       const isPositive = change > 0;
 
                       return (
-                        <TableRow key={entry.id}>
+                        <TableRow  key={entry.id} >
                           <TableCell className="text-xs whitespace-nowrap">
                             {format(new Date(entry.createdAt), "MMM d, yyyy HH:mm")}
                           </TableCell>
                           <TableCell>
-                            <Badge variant="outline" className="text-xs">
+                            <Badge variant="outline" className="text-xs hover:bg-muted hover:text-foreground">
                               {entry.transactionType.replace("_", " ")}
                             </Badge>
                           </TableCell>
@@ -602,6 +603,11 @@ export default async function InventoryDetailsPage({
                           </TableCell>
                           <TableCell className="text-xs text-muted-foreground max-w-[200px] truncate">
                             {entry.remarks ?? entry.referenceType ?? "—"}
+                          </TableCell>
+                          <TableCell>
+                            <Link href={`/dashboard/inventory/adjustments/${entry.referenceId}`} className="text-muted-foreground hover:text-foreground">
+                              <Eye className="w-3.5 h-3.5" />
+                            </Link>
                           </TableCell>
                         </TableRow>
                       );

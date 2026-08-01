@@ -4,6 +4,9 @@ import { findLocationWebhookByLocation } from "@/lib/locations/services/webhook.
 
 export async function GET(request: NextRequest) {
   try {
+    const { searchParams } = new URL(request.url);
+    const isOnlineChecking = searchParams.get("isOnlineCheckEnabled")?.toLowerCase() === "true";
+    
     // 1. Fetch active workspace nodes from Prisma
     const locations = await prisma.location.findMany({
       where: {
@@ -26,7 +29,7 @@ export async function GET(request: NextRequest) {
       locations.map(async (loc) => {
         let isOnline = false;
 
-        if (loc.inflowId) {
+        if (loc.inflowId && isOnlineChecking) {
           try {
             // Re-use your workspace matching function logic
             const webhook = await findLocationWebhookByLocation(loc.inflowId);

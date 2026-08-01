@@ -113,9 +113,17 @@ export function StockAdjustmentFormOutdated({
 }: InventoryFormProps) {
   const router = useRouter();
   const isEditMode = !!initialData;
+<<<<<<< HEAD
 
   // Void Draft >>
   const [isPending, startTransition] = useTransition();
+=======
+  const isDraft = initialData?.status === "DRAFT";
+
+  // Void Draft >>
+  const [isPending, startTransition] = useTransition();
+  
+>>>>>>> 0bb88344244287618b9a29d21a23a5f88ff00f2d
 
   const [showVoidModal, setShowVoidModal] = useState(false);
   const [voidReason, setVoidReason] = useState("");
@@ -410,7 +418,11 @@ export function StockAdjustmentFormOutdated({
             <div className="flex items-center gap-2">
               {/* Cancel/Void Trigger */}
 
+<<<<<<< HEAD
               {isPending &&(
+=======
+              {isDraft &&(
+>>>>>>> 0bb88344244287618b9a29d21a23a5f88ff00f2d
                 <button
                     type="button"
                     disabled={isVoiding || isPending}

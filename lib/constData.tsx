@@ -289,11 +289,6 @@ export const data = {
           icon: SlidersHorizontal,
         },
         {
-          title: "Snapshots",
-          url: "/dashboard/inventory/snapshots",
-          icon: Camera,
-        },
-        {
           title: "Inventory Ledger",
           url: "/dashboard/inventory/ledger",
           icon: Briefcase,
@@ -343,40 +338,7 @@ export const data = {
         },
       ],
     },
-    // {
-    //   title: "Customer",
-    //   url: "/dashboard/customers",
-    //   icon: Contact2,
-    //   items: [
-    //     {
-    //       title: "All Customers",
-    //       url: "/dashboard/customers",
-    //       icon: Users,
-    //     },
-    //      {
-    //       title: "Create Customer",
-    //       url: "/dashboard/customers/create",
-    //       icon: UserPlus,
-    //     },
-    //   ],
-    // },
-    // {
-    //   title: "Vendors",
-    //   url: "/dashboard/vendors",
-    //   icon: Briefcase,
-    //   items: [
-    //     {
-    //       title: "All Vendors",
-    //       url: "/dashboard/vendors",
-    //       icon: Store,
-    //     },
-    //     {
-    //       title: "Create Vendor",
-    //       url: "/dashboard/vendors/create",
-    //       icon: PlusCircle,
-    //     },
-    //   ],
-    // },
+  
     {
       title: "Users",
       url: "/dashboard/users",
@@ -427,74 +389,74 @@ export const data = {
     /* -------------------------------------------------------------------------- */
     /* FINANCIAL SETUP                              */
     /* -------------------------------------------------------------------------- */
-    {
-      title: "Pricing Scheme",
-      url: "/dashboard/pricing-scheme",
-      icon: Banknote,
-      items: [
-        {
-          title: "All Pricing Scheme",
-          url: "/dashboard/pricing-scheme",
-          icon: Tag,
-        },
-        {
-          title: "Create Pricing Scheme",
-          url: "/dashboard/pricing-scheme/create",
-          icon: PlusCircle,
-        },
-      ],
-    },
-    {
-      title: "Taxing Scheme",
-      url: "/dashboard/taxing-scheme",
-      icon: Percent,
-      items: [
-        {
-          title: "All Taxing Scheme",
-          url: "/dashboard/taxing-scheme",
-          icon: Receipt,
-        },
-        {
-          title: "Create Taxing Scheme",
-          url: "/dashboard/taxing-scheme/create",
-          icon: PlusCircle,
-        },
-      ],
-    },
-    {
-      title: "Currency",
-      url: "/dashboard/currencies",
-      icon: DollarSign,
-      items: [
-        {
-          title: "All Currency",
-          url: "/dashboard/currencies",
-          icon: Coins,
-        },
-        {
-          title: "Create Currency",
-          url: "/dashboard/currencies/create",
-          icon: PlusCircle,
-        },
-      ],
-    },
-    {
-      title: "Payment Terms",
-      url: "/dashboard/payment-terms",
-      icon: CalendarDays,
-      items: [
-        {
-          title: "All Payment Terms",
-          url: "/dashboard/payment-terms",
-          icon: FileClock,
-        },
-        {
-          title: "Create Payment Terms",
-          url: "/dashboard/payment-terms/create",
-          icon: PlusCircle,
-        },
-      ],
-    },
+    // {
+    //   title: "Pricing Scheme",
+    //   url: "/dashboard/pricing-scheme",
+    //   icon: Banknote,
+    //   items: [
+    //     {
+    //       title: "All Pricing Scheme",
+    //       url: "/dashboard/pricing-scheme",
+    //       icon: Tag,
+    //     },
+    //     {
+    //       title: "Create Pricing Scheme",
+    //       url: "/dashboard/pricing-scheme/create",
+    //       icon: PlusCircle,
+    //     },
+    //   ],
+    // },
+    // {
+    //   title: "Taxing Scheme",
+    //   url: "/dashboard/taxing-scheme",
+    //   icon: Percent,
+    //   items: [
+    //     {
+    //       title: "All Taxing Scheme",
+    //       url: "/dashboard/taxing-scheme",
+    //       icon: Receipt,
+    //     },
+    //     {
+    //       title: "Create Taxing Scheme",
+    //       url: "/dashboard/taxing-scheme/create",
+    //       icon: PlusCircle,
+    //     },
+    //   ],
+    // },
+    // {
+    //   title: "Currency",
+    //   url: "/dashboard/currencies",
+    //   icon: DollarSign,
+    //   items: [
+    //     {
+    //       title: "All Currency",
+    //       url: "/dashboard/currencies",
+    //       icon: Coins,
+    //     },
+    //     {
+    //       title: "Create Currency",
+    //       url: "/dashboard/currencies/create",
+    //       icon: PlusCircle,
+    //     },
+    //   ],
+    // },
+    // {
+    //   title: "Payment Terms",
+    //   url: "/dashboard/payment-terms",
+    //   icon: CalendarDays,
+    //   items: [
+    //     {
+    //       title: "All Payment Terms",
+    //       url: "/dashboard/payment-terms",
+    //       icon: FileClock,
+    //     },
+    //     {
+    //       title: "Create Payment Terms",
+    //       url: "/dashboard/payment-terms/create",
+    //       icon: PlusCircle,
+    //     },
+    //   ],
+    // },
 
     {
       title: "Adjustment Reasons",
@@ -581,70 +543,83 @@ export const data = {
         },
       ],
     },
-    {
-      title: "ETL",
-      url: "/dashboard/etl",
-      icon: Database,
-      items: [
-        {
-          title: "Inflow Cloud",
-          url: "/dashboard/etl/inflow",
-          icon: CloudDownload,
-        },
-        {
-          title: "Logs",
-          url: "/dashboard/etl/logs",
-          icon: Terminal,
-        },
-      ],
-    },
-    {
-      title: "Settings",
-      url: "/dashboard/settings",
-      icon: Settings,
-      items: [
-        {
-          title: "Adjustment Reasons",
-          url: "/dashboard/settings/adjustment-reasons",
-          icon: Pencil,
-        },
-        {
-          title: "General",
-          url: "/dashboard/settings/general",
-          icon: ToggleLeft,
-        },
-        {
-          title: "Database",
-          url: "/dashboard/settings/database",
-          icon: HardDrive,
-        },
-        {
-          title: "Sync",
-          url: "/dashboard/settings/sync",
-          icon: RefreshCw,
-        },
-        {
-          title: "Payment",
-          url: "/dashboard/settings/payment",
-          icon: CreditCard,
-        },
-        {
-          title: "Tax Configuration",
-          url: "/dashboard/settings/tax",
-          icon: Landmark,
-        },
-        {
-          title: "Trash",
-          url: "/dashboard/settings/trash",
-          icon: Trash,
-        },
+    // {
+    //   title: "ETL",
+    //   url: "/dashboard/etl",
+    //   icon: Database,
+    //   items: [
+    //     {
+    //       title: "Inflow Cloud",
+    //       url: "/dashboard/etl/inflow",
+    //       icon: CloudDownload,
+    //     },
+    //     {
+    //       title: "Logs",
+    //       url: "/dashboard/etl/logs",
+    //       icon: Terminal,
+    //     },
+    //   ],
+    // },
+    // {
+    //   title: "Settings",
+    //   url: "/dashboard/settings",
+    //   icon: Settings,
+    //   items: [
+    //     {
+    //       title: "Adjustment Reasons",
+    //       url: "/dashboard/settings/adjustment-reasons",
+    //       icon: Pencil,
+    //     },
+    //     {
+    //       title: "General",
+    //       url: "/dashboard/settings/general",
+    //       icon: ToggleLeft,
+    //     },
+    //     {
+    //       title: "Database",
+    //       url: "/dashboard/settings/database",
+    //       icon: HardDrive,
+    //     },
+    //     {
+    //       title: "Sync",
+    //       url: "/dashboard/settings/sync",
+    //       icon: RefreshCw,
+    //     },
+    //     {
+    //       title: "Payment",
+    //       url: "/dashboard/settings/payment",
+    //       icon: CreditCard,
+    //     },
+    //     {
+    //       title: "Tax Configuration",
+    //       url: "/dashboard/settings/tax",
+    //       icon: Landmark,
+    //     },
+    //     {
+    //       title: "Trash",
+    //       url: "/dashboard/settings/trash",
+    //       icon: Trash,
+    //     },
         
-      ],
-    },
+    //   ],
+    // },
   ]
 }
 
-
+// Settings
+// ├── General
+// ├── Financial
+// │   ├── Pricing Schemes
+// │   ├── Taxing Schemes
+// │   ├── Currencies
+// │   └── Payment Terms
+// ├── Inventory
+// │   └── Adjustment Reasons
+// ├── Database
+// ├── Sync
+// ├── Payment
+// ├── Tax Configuration
+// └── Trash
 
 
 

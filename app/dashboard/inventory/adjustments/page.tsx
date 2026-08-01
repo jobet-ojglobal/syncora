@@ -122,16 +122,10 @@ export default function InventoryAdjustmentsListPage() {
         description="Log stock level modifications, reconcile discrepancies from damaged or lost goods, and review historical inventory movement audits."
         icon={SlidersHorizontal}
         className="border-b pb-5"
-      >
-        <Button asChild size="sm" className="gap-1.5 shrink-0 text-xs">
-          <Link href="/dashboard/inventory/adjustments/new">
-            <Plus className="w-4 h-4" /> New Adjustment
-          </Link>
-        </Button>
-      </PageHeader>
+      />
 
       {/* Toolbar Filters */}
-      <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center justify-between">
+      <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center">
         <div className="w-full sm:max-w-md relative">
           <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground/70" />
           <Input
