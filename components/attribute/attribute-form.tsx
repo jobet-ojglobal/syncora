@@ -128,7 +128,7 @@ export function AttributeForm({ initialData }: AttributeFormProps) {
                     </div>
 
                     {/* Optional hex code configuration block */}
-                    <div className="w-40">
+                    <div className="w-50">
                       <Input
                         placeholder="Hex code (e.g. #000000)"
                         className="text-xs h-9 font-mono"

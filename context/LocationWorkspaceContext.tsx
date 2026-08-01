@@ -28,12 +28,12 @@ const fetcher = (url: string) => fetch(url).then((res) => res.json());
 
 export const LocationWorkspaceProvider = ({ children }: { children: React.ReactNode }) => {
   // Toggle state to enable/disable automated background online status checking
-  const [isCheckingOnlineStatus, setIsCheckingOnlineStatus] = useState<boolean>(true);
+  const [isCheckingOnlineStatus, setIsCheckingOnlineStatus] = useState<boolean>(false);
 
   // 1. Fetch entire workspace statuses globally via SWR
   // Conditional refreshInterval dynamically disables polling when checking is toggled off
   const { data: locations, isLoading, mutate } = useSWR<LocationItem[]>(
-    "/api/admin/locations/webhooks",
+    "/api/admin/locations/webhooks?isOnlineCheckEnabled=" + isCheckingOnlineStatus,
     fetcher,
     {
       refreshInterval: isCheckingOnlineStatus ? 15000 : 0, // Sync status every 15s if enabled, pause if disabled
@@ -122,6 +122,9 @@ export const useLocationWorkspace = () => {
   }
   return context;
 };
+
+
+
 // "use client";
 
 // import React, { createContext, useContext, useState, useEffect, useMemo } from "react";

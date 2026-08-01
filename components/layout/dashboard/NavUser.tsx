@@ -23,7 +23,8 @@ import {
 // import { useUser } from "@/context/UserProvider"
 // import { signOut } from "@/lib/auth-client"
 import { ChevronsUpDownIcon, SparklesIcon, BadgeCheckIcon, CreditCardIcon, BellIcon, LogOutIcon, Settings } from "lucide-react"
-import { useRouter } from "next/navigation"
+import Link from "next/link"
+import { useRouter, } from "next/navigation"
 
 export function NavUser() {
   const { isMobile } = useSidebar()
@@ -106,20 +107,16 @@ export function NavUser() {
                 />
                 Notifications
               </DropdownMenuItem>
-              <DropdownMenuItem>
-                <Settings
-                />
-                Settings
+              <DropdownMenuItem asChild>
+                <Link href="/dashboard/settings/general" className="flex items-center gap-2 w-full">
+                  <Settings
+                  />
+                  Settings
+                </Link>
               </DropdownMenuItem>
             </DropdownMenuGroup>
             <DropdownMenuSeparator />
-            {/* <DropdownMenuItem
-              onClick={handleLogout}
-              >
-                <LogOutIcon
-              />
-              Log out
-            </DropdownMenuItem> */}
+           
           </DropdownMenuContent>
         </DropdownMenu>
       </SidebarMenuItem>

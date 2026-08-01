@@ -1,17 +1,18 @@
 // components/CurrencyForm.tsx
 "use client";
 
-import { useForm, useWatch } from "react-hook-form";
+import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { currencySchema, CurrencyInput } from "@/schemas/currency.schema";
-import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Switch } from "@/components/ui/switch";
 import { Coins, ArrowLeftRight, ArrowLeft, RefreshCw, Layers } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { Field, FieldGroup, FieldLabel, FieldLegend, FieldSet } from "@/components/ui/field";
 import { mutate } from "swr";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { FormInput } from "../shared/form-input";
+import { FormSelect } from "../shared/form-select";
+import { FormSwitch } from "../shared/form-switch";
 
 interface CurrencyFormProps {
   initialData?: any | null;
@@ -57,7 +58,7 @@ export function CurrencyForm({ initialData }: CurrencyFormProps) {
     },
   });
 
-  const { register, handleSubmit, watch, setValue, formState: { errors, isSubmitting } } = form;
+  const { register, control, handleSubmit, watch, setValue, formState: { errors, isSubmitting } } = form;
 
   // Watch parameters loop hooks to construct a real-time reactive preview box string
   const watchedSymbol = watch("symbol") || "";
@@ -114,240 +115,211 @@ export function CurrencyForm({ initialData }: CurrencyFormProps) {
   };
 
   const onSubmit = async (values: CurrencyInput) => {
-  try {
-    const response = await fetch("/api/admin/currencies", {
-      method: isEditMode ? "PATCH" : "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(values),
-    });
+    try {
+      const response = await fetch("/api/admin/currencies", {
+        method: isEditMode ? "PATCH" : "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(values),
+      });
 
-    if (!response.ok) {
-      const payload = await response.json();
-      throw new Error(payload.error || "Execution engine rejected monetary rule mutation mapping.");
+      if (!response.ok) {
+        const payload = await response.json();
+        throw new Error(payload.error || "Execution engine rejected monetary rule mutation mapping.");
+      }
+
+      toast.success(isEditMode ? "Currency properties updated" : "New trading currency initialized");
+      
+      // 1. Tell SWR globally to invalidate the cache for your filtered list API endpoint
+      // Using a function allows matching any pagination index or search string wildcard
+      mutate((key) => typeof key === "string" && key.startsWith("/api/admin/currencies/filtered"));
+
+      // 2. Safely redirect the user back
+      router.push("/dashboard/settings/financial/currencies");
+    } catch (err: any) {
+      toast.error("Write Aborted", { description: err.message });
     }
-
-    toast.success(isEditMode ? "Currency properties updated" : "New trading currency initialized");
-    
-    // 1. Tell SWR globally to invalidate the cache for your filtered list API endpoint
-    // Using a function allows matching any pagination index or search string wildcard
-    mutate((key) => typeof key === "string" && key.startsWith("/api/admin/currencies/filtered"));
-
-    // 2. Safely redirect the user back
-    router.push("/dashboard/currencies");
-  } catch (err: any) {
-    toast.error("Write Aborted", { description: err.message });
-  }
-};
-
-  // const onSubmit = async (values: CurrencyInput) => {
-  //   try {
-  //     const response = await fetch("/api/admin/currencies", {
-  //       method: isEditMode ? "PATCH" : "POST",
-  //       headers: { "Content-Type": "application/json" },
-  //       body: JSON.stringify(values),
-  //     });
-
-  //     if (!response.ok) {
-  //       const payload = await response.json();
-  //       throw new Error(payload.error || "Execution engine rejected monetary rule mutation mapping.");
-  //     }
-
-  //     toast.success(isEditMode ? "Currency properties updated" : "New trading currency initialized");
-  //     router.push("/dashboard/currencies");
-  //     router.refresh();
-
-
-  //   } catch (err: any) {
-  //     toast.error("Write Aborted", { description: err.message });
-  //   }
-  // };
+  };
 
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className="w-full max-w-5xl mx-auto p-6 bg-card border rounded-xl shadow-xs space-y-6 text-xs">
-      <FieldGroup className="gap-6">
-        
-        {/* Real-time Ledger Formatting Engine Preview Widget Banner */}
-        <div className="bg-slate-900 rounded-xl p-4 text-white font-mono flex flex-col sm:flex-row items-center justify-between gap-4 shadow-inner">
-          <div>
-            <span className="text-[10px] text-slate-400 uppercase tracking-wider block font-bold">System Ledger Print Sample Preview</span>
-            <div className="text-lg font-bold tracking-tight text-primary mt-1 flex gap-4">
-              <div>Positive: <span className="text-white">{generateFormatSample(false)}</span></div>
-              <div className="text-rose-400">Negative: <span>{generateFormatSample(true)}</span></div>
-            </div>
-          </div>
-          <div className="text-[10px] text-right text-slate-400 bg-slate-800 px-3 py-1.5 rounded-md border border-slate-700">
-            Base Matrix Tracker: <span className="text-emerald-400 font-bold">1.00000000 {watch("isoCode") || "XYZ"}</span>
+    <form onSubmit={handleSubmit(onSubmit)} className="w-full text-xs font-medium space-y-6 ">
+
+      <div className="bg-slate-900 rounded-xl p-4 text-white font-mono flex flex-col sm:flex-row items-center justify-between gap-4 shadow-inner">
+        <div>
+          <span className="text-[10px] text-slate-400 uppercase tracking-wider block font-bold">System Ledger Print Sample Preview</span>
+          <div className="text-lg font-bold tracking-tight text-blue-300 mt-1 flex gap-4">
+            <div>Positive: <span className="text-white">{generateFormatSample(false)}</span></div>
+            <div className="text-rose-400">Negative: <span>{generateFormatSample(true)}</span></div>
           </div>
         </div>
+        <div className="text-[10px] text-right text-slate-400 bg-slate-800 px-3 py-1.5 rounded-md border border-slate-700">
+          Base Matrix Tracker: <span className="text-emerald-400 font-bold">1.00000000 {watch("isoCode") || "XYZ"}</span>
+        </div>
+      </div>
+           
+      <Card className="shadow-xs">
+        <CardHeader className="border-b pb-3 flex flex-row items-center justify-between space-y-0">
+          <div className="space-y-1">
+            <CardTitle className="text-sm font-semibold flex items-center gap-1.5">
+              <Coins className="w-4 h-4 text-primary" /> 
+              Forex Currency Definitions Card
+            </CardTitle>
+            <CardDescription className="text-[10px] text-muted-foreground/80">
+              The currency configuration defines how the system will display and process monetary values. Ensure that the ISO code is correct for accurate exchange rate tracking.
+            </CardDescription>
+          </div>
+        </CardHeader>
+        <CardContent className="grid grid-cols-1 md:grid-cols-3 gap-4" >
+          <FormInput
+            name="isoCode"
+            control={control}
+            label="Unique 3-Letter ISO Code"
+            placeholder="e.g., EUR, JPY, GBP"
+            classNameLabel="text-muted-foreground font-semibold"
+            required
+          />
+          <FormInput
+            name="name"
+            control={control}
+            label="Currency System Display Title"
+            placeholder="e.g., Euro Member Token, British Pound Sterling"
+            classNameLabel="text-muted-foreground font-semibold"
+            required
+          />
+          <FormSelect
+            name="symbol"
+            control={control}
+            label="Trading Settlement Currency Anchor"
+            placeholder="-- Choose Currency Matrix Hub --"
+            options={POPULAR_CURRENCIES.map((cur) => ({
+              id: cur.code,
+              name: `${cur.symbol} - ${cur.code} (${cur.name})`,
+            }))}
+            classNameLabel="text-muted-foreground font-semibold"
+          />
+         
 
-        {/* SECTION 1: Core Monetary Definition Properties Fields Card */}
-        <FieldSet className="grid grid-cols-1 md:grid-cols-12 gap-4">
-          <FieldLegend className="col-span-1 md:col-span-12 flex items-center gap-2 border-b pb-2 text-foreground font-semibold text-sm w-full">
-            <Coins className="w-4 h-4 text-primary" /> Forex Currency Definitions Card
-          </FieldLegend>
+        </CardContent>
+      </Card>
 
-          <Field className="md:col-span-3">
-            <FieldLabel>Unique 3-Letter ISO Code *</FieldLabel>
-            <Input placeholder="e.g., EUR, JPY, GBP" {...register("isoCode")} disabled={isEditMode} className="font-mono font-bold uppercase tracking-widest text-center" />
-            {errors.isoCode && <span className="text-xs text-destructive">{errors.isoCode.message}</span>}
-          </Field>
-
-          <Field className="md:col-span-6">
-            <FieldLabel>Currency System Display Title *</FieldLabel>
-            <Input placeholder="e.g., Euro Member Token, British Pound Sterling" {...register("name")} />
-            {errors.name && <span className="text-xs text-destructive">{errors.name.message}</span>}
-          </Field>
-
-          {/* SECTION 1: Core Monetary Definition Properties Fields Card */}
-          <Field className="md:col-span-3">
-            <FieldLabel>Glyph Symbol *</FieldLabel>
-            <div className="flex gap-1.5">
-              <select
-                className="rounded-md border border-input bg-background px-2 h-9 text-xs focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-ring"
-                onChange={(e) => {
-                  if (e.target.value) {
-                    setValue("symbol", e.target.value, { shouldValidate: true });
-                  }
-                }}
-                defaultValue={watch("symbol") || "$"}
-              >
-                <option value="">Custom...</option>
-                {POPULAR_CURRENCIES.map((c) => (
-                  <option key={c.code} value={c.symbol}>
-                    {c.symbol} ({c.code})
-                  </option>
-                ))}
-              </select>
-              
-              <Input 
-                placeholder="e.g., $, €, ₱" 
-                {...register("symbol")} 
-                className="text-center font-bold h-9 flex-1" 
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Left */}
+        <div className=" space-y-6">
+          <Card className="shadow-xs">
+            <CardHeader className="border-b pb-3 flex flex-row items-center justify-between space-y-0">
+              <div className="space-y-1">
+                <CardTitle className="text-sm font-semibold flex items-center gap-1.5">
+                  <Layers className="w-4 h-4 text-primary" />
+                  Forex Currency Formatting & Display Rules
+                </CardTitle>
+                <CardDescription className="text-[10px] text-muted-foreground/80">
+                  These settings control how the currency is displayed in the system, including decimal precision, separators, and negative number formatting.
+                </CardDescription>
+              </div>
+            </CardHeader>
+            <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4" >
+              <FormInput
+                name="decimalSeparator"
+                control={control}
+                label="Decimal Separator Token"
+                placeholder="e.g., ."
+                classNameLabel="text-muted-foreground font-semibold"
+                required
               />
-            </div>
-            {errors.symbol && <span className="text-xs text-destructive block mt-1">{errors.symbol.message}</span>}
-          </Field>
-        </FieldSet>
-
-        {/* SECTION 2: Localization Layout Formatting Strategy Configuration Parameters */}
-        <FieldSet className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 mt-4">
-          <FieldLegend className="col-span-1 sm:col-span-2 md:col-span-4 border-b pb-2 mb-4 w-full flex items-center gap-2 font-semibold text-foreground text-sm">
-            <Layers className="w-4 h-4 text-muted-foreground" /> Localized Accounting Typographic Settings
-          </FieldLegend>
-
-          <Field >
-            <FieldLabel>Decimal Separator Token</FieldLabel>
-            <Input {...register("decimalSeparator")} className="font-mono text-center font-bold" maxLength={1} />
-          </Field>
-
-          <Field>
-            <FieldLabel>Thousands Separator Token</FieldLabel>
-            <Input {...register("thousandsSeparator")} className="font-mono text-center font-bold" maxLength={1} />
-          </Field>
-
-          <Field>
-            <FieldLabel>Decimal Precision Capping</FieldLabel>
-            <Input type="number" {...register("decimalPlaces", { valueAsNumber: true })} className="font-mono text-center" />
-          </Field>
-
-          <Field>
-            <FieldLabel>Negative Value Accounting Format</FieldLabel>
-            <select 
-              {...register("negativeType")} 
-              className="w-full rounded-md border border-input bg-background px-3 h-9 text-xs focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-ring"
-            >
-              <option value="Leading">Leading Minus (-$100)</option>
-              <option value="Trailing">Trailing Minus ($100-)</option>
-              <option value="Parentheses">Financial Parentheses (($100))</option>
-            </select>
-          </Field>
-
-          <Field className="md:col-span-4 flex flex-col justify-end">
-            <div className="flex items-center justify-between min-h-9 gap-4 rounded-lg border bg-background px-3 py-1.5 shadow-2xs">
-              <div className="space-y-0.5">
-                <FieldLabel className="font-semibold text-foreground block">
-                  Render Symbol Before Value Numbers Array
-                </FieldLabel>
-                <span className="text-[10px] text-muted-foreground">
-                  True outputs prefix ($100), False structures values with suffixes (100 $).
-                </span>
-              </div>
-              <Switch 
-                checked={watch("isSymbolFirst")} 
-                onCheckedChange={(val) => setValue("isSymbolFirst", val)}
-                className="scale-90 shrink-0" 
+              <FormInput
+                name="thousandsSeparator"
+                control={control}
+                label="Thousands Separator Token"
+                placeholder="e.g., ,"
+                classNameLabel="text-muted-foreground font-semibold"
+                required
               />
-            </div>
-          </Field>
-        </FieldSet>
+              <FormInput
+                name="decimalPlaces"
+                control={control}
+                label="Decimal Precision Capping"
+                placeholder="e.g., 2"
+                type="number"
+                classNameLabel="text-muted-foreground font-semibold"
+                required
+              />
+              <FormSelect
+                name="negativeType"
+                control={control}
+                label="Negative Number Display Style"
+                placeholder="-- Choose Negative Display Style --"
+                options={[
+                  { id: "Leading", name: "Leading Negative Sign (-123.45)" },
+                  { id: "Trailing", name: "Trailing Negative Sign (123.45-)" },
+                  { id: "Parentheses", name: "Parentheses Style ((123.45))" },
+                ]}
+                emptyMessage="No negative display styles available"
+                classNameLabel="text-muted-foreground font-semibold"
+              />
 
-        {/* SECTION 3: Live Conversion Multipliers Valuation Routing Engine Block */}
-        <FieldSet className="mt-4 space-y-4 ">
-          <FieldLegend className="flex items-center gap-2 font-semibold text-foreground text-sm border-b  pb-2 w-full ">
-            <ArrowLeftRight className="w-4 h-4 text-muted-foreground" /> Base System Exchange Alignment Configuration Vector
-          </FieldLegend>
-
-          <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-end bg-muted/20 border p-4 rounded-xl mt-2">
-            <Field className="md:col-span-5">
-              <FieldLabel className="font-bold text-foreground">Exchange Rate Coeffecient Factor Vector *</FieldLabel>
-              <div className="relative">
-                <Input 
-                  type="number" 
-                  step="0.00000001" 
-                  placeholder="1.00000000" 
-                  {...register("exchangeRate", { valueAsNumber: true })} 
-                  className="font-mono text-xs font-semibold pl-3 pr-20"
-                />
-                <span className="absolute right-3 top-2.5 text-[10px] font-bold text-muted-foreground uppercase font-mono">
-                  = 1 Base Units
-                </span>
+            </CardContent>
+          </Card>
+        </div>
+        {/* Right */}
+        <div className=" space-y-6">
+          <Card className="shadow-xs">
+            <CardHeader className="border-b pb-3 flex flex-row items-center justify-between space-y-0">
+              <div className="space-y-1">
+                <CardTitle className="text-sm font-semibold flex items-center gap-1.5">
+                  <ArrowLeftRight className="w-4 h-4 text-primary" />
+                  Forex Currency Exchange Rate & Market Feed
+                </CardTitle>
+                <CardDescription className="text-[10px] text-muted-foreground/80">
+                  The exchange rate is relative to the USD base currency. You can manually set the rate or fetch the latest market data.
+                </CardDescription>
               </div>
-              {errors.exchangeRate && <span className="text-xs text-destructive block mt-1">{errors.exchangeRate.message}</span>}
-            </Field>
-
-            <Field className="md:col-span-4 flex flex-col justify-end">
-              <div className="flex items-center justify-between min-h-9 gap-4 rounded-lg border bg-background px-3 py-1.5 shadow-2xs">
-                <div className="space-y-0.5">
-                  <FieldLabel className="font-medium text-[11px] block leading-normal text-foreground">
-                    Manual Override Lock
-                  </FieldLabel>
-                  <span className="text-[9px] text-muted-foreground block leading-tight">
-                    Isolate row against public tickers updates APIs overrides.
-                  </span>
-                </div>
-                <Switch 
-                  checked={watch("isManual")} 
-                  onCheckedChange={(val) => setValue("isManual", val, { shouldValidate: true })} 
-                  className="scale-90 shrink-0" 
-                />
-              </div>
-            </Field>
-
-            <div className="md:col-span-3 flex flex-col  justify-center">
-              <Button 
-                type="button" 
-                variant="outline" 
-                size="sm" 
-                onClick={syncLatestMarketRates} 
-                className="w-full text-xs h-9 gap-1.5 font-medium"
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={syncLatestMarketRates}
               >
-                <RefreshCw className="w-3.5 h-3.5" /> Call Open Market API
+                <RefreshCw className="w-4 h-4 mr-1" />
+                Fetch Market Rate
               </Button>
-            </div>
-          </div>
-        </FieldSet>
-
-        {/* Form control actions container */}
-        <div className="flex items-center justify-between border-t pt-4">
-          <Button type="button" variant="ghost" size="sm" onClick={() => router.back()} className="text-xs gap-1.5">
-            <ArrowLeft className="w-4 h-4" /> Cancel
-          </Button>
-          <Button type="submit" disabled={isSubmitting} size="sm" className="min-w-[150px] text-xs">
-            {isSubmitting ? "Locking financial metrics..." : isEditMode ? "Save Valuation Rules" : "Deploy Currency Profile"}
-          </Button>
+            </CardHeader>
+            <CardContent className="grid grid-cols-1  gap-4" >
+              <FormInput
+                name="exchangeRate"
+                control={control}
+                label="Exchange Rate (relative to USD)"
+                placeholder="e.g., 1.00000000"
+                type="number"
+                step="0.00000001"
+                classNameLabel="text-muted-foreground font-semibold"
+                required
+              />
+              <FormSwitch
+                name="isManual"
+                control={control}
+                variant="card"
+                label="Manual Rate Override"
+                description="If enabled, the exchange rate will not be auto-updated from market feeds."
+                className="p-2.5"
+              />
+            </CardContent>
+          </Card>
         </div>
+      </div>
 
-      </FieldGroup>
+      <div className="flex items-center justify-end gap-2">
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={() => router.back()}
+        >
+          <ArrowLeft className="w-4 h-4 mr-1" />
+          Cancel
+        </Button>
+        <Button type="submit" size="sm" disabled={isSubmitting}>
+          {isSubmitting ? "Processing..." : isEditMode ? "Update Scheme" : "Create Scheme"}
+        </Button>
+      </div>
     </form>
   );
 }

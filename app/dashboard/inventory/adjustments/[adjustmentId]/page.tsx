@@ -385,7 +385,7 @@ export default function InventoryAdjustmentDetailsPage({
                             </span>
                             <div className="flex items-center gap-2">
                               <span className="font-mono text-[10px] text-muted-foreground flex items-center gap-1">
-                                <Barcode className="w-3 h-3" /> {line.product?.sku || "N/A"}
+                                 SKU: {line.product?.sku || "N/A"}
                               </span>
                               {line.product?.trackSerials && (
                                 <Badge variant="outline" className="text-[9px] px-1 py-0 h-4 bg-primary/5 border-primary/20 text-primary">

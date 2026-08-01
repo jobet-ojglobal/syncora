@@ -196,7 +196,11 @@ const InflowWorkspace = () => {
                 <SyncButtonOptions source="inventory" title="Inventory Levels" />
                 <SyncButtonOptions source="product_cost_adjustments" title="Cost Adjustments" />
                 <SyncButtonOptions source="product_boms" title="Bills of Materials" />
-                {/* <SyncButtonOptions source="product_images" title="Product Images" /> */}
+                <SyncButtonOptions source="customers" title="Customers" />
+                <SyncButtonOptions source="vendors" title="Vendors" />
+                <SyncButtonOptions source="sales_orders" title="Sales Orders" />
+                <SyncButtonOptions source="purchase_orders" title="Purchase Orders" />
+                        {/* <SyncButtonOptions source="product_images" title="Product Images" /> */}
                 {/* <SyncButtonOptions source="product_attachments" title="Product Attachments" />
                 <SyncButtonOptions source="product_barcodes" title="Product Barcodes" />
                 <SyncButtonOptions source="product_taxes" title="Product Taxes" />
@@ -205,10 +209,6 @@ const InflowWorkspace = () => {
                 <SyncButtonOptions source="product_prices" title="Product Prices" />
                 
                  */}
-                <SyncButtonOptions source="customers" title="Customers" />
-                <SyncButtonOptions source="vendors" title="Vendors" />
-                <SyncButtonOptions source="sales_orders" title="Sales Orders" />
-                <SyncButtonOptions source="purchase_orders" title="Purchase Orders" />
               </CardContent>
             </Card>
 
