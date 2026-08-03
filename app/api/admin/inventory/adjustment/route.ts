@@ -70,7 +70,7 @@ export async function POST(req: Request) {
       status,
       lines,
     } = validatedData;
-
+    
     // TODO: Replace with dynamic user context from session / auth header
     const performedById = "cc920c31-bcb2-4264-9946-4b7693c9c7e0";
 
@@ -377,16 +377,70 @@ export async function POST(req: Request) {
           // BIN LINKING & ADJUSTMENT LINE CREATION
           // ==============================================================
 
+          // if (!trackSerials) {
+          //   // NON-SERIALIZED PATH:
+          //   // Link directly to inventoryBinId on each InventoryAdjustmentLine.
+          //   if (bins.length > 0) {
+          //     for (const binData of bins) {
+          //       if (!binData.sublocationId) continue;
+          //       const committedBinId = sublocationToBinMap.get(binData.sublocationId) || null;
+          //       const targetBinQty = Number(binData.quantity) || 0;
+
+          //       // Find existing bin balance prior to update to compute delta
+          //       const existingBin = await tx.inventoryBin.findUnique({
+          //         where: {
+          //           inventoryId_sublocationId: {
+          //             inventoryId: inventory.id,
+          //             sublocationId: binData.sublocationId,
+          //           },
+          //         },
+          //       });
+                
+          //       const prevBinQty = existingBin ? Number(existingBin.quantity) : 0;
+
+          //       await tx.inventoryAdjustmentLine.create({
+          //         data: {
+          //           adjustmentId: adjustment.id,
+          //           inventoryId: inventory.id,
+          //           productId,
+          //           locationId,
+          //           inventoryBinId: committedBinId, // Directly populated
+          //           quantityBefore: prevBinQty,
+          //           quantityAdjusted: targetBinQty - prevBinQty,
+          //           quantityAfter: targetBinQty,
+          //           quantityReserved: line.quantityReserved,
+          //           reason: (line.reason as InventoryAdjustmentLineReason) || null,
+          //         },
+          //       });
+          //     }
+          //   } else {
+          //     // Non-bin tracked line
+          //     await tx.inventoryAdjustmentLine.create({
+          //       data: {
+          //         adjustmentId: adjustment.id,
+          //         inventoryId: inventory.id,
+          //         productId,
+          //         locationId,
+          //         inventoryBinId: null,
+          //         quantityBefore: currentOnHand,
+          //         quantityAdjusted: netOnHandChange,
+          //         quantityAfter: targetOnHand,
+          //         quantityReserved: line.quantityReserved,
+          //         reason: (line.reason as InventoryAdjustmentLineReason) || null,
+          //       },
+          //     });
+          //   }
+          // } 
           if (!trackSerials) {
             // NON-SERIALIZED PATH:
-            // Link directly to inventoryBinId on each InventoryAdjustmentLine.
             if (bins.length > 0) {
               for (const binData of bins) {
                 if (!binData.sublocationId) continue;
-                const committedBinId = sublocationToBinMap.get(binData.sublocationId) || null;
-                const targetBinQty = Number(binData.quantity) || 0;
 
-                // Find existing bin balance prior to update to compute delta
+                const targetBinQty = Number(binData.quantity) || 0;
+                const committedBinId = sublocationToBinMap.get(binData.sublocationId) || null;
+
+                // 1. Fetch the bin state BEFORE upserting
                 const existingBin = await tx.inventoryBin.findUnique({
                   where: {
                     inventoryId_sublocationId: {
@@ -395,18 +449,57 @@ export async function POST(req: Request) {
                     },
                   },
                 });
-                
-                const prevBinQty = existingBin ? Number(existingBin.quantity) : 0;
 
+                const prevBinQty = existingBin ? Number(existingBin.quantity) : 0;
+                const quantityDifference = targetBinQty - prevBinQty;
+
+                // 2. Upsert the Bin
+                if (existingBin) {
+                  await tx.inventoryBin.update({
+                    where: { id: existingBin.id },
+                    data: { quantity: targetBinQty },
+                  });
+                } else {
+                  const newBin = await tx.inventoryBin.create({
+                    data: {
+                      inventoryId: inventory.id,
+                      sublocationId: binData.sublocationId,
+                      quantity: targetBinQty,
+                    },
+                  });
+                  // Update map for created bin ID
+                  sublocationToBinMap.set(binData.sublocationId, newBin.id);
+                }
+
+                // 3. Stage Bin Ledger Entry
+                if (quantityDifference !== 0) {
+                  ledgerEntriesToCreate.push({
+                    productId,
+                    locationId,
+                    sublocationId: binData.sublocationId,
+                    transactionType: "ADJUSTMENT",
+                    referenceType: "ADJUSTMENT",
+                    referenceId: adjustment.id,
+                    performedById,
+                    quantityChange: quantityDifference,
+                    quantityBefore: prevBinQty,
+                    quantityAfter: targetBinQty,
+                    remarks:
+                      remarks ||
+                      `Stock Adjustment posted (${adjustment.adjustmentNumber})`,
+                  });
+                }
+
+                // 4. Create Line Item with accurate quantityBefore (0)
                 await tx.inventoryAdjustmentLine.create({
                   data: {
                     adjustmentId: adjustment.id,
                     inventoryId: inventory.id,
                     productId,
                     locationId,
-                    inventoryBinId: committedBinId, // Directly populated
-                    quantityBefore: prevBinQty,
-                    quantityAdjusted: targetBinQty - prevBinQty,
+                    inventoryBinId: committedBinId || sublocationToBinMap.get(binData.sublocationId),
+                    quantityBefore: prevBinQty, // Correctly records 0 for new bins!
+                    quantityAdjusted: quantityDifference,
                     quantityAfter: targetBinQty,
                     quantityReserved: line.quantityReserved,
                     reason: (line.reason as InventoryAdjustmentLineReason) || null,
@@ -430,7 +523,9 @@ export async function POST(req: Request) {
                 },
               });
             }
-          } else {
+          }
+          else {
+          
             // SERIALIZED PATH:
             // Single line representing the primary serial transaction
             const createdLine = await tx.inventoryAdjustmentLine.create({
@@ -677,6 +772,83 @@ export async function PATCH(req: Request) {
     );
   }
 }
+
+// if (!trackSerials) {
+//             // NON-SERIALIZED PATH:
+//             // Link directly to inventoryBinId on each InventoryAdjustmentLine.
+//             if (bins.length > 0) {
+//               for (const binData of bins) {
+//                 if (!binData.sublocationId) continue;
+                
+//                 const committedBinId = sublocationToBinMap.get(binData.sublocationId) || null;
+//                 const targetBinQty = Number(binData.quantity) || 0;
+
+//                 // 1. Query existing bin balance BEFORE performing upsert/update
+//                 const existingBin = await tx.inventoryBin.findUnique({
+//                   where: {
+//                     inventoryId_sublocationId: {
+//                       inventoryId: inventory.id,
+//                       sublocationId: binData.sublocationId,
+//                     },
+//                   },
+//                 });
+
+//                 const prevBinQty = existingBin ? Number(existingBin.quantity) : 0;
+//                 const quantityAdjusted = targetBinQty - prevBinQty;
+
+//                 // 2. Upsert/Update the Bin quantity
+//                 if (existingBin) {
+//                   await tx.inventoryBin.update({
+//                     where: { id: existingBin.id },
+//                     data: { quantity: targetBinQty },
+//                   });
+//                 } else {
+//                   await tx.inventoryBin.create({
+//                     data: {
+//                       inventoryId: inventory.id,
+//                       sublocationId: binData.sublocationId,
+//                       quantity: targetBinQty,
+//                     },
+//                   });
+//                 }
+
+//                 // 3. Create the adjustment line with accurate before/adjusted values
+//                 await tx.inventoryAdjustmentLine.create({
+//                   data: {
+//                     adjustmentId: adjustment.id,
+//                     inventoryId: inventory.id,
+//                     productId,
+//                     locationId,
+//                     inventoryBinId: committedBinId,
+//                     quantityBefore: prevBinQty, // Correctly records 0 for initial stock
+//                     quantityAdjusted: quantityAdjusted, // Correctly records targetBinQty - 0
+//                     // quantityBefore: currentOnHand,
+//                     // quantityAdjusted: netOnHandChange,
+//                     quantityAfter: targetBinQty,
+//                     quantityReserved: line.quantityReserved,
+//                     reason: (line.reason as InventoryAdjustmentLineReason) || null,
+//                   },
+//                 });
+//               }
+//             } else {
+//               // Non-bin tracked line
+//               await tx.inventoryAdjustmentLine.create({
+//                 data: {
+//                   adjustmentId: adjustment.id,
+//                   inventoryId: inventory.id,
+//                   productId,
+//                   locationId,
+//                   inventoryBinId: null,
+//                   quantityBefore: currentOnHand,
+//                   quantityAdjusted: netOnHandChange,
+//                   quantityAfter: targetOnHand,
+//                   quantityReserved: line.quantityReserved,
+//                   reason: (line.reason as InventoryAdjustmentLineReason) || null,
+//                 },
+//               });
+//             }
+            
+//           } else {
 
 
         // ----------------------------------------------------------------

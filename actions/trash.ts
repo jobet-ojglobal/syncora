@@ -21,6 +21,7 @@ export interface TrashItem {
     | "Product Group"
     | "Location"
     | "Team Member"
+    | "Adjustment Reason"
   deletedAt: Date;
 }
 
@@ -39,7 +40,8 @@ export async function getGlobalTrash(): Promise<TrashItem[]> {
     vendors,
     productGroups,
     locations,
-    teamMembers
+    teamMembers,
+    adjusmentReasons
   ] = await Promise.all([
     prisma.user.findMany({ where: { deletedAt: { not: null } } }),
     prisma.attribute.findMany({ where: { deletedAt: { not: null } } }),
@@ -61,6 +63,7 @@ export async function getGlobalTrash(): Promise<TrashItem[]> {
     prisma.productGroup.findMany({ where: { deletedAt: { not: null } } }),
     prisma.location.findMany({ where: { deletedAt: { not: null } } }),
     prisma.teamMember.findMany({ where: { deletedAt: { not: null } } }),
+    prisma.adjustmentReason.findMany({ where: { deletedAt: { not: null } } }),
   ]);
 
   const trash: TrashItem[] = [
@@ -164,6 +167,13 @@ export async function getGlobalTrash(): Promise<TrashItem[]> {
       id: l.id,
       title: l.name,
       modelType: "Team Member" as const,
+      deletedAt: l.deletedAt!,
+    })),
+
+    ...adjusmentReasons.map((l) => ({
+      id: l.id,
+      title: l.name,
+      modelType: "Adjustment Reason" as const,
       deletedAt: l.deletedAt!,
     })),
   ];

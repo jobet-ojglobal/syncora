@@ -3,7 +3,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Plus, Search, Edit3, CheckCircle2, XCircle, Percent } from "lucide-react";
+import { Plus, Search, Edit3, CheckCircle2, XCircle, Percent, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -63,10 +63,21 @@ export default function TaxingSchemesListPage() {
 
   // 3. SWR list key hook binds directly onto debounced search value variable
   // Adjusted endpoint pattern to support API-driven filtering and pagination
-  const { data: payload, error, isLoading, mutate } = useSWR(
-    `/api/admin/taxing-scheme/filtered?search=${debouncedSearch}&page=${pageIndex}&limit=${PAGE_SIZE}`,
+  const {
+    data: payload,
+    error,
+    isLoading,
+    isValidating,
+    mutate,
+  } = useSWR(
+    `/api/admin/taxing-scheme/filtered?search=${encodeURIComponent(
+      debouncedSearch
+    )}&page=${pageIndex}&limit=${PAGE_SIZE}`,
     fetcher,
-    { keepPreviousData: true }
+    {
+      keepPreviousData: true,
+      revalidateOnFocus: false,
+    }
   );
 
   const schemes: SchemeRow[] = payload?.data || [];
@@ -78,7 +89,6 @@ export default function TaxingSchemesListPage() {
     setSearchQuery(value);
     setPageIndex(0); // Reset page indices to 0 on searching to avoid index overflow gaps
   };
-
 
   if (error) {
     return (
@@ -106,11 +116,17 @@ export default function TaxingSchemesListPage() {
       </PageHeader>
 
       {/* Utilities bar */}
-      <div className="w-full sm:max-w-md">
-        <SearchInput 
+      <div className="w-full sm:max-w-md flex items-center gap-2">
+        <SearchInput
           placeholder="Filter schemes by system name, ID token..."
-          searchQuery={searchQuery} 
-          setSearchQuery={handleSearchChange} />
+          searchQuery={searchQuery}
+          setSearchQuery={handleSearchChange}
+        />
+
+        {/* Visual indicator when background validation is fetching for active search */}
+        {isValidating && !isLoading && (
+          <Loader2 className="w-4 h-4 animate-spin text-muted-foreground shrink-0" />
+        )}
       </div>
 
       {/* Main Data Layout */}

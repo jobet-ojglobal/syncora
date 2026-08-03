@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Plus, Search, Coins, Edit3, Globe, RefreshCw, Layers } from "lucide-react";
+import { Plus, Search, Coins, Edit3, Globe, RefreshCw, Layers, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -38,48 +38,59 @@ const fetcher = (url: string) => fetch(url).then((res) => {
 
 export default function CurrenciesListPage() {
   const [searchQuery, setSearchQuery] = useState("");
-  const [updatingCode, setUpdatingCode] = useState<string | null>(null);
   const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [updatingCode, setUpdatingCode] = useState<string | null>(null);
 
   // Server Pagination State Matrix
   const [pageIndex, setPageIndex] = useState(0);
   const PAGE_SIZE = 10;
 
-  // 2. Automatically sync typing input to debounced state with a 300ms window delay
+  // Single-source debouncer for search input
   useEffect(() => {
     const timer = setTimeout(() => {
       setDebouncedSearch(searchQuery);
-      setPageIndex(0); // Safely reset page baseline whenever search boundaries finish mutating
+      setPageIndex(0); // Safely reset page baseline when search updates
     }, 300);
 
-    return () => clearTimeout(timer); // Clean up timeout frame if the user types again before 300ms
+    return () => clearTimeout(timer); // Clean up timeout frame if user types again within 300ms
   }, [searchQuery]);
 
-  // 1. SWR reads search and page parameters dynamically.
-  // Whenever pageIndex or searchQuery shifts, SWR fires an isolated fetch auto-magically.
-  const { data: payload, error, isLoading, mutate } = useSWR(
-    `/api/admin/currencies/filtered?search=${debouncedSearch}&page=${pageIndex}&limit=${PAGE_SIZE}`,
+  // SWR dynamically fetches data based on debouncedSearch and pageIndex
+  const {
+    data: payload,
+    error,
+    isLoading,
+    isValidating,
+    mutate,
+  } = useSWR(
+    `/api/admin/currencies/filtered?search=${encodeURIComponent(
+      debouncedSearch
+    )}&page=${pageIndex}&limit=${PAGE_SIZE}`,
     fetcher,
-    { keepPreviousData: true } // Keeps the table populated with old records during search transitions
+    {
+      keepPreviousData: true,
+      revalidateOnFocus: false,
+    }
   );
 
-  // Safely extract payload records map structures matching your layout fields
+  // Extract payload records cleanly
   const currencies: CurrencyRow[] = payload?.data || [];
   const totalRecords = payload?.totalRecords || 0;
   const pageCount = payload?.pageCount || 0;
 
-  // Handle Search input adjustments
+  // Clean Search Handler (Delegates page resetting entirely to the debounced effect)
   const handleSearchChange = (value: string) => {
     setSearchQuery(value);
-    setPageIndex(0); // Reset page indices to 0 on searching to avoid index overflow gaps
   };
 
   const renderTypographicRuleSample = (row: CurrencyRow) => {
     let rawDigits = `1${row.thousandsSeparator}234${row.decimalSeparator}`;
     for (let i = 0; i < row.decimalPlaces; i++) rawDigits += "5";
     if (row.decimalPlaces === 0) rawDigits = `1${row.thousandsSeparator}235`;
-    
-    return row.isSymbolFirst ? `${row.symbol}${rawDigits}` : `${rawDigits}${row.symbol}`;
+
+    return row.isSymbolFirst
+      ? `${row.symbol}${rawDigits}`
+      : `${rawDigits}${row.symbol}`;
   };
 
   const handleRefreshMarketTicker = async (isoCode: string, inflowId: string) => {
@@ -87,27 +98,35 @@ export default function CurrenciesListPage() {
       setUpdatingCode(isoCode);
       const feedRes = await fetch(`https://open.er-api.com/v6/latest/USD`);
       if (!feedRes.ok) throw new Error("Public telemetry connection dropped out.");
-      
+
       const marketData = await feedRes.json();
       const freshRate = marketData.rates[isoCode.toUpperCase()];
-      if (!freshRate) throw new Error(`Currency indicator "${isoCode}" not present within current market vectors.`);
+      if (!freshRate)
+        throw new Error(
+          `Currency indicator "${isoCode}" not present within current market vectors.`
+        );
 
       const parsedRateCoeff = Number((1 / freshRate).toFixed(8));
 
       const response = await fetch("/api/admin/currencies/rate-update", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ inflowId, exchangeRate: parsedRateCoeff })
+        body: JSON.stringify({ inflowId, exchangeRate: parsedRateCoeff }),
       });
 
       if (!response.ok) throw new Error("Internal pipeline write verification failed.");
 
-      toast.success(`${isoCode} rate re-calibrated`, { description: `Value mapped to: ${parsedRateCoeff.toFixed(8)} against USD.` });
-      
-      // 2. Tell SWR to fetch the latest values from your data source
+      toast.success(`${isoCode} rate re-calibrated`, {
+        description: `Value mapped to: ${parsedRateCoeff.toFixed(8)} against USD.`,
+      });
+
+      // Refresh data
       mutate();
     } catch (err: any) {
-      toast.error("Market Ticker Sync Failed", { description: err.message || "Failed synchronizing current market exchange metrics." });
+      toast.error("Market Ticker Sync Failed", {
+        description:
+          err.message || "Failed synchronizing current market exchange metrics.",
+      });
     } finally {
       setUpdatingCode(null);
     }
@@ -136,11 +155,17 @@ export default function CurrenciesListPage() {
         </Button>
       </PageHeader>
 
-      <div className="w-full sm:max-w-md">
-        <SearchInput 
+      <div className="w-full sm:max-w-md flex items-center gap-2">
+        <SearchInput
           placeholder="Search currencies by ISO code, display label..."
-          searchQuery={searchQuery} 
-          setSearchQuery={handleSearchChange} />
+          searchQuery={searchQuery}
+          setSearchQuery={handleSearchChange}
+        />
+
+        {/* Visual indicator when background validation is fetching for active search */}
+        {isValidating && !isLoading && (
+          <Loader2 className="w-4 h-4 animate-spin text-muted-foreground shrink-0" />
+        )}
       </div>
 
       {isLoading && !payload ? (

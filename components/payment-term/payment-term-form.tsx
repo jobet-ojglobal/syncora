@@ -1,26 +1,14 @@
 "use client";
 
 import { useForm } from "react-hook-form";
-import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Switch } from "@/components/ui/switch";
-import { Scale, CalendarClock, ArrowLeft, Loader2 } from "lucide-react";
+import { Scale, ArrowLeft } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import {
-  Field,
-  FieldDescription,
-  FieldError,
-  FieldGroup,
-  FieldLabel,
-  FieldLegend,
-  FieldSeparator,
-  FieldSet,
-} from "@/components/ui/field";
+
 import { paymentTermsSchema } from "@/schemas/payment-term.schema";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { FormInput } from "../shared/form-input";
-import { FormSelect } from "../shared/form-select";
 import { FormSwitch } from "../shared/form-switch";
 
 interface PaymentTermsFormProps {
