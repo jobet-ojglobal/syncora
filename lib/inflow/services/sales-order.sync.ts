@@ -4,15 +4,50 @@ import { getCustomer } from "../data/customers";
 import { syncCustomer } from "./customer.sync";
 
 export interface SalesOrderSyncValidationSets {
+  validCustomers: Set<string>;
   validLocations: Set<string>;
   validTerms: Set<string>;
   validTeamMembers: Set<string>;
   validProducts: Set<string>;
 }
 
-import { Prisma } from "@/generated/prisma/client";
+import { Prisma, SalesOrderInventoryStatus, SalesOrderPaymentStatus } from "@/generated/prisma/client";
+import { InflowSalesOrder } from "../types";
+import { toJsonInput } from "./helpers";
 
 type Tx = Prisma.TransactionClient;
+
+
+/**
+ * Normalizes incoming lower/mixed-case payment status strings to Prisma SalesOrderPaymentStatus enum values.
+ */
+function toPaymentStatus(status: string | null | undefined): SalesOrderPaymentStatus {
+  if (!status) return SalesOrderPaymentStatus.OWING;
+  
+  const normalized = status.toUpperCase().trim();
+  if (Object.values(SalesOrderPaymentStatus).includes(normalized as SalesOrderPaymentStatus)) {
+    return normalized as SalesOrderPaymentStatus;
+  }
+
+  // Handle common edge-case aliases if API format varies
+  if (normalized === "UNPAID" || normalized === "DUE") return SalesOrderPaymentStatus.OWING;
+
+  return SalesOrderPaymentStatus.OWING; // Default fallback
+}
+
+/**
+ * Normalizes incoming lower/mixed-case inventory status strings to Prisma SalesOrderInventoryStatus enum values.
+ */
+function toInventoryStatus(status: string | null | undefined): SalesOrderInventoryStatus {
+  if (!status) return SalesOrderInventoryStatus.UNFULFILLED;
+
+  const normalized = status.toUpperCase().trim();
+  if (Object.values(SalesOrderInventoryStatus).includes(normalized as SalesOrderInventoryStatus)) {
+    return normalized as SalesOrderInventoryStatus;
+  }
+
+  return SalesOrderInventoryStatus.UNFULFILLED; // Default fallback
+}
 
 
 /**
@@ -21,10 +56,10 @@ type Tx = Prisma.TransactionClient;
  */
 export async function syncSalesOrder(
   tx: Tx,
-  order: any,
+  order: InflowSalesOrder,
   validationSets: SalesOrderSyncValidationSets
 ) {
-  const { validLocations, validTerms, validTeamMembers, validProducts } = validationSets;
+  const { validCustomers, validLocations, validTerms, validTeamMembers, validProducts } = validationSets;
 
   // 1. 🛡️ JIT Self-Healing Layer for missing Customers
   const customerExists = await tx.customer.findUnique({
@@ -61,148 +96,152 @@ export async function syncSalesOrder(
   const cleanConfirmerId = order.confirmerTeamMemberId && validTeamMembers.has(order.confirmerTeamMemberId) ? order.confirmerTeamMemberId : null;
   const cleanSalesRepId = order.salesRepTeamMemberId && validTeamMembers.has(order.salesRepTeamMemberId) ? order.salesRepTeamMemberId : null;
 
+  const soPayload = {
+    orderNumber: order.orderNumber,
+      poNumber: order.poNumber || null,
+      externalId: order.externalId || null,
+      source: order.source || null,
+      subTotal: new Prisma.Decimal(order.subTotal || 0),
+      total: new Prisma.Decimal(order.total || 0),
+      amountPaid: new Prisma.Decimal(order.amountPaid || 0),
+      balance: new Prisma.Decimal(order.balance || 0),
+      orderFreight: new Prisma.Decimal(order.orderFreight || 0),
+      returnFee: new Prisma.Decimal(order.returnFee || 0),
+      returnFreight: new Prisma.Decimal(order.returnFreight || 0),
+      exchangeRate: new Prisma.Decimal(order.exchangeRate ?? 1.0),
+      exchangeRateAutoPulled: order.exchangeRateAutoPulled ? new Date(order.exchangeRateAutoPulled) : null,
+      paymentStatus: toPaymentStatus(order.paymentStatus),
+      inventoryStatus: toInventoryStatus(order.inventoryStatus),
+      isCancelled: order.isCancelled ?? false,
+      isCompleted: order.isCompleted ?? false,
+      isFullyPicked: order.isFullyPicked ?? false,
+      isInvoiced: order.isInvoiced ?? false,
+      isPicking: order.isPicking ?? false,
+      isPrioritized: order.isPrioritized ?? false,
+      isQuote: order.isQuote ?? false,
+      isTaxInclusive: order.isTaxInclusive ?? false,
+      needsConfirmation: order.needsConfirmation ?? false,
+      orderDate: order.orderDate ? new Date(order.orderDate) : null,
+      dueDate: order.dueDate ? new Date(order.dueDate) : null,
+      invoicedDate: order.invoicedDate ? new Date(order.invoicedDate) : null,
+      paidDate: order.paidDate ? new Date(order.paidDate) : null,
+      requestedShipDate: order.requestedShipDate ? new Date(order.requestedShipDate) : null,
+      shippedDate: order.shippedDate ? new Date(order.shippedDate) : null,
+      contactName: order.contactName || null,
+      email: order.email || null,
+      phone: order.phone || null,
+      orderRemarks: order.orderRemarks || null,
+      packRemarks: order.packRemarks || null,
+      pickRemarks: order.pickRemarks || null,
+      restockRemarks: order.restockRemarks || null,
+      returnRemarks: order.returnRemarks || null,
+      shipRemarks: order.shipRemarks || null,
+      shipToCompanyName: order.shipToCompanyName || null,
+      showShipping: order.showShipping ?? true,
+      billingAddress: toJsonInput(order.billingAddress),
+      shippingAddress: toJsonInput(order.shippingAddress),
+      customFields: toJsonInput(order.customFields),
+      nonCustomerCost: toJsonInput(order.nonCustomerCost),
+      sameBillingAndShipping: order.sameBillingAndShipping ?? false,
+      customerId: order.customerId,
+      locationId: cleanLocationId,
+      paymentTermsId: cleanTermsId,
+      assignedToTeamMemberId: cleanAssignedId,
+      confirmerTeamMemberId: cleanConfirmerId,
+      salesRepTeamMemberId: cleanSalesRepId,
+      salesRep: order.salesRep || null,
+      pricingSchemeId: order.pricingSchemeId || null,
+      taxingSchemeId: order.taxingSchemeId || null,
+      currencyId: order.currencyId || null,
+      lastModifiedById: order.lastModifiedById || null,
+      calculateTax2OnTax1: order.calculateTax2OnTax1 ?? false,
+      tax1: new Prisma.Decimal(order.tax1 || 0),
+      tax1Name: order.tax1Name || null,
+      tax1OnShipping: order.tax1OnShipping ?? false,
+      tax1Rate: new Prisma.Decimal(order.tax1Rate || 0),
+      tax2: new Prisma.Decimal(order.tax2 || 0),
+      tax2Name: order.tax2Name || null,
+      tax2OnShipping: order.tax2OnShipping ?? false,
+      tax2Rate: new Prisma.Decimal(order.tax2Rate || 0),
+  };
+
   // 3. Upsert Parent Record
   await tx.salesOrder.upsert({
     where: { inflowId: order.salesOrderId },
-    update: {
-      orderNumber: order.orderNumber,
-      poNumber: order.poNumber || null,
-      externalId: order.externalId || null,
-      source: order.source || null,
-      subTotal: new Prisma.Decimal(order.subTotal || 0),
-      total: new Prisma.Decimal(order.total || 0),
-      amountPaid: new Prisma.Decimal(order.amountPaid || 0),
-      balance: new Prisma.Decimal(order.balance || 0),
-      orderFreight: new Prisma.Decimal(order.orderFreight || 0),
-      returnFee: new Prisma.Decimal(order.returnFee || 0),
-      returnFreight: new Prisma.Decimal(order.returnFreight || 0),
-      exchangeRate: order.exchangeRate ? parseFloat(order.exchangeRate) : 1.0,
-      exchangeRateAutoPulled: order.exchangeRateAutoPulled ? new Date(order.exchangeRateAutoPulled) : null,
-      paymentStatus: order.paymentStatus,
-      inventoryStatus: order.inventoryStatus,
-      isCancelled: order.isCancelled ?? false,
-      isCompleted: order.isCompleted ?? false,
-      isFullyPicked: order.isFullyPicked ?? false,
-      isInvoiced: order.isInvoiced ?? false,
-      isPicking: order.isPicking ?? false,
-      isPrioritized: order.isPrioritized ?? false,
-      isQuote: order.isQuote ?? false,
-      isTaxInclusive: order.isTaxInclusive ?? false,
-      needsConfirmation: order.needsConfirmation ?? false,
-      orderDate: order.orderDate ? new Date(order.orderDate) : null,
-      dueDate: order.dueDate ? new Date(order.dueDate) : null,
-      invoicedDate: order.invoicedDate ? new Date(order.invoicedDate) : null,
-      paidDate: order.paidDate ? new Date(order.paidDate) : null,
-      requestedShipDate: order.requestedShipDate ? new Date(order.requestedShipDate) : null,
-      shippedDate: order.shippedDate ? new Date(order.shippedDate) : null,
-      contactName: order.contactName || null,
-      email: order.email || null,
-      phone: order.phone || null,
-      orderRemarks: order.orderRemarks || null,
-      packRemarks: order.packRemarks || null,
-      pickRemarks: order.pickRemarks || null,
-      restockRemarks: order.restockRemarks || null,
-      returnRemarks: order.returnRemarks || null,
-      shipRemarks: order.shipRemarks || null,
-      shipToCompanyName: order.shipToCompanyName || null,
-      showShipping: order.showShipping ?? true,
-      billingAddress: order.billingAddress || Prisma.DbNull,
-      shippingAddress: order.shippingAddress || Prisma.DbNull,
-      customFields: order.customFields || Prisma.DbNull,
-      nonCustomerCost: order.nonCustomerCost || Prisma.DbNull,
-      sameBillingAndShipping: order.sameBillingAndShipping ?? false,
-      customerId: order.customerId,
-      locationId: cleanLocationId,
-      paymentTermsId: cleanTermsId,
-      assignedToTeamMemberId: cleanAssignedId,
-      confirmerTeamMemberId: cleanConfirmerId,
-      salesRepTeamMemberId: cleanSalesRepId,
-      salesRep: order.salesRep || null,
-      pricingSchemeId: order.pricingSchemeId || null,
-      taxingSchemeId: order.taxingSchemeId || null,
-      currencyId: order.currencyId || null,
-      lastModifiedById: order.lastModifiedById || null,
-      calculateTax2OnTax1: order.calculateTax2OnTax1 ?? false,
-      tax1: new Prisma.Decimal(order.tax1 || 0),
-      tax1Name: order.tax1Name || null,
-      tax1OnShipping: order.tax1OnShipping ?? false,
-      tax1Rate: new Prisma.Decimal(order.tax1Rate || 0),
-      tax2: new Prisma.Decimal(order.tax2 || 0),
-      tax2Name: order.tax2Name || null,
-      tax2OnShipping: order.tax2OnShipping ?? false,
-      tax2Rate: new Prisma.Decimal(order.tax2Rate || 0),
-    },
+    update: soPayload,
     create: {
+      ...soPayload,
       id: order.salesOrderId,
       inflowId: order.salesOrderId,
-      orderNumber: order.orderNumber,
-      poNumber: order.poNumber || null,
-      externalId: order.externalId || null,
-      source: order.source || null,
-      subTotal: new Prisma.Decimal(order.subTotal || 0),
-      total: new Prisma.Decimal(order.total || 0),
-      amountPaid: new Prisma.Decimal(order.amountPaid || 0),
-      balance: new Prisma.Decimal(order.balance || 0),
-      orderFreight: new Prisma.Decimal(order.orderFreight || 0),
-      returnFee: new Prisma.Decimal(order.returnFee || 0),
-      returnFreight: new Prisma.Decimal(order.returnFreight || 0),
-      exchangeRate: order.exchangeRate ? parseFloat(order.exchangeRate) : 1.0,
-      exchangeRateAutoPulled: order.exchangeRateAutoPulled ? new Date(order.exchangeRateAutoPulled) : null,
-      paymentStatus: order.paymentStatus,
-      inventoryStatus: order.inventoryStatus,
-      isCancelled: order.isCancelled ?? false,
-      isCompleted: order.isCompleted ?? false,
-      isFullyPicked: order.isFullyPicked ?? false,
-      isInvoiced: order.isInvoiced ?? false,
-      isPicking: order.isPicking ?? false,
-      isPrioritized: order.isPrioritized ?? false,
-      isQuote: order.isQuote ?? false,
-      isTaxInclusive: order.isTaxInclusive ?? false,
-      needsConfirmation: order.needsConfirmation ?? false,
-      orderDate: order.orderDate ? new Date(order.orderDate) : null,
-      dueDate: order.dueDate ? new Date(order.dueDate) : null,
-      invoicedDate: order.invoicedDate ? new Date(order.invoicedDate) : null,
-      paidDate: order.paidDate ? new Date(order.paidDate) : null,
-      requestedShipDate: order.requestedShipDate ? new Date(order.requestedShipDate) : null,
-      shippedDate: order.shippedDate ? new Date(order.shippedDate) : null,
-      contactName: order.contactName || null,
-      email: order.email || null,
-      phone: order.phone || null,
-      orderRemarks: order.orderRemarks || null,
-      packRemarks: order.packRemarks || null,
-      pickRemarks: order.pickRemarks || null,
-      restockRemarks: order.restockRemarks || null,
-      returnRemarks: order.returnRemarks || null,
-      shipRemarks: order.shipRemarks || null,
-      shipToCompanyName: order.shipToCompanyName || null,
-      showShipping: order.showShipping ?? true,
-      billingAddress: order.billingAddress || Prisma.DbNull,
-      shippingAddress: order.shippingAddress || Prisma.DbNull,
-      customFields: order.customFields || Prisma.DbNull,
-      nonCustomerCost: order.nonCustomerCost || Prisma.DbNull,
-      sameBillingAndShipping: order.sameBillingAndShipping ?? false,
-      customerId: order.customerId,
-      locationId: cleanLocationId,
-      paymentTermsId: cleanTermsId,
-      assignedToTeamMemberId: cleanAssignedId,
-      confirmerTeamMemberId: cleanConfirmerId,
-      salesRepTeamMemberId: cleanSalesRepId,
-      salesRep: order.salesRep || null,
-      pricingSchemeId: order.pricingSchemeId || null,
-      taxingSchemeId: order.taxingSchemeId || null,
-      currencyId: order.currencyId || null,
-      lastModifiedById: order.lastModifiedById || null,
-      calculateTax2OnTax1: order.calculateTax2OnTax1 ?? false,
-      tax1: new Prisma.Decimal(order.tax1 || 0),
-      tax1Name: order.tax1Name || null,
-      tax1OnShipping: order.tax1OnShipping ?? false,
-      tax1Rate: new Prisma.Decimal(order.tax1Rate || 0),
-      tax2: new Prisma.Decimal(order.tax2 || 0),
-      tax2Name: order.tax2Name || null,
-      tax2OnShipping: order.tax2OnShipping ?? false,
-      tax2Rate: new Prisma.Decimal(order.tax2Rate || 0),
     },
   });
+
+  // orderNumber: order.orderNumber,
+  //     poNumber: order.poNumber || null,
+  //     externalId: order.externalId || null,
+  //     source: order.source || null,
+  //     subTotal: new Prisma.Decimal(order.subTotal || 0),
+  //     total: new Prisma.Decimal(order.total || 0),
+  //     amountPaid: new Prisma.Decimal(order.amountPaid || 0),
+  //     balance: new Prisma.Decimal(order.balance || 0),
+  //     orderFreight: new Prisma.Decimal(order.orderFreight || 0),
+  //     returnFee: new Prisma.Decimal(order.returnFee || 0),
+  //     returnFreight: new Prisma.Decimal(order.returnFreight || 0),
+  //     exchangeRate: order.exchangeRate ? parseFloat(order.exchangeRate) : 1.0,
+  //     exchangeRateAutoPulled: order.exchangeRateAutoPulled ? new Date(order.exchangeRateAutoPulled) : null,
+  //     paymentStatus: order.paymentStatus,
+  //     inventoryStatus: order.inventoryStatus,
+  //     isCancelled: order.isCancelled ?? false,
+  //     isCompleted: order.isCompleted ?? false,
+  //     isFullyPicked: order.isFullyPicked ?? false,
+  //     isInvoiced: order.isInvoiced ?? false,
+  //     isPicking: order.isPicking ?? false,
+  //     isPrioritized: order.isPrioritized ?? false,
+  //     isQuote: order.isQuote ?? false,
+  //     isTaxInclusive: order.isTaxInclusive ?? false,
+  //     needsConfirmation: order.needsConfirmation ?? false,
+  //     orderDate: order.orderDate ? new Date(order.orderDate) : null,
+  //     dueDate: order.dueDate ? new Date(order.dueDate) : null,
+  //     invoicedDate: order.invoicedDate ? new Date(order.invoicedDate) : null,
+  //     paidDate: order.paidDate ? new Date(order.paidDate) : null,
+  //     requestedShipDate: order.requestedShipDate ? new Date(order.requestedShipDate) : null,
+  //     shippedDate: order.shippedDate ? new Date(order.shippedDate) : null,
+  //     contactName: order.contactName || null,
+  //     email: order.email || null,
+  //     phone: order.phone || null,
+  //     orderRemarks: order.orderRemarks || null,
+  //     packRemarks: order.packRemarks || null,
+  //     pickRemarks: order.pickRemarks || null,
+  //     restockRemarks: order.restockRemarks || null,
+  //     returnRemarks: order.returnRemarks || null,
+  //     shipRemarks: order.shipRemarks || null,
+  //     shipToCompanyName: order.shipToCompanyName || null,
+  //     showShipping: order.showShipping ?? true,
+  //     billingAddress: order.billingAddress || Prisma.DbNull,
+  //     shippingAddress: order.shippingAddress || Prisma.DbNull,
+  //     customFields: order.customFields || Prisma.DbNull,
+  //     nonCustomerCost: order.nonCustomerCost || Prisma.DbNull,
+  //     sameBillingAndShipping: order.sameBillingAndShipping ?? false,
+  //     customerId: order.customerId,
+  //     locationId: cleanLocationId,
+  //     paymentTermsId: cleanTermsId,
+  //     assignedToTeamMemberId: cleanAssignedId,
+  //     confirmerTeamMemberId: cleanConfirmerId,
+  //     salesRepTeamMemberId: cleanSalesRepId,
+  //     salesRep: order.salesRep || null,
+  //     pricingSchemeId: order.pricingSchemeId || null,
+  //     taxingSchemeId: order.taxingSchemeId || null,
+  //     currencyId: order.currencyId || null,
+  //     lastModifiedById: order.lastModifiedById || null,
+  //     calculateTax2OnTax1: order.calculateTax2OnTax1 ?? false,
+  //     tax1: new Prisma.Decimal(order.tax1 || 0),
+  //     tax1Name: order.tax1Name || null,
+  //     tax1OnShipping: order.tax1OnShipping ?? false,
+  //     tax1Rate: new Prisma.Decimal(order.tax1Rate || 0),
+  //     tax2: new Prisma.Decimal(order.tax2 || 0),
+  //     tax2Name: order.tax2Name || null,
+  //     tax2OnShipping: order.tax2OnShipping ?? false,
+  //     tax2Rate: new Prisma.Decimal(order.tax2Rate || 0),
 
   // 4. Clear stale child dependencies
   await Promise.all([

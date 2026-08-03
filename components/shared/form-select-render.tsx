@@ -12,7 +12,6 @@ export interface SelectOption {
   disabled?: boolean;
 }
 
-// 1. Remove the default values inside the interface definition
 interface FormSelectProps<
   TFieldValues extends FieldValues,
   TName extends FieldPath<TFieldValues>
@@ -28,11 +27,11 @@ interface FormSelectProps<
   classNameField?: string;
   classNameInput?: string;
   required?: boolean;
-  labelIcon?: LucideIcon
+  labelIcon?: LucideIcon;
+  renderOption?: (option: SelectOption) => React.ReactNode;
 }
 
-// 2. Remove the default values inside the function declarations as well
-export function FormSelect<
+export function FormSelectRender<
   TFieldValues extends FieldValues,
   TName extends FieldPath<TFieldValues>
 >({
@@ -42,12 +41,13 @@ export function FormSelect<
   labelIcon: IconLabel,
   placeholder = "Select...",
   options,
-  emptyMessage = "No options available",
+  emptyMessage = "No attribute slot available",
   classNameLabel = "",
   classNameField = "",
   classNameInput = "",
   disabled = false,
-  required = false
+  required = false,
+  renderOption,
 }: FormSelectProps<TFieldValues, TName>) {
   const selectId = `form-select-${name}`;
 
@@ -57,21 +57,22 @@ export function FormSelect<
       control={control}
       render={({ field, fieldState }) => (
         <Field data-invalid={fieldState.invalid} className={classNameField}>
-          { (label && !IconLabel) ? 
-            <FieldLabel htmlFor={selectId} className={classNameLabel}>
-              {label} {required && <b className="text-red-500">*</b>}
-            </FieldLabel> : (label && IconLabel) ?  
-            <FieldLabel htmlFor={selectId} className={`flex items-center gap-1 ${classNameLabel}`} >
-                <IconLabel className="w-3.5 h-3.5 text-muted-foreground" />
-                Target Facility Terminal *
-              </FieldLabel>
-               : "" 
-          }
+          {label && (
+            <FieldLabel
+              htmlFor={selectId}
+              className={`flex items-center gap-1 ${classNameLabel}`}
+            >
+              {IconLabel && <IconLabel className="w-3.5 h-3.5 text-muted-foreground" />}
+              <span>{label}</span>
+              {required && <b className="text-red-500">*</b>}
+            </FieldLabel>
+          )}
+
           <FieldContent className="relative">
             <Select
               name={field.name}
               value={field.value ?? ""}
-              onValueChange={(val) => field.onChange(val === "null" ? "" : val)}
+              onValueChange={(val) => field.onChange(val === "__EMPTY__" ? "" : val)}
               disabled={disabled}
             >
               <SelectTrigger
@@ -79,23 +80,29 @@ export function FormSelect<
                 aria-invalid={fieldState.invalid}
                 className={`w-full text-xs font-medium h-9 ${classNameInput}`}
               >
-                <SelectValue  placeholder={placeholder} />
+                <SelectValue placeholder={placeholder} />
               </SelectTrigger>
-              <SelectContent position="item-aligned"  >
+              
+              <SelectContent position="item-aligned">
                 {options && options.length > 0 ? (
                   options.map((option) => (
-                    <SelectItem key={option.id} value={option.id}>
-                      {option.name}
+                    <SelectItem
+                      key={option.id}
+                      value={option.id}
+                      disabled={option.disabled}
+                    >
+                      {renderOption ? renderOption(option) : option.name}
                     </SelectItem>
                   ))
                 ) : (
-                  <SelectItem value="null" >
+                  <SelectItem value="__EMPTY__" disabled>
                     {emptyMessage}
                   </SelectItem>
                 )}
               </SelectContent>
             </Select>
           </FieldContent>
+
           {fieldState.invalid && fieldState.error && (
             <FieldError className="text-xs" errors={[fieldState.error]} />
           )}
@@ -104,23 +111,3 @@ export function FormSelect<
     />
   );
 }
-
-{/* Dynamic Payment Terms Selection */}
-    //   <FormSelect
-    //     name="defaultPaymentTermsId"
-    //     control={control}
-    //     label="Payment Term"
-    //     placeholder="Select a term"
-    //     options={catalogs.paymentTerms}
-    //     emptyMessage="No payment terms available"
-    //   />
-
-      {/* Another example reusing the component for Currencies */}
-    //   <FormSelect
-    //     name="currencyId"
-    //     control={control}
-    //     label="Default Currency"
-    //     placeholder="Select currency"
-    //     options={catalogs.currencies}
-    //     emptyMessage="No currencies configured"
-    //   />

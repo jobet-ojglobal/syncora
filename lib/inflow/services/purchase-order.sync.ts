@@ -1,5 +1,5 @@
 // services/sync/purchase/purchase-order.sync.ts
-import { Prisma } from "@/generated/prisma/client";
+import { Prisma, PurchaseOrderPaymentStatus, PurchaseOrderInventoryStatus} from "@/generated/prisma/client";
 import { InflowPurchaseOrder } from "../types";
 import { getVendor } from "../data/vendors";
 import { syncVendor } from "./vendor.sync";
@@ -31,6 +31,44 @@ const toDecimal = (val: string | number | null | undefined): Prisma.Decimal | nu
   if (val === null || val === undefined || val === "") return null;
   return new Prisma.Decimal(val);
 };
+
+
+/**
+ * Normalizes incoming lower/mixed-case payment status strings to Prisma PurchaseOrderPaymentStatus enum values.
+ */
+export function toPaymentStatus(status: string | null | undefined): PurchaseOrderPaymentStatus {
+  if (!status) return PurchaseOrderPaymentStatus.OWING;
+  
+  const normalized = status.toUpperCase().trim();
+  
+  // Check if the exact uppercase string exists in the Prisma Enum
+  if (Object.values(PurchaseOrderPaymentStatus).includes(normalized as PurchaseOrderPaymentStatus)) {
+    return normalized as PurchaseOrderPaymentStatus;
+  }
+
+  // Handle common edge-case aliases if the API format varies
+  if (normalized === "DUE") return PurchaseOrderPaymentStatus.OWING;
+
+  // Default fallback
+  return PurchaseOrderPaymentStatus.OWING; 
+}
+
+/**
+ * Normalizes incoming lower/mixed-case inventory status strings to Prisma PurchaseOrderInventoryStatus enum values.
+ */
+export function toInventoryStatus(status: string | null | undefined): PurchaseOrderInventoryStatus {
+  if (!status) return PurchaseOrderInventoryStatus.UNFULFILLED;
+
+  const normalized = status.toUpperCase().trim();
+  
+  // Check if the exact uppercase string exists in the Prisma Enum
+  if (Object.values(PurchaseOrderInventoryStatus).includes(normalized as PurchaseOrderInventoryStatus)) {
+    return normalized as PurchaseOrderInventoryStatus;
+  }
+
+  // Default fallback
+  return PurchaseOrderInventoryStatus.UNFULFILLED; 
+}
 
 /**
  * Syncs a single purchase order record along with all its respective child dependencies 
@@ -286,10 +324,10 @@ export async function syncPurchaseOrder(
     freight: toDecimal(order.freight) ?? new Prisma.Decimal(0),
     returnFee: toDecimal(order.returnFee) ?? new Prisma.Decimal(0),
     returnExtra: toDecimal(order.returnExtra) ?? new Prisma.Decimal(0),
-    exchangeRate: order.exchangeRate ? parseFloat(order.exchangeRate) : 1.0,
+    exchangeRate: toDecimal(order.exchangeRate) ?? new Prisma.Decimal(1.0),
     exchangeRateAutoPulled: order.exchangeRateAutoPulled ? new Date(order.exchangeRateAutoPulled) : null,
-    paymentStatus: order.paymentStatus,
-    inventoryStatus: order.inventoryStatus,
+    paymentStatus: toPaymentStatus(order.paymentStatus),
+    inventoryStatus: toInventoryStatus(order.inventoryStatus),
     isCancelled: order.isCancelled ?? false,
     isCompleted: order.isCompleted ?? false,
     isQuote: order.isQuote ?? false,
