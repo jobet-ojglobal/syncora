@@ -34,7 +34,7 @@ import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 import { Field, FieldContent, FieldError, FieldGroup, FieldLabel, FieldLegend, FieldSet } from "@/components/ui/field";
 import { generateSku2Variant2 } from "@/helpers/genSKU";
-import { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { BrandSelect } from "../shared/brand-select";
 import { CategorySelect } from "../shared/category-select";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../ui/select";
@@ -42,8 +42,14 @@ import { cn } from "@/lib/utils";
 import Image from "next/image";
 import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from "../ui/input-group";
 import { DynamicAlert } from "../shared/alert";
-import ProductProfileForm from "../shared/form-product-image";
 import { FormInput } from "../shared/form-input";
+import { FormSelect } from "../shared/form-select";
+
+interface SelectOption {
+  id: string;
+  name: string;
+  disabled?: boolean;
+}
 
 interface BrandLookupOption {
   id: string;
@@ -157,16 +163,16 @@ export function ProductForm({  brands, uoms, groups: productGroups, pricingSchem
 
     return [];
 
-  //   // If it's a brand new product, cleanly loop through all platform schemes 
-  //   // so the operator doesn't have to hit "Append Tier" 5 times manually.
-  //   // if (pricingSchemes && pricingSchemes.length > 0) {
-  //   //   return pricingSchemes.map((scheme) => ({
-  //   //     pricingSchemeId: scheme.inflowId,
-  //   //     priceType: "FixedPrice" as "FixedPrice" | "FixedMarkup" | "Dynamic" | "Tiered",
-  //   //     unitPrice: 0,
-  //   //     fixedMarkup: 0,
-  //   //   }));
-  //   // }
+    // If it's a brand new product, cleanly loop through all platform schemes 
+    // so the operator doesn't have to hit "Append Tier" 5 times manually.
+    // if (pricingSchemes && pricingSchemes.length > 0) {
+    //   return pricingSchemes.map((scheme) => ({
+    //     pricingSchemeId: scheme.inflowId,
+    //     priceType: "FixedPrice" as "FixedPrice" | "FixedMarkup" | "Dynamic" | "Tiered",
+    //     unitPrice: 0,
+    //     fixedMarkup: 0,
+    //   }));
+    // }
 
   //   // Bare minimum fallback array structure
   //   return [{ pricingSchemeId: "", priceType: "FixedPrice" as "FixedPrice" | "FixedMarkup" | "Dynamic" | "Tiered", unitPrice: 0, fixedMarkup: 0 }];
@@ -363,6 +369,21 @@ export function ProductForm({  brands, uoms, groups: productGroups, pricingSchem
     const sku = generateSku2Variant2(brandName, watchedName, []);
     setValue("sku", sku);
   }, [watchedName, watchedBrandId, brandMap, isEditMode, setValue]);
+  
+
+  const variantOptions: SelectOption[] = React.useMemo(() => {
+    if (!selectedGroupDetails) return [];
+
+    return computedVariantSlotsFromOptions.map((v) => {
+      const isOccupiedByOther = v.productId && v.productId !== form.getValues("inflowId");
+
+      return {
+        id: v.signature,
+        name: getVariantLabel(v),
+        disabled: !!isOccupiedByOther,
+      };
+    });
+  }, [selectedGroupDetails, computedVariantSlotsFromOptions, form]);
 
   const onSubmit = async (values: ProductInput) => {
 
@@ -478,33 +499,20 @@ export function ProductForm({  brands, uoms, groups: productGroups, pricingSchem
                 />
               </Field>
 
-              <Controller
-                control={control}
+              <FormSelect
                 name="standardUomName"
-                render={({ field, fieldState }) => (
-                  <Field className="col-span-1">
-                    <FieldLabel htmlFor="form-groupId">Base System UOM <b className="text-red-500">*</b></FieldLabel>
-                    <Select 
-                      onValueChange={field.onChange}
-                      value={field.value ?? ""}>
-                      <SelectTrigger id="form-groupId" className="w-full">
-                        <SelectValue placeholder="Select Product Group" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        { uoms.length === 0 ? (
-                          <SelectItem value="">No base unit available</SelectItem>
-                        ) : (
-                          uoms.map((u) => (
-                            <SelectItem key={u.id} value={u.code}>{u.name} ({u.code})</SelectItem>
-                          ))
-                        )}
-                      </SelectContent>
-                    </Select>
-                    {fieldState.error && <FieldError className="text-xs">{fieldState.error.message}</FieldError>}
-                  </Field>
-                )}
+                control={control}
+                label="Base System UOM"
+                placeholder="-- Select UOM --"
+                options={uoms.map((item) => ({
+                  id: item.code,
+                  name: `${item.name} (${item.code})`,
+                }))}
+                required
+                emptyMessage="No base unit available"
+                classNameLabel="text-muted-foreground font-semibold"
               />
-              
+
             </FieldSet>
 
             <Controller
@@ -542,72 +550,35 @@ export function ProductForm({  brands, uoms, groups: productGroups, pricingSchem
             </div>
 
             <FieldSet className="grid grid-cols-1 md:grid-cols-2 gap-4 ">
-              <Controller
-                control={control}
+              <FormSelect
                 name="productGroupId"
-                render={({ field, fieldState }) => (
-                  <Field className="col-span-1">
-                    <FieldLabel htmlFor="form-groupId">Product Group Cluster</FieldLabel>
-                    <Select 
-                      onValueChange={(e) => {
-                        field.onChange(e)
-                        setValue("variantSignature", ""); 
-                      }}
-                      value={field.value ?? ""}>
-                      <SelectTrigger id="form-groupId" className="w-full">
-                        <SelectValue placeholder="Select Product Group" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        { productGroups.length === 0 ? (
-                          <SelectItem value="">No product group available</SelectItem>
-                        ) : (
-                          productGroups?.map((group) => (
-                            <SelectItem key={group.inflowId} value={group.inflowId}>{group.name}</SelectItem>
-                          ))
-                        )}
-                      </SelectContent>
-                    </Select>
-                    {fieldState.error && <FieldError className="text-xs">{fieldState.error.message}</FieldError>}
-                  </Field>
-                )}
+                control={control}
+                label="Product Group Cluster"
+                placeholder="-- Select Product Group --"
+                options={productGroups.map((item) => ({
+                  id: item.inflowId,
+                  name: item.name,
+                }))}
+                emptyMessage="No product group available"
+                classNameLabel="text-muted-foreground font-semibold"
               />
+
+              
 
               {/* 2. Select the specific Variant Intersection slot */}
               {selectedGroupDetails && (
-                <Controller
-                  control={control}
+                <FormSelect
                   name="variantSignature"
-                  render={({ field, fieldState }) => (
-                    <Field className="col-span-1">
-                      <FieldLabel >Target Matrix Attribute Configuration Slot</FieldLabel>
-                      <Select onValueChange={field.onChange} >
-                        <SelectTrigger className="w-full">
-                          <SelectValue placeholder="Select Variant Slot" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          { productGroups.length === 0 ? (
-                            <SelectItem value="">No attribute slot available</SelectItem>
-                          ) : (
-                            computedVariantSlotsFromOptions.map((v) => {
-                              const isOccupiedByOther = v.productId && v.productId !== form.getValues("inflowId");
-                              return (
-                                <SelectItem 
-                                  key={v.signature} 
-                                  value={v.signature}
-                                  disabled={!!isOccupiedByOther} // Locks out slots belonging to alternate products
-                                >
-                                  {getVariantLabel(v)}
-                                </SelectItem>
-                              );
-                            })
-                          )}
-                        </SelectContent>
-                      </Select>
-                      {fieldState.error && <FieldError className="text-xs">{fieldState.error.message}</FieldError>}
-                    </Field>
-                  )}
+                  control={form.control}
+                  label="Variant Slot"
+                  placeholder="-- Select Variant Slot --"
+                  options={variantOptions}
+                  emptyMessage="No attribute slot available"
+                  classNameLabel="text-muted-foreground font-semibold"
                 />
               )}
+
+              
 
               {/* 📊 Active Matrix Attribute Configuration Dashboard Block */}
               {selectedGroupDetails && (
@@ -1596,3 +1567,50 @@ export function ProductForm({  brands, uoms, groups: productGroups, pricingSchem
     </form>
   );
 }
+
+
+ {/* <FormSelect
+                  name="variantSignature"
+                  control={control}
+                  label="Target Matrix Attribute Configuration Slot"
+                  placeholder="-- Select Variant Slot --"
+                  options={productGroups.map((item) => ({
+                    id: item.inflowId,
+                    name: item.name,
+                  }))}
+                  emptyMessage="No attribute slot available"
+                  classNameLabel="text-muted-foreground font-semibold"
+                />
+                <Controller
+                  control={control}
+                  name="variantSignature"
+                  render={({ field, fieldState }) => (
+                    <Field className="col-span-1">
+                      <FieldLabel >Target Matrix Attribute Configuration Slot</FieldLabel>
+                      <Select onValueChange={field.onChange} >
+                        <SelectTrigger className="w-full">
+                          <SelectValue placeholder="Select Variant Slot" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          { productGroups.length === 0 ? (
+                            <SelectItem value="">No attribute slot available</SelectItem>
+                          ) : (
+                            computedVariantSlotsFromOptions.map((v) => {
+                              const isOccupiedByOther = v.productId && v.productId !== form.getValues("inflowId");
+                              return (
+                                <SelectItem 
+                                  key={v.signature} 
+                                  value={v.signature}
+                                  disabled={!!isOccupiedByOther} // Locks out slots belonging to alternate products
+                                >
+                                  {getVariantLabel(v)}
+                                </SelectItem>
+                              );
+                            })
+                          )}
+                        </SelectContent>
+                      </Select>
+                      {fieldState.error && <FieldError className="text-xs">{fieldState.error.message}</FieldError>}
+                    </Field>
+                  )}
+                /> */}

@@ -57,6 +57,7 @@ export class SalesOrderSyncService {
 
       // Customers lookup continues to bypass initial skip via the functional module's JIT recovery layer
       const validationSets = {
+        validCustomers: new Set(dbCustomers.map((l) => l.inflowId)),
         validLocations: new Set(dbLocations.map((l) => l.inflowId)),
         validTerms: new Set(dbTerms.map((t) => t.inflowId)),
         validTeamMembers: new Set(dbTeam.map((tm) => tm.inflowId)),

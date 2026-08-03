@@ -2682,12 +2682,12 @@ model SalesOrder {
   orderFreight           Decimal   @db.Decimal(18, 5)
   returnFee              Decimal   @db.Decimal(18, 5)
   returnFreight          Decimal   @db.Decimal(18, 5)
-  exchangeRate           Float     @default(1.0)
+  exchangeRate           Decimal   @default(1.0) @db.Decimal(18, 10)
   exchangeRateAutoPulled DateTime?
   
   // Statuses & Flags
-  paymentStatus          PaymentStatus 
-  inventoryStatus        SalesOrderStatus
+  paymentStatus          SalesOrderPaymentStatus 
+  inventoryStatus        SalesOrderInventoryStatus
   isCancelled            Boolean   @default(false)
   isCompleted            Boolean   @default(false)
   isFullyPicked          Boolean   @default(false)
@@ -2991,23 +2991,20 @@ model SalesOrderAttachment {
   @@map("sales_order_attachment")
 }
 
-enum SalesOrderStatus {
-    DRAFT
-    CONFIRMED
-    PICKING
-    PACKED
-    SHIPPED
-    COMPLETED
-    CANCELLED
+enum SalesOrderPaymentStatus {
+  OWING
+  UNINVOICED
+  INVOICED
+  QUOTE
+  PAID
 }
 
-enum PaymentStatus {
-    UNPAID
-    PARTIALLY_PAID
-    PAID
-    REFUNDED
+enum SalesOrderInventoryStatus {
+  STARTED
+  UNFULFILLED
+  FULFILLED  
+  QUOTE
 }
-
 
 model InventoryReservation {
   id          String @id @default(cuid())
@@ -3044,12 +3041,12 @@ model PurchaseOrder {
   freight                Decimal   @db.Decimal(18, 5)
   returnFee              Decimal   @db.Decimal(18, 5)
   returnExtra            Decimal   @db.Decimal(18, 5)
-  exchangeRate           Float     @default(1.0)
+  exchangeRate           Decimal  @default(1.0) @db.Decimal(18, 10)
   exchangeRateAutoPulled DateTime?
 
   // Statuses & Flags
-  paymentStatus          String    // e.g., "Quote"
-  inventoryStatus        String    // e.g., "Quote"
+  paymentStatus          PurchaseOrderPaymentStatus    // e.g., "Quote"
+  inventoryStatus        PurchaseOrderInventoryStatus    // e.g., "Quote"
   isCancelled            Boolean   @default(false)
   isCompleted            Boolean   @default(false)
   isQuote                Boolean   @default(false)
@@ -3127,6 +3124,21 @@ model PurchaseOrder {
   @@index([orderDate])
 
   @@map("purchase_order")
+}
+
+enum PurchaseOrderPaymentStatus {
+  OWING
+  UNPAID
+  PAID
+  PARTIAL
+  QUOTE
+}
+
+enum PurchaseOrderInventoryStatus {
+  STARTED
+  UNFULFILLED
+  FULFILLED  
+  QUOTE
 }
 
 model PurchaseOrderLocationMap {

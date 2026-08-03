@@ -296,6 +296,34 @@ export async function POST(request: NextRequest) {
         break;
       }
 
+      case "inventory":
+      case "inventoryLocal": {
+        const batchID = payload.batch_id || payload.source_key;
+
+        if (batchID) {
+          // Offload the sync processing to the dedicated background worker queue
+          await getLocationSyncQueue().add(
+            "inventory_sync_job",
+            {
+              source: eventType,
+              loggedEventId: loggedEvent.id,
+              dataId: payload.inflowId || batchID,
+              source_key: payload.source_key || null,
+              location, 
+              data: { inventoryId: batchID }
+            },
+            {
+              attempts: 3,
+              backoff: {
+                type: "exponential",
+                delay: 2000, // Wait 2s, then 4s, then 8s on failure
+              },
+            }
+          );
+        }
+        break;
+      }
+
       default:
         console.log(`[Webhook Router] Unhandled webhook event classification: ${eventType} for Location: ${locationId}`);
         break;
