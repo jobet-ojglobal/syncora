@@ -1122,9 +1122,26 @@ export const breadcrumbsMap = [
           },
 
           {
-            id: "admin-out-of-stock",
-            href: "/dashboard/inventory/out-of-stock",
-            label: "Out of Stock",
+            id: "admin-stocks",
+            href: "/dashboard/inventory/stocks",
+            label: "Stocks",
+            children: [
+              {
+                id: "admin-stocks-view",
+                href: "/dashboard/inventory/stocks/[id]",
+                label: "Stock Overview",
+              },
+              {
+                id: "admin-stocks-adjust",
+                href: "/dashboard/inventory/stocks/[id]/adjust",
+                label: "Create Stock Adjustment ",
+              },
+            ]
+          },
+          {
+            id: "admin-inv-adjustments",
+            href: "/dashboard/inventory/adjustments",
+            label: "Stock Adjustments",
           },
 
           {
@@ -1133,11 +1150,7 @@ export const breadcrumbsMap = [
             label: "Overstocked",
           },
 
-          {
-            id: "admin-adjustments",
-            href: "/dashboard/inventory/adjustments",
-            label: "Adjustments",
-          },
+          
 
           {
             id: "admin-snapshots",

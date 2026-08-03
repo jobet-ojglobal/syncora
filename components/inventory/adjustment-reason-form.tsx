@@ -1,24 +1,18 @@
 "use client";
 
-import { useForm, Controller } from "react-hook-form";
+import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import {
   adjustmentReasonSchema,
   AdjustmentReasonInput,
 } from "@/schemas/adjustment-reason.schema";
-import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox"; // or standard <input type="checkbox" />
+import { Card, CardContent } from "@/components/ui/card";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
-import {
-  Field,
-  FieldGroup,
-  FieldLabel,
-  FieldLegend,
-  FieldSet,
-} from "@/components/ui/field";
 import { FormSwitch } from "../shared/form-switch";
+import { ArrowLeft } from "lucide-react";
+import { FormInput } from "../shared/form-input";
 
 interface AdjustmentReasonFormProps {
   initialData?: {
@@ -49,11 +43,9 @@ export function AdjustmentReasonForm({
   });
 
   const {
-    register,
     handleSubmit,
     control,
-    reset,
-    formState: { errors, isSubmitting },
+    formState: { isSubmitting },
   } = form;
 
   const onSubmit = async (values: AdjustmentReasonInput) => {
@@ -79,7 +71,7 @@ export function AdjustmentReasonForm({
         }
       );
 
-      router.push("/dashboard/settings/adjustment-reasons");
+      router.push("/dashboard/inventory/adjustments/reasons");
       router.refresh();
 
       if (onSuccess) onSuccess();
@@ -91,33 +83,17 @@ export function AdjustmentReasonForm({
   };
 
   return (
-    <form
-      onSubmit={handleSubmit(onSubmit)}
-      className="w-full max-w-xl mx-auto p-6 bg-card border rounded-xl shadow-sm"
-    >
-      <FieldGroup className="gap-5">
-        <FieldSet>
-          <FieldLegend>
-            {isEditMode
-              ? `Modify ${initialData?.name}`
-              : "Register Adjustment Reason"}
-          </FieldLegend>
-
-          <FieldGroup className="gap-4 mt-4">
-            {/* Name */}
-            <Field>
-              <FieldLabel htmlFor="reason-name">Reason Name *</FieldLabel>
-              <Input
-                id="reason-name"
-                placeholder="e.g., Damaged Stock, Shrinkage, Audit Variance"
-                {...register("name")}
-              />
-              {errors.name && (
-                <span className="text-xs text-destructive">
-                  {errors.name.message}
-                </span>
-              )}
-            </Field>
+    <form onSubmit={handleSubmit(onSubmit)} className="w-full text-xs font-medium space-y-6 ">
+      <Card className="shadow-xs">
+        <CardContent className="space-y-2" >
+          <FormInput
+              name="name"
+              control={control}
+              label="Reason Name"
+              placeholder="e.g., Damaged Stock, Shrinkage, Audit Variance"
+              classNameLabel="text-muted-foreground font-semibold"
+              required
+            />
 
             {/* Active Toggle */}
             <FormSwitch
@@ -138,28 +114,23 @@ export function AdjustmentReasonForm({
                 description="Restrict visibility of this adjustment code to system admins."
                 className="sm:col-span-2 p-2.5"
             />
-          </FieldGroup>
-        </FieldSet>
+        </CardContent>
+      </Card>
 
-        {/* Action Buttons */}
-        <div className="flex flex-row items-center justify-end gap-4 w-full mt-2">
-          <Button
-            type="button"
-            variant="secondary"
-            disabled={isSubmitting}
-            onClick={() => reset()}
-          >
-            Reset
-          </Button>
-          <Button type="submit" disabled={isSubmitting}>
-            {isSubmitting
-              ? "Saving changes..."
-              : isEditMode
-              ? "Save Changes"
-              : "Create Adjustment Reason"}
-          </Button>
-        </div>
-      </FieldGroup>
+      <div className="flex items-center justify-end gap-2">
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={() => router.back()}
+        >
+          <ArrowLeft className="w-4 h-4 mr-1" />
+          Cancel
+        </Button>
+        <Button type="submit" size="sm" disabled={isSubmitting}>
+          {isSubmitting ? "Processing..." : isEditMode ? "Update Reason" : "Create Reason"}
+        </Button>
+      </div>
     </form>
   );
 }

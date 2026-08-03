@@ -23,7 +23,7 @@ import { prisma } from './prisma';
 
 export type ModelName = 
     'user' | 'attribute' | 'category' | 'currency' | 'taxingScheme' | 'pricingScheme' | 'paymentTerm' | 'product' 
-    | 'brand' | 'customer' | 'vendor' | 'productGroup' | 'location' | 'uom' | "teamMember" ; 
+    | 'brand' | 'customer' | 'vendor' | 'productGroup' | 'location' | 'uom' | "teamMember" | "adjustmentReason" ; 
 
 export class SoftDeleteRepository {
   static async softDelete<T = any>(

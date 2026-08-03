@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { Plus, Search, Edit3, CheckCircle2, XCircle, Users2, Landmark, ShieldCheck, Tags } from "lucide-react";
+import { Plus, Search, Edit3, CheckCircle2, XCircle, Users2, Landmark, ShieldCheck, Tags, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -50,10 +50,21 @@ export default function PricingSchemesListPage() {
   }, [searchQuery]);
 
   // 3. SWR list key hook binds directly onto debounced search value variable
-  const { data: payload, error, isLoading, mutate } = useSWR(
-    `/api/admin/pricing-scheme/filtered?search=${debouncedSearch}&page=${pageIndex}&limit=${PAGE_SIZE}`,
+  const {
+    data: payload,
+    error,
+    isLoading,
+    isValidating,
+    mutate,
+  } = useSWR(
+    `/api/admin/pricing-scheme/filtered?search=${encodeURIComponent(
+      debouncedSearch
+    )}&page=${pageIndex}&limit=${PAGE_SIZE}`,
     fetcher,
-    { keepPreviousData: true }
+    {
+      keepPreviousData: true,
+      revalidateOnFocus: false,
+    }
   );
 
   const schemes: PricingSchemeRow[] = payload?.data || [];
@@ -63,7 +74,6 @@ export default function PricingSchemesListPage() {
   // Handle Search input adjustments
   const handleSearchChange = (value: string) => {
     setSearchQuery(value);
-    setPageIndex(0); // Reset page indices to 0 on searching to avoid index overflow gaps
   };
 
   if (error) {
@@ -90,11 +100,17 @@ export default function PricingSchemesListPage() {
       </PageHeader>
      
       {/* Lookup search component utility filter toolbar segment */}
-      <div className="w-full sm:max-w-md">
-        <SearchInput 
+      <div className="w-full sm:max-w-md flex items-center gap-2">
+        <SearchInput
           placeholder="Filter schemes by template name, ID index..."
-          searchQuery={searchQuery} 
-          setSearchQuery={handleSearchChange} />
+          searchQuery={searchQuery}
+          setSearchQuery={handleSearchChange}
+        />
+
+        {/* Visual indicator when background validation is fetching for active search */}
+        {isValidating && !isLoading && (
+          <Loader2 className="w-4 h-4 animate-spin text-muted-foreground shrink-0" />
+        )}
       </div>
 
       {/* Central data layout directory board canvas */}

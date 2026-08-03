@@ -43,7 +43,6 @@ import {
 } from "@/components/ui/table";
 import Image from "next/image";
 import { prisma } from "@/lib/prisma";
-import { AdjustStockDialog } from "@/components/stock/adjust-stock-dialog";
 import { TablePagination } from "@/components/stock/table-pagination";
 import { ActionTypeFilter } from "@/components/stock/action-type-filter";
 import { SerialActionSearch } from "@/components/stock/serial-action-search";
@@ -269,7 +268,7 @@ export default async function InventoryDetailsPage({
   }));
 
   return (
-    <div className="flex-1 space-y-6 p-6 md:p-8">
+    <div className="w-full max-w-[90rem] mx-auto text-foreground sm:p-6 space-y-6 text-xs sm:text-sm">
       {/* Header & KPI Summary Cards */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-4">
@@ -316,14 +315,11 @@ export default async function InventoryDetailsPage({
         </div>
 
         <div className="flex items-center gap-2">
-          <AdjustStockDialog
-            inventoryId={inventory.id}
-            currentOnHand={onHand}
-            bins={serializedBins}
-          />
-          <Button size="sm">
-            <ArrowUpDown className="h-4 w-4 mr-2" />
-            Transfer Stock
+          <Button asChild variant="outline" size="sm" className="h-7 px-2 text-muted-foreground hover:text-foreground gap-1">
+            <Link href={`/dashboard/inventory/stocks/${inventory.id}/adjust`}>
+              <Sliders className="h-4 w-4 mr-2" />
+              Adjust Stock
+            </Link>
           </Button>
         </div>
       </div>
@@ -558,6 +554,7 @@ export default async function InventoryDetailsPage({
                   <TableRow>
                     <TableHead>Date & Time</TableHead>
                     <TableHead>Type</TableHead>
+                    <TableHead className="text-right">Quantity Before</TableHead>
                     <TableHead className="text-right">Change</TableHead>
                     <TableHead className="text-right">Balance After</TableHead>
                     <TableHead>Performed By</TableHead>
@@ -586,6 +583,9 @@ export default async function InventoryDetailsPage({
                               {entry.transactionType.replace("_", " ")}
                             </Badge>
                           </TableCell>
+                          <TableCell className="text-right font-mono font-medium">
+                            {Number(entry.quantityBefore).toLocaleString()}
+                          </TableCell>
                           <TableCell
                             className={`text-right font-medium font-mono ${
                               isPositive
@@ -605,7 +605,7 @@ export default async function InventoryDetailsPage({
                             {entry.remarks ?? entry.referenceType ?? "—"}
                           </TableCell>
                           <TableCell>
-                            <Link href={`/dashboard/inventory/adjustments/${entry.referenceId}`} className="text-muted-foreground hover:text-foreground">
+                            <Link href={`/dashboard/inventory/ledgers/${entry.referenceId}`} className="text-muted-foreground hover:text-foreground">
                               <Eye className="w-3.5 h-3.5" />
                             </Link>
                           </TableCell>

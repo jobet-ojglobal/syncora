@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { DeleteButton } from "@/components/shared/delete-button";
 import Image from "next/image";
+import PageHeader from "@/components/layout/dashboard/PageHeader";
 
 interface BinDetail {
   id: string;
@@ -79,21 +80,18 @@ export default function InventoryList() {
 
   return (
     <div className="w-full max-w-7xl mx-auto p-6 space-y-6">
-      
-      {/* Upper Title Segment */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b pb-5">
-        <div>
-          <h1 className="text-xl font-bold tracking-tight">Master Stock Ledger</h1>
-          <p className="text-xs text-muted-foreground mt-0.5">
-            Real-time multi-warehouse balance records, dynamic picker bin configurations, and reserve allocations.
-          </p>
-        </div>
+      <PageHeader
+        title="Master Stock Ledger"
+        description="Multi-warehouse balance records, dynamic picker bin configurations, and reserve allocations."
+        icon={Layers}
+        className="border-b pb-5"
+      > 
         <Button asChild size="sm" className="gap-1.5 shrink-0">
-          <Link href="/dashboard/inventory/new">
+          <Link href="/dashboard/inventory/stocks/new">
             <Plus className="w-4 h-4" /> Post Stock Adjustment
           </Link>
         </Button>
-      </div>
+      </PageHeader>
 
       {/* Filter Options Utility Block */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -248,12 +246,12 @@ export default function InventoryList() {
                       <td className="p-4">
                         <div className="flex items-center justify-end gap-1">
                           <Button asChild variant="ghost" size="sm" className="h-7 px-2 text-muted-foreground hover:text-foreground gap-1">
-                            <Link href={`/dashboard/inventory/${item.id}`} title="View">
+                            <Link href={`/dashboard/inventory/stocks/${item.id}`} title="View">
                               <View className="w-3 h-3" /> View
                             </Link>
                           </Button>
                           <Button asChild variant="ghost" size="sm" className="h-7 px-2 text-muted-foreground hover:text-foreground gap-1">
-                            <Link href={`/dashboard/inventory/${item.id}/adjust`}>
+                            <Link href={`/dashboard/inventory/stocks/${item.id}/adjust`}>
                               <Edit className="w-3 h-3" /> Adjust
                             </Link>
                           </Button>

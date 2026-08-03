@@ -19,6 +19,7 @@ const modelMap: Record<TrashItem["modelType"], ModelName> = {
   "Product Group": "productGroup",
   Location: "location",
   "Team Member": "teamMember",
+  "Adjustment Reason": "adjustmentReason"
 };
 
 export async function restoreItem(id: string, modelType: TrashItem["modelType"]) {
