@@ -344,11 +344,7 @@ model Product {
   tags              ProductTag[]
   features          ProductFeature[]
   inventories       Inventory[]
-<<<<<<< HEAD
-  inventoryItems    InventoryItem[]
-=======
   inventoryBinItems    InventoryBinItem[]
->>>>>>> 4f3e478e359a814e5626cd9876600434acbd2fac
   adjustmentLines   InventoryAdjustmentLine[]
   costAdjustments   ProductCostAdjustment[]
   inventoryLedger   InventoryLedger[]
@@ -1133,11 +1129,7 @@ model Location {
   
   address             LocationAddress?
   inventories         Inventory[]
-<<<<<<< HEAD
-  inventoryItems      InventoryItem[]
-=======
   inventoryBinItems   InventoryBinItem[]
->>>>>>> 4f3e478e359a814e5626cd9876600434acbd2fac
   sublocations        Sublocation[]
   adjustmentLines     InventoryAdjustmentLine[]
   inventoryLedger     InventoryLedger[]
@@ -1232,8 +1224,6 @@ model Sublocation {
   
   adjustmentLineBins  InventoryAdjustmentLineBin[]
 
-  inventoryItems      InventoryItem[]
-
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
@@ -1290,38 +1280,6 @@ model Inventory {
   @@map("inventory")
 }
 
-<<<<<<< HEAD
-model InventoryItem {
-  id            String      @id @default(cuid())
-  productId     String
-  locationId    String
-  sublocationId String?
-  serialNumber  String      @unique
-  status        SerialStatus @default(IN_STOCK)
-
-  product       Product     @relation(fields: [productId], references: [inflowId], onDelete: Cascade)
-  location      Location    @relation(fields: [locationId], references: [inflowId], onDelete: Cascade)
-  sublocation   Sublocation? @relation(fields: [sublocationId], references: [id], onDelete: SetNull)
-
-  ledgerEntries InventoryLedger[]
-  adjustmentSerials     InventoryAdjustmentSerial[]
-
-  createdAt     DateTime    @default(now())
-  updatedAt     DateTime    @updatedAt
-
-  @@index([productId, locationId])
-  @@map("inventory_item")
-}
-
-enum SerialStatus {
-  IN_STOCK
-  RESERVED
-  SOLD
-  DAMAGED
-}
-
-=======
->>>>>>> 4f3e478e359a814e5626cd9876600434acbd2fac
 model InventoryBin {
   id            String      @id @default(cuid())
   inventoryId   String
@@ -1375,40 +1333,6 @@ enum SerialStatus {
   DAMAGED
 }
 
-<<<<<<< HEAD
-
-
-<<<<<<< HEAD
-  // productId      String
-  // product             Product @relation(fields: [productId], references: [inflowId], onDelete: Cascade)
-  // @@unique([productId,sublocationId])
-
-<<<<<<< HEAD
-enum InventoryAdjustmentReason {
-  STOCK_COUNT
-  DAMAGE
-  LOSS
-  THEFT
-  EXPIRED
-  RETURN
-  CORRECTION
-  MANUAL
-=======
-// enum InventoryAdjustmentReason {
-//   STOCK_COUNT
-//   DAMAGE
-//   LOSS
-//   THEFT
-//   EXPIRED
-//   RETURN
-//   CORRECTION
-//   MANUAL
-// }
-
-=======
->>>>>>> 558b7f0a0f5120b0b02d67182fb9dea2d80ab114
-=======
->>>>>>> dd9bab295ca918cde8394134d9371c7d168b5954
 model AdjustmentReason {
   id            String   @id @default(cuid())
   inflowId      String   @unique
@@ -1426,7 +1350,6 @@ model AdjustmentReason {
   @@index([name])
 
   @@map("adjustment_reason")
->>>>>>> 4f3e478e359a814e5626cd9876600434acbd2fac
 }
 
 enum AdjustmentStatus {
@@ -1436,15 +1359,6 @@ enum AdjustmentStatus {
 }
 
 model InventoryAdjustment {
-<<<<<<< HEAD
-  id                String                    @id @default(cuid())
-  adjustmentNumber  String                    @unique
-  reason            InventoryAdjustmentReason
-  notes             String?
-
-  performedById     String
-  performedBy       TeamMember?              @relation(fields: [performedById], references: [inflowId])
-=======
   id                    String                    @id @default(cuid())
   adjustmentNumber      String                    @unique
   adjustmentReasonId    String?
@@ -1457,7 +1371,6 @@ model InventoryAdjustment {
   lastModifiedBy       TeamMember?            @relation("ModifiedAdjustment", fields: [lastModifiedById], references: [inflowId])
 
   adjustmentReason  AdjustmentReason?         @relation(fields: [adjustmentReasonId], references: [inflowId])
->>>>>>> 4f3e478e359a814e5626cd9876600434acbd2fac
 
   lines             InventoryAdjustmentLine[]
   status            AdjustmentStatus          @default(DRAFT)
@@ -1468,29 +1381,14 @@ model InventoryAdjustment {
   @@map("inventory_adjustment")
 }
 
-<<<<<<< HEAD
-=======
 
->>>>>>> 4f3e478e359a814e5626cd9876600434acbd2fac
 model InventoryAdjustmentLine {
   id               String   @id @default(cuid())
   adjustmentId     String
   inventoryId      String?
   productId        String
   locationId       String
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
-  sublocationId    String?  // null = Unassigned / Floor stock
-=======
   inventoryBinId   String? 
->>>>>>> 4f3e478e359a814e5626cd9876600434acbd2fac
-=======
-  // inventoryBinId   String? 
->>>>>>> dd9bab295ca918cde8394134d9371c7d168b5954
-=======
-  inventoryBinId   String? 
->>>>>>> 2e67c95764e8874c8ff5004c90ed13dfb51dbf5b
 
   quantityBefore   Decimal  @db.Decimal(18, 4)
   quantityAdjusted Decimal  @db.Decimal(18, 4) // Can be positive (+) or negative (-)
@@ -1502,19 +1400,7 @@ model InventoryAdjustmentLine {
   adjustment       InventoryAdjustment       @relation(fields: [adjustmentId], references: [id], onDelete: Cascade)
   product          Product                   @relation(fields: [productId], references: [inflowId], onDelete: Restrict)
   location         Location                  @relation(fields: [locationId], references: [inflowId], onDelete: Restrict)
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
-  sublocation      Sublocation?              @relation(fields: [sublocationId], references: [id], onDelete: SetNull)
-=======
   inventoryBin     InventoryBin?              @relation(fields: [inventoryBinId], references: [id], onDelete: SetNull)
->>>>>>> 4f3e478e359a814e5626cd9876600434acbd2fac
-=======
-  // inventoryBin     InventoryBin?              @relation(fields: [inventoryBinId], references: [id], onDelete: SetNull)
->>>>>>> dd9bab295ca918cde8394134d9371c7d168b5954
-=======
-  inventoryBin     InventoryBin?              @relation(fields: [inventoryBinId], references: [id], onDelete: SetNull)
->>>>>>> 2e67c95764e8874c8ff5004c90ed13dfb51dbf5b
 
   // Track exact serial numbers modified by this adjustment line
   serials          InventoryAdjustmentSerial[]
@@ -1525,35 +1411,7 @@ model InventoryAdjustmentLine {
   @@index([adjustmentId])
   @@index([productId])
   @@index([locationId])
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
-  @@index([sublocationId])
-  @@map("inventory_adjustment_line")
-}
-
-model InventoryAdjustmentSerial {
-  id                   String                  @id @default(cuid())
-  adjustmentLineId     String
-  inventoryItemId      String?                 // Linked if existing serial
-  serialNumber         String                  // Serial string value
-
-  adjustmentLine       InventoryAdjustmentLine @relation(fields: [adjustmentLineId], references: [id], onDelete: Cascade)
-  inventoryItem        InventoryItem?          @relation(fields: [inventoryItemId], references: [id], onDelete: SetNull)
-
-  @@index([adjustmentLineId])
-  @@index([serialNumber])
-  @@map("inventory_adjustment_serial")
-}
-
-=======
   @@index([inventoryBinId])
-=======
-  // @@index([inventoryBinId])
->>>>>>> dd9bab295ca918cde8394134d9371c7d168b5954
-=======
-  @@index([inventoryBinId])
->>>>>>> 2e67c95764e8874c8ff5004c90ed13dfb51dbf5b
   @@map("inventory_adjustment_line")
 }
 
@@ -1618,7 +1476,6 @@ enum InventorySerialAdjustmentAction {
   VERIFY
 }
 
->>>>>>> 4f3e478e359a814e5626cd9876600434acbd2fac
 // Inventory Ledgers
 
 model InventoryLedger {
@@ -1638,11 +1495,7 @@ model InventoryLedger {
   toSublocationId  String?
 
   batchNumber      String?
-<<<<<<< HEAD
-  inventoryItemId  String?                  // Set if transaction relates to a specific serial
-=======
   inventoryBinItemId  String?                  // Set if transaction relates to a specific serial
->>>>>>> 4f3e478e359a814e5626cd9876600434acbd2fac
   uomName          String?
 
   quantityChange   Decimal                  @db.Decimal(18, 4)
@@ -1658,11 +1511,7 @@ model InventoryLedger {
   location         Location                 @relation(fields: [locationId], references: [inflowId], onDelete: Restrict)
   sublocation      Sublocation?             @relation(fields: [sublocationId], references: [id], onDelete: SetNull)
   performedBy      TeamMember?              @relation(fields: [performedById], references: [inflowId], onDelete: SetNull)
-<<<<<<< HEAD
-  inventoryItem    InventoryItem?           @relation(fields: [inventoryItemId], references: [id], onDelete: SetNull)
-=======
   inventoryBinItem    InventoryBinItem?           @relation(fields: [inventoryBinItemId], references: [id], onDelete: SetNull)
->>>>>>> 4f3e478e359a814e5626cd9876600434acbd2fac
 
   createdAt        DateTime                 @default(now())
 
@@ -1760,23 +1609,6 @@ enum InventoryTransactionType {
 
 
 // CLOUD STOCK ADJUSTMENT
-model AdjustmentReason {
-  id            String   @id @default(cuid())
-  inflowId      String   @unique
-  name          String
-  isActive      Boolean  @default(true)
-  isInternal    Boolean  @default(false)
-
-  stockAdjustments  StockAdjustment[]
-
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-  deletedAt     DateTime?
-
-  @@index([name])
-
-  @@map("adjustment_reason")
-}
 
 
 model StockAdjustment {
@@ -3424,165 +3256,3 @@ model PurchaseOrderAttachment {
   @@map("purchase_order_attachment")
 }
 
-
-// Customer Model
-// model Customer {
-//   id                            String   @id @default(cuid())
-//   inflowId                      String   @unique
-//   name                          String
-//   contactName                   String?
-//   email                         String?
-//   phone                         String?
-//   fax                           String?
-//   website                       String?
-//   remarks                       String?
-//   taxExemptNumber               String?
-//   defaultCarrier                String?
-//   defaultPaymentMethod          String?
-//   discount                      Decimal? @db.Decimal(10,2)
-//   isActive                      Boolean  @default(true)
-//   defaultLocationId             String?
-//   defaultPaymentTermsId         String?
-//   pricingSchemeId               String?
-//   taxingSchemeId                String?
-//   defaultSalesRepTeamMemberId   String?
-//   lastModifiedById             String?
-//   lastModifiedDttm             DateTime?
-//   defaultBillingAddressId      String?
-//   defaultShippingAddressId     String?
-//   timestamp                    String?
-
-//   addresses                    CustomerAddress[]
-//   defaultLocation              Location? @relation(fields: [defaultLocationId],references: [inflowId])
-//   defaultPaymentTerms          PaymentTerms? @relation(fields: [defaultPaymentTermsId], references: [inflowId])
-//   pricingScheme                PricingScheme? @relation(fields: [pricingSchemeId],references: [inflowId])
-//   taxingScheme                 TaxingScheme? @relation(fields: [taxingSchemeId], references: [inflowId])
-//   defaultSalesRep              TeamMember? @relation("CustomerSalesRep", fields: [defaultSalesRepTeamMemberId], references: [inflowId])
-//   lastModifiedBy               TeamMember? @relation("CustomerLastModifiedBy",fields: [lastModifiedById],references: [inflowId])
-//   dues                          CustomerDue[]
-//   balances                      CustomerBalance[]
-//   credits                       CustomerCredit[]
-
-//   user                          User?
-
-
-//   createdAt                   DateTime @default(now())
-//   updatedAt                   DateTime @updatedAt
-
-//   deletedAt                   DateTime?
-
-//   @@index([name])
-//   @@index([pricingSchemeId])
-//   @@index([taxingSchemeId])
-
-//   @@map("customer")
-// }
-
-// model CustomerAddress {
-//   id                        String @id @default(cuid())
-//   inflowId                  String @unique
-//   customerId                String
-//   name                      String?
-//   address1                  String?
-//   address2                  String?
-//   city                      String?
-//   state                     String?
-//   country                   String?
-//   postalCode                String?
-//   remarks                   String?
-//   addressType               String?
-//   timestamp                 String?
-//   customer                  Customer @relation(fields: [customerId],references: [inflowId],onDelete: Cascade)
-
-//   createdAt                 DateTime @default(now())
-//   updatedAt                 DateTime @updatedAt
-
-//   @@index([customerId])
-
-//   @@map("customer_address")
-// }
-
-// model InflowIntegration {
-//   id          String   @id @default(cuid())
-//   webhookId   String?  @unique
-//   webhookUrl  String?
-//   secret      String?
-//   isConnected Boolean @default(false)
-
-//   createdAt   DateTime @default(now())
-//   updatedAt   DateTime @updatedAt
-
-//   @@map("inflow_integration")
-// }
-
-
-
-// model ProductGroupOptionAttributeMap {
-//   id          String @id @default(cuid())
-
-//   optionId    String @unique
-//   attributeId String
-
-//   option      ProductGroupOption @relation(fields:[optionId], references:[inflowId])
-//   attribute   Attribute @relation(fields:[attributeId], references:[id])
-// }
-
-// model ProductGroupOptionValueAttributeValueMap {
-//   id               String @id @default(cuid())
-
-//   optionValueId    String @unique
-//   attributeValueId String
-
-//   optionValue      ProductGroupOptionValue @relation(fields:[optionValueId], references:[inflowId])
-//   attributeValue   AttributeValue @relation(fields:[attributeValueId], references:[id])
-// }
-
-
-
-
-// Integrations
-
-// model WebhookSubscription {
-//   id          String   @id @default(cuid())
-//   provider    String   // "inflow"
-//   remoteId    String?  // ID from inFlow if they provide one
-//   url         String
-//   event       String
-//   active      Boolean  @default(true)
-
-//   createdAt   DateTime @default(now())
-//   updatedAt   DateTime @updatedAt
-
-//   @@map("webhook_subscription")
-// }
-
-// model WebhookEvent {
-//   id          String   @id @default(cuid())
-
-//   provider    String
-//   eventType   String
-//   payload     Json
-
-//   processed   Boolean  @default(false)
-//   receivedAt  DateTime @default(now())
-
-//   @@index([provider, eventType])
-
-//   @@map("webhook_event")
-// }
-
-// model InflowWebhook {
-//   id                      String   @id
-//   url                     String
-
-//   secret                  String?
-//   events                  Json
-//   isDisabled              Boolean @default(false)
-//   consecutiveFailureCount Int     @default(0)
-//   lastFailureMessage      String?
-
-//   createdAt               DateTime @default(now())
-//   updatedAt               DateTime @updatedAt
-
-//   @@map("inflow_webhook")
-// }
