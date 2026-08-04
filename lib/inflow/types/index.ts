@@ -127,7 +127,7 @@ export interface InflowProduct {
   originCountry: string | null;
   hsTariffNumber: string | null;
   remarks: string | null;
-  categoryId: string;
+  categoryId: string | null;
   lastVendorId: string | null;
   lastModifiedById: string | null;
   createdDttm: string;
@@ -142,7 +142,7 @@ export interface InflowProduct {
   inventoryLines: InflowInventoryLine[];
   productVariant: InflowProductVariant
 
-  category?: InflowCategory;
+  category?: InflowCategory | null;
   productBarcodes?: InflowProductBarcode[];
   taxCodes?: InflowProductTaxCode[];
   reorderSettings?: InflowReorderSetting[];
@@ -423,7 +423,7 @@ export interface InflowLocation {
   isDefault: boolean;
   name: string;
 
-  timestamp: string;
+  timestamp?: string | null;
 }
 
 // =====================================

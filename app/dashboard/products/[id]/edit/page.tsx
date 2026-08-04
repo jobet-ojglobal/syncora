@@ -5,6 +5,7 @@ import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { getProductMetadata} from "@/services/product-metadata";
 import { ProductForm } from "@/components/product/product-form";
+import { ProductCustomFields } from "@/types/product.type";
 
 interface Props {
   params: Promise<{ id: string }>;
@@ -81,8 +82,11 @@ export default async function EditProductPage({ params }: Props) {
 
   if (!prodData) return notFound();
 
+  const customFields = (prodData.customFields ?? {}) as ProductCustomFields;
+
   const formattedPayload = {
     ...prodData,
+    itemType: prodData.itemType as string,
     weight: prodData.weight ? Number(prodData.weight) : null,
     width: prodData.width ? Number(prodData.width) : null,
     height: prodData.height ? Number(prodData.height) : null,
@@ -115,13 +119,25 @@ export default async function EditProductPage({ params }: Props) {
       smallUrl: img.smallUrl,
       thumbUrl: img.thumbUrl,
     })),
-    isMapped: !!prodData.localMappings
+    isMapped: !!prodData.localMappings,
+    customFields: {
+      custom1: customFields.custom1 ?? "asdas",
+      custom2: customFields.custom2 ?? "",
+      custom3: customFields.custom3 ?? "",
+      custom4: customFields.custom4 ?? "",
+      custom5: customFields.custom5 ?? "",
+      custom6: customFields.custom6 ?? "",
+      custom7: customFields.custom7 ?? "",
+      custom8: customFields.custom8 ?? "",
+      custom9: customFields.custom9 ?? "",
+      custom10: customFields.custom10 ?? "",
+    },
   };
-  
+
   delete (formattedPayload as any).cost;
 
   return (
-    <div className="w-full max-w-12xl mx-auto p-6 space-y-6">
+    <div className="w-full max-w-[90rem] mx-auto mx-auto p-6 space-y-6">
       <Link
         href="/dashboard/products"
         className="mb-4 inline-flex items-center gap-2 text-sm font-medium text-slate-600 hover:text-slate-900"
@@ -129,6 +145,7 @@ export default async function EditProductPage({ params }: Props) {
         <ArrowLeft className="h-4 w-4" />
         Back to Products
       </Link>
+      
       <PageHeader title="Edit Product" description="Edit a product." />
       <ProductForm initialData={formattedPayload} {...metadata} />
     </div>

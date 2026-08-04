@@ -1,7 +1,7 @@
 // lib/locations/services/payment-term-sync-map.service.ts
 import { prisma } from "@/lib/prisma";
 import { getPaymentTerms } from "../data/payment-term"; 
-import { upsertPaymentTerm } from "@/lib/inflow/services/payment-term.sync";
+import { paymentTermSync } from "@/lib/inflow/services/payment-term.sync";
 import crypto from "crypto";
 
 type SyncOptions = {
@@ -64,7 +64,7 @@ export class PaymentTermSyncMapService {
               };
 
               // Pass the transaction client context down to avoid connection fragmentation
-              match = await upsertPaymentTerm(tx, payload);
+              match = await paymentTermSync(tx, payload);
             }
 
             return { incoming: term, existing: match };

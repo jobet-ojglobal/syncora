@@ -1,12 +1,13 @@
 // lib/inflow/services/customer.sync.ts
 
 import { Prisma } from "@/generated/prisma/client";
-import { ensureLocationShell, ensurePaymentTermsShell } from "@/lib/inflow/services/helpers";
 import { InflowCustomer } from "@/lib/inflow/types";
 import { getTaxingScheme } from "@/lib/inflow/data/taxing-schemes";
 import { syncTaxingScheme } from "@/lib/inflow/services/taxing-scheme.sync";
 import { getPricingScheme } from "@/lib/inflow/data/pricing-schemes";
 import { syncPricingScheme } from "@/lib/inflow/services/pricing-scheme.sync";
+import { syncLocation } from "@/lib/inflow/services/location.sync";
+import { paymentTermSync } from "@/lib/inflow/services/payment-term.sync";
 
 /**
  * Syncs a single customer payload into the local database using an ongoing Prisma transaction.
@@ -22,8 +23,8 @@ export async function syncCustomer(
    * STEP 1: Rich Foreign Key Healing (Locations & Terms)
    */
   if (customer.defaultLocation?.locationId && !caches.verifiedLocationIds.has(customer.defaultLocation.locationId)) {
-    await ensureLocationShell(tx, {
-      inflowId: customer.defaultLocation.locationId,
+    await syncLocation(tx, {
+      locationId: customer.defaultLocation.locationId,
       name: customer.defaultLocation.name || "Default Warehouse",
       isActive: customer.defaultLocation.isActive,
       isDefault: customer.defaultLocation.isDefault,
@@ -33,9 +34,11 @@ export async function syncCustomer(
   }
 
   if (customer.defaultPaymentTerms?.paymentTermsId && !caches.verifiedPaymentTermsIds.has(customer.defaultPaymentTerms.paymentTermsId)) {
-    await ensurePaymentTermsShell(tx, {
-      inflowId: customer.defaultPaymentTerms.paymentTermsId,
+    await paymentTermSync(tx, {
+      paymentTermsId: customer.defaultPaymentTerms.paymentTermsId,
       name: customer.defaultPaymentTerms.name || "Standard Terms",
+      daysDue: 0,
+      isActive: true,
     });
     caches.verifiedPaymentTermsIds.add(customer.defaultPaymentTerms.paymentTermsId);
   }

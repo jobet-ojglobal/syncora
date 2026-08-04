@@ -14,7 +14,7 @@ export type InflowPaymentTermInput = {
  * Executes a single atomic database upsert for an inFlow Payment Term.
  * Accepts an optional transaction client context to stay within existing sync blocks.
  */
-export async function upsertPaymentTerm(
+export async function paymentTermSync(
   txOrPrisma: typeof prisma | Tx,
   term: InflowPaymentTermInput
 ) {

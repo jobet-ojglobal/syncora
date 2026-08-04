@@ -1,6 +1,6 @@
 import { prisma } from "@/lib/prisma"; // Ensure you import your default Prisma client instance
 import { getPaymentTerms } from "../data/payment-terms";
-import { upsertPaymentTerm } from "./payment-term.sync";
+import { paymentTermSync } from "./payment-term.sync";
 
 type SyncOptions = {
   onProgress?: (progress: number) => Promise<void>;
@@ -17,7 +17,7 @@ export class PaymentTermSyncService {
       const term = terms[i];
       
       // CRITICAL FIX: Pass the base prisma instance as the first parameter
-      await upsertPaymentTerm(prisma, term);
+      await paymentTermSync(prisma, term);
 
       processed++;
 

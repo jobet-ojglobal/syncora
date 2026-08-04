@@ -8,6 +8,8 @@ import { getCategories } from "@/lib/locations/data/category";
 import { getPricingSchemes } from "@/lib/locations/data/pricing-scheme";
 import { getPaymentTerms } from "@/lib/locations/data/payment-term";
 import { getLocations } from "@/lib/locations/data/location";
+import { getProducts } from "@/lib/locations/data/product";
+import { getLocalProducts } from "@/lib/locations/data/product-local";
 
 export const dynamic = "force-dynamic";
 
@@ -111,6 +113,18 @@ export async function GET(request: NextRequest) {
         id: String(item.locationId), // incoming original ID
         name: item.name,
         description: `0 nested items present`,
+        rawData: item, // Cache full object to pass back later
+      }));
+
+      return NextResponse.json({ items: previewItems });
+    }  else if (source === "products_local") {
+      const rawLocations = await getLocalProducts(location.url);
+      
+      // Transform records into a uniform preview structure
+      const previewItems = rawLocations.map((item: any) => ({
+        id: String(item.productId), // incoming original ID
+        name: item.name,
+        description:`${item.serials?.length || 0} nested serials. ${item.prices?.length || 0} nested prices`,
         rawData: item, // Cache full object to pass back later
       }));
 

@@ -10,7 +10,8 @@ import {
   Pencil, 
   ArrowUpRight, 
   ArrowDownLeft, 
-  RotateCcw 
+  RotateCcw, 
+  Clock
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -122,7 +123,16 @@ export default function InventoryAdjustmentsListPage() {
         description="Log stock level modifications, reconcile discrepancies from damaged or lost goods, and review historical inventory movement audits."
         icon={SlidersHorizontal}
         className="border-b pb-5"
-      />
+      >
+        <div className="flex items-center gap-2">
+          <Button asChild variant="outline" size="sm" className="h-7 px-2 text-muted-foreground hover:text-foreground gap-1">
+            <Link href={`/dashboard/inventory/adjustments/reasons`}>
+              <Clock className="h-4 w-4 mr-2" />
+              Adjustment Reasons
+            </Link>
+          </Button>
+        </div>
+      </PageHeader>
 
       {/* Toolbar Filters */}
       <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center">

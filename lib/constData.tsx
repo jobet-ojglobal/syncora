@@ -87,45 +87,45 @@ export const data = {
       url: "/dashboard",
       icon: LayoutDashboard,
     },
-    {
-      title: "POS",
-      url: "/dashboard/pos",
-      icon: MonitorCheck,
-    },
-    {
-      title: "Customer Orders",
-      url: "/dashboard/customer-orders",
-      icon: ShoppingCart,
-      items: [
-        {
-          title: "All Orders",
-          url: "/dashboard/customer-orders",
-          icon: ShoppingBag,
-        },
-      ],
-    },
-    {
-      title: "Fulfillments",
-      url: "/dashboard/fulfillments",
-      icon: ClipboardCheck,
-      items: [
-        {
-          title: "All Fulfillments",
-          url: "/dashboard/fulfillments",
-          icon: CheckSquare,
-        },
-        {
-          title: "Pickup",
-          url: "/dashboard/fulfillments/pickup",
-          icon: PackageOpen,
-        },
-        {
-          title: "Delivery",
-          url: "/dashboard/fulfillments/delivery",
-          icon: Ship,
-        },
-      ],
-    },
+    // {
+    //   title: "POS",
+    //   url: "/dashboard/pos",
+    //   icon: MonitorCheck,
+    // },
+    // {
+    //   title: "Customer Orders",
+    //   url: "/dashboard/customer-orders",
+    //   icon: ShoppingCart,
+    //   items: [
+    //     {
+    //       title: "All Orders",
+    //       url: "/dashboard/customer-orders",
+    //       icon: ShoppingBag,
+    //     },
+    //   ],
+    // },
+    // {
+    //   title: "Fulfillments",
+    //   url: "/dashboard/fulfillments",
+    //   icon: ClipboardCheck,
+    //   items: [
+    //     {
+    //       title: "All Fulfillments",
+    //       url: "/dashboard/fulfillments",
+    //       icon: CheckSquare,
+    //     },
+    //     {
+    //       title: "Pickup",
+    //       url: "/dashboard/fulfillments/pickup",
+    //       icon: PackageOpen,
+    //     },
+    //     {
+    //       title: "Delivery",
+    //       url: "/dashboard/fulfillments/delivery",
+    //       icon: Ship,
+    //     },
+    //   ],
+    // },
 
     /* -------------------------------------------------------------------------- */
     /* PRODUCT & CATALOG MANAGEMENT                        */
@@ -268,21 +268,21 @@ export const data = {
           url: "/dashboard/inventory/stocks",
           icon: Layers,
         },
-        {
-          title: "Low Stock",
-          url: "/dashboard/inventory/low-stock",
-          icon: AlertTriangle,
-        },
-        {
-          title: "Out of Stock",
-          url: "/dashboard/inventory/out-of-stock",
-          icon: XCircle,
-        },
-        {
-          title: "Overstocked",
-          url: "/dashboard/inventory/overstocked",
-          icon: ArrowUpCircle,
-        },
+        // {
+        //   title: "Low Stock",
+        //   url: "/dashboard/inventory/low-stock",
+        //   icon: AlertTriangle,
+        // },
+        // {
+        //   title: "Out of Stock",
+        //   url: "/dashboard/inventory/out-of-stock",
+        //   icon: XCircle,
+        // },
+        // {
+        //   title: "Overstocked",
+        //   url: "/dashboard/inventory/overstocked",
+        //   icon: ArrowUpCircle,
+        // },
         {
           title: "Adjustments",
           url: "/dashboard/inventory/adjustments",
@@ -339,23 +339,7 @@ export const data = {
       ],
     },
   
-    {
-      title: "Users",
-      url: "/dashboard/users",
-      icon: Users,
-      items: [
-        {
-          title: "All Users",
-          url: "/dashboard/users",
-          icon: Users2,
-        },
-        {
-          title: "Create User",
-          url: "/dashboard/users/create",
-          icon: UserPlus,
-        },
-      ],
-    },
+    
     {
       title: "Team Members",
       url: "/dashboard/team-members",
@@ -458,91 +442,94 @@ export const data = {
     //   ],
     // },
 
-    {
-      title: "Adjustment Reasons",
-      url: "/dashboard/adjustment-reasons",
-      icon: CalendarDays,
-      items: [
-        {
-          title: "All Adjustment Reasons",
-          url: "/dashboard/adjustment-reasons",
-          icon: FileClock,
-        },
-        {
-          title: "Create Adjustment Reasons",
-          url: "/dashboard/adjustment-reasons/create",
-          icon: PlusCircle,
-        },
-      ],
-    },
+    // {
+    //   title: "Adjustment Reasons",
+    //   url: "/dashboard/adjustment-reasons",
+    //   icon: CalendarDays,
+    //   items: [
+    //     {
+    //       title: "All Adjustment Reasons",
+    //       url: "/dashboard/adjustment-reasons",
+    //       icon: FileClock,
+    //     },
+    //     {
+    //       title: "Create Adjustment Reasons",
+    //       url: "/dashboard/adjustment-reasons/create",
+    //       icon: PlusCircle,
+    //     },
+    //   ],
+    // },
 
     /* -------------------------------------------------------------------------- */
     /* DATA, INSIGHTS & SETTINGS                          */
     /* -------------------------------------------------------------------------- */
-    {
-      title: "Analytics",
-      url: "/dashboard/analytics",
-      icon: BarChart3,
-      items: [
-        {
-          title: "Sales",
-          url: "/dashboard/analytics/sales",
-          icon: TrendingUp,
-        },
-        {
-          title: "Inventory",
-          url: "/dashboard/analytics/inventory",
-          icon: Warehouse,
-        },
-        {
-          title: "Branches",
-          url: "/dashboard/analytics/branches",
-          icon: MapPin,
-        },
-        {
-          title: "Customers",
-          url: "/dashboard/analytics/customers",
-          icon: UserCheck,
-        },
-        {
-          title: "Products",
-          url: "/dashboard/analytics/products",
-          icon: Box,
-        },
-      ],
-    },
-    {
-      title: "Reports",
-      url: "/dashboard/reports",
-      icon: FileText,
-      items: [
-        {
-          title: "Sales",
-          url: "/dashboard/reports/sales",
-          icon: LineChart,
-        },
-        {
-          title: "Inventory",
-          url: "/dashboard/reports/inventory",
-          icon: PieChart,
-        },
-        {
-          title: "Branches",
-          url: "/dashboard/reports/branches",
-          icon: Map,
-        },
-        {
-          title: "Products",
-          url: "/dashboard/reports/products",
-          icon: Layers3,
-        },
-        {
-          title: "Export",
-          url: "/dashboard/reports/export",
-          icon: Download,
-        },
-      ],
-    },
+    // {
+    //   title: "Analytics",
+    //   url: "/dashboard/analytics",
+    //   icon: BarChart3,
+    //   items: [
+    //     {
+    //       title: "Sales",
+    //       url: "/dashboard/analytics/sales",
+    //       icon: TrendingUp,
+    //     },
+    //     {
+    //       title: "Inventory",
+    //       url: "/dashboard/analytics/inventory",
+    //       icon: Warehouse,
+    //     },
+    //     {
+    //       title: "Branches",
+    //       url: "/dashboard/analytics/branches",
+    //       icon: MapPin,
+    //     },
+    //     {
+    //       title: "Customers",
+    //       url: "/dashboard/analytics/customers",
+    //       icon: UserCheck,
+    //     },
+    //     {
+    //       title: "Products",
+    //       url: "/dashboard/analytics/products",
+    //       icon: Box,
+    //     },
+    //   ],
+    // },
+    // {
+    //   title: "Reports",
+    //   url: "/dashboard/reports",
+    //   icon: FileText,
+    //   items: [
+    //     {
+    //       title: "Sales",
+    //       url: "/dashboard/reports/sales",
+    //       icon: LineChart,
+    //     },
+    //     {
+    //       title: "Inventory",
+    //       url: "/dashboard/reports/inventory",
+    //       icon: PieChart,
+    //     },
+    //     {
+    //       title: "Branches",
+    //       url: "/dashboard/reports/branches",
+    //       icon: Map,
+    //     },
+    //     {
+    //       title: "Products",
+    //       url: "/dashboard/reports/products",
+    //       icon: Layers3,
+    //     },
+    //     {
+    //       title: "Export",
+    //       url: "/dashboard/reports/export",
+    //       icon: Download,
+    //     },
+    //   ],
+    // },
+
+
+    
     // {
     //   title: "ETL",
     //   url: "/dashboard/etl",

@@ -1,10 +1,10 @@
+import { getInventoryLevels } from '@/lib/inflow/data/inventory';
 import { NextResponse } from 'next/server';
-import { getInventory } from '@/lib/inflow/data/inventory';
 
 export async function GET() {
   try {
     const data =
-        await getInventory();
+        await getInventoryLevels();
 
     return NextResponse.json({
       success: true,

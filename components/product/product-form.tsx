@@ -2,7 +2,7 @@
 
 import { useForm, useFieldArray, Controller, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { productSchema, ProductInput } from "@/schemas/product.schema";
+import { productSchema, ProductInput, DEFAULT_CUSTOM_FIELDS } from "@/schemas/product.schema";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -28,11 +28,16 @@ import {
   Save,
   AlertCircle,
   Edit3,
-  FolderTree
+  FolderTree,
+  Settings2,
+  X,
+  Key,
+  Search,
+  Sparkles
 } from "lucide-react";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
-import { Field, FieldContent, FieldError, FieldGroup, FieldLabel, FieldLegend, FieldSet } from "@/components/ui/field";
+import { Field, FieldContent, FieldDescription, FieldError, FieldGroup, FieldLabel, FieldLegend, FieldSet } from "@/components/ui/field";
 import { generateSku2Variant2 } from "@/helpers/genSKU";
 import React, { useEffect, useMemo, useState } from "react";
 import { BrandSelect } from "../shared/brand-select";
@@ -44,6 +49,7 @@ import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from "
 import { DynamicAlert } from "../shared/alert";
 import { FormInput } from "../shared/form-input";
 import { FormSelect } from "../shared/form-select";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
 interface SelectOption {
   id: string;
@@ -143,6 +149,7 @@ export function ProductForm({  brands, uoms, groups: productGroups, pricingSchem
   const isEditMode = !!initialData;
   // Place inside your component:
   const [expandedIndex, setExpandedIndex] = useState<number | null>(null);
+  const [tagInput, setTagInput] = useState("");
 
   const toggleExpand = (idx: number) => {
     setExpandedIndex(expandedIndex === idx ? null : idx);
@@ -161,18 +168,25 @@ export function ProductForm({  brands, uoms, groups: productGroups, pricingSchem
       }));
     }
 
-    return [];
-
     // If it's a brand new product, cleanly loop through all platform schemes 
     // so the operator doesn't have to hit "Append Tier" 5 times manually.
-    // if (pricingSchemes && pricingSchemes.length > 0) {
-    //   return pricingSchemes.map((scheme) => ({
-    //     pricingSchemeId: scheme.inflowId,
-    //     priceType: "FixedPrice" as "FixedPrice" | "FixedMarkup" | "Dynamic" | "Tiered",
-    //     unitPrice: 0,
-    //     fixedMarkup: 0,
-    //   }));
-    // }
+    if (pricingSchemes && pricingSchemes.length > 0) {
+      // return pricingSchemes.map((scheme) => ({
+      //   pricingSchemeId: scheme.inflowId,
+      //   priceType: "FixedPrice" as "FixedPrice" | "FixedMarkup" | "Dynamic" | "Tiered",
+      //   unitPrice: 0,
+      //   fixedMarkup: 0,
+      // }));
+
+      return pricingSchemes.filter((scheme) => scheme.name === "Normal Price").map((scheme) => ({
+        pricingSchemeId: scheme.inflowId,
+        priceType: "FixedPrice" as "FixedPrice" | "FixedMarkup" | "Dynamic" | "Tiered",
+        unitPrice: 0,
+        fixedMarkup: 0,
+      }));
+    }
+    
+    
 
   //   // Bare minimum fallback array structure
   //   return [{ pricingSchemeId: "", priceType: "FixedPrice" as "FixedPrice" | "FixedMarkup" | "Dynamic" | "Tiered", unitPrice: 0, fixedMarkup: 0 }];
@@ -204,6 +218,13 @@ export function ProductForm({  brands, uoms, groups: productGroups, pricingSchem
       width: initialData?.width ? Number(initialData.width) : 0,
       height: initialData?.height ? Number(initialData.height) : 0,
       length: initialData?.length ? Number(initialData.length) : 0,
+
+      customFields: {
+        ...DEFAULT_CUSTOM_FIELDS,
+        ...(initialData?.customFields ?? {}),
+      },
+      tags: initialData?.tags ?? [],
+      features: initialData?.features?.map((f: any) => ({ key: f.key, value: f.value })) ?? [],
 
       // Seed extended valuation allocations
       initialCost: initialData?.initialCost ? Number(initialData.initialCost) : 0,
@@ -250,6 +271,28 @@ export function ProductForm({  brands, uoms, groups: productGroups, pricingSchem
     control,
     name: "barcodes"
   });
+
+  const { fields: featureFields, append: appendFeature, remove: removeFeature } = useFieldArray({
+    control,
+    name: "features"
+  });
+
+  const watchedTags = watch("tags") || [];
+
+  const handleTagKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter" || e.key === ",") {
+      e.preventDefault();
+      const sanitized = tagInput.trim().replace(/,$/, "");
+      if (sanitized && !watchedTags.includes(sanitized)) {
+        setValue("tags", [...watchedTags, sanitized]);
+      }
+      setTagInput("");
+    }
+  };
+
+  const removeTag = (tagToRemove: string) => {
+    setValue("tags", watchedTags.filter(t => t !== tagToRemove));
+  };
   
   
   // Watch the matrix relationship variables
@@ -1034,6 +1077,84 @@ export function ProductForm({  brands, uoms, groups: productGroups, pricingSchem
 
         {/* right Column */}
         <div className="space-y-6">
+          <Card className="shadow-xs">
+            <CardHeader className="border-b pb-3 flex flex-row items-center justify-between space-y-0">
+              <div className="space-y-1">
+                <CardTitle className="text-sm font-semibold flex items-center gap-1.5">
+                  <Sparkles className="w-4 h-4 text-primary" />
+                  Product Highlights & Discoverability
+                </CardTitle>
+                <CardDescription className="text-[11px]">
+                  Manage key product attributes that improve visibility, search results, and customer discovery.
+                </CardDescription>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-6 pt-4">
+              <Field className="space-y-2">
+                <div className="flex justify-between items-center">
+                  <div>
+                    <FieldLabel>Technical Specifications / Features</FieldLabel>
+                    <p className="text-[11px] text-muted-foreground">Pair values like Key: <b>Sensor</b> | Value: <b>Full Frame</b></p>
+                  </div>
+                  <Button 
+                    type="button" 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={() => appendFeature({ key: "", value: "" })} 
+                    className="h-7 text-xs gap-1 shrink-0"
+                  >
+                    <Plus className="w-3 h-3" /> Add Spec
+                  </Button>
+                </div>
+                
+                <div className="space-y-2 max-h-[260px] overflow-y-auto pr-1">
+                  {featureFields.map((field, index) => (
+                    <div key={field.id} className="flex gap-2 items-start bg-muted/20 p-2 border rounded-lg relative group">
+                      <div className="grid grid-cols-2 gap-2 w-full">
+                        <div>
+                          <Input placeholder="Label (e.g., Sensor)" className="h-8 text-xs font-semibold" {...register(`features.${index}.key` as const)} />
+                          {errors.features?.[index]?.key && (
+                            <span className="text-[10px] text-destructive">{errors.features[index]?.key?.message}</span>
+                          )}
+                        </div>
+                        <div>
+                          <Input placeholder="Spec (e.g., Full Frame)" className="h-8 text-xs" {...register(`features.${index}.value` as const)} />
+                          {errors.features?.[index]?.value && (
+                            <span className="text-[10px] text-destructive">{errors.features[index]?.value?.message}</span>
+                          )}
+                        </div>
+                      </div>
+                      <Button type="button" variant="ghost" size="icon" onClick={() => removeFeature(index)} className="text-muted-foreground hover:text-destructive h-8 w-8 shrink-0 align-middle">
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </Button>
+                    </div>
+                  ))}
+                  {featureFields.length === 0 && (
+                    <p className="text-xs text-muted-foreground italic p-4 border border-dashed rounded-lg text-center bg-muted/10">No system specifications added yet.</p>
+                  )}
+                </div>
+              </Field>
+              <Field className="space-y-2">
+                <div>
+                  <FieldLabel htmlFor="tags-input" >Search Keywords & Tags</FieldLabel>
+                  <FieldDescription className="text-[11px] text-muted-foreground">Type a tag and press <kbd className="px-1 bg-muted border rounded text-[10px]">Enter</kbd> or <kbd className="px-1 bg-muted border rounded text-[10px]">,</kbd> to lock it in.</FieldDescription>
+                </div>
+                <Input id="tags-input" placeholder="e.g., hot-swap, wireless, mechanical" value={tagInput} onChange={(e) => setTagInput(e.target.value)} onKeyDown={handleTagKeyDown} />
+                <div className="flex flex-wrap gap-1.5 p-2 border rounded-lg min-h-[80px] bg-muted/20 align-top content-start">
+                  {watchedTags.map((tag, idx) => (
+                    <span key={tag || idx} className="inline-flex items-center gap-1 bg-primary/10 text-primary border border-primary/20 rounded-md px-2 py-0.5 text-xs font-medium">
+                      {tag}
+                      <button type="button" onClick={() => removeTag(tag)} className="hover:text-destructive text-muted-foreground/80 focus:outline-none">
+                        <X className="w-3 h-3" />
+                      </button>
+                    </span>
+                  ))}
+                  {watchedTags.length === 0 && <span className="text-xs text-muted-foreground italic m-auto">No tags assigned.</span>}
+                </div>
+              </Field>
+            </CardContent>
+          </Card>
+          
           {/* 🏢 Dynamic Multi-Tier Pricing Matrix Section */}
           <div className="bg-card border rounded-xl p-5 space-y-4 shadow-xs ">
             <div className="space-y-0.5 border-b pb-2">
@@ -1060,27 +1181,6 @@ export function ProductForm({  brands, uoms, groups: productGroups, pricingSchem
                 placeholder="0.00"
                 classNameField="md:col-span-1"
               />
-              {/* <Controller 
-                control={control} 
-                name="initialCost" 
-                render={({ field, fieldState }) => (
-                  <Field className="md:col-span-1">
-                    <FieldLabel htmlFor="initialCost">Standard Base Cost ($) <b className="text-red-500">*</b></FieldLabel>
-                    <FieldContent>
-                      <Input
-                        {...field}
-                        {...register("initialCost", { valueAsNumber: true })} 
-                        id="initialCost"
-                        type="number" 
-                        step="0.00001" 
-                        placeholder="0.00"
-                        aria-invalid={fieldState.invalid}
-                      />
-                      {fieldState.invalid && <FieldError className="text-xs" errors={[fieldState.error]} />}
-                    </FieldContent>
-                  </Field>
-                )}
-              /> */}
               <FieldLabel>Price Matrix Lines Mapping</FieldLabel>
               {priceFields.length === 0 ? (
                 <div className="flex flex-col items-center justify-center p-8 border border-dashed rounded-xl bg-muted/5 text-muted-foreground text-center">
@@ -1548,6 +1648,54 @@ export function ProductForm({  brands, uoms, groups: productGroups, pricingSchem
                 <Plus className="w-3.5 h-3.5" /> Bind Image URL
               </Button>
           </div>
+
+          {/* Custom Fields */}
+          <Card className="shadow-xs">
+             <CardHeader className="border-b pb-3 flex flex-row items-center justify-between space-y-0">
+              <div className="space-y-1">
+                <CardTitle className="text-sm font-semibold flex items-center gap-1.5">
+                  <Settings2 className="w-4 h-4 text-primary" />
+                  Custom Fields
+                </CardTitle>
+                <CardDescription className="text-[11px]">
+                  Configure additional fields to capture information specific to your business.
+                </CardDescription>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-6 pt-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* Column 1: Custom Fields 1 through 5 */}
+                <div className="space-y-2">
+                  {[1, 2, 3, 4, 5].map((num) => (
+                    <FormInput
+                      key={`custom${num}`}
+                      name={`customFields.custom${num}`}
+                      control={control}
+                      label={`Custom ${num}`}
+                      placeholder={`Enter custom ${num} value`}
+                      classNameLabel="text-muted-foreground font-semibold text-xs"
+                    />
+                  ))}
+                </div>
+
+                {/* Column 2: Custom Fields 6 through 10 */}
+                <div className="space-y-2">
+                  {[6, 7, 8, 9, 10].map((num) => (
+                    <FormInput
+                      key={`custom${num}`}
+                      name={`customFields.custom${num}`}
+                      control={control}
+                      label={`Custom ${num}`}
+                      placeholder={`Enter custom ${num} value`}
+                      classNameLabel="text-muted-foreground font-semibold text-xs"
+                    />
+                  ))}
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+
         </div>
       </div>
 
