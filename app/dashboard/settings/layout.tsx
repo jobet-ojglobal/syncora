@@ -21,6 +21,7 @@ import {
   FileText,
   SlidersHorizontal,
   MapPin,
+  Users,
 } from "lucide-react";
 import PageHeader from "@/components/layout/dashboard/PageHeader";
 
@@ -33,6 +34,7 @@ interface NavItem {
 
 const settingsNav: NavItem[] = [
   { title: "General", href: "/dashboard/settings/general", icon: Settings },
+  { title: "User", href: "/dashboard/settings/users", icon: Users },
   {
     title: "Financial",
     href: "/dashboard/settings/financial",
@@ -54,7 +56,7 @@ const settingsNav: NavItem[] = [
   // },
   { title: "Inflow Cloud", href: "/dashboard/settings/inflow", icon: Database },
   { title: "Location", href: "/dashboard/settings/locations", icon: MapPin },
-  // { title: "Sync", href: "/dashboard/settings/sync", icon: RefreshCw },
+  
   { title: "Payment", href: "/dashboard/settings/payment", icon: CreditCard },
   // { title: "Tax Configuration", href: "/dashboard/settings/tax-config", icon: Receipt },
   { title: "Trash", href: "/dashboard/settings/trash", icon: Trash2 },

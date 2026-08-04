@@ -1,16 +1,15 @@
 import PageHeader from "@/components/layout/dashboard/PageHeader";
 import { TransferOrderForm } from "@/components/transfer/transfer-form";
 import { prisma } from "@/lib/prisma";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, ArrowLeftRight } from "lucide-react";
 import Link from "next/link";
 
-export default async function CreateTransferPage() {
-
+export default async function NewTransferPage() {
   const [locations] = await Promise.all([
     prisma.location.findMany({
       where: {
         isActive: true,
-        deletedAt: null
+        deletedAt: null,
       },
       select: {
         inflowId: true,
@@ -25,22 +24,24 @@ export default async function CreateTransferPage() {
       {/* HEADER */}
       <Link
         href="/dashboard/transfers"
-        className="mb-4 inline-flex items-center gap-2 text-sm font-medium text-slate-600 hover:text-slate-900"
+        className="mb-4 inline-flex items-center gap-2 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
       >
         <ArrowLeft className="h-4 w-4" />
         Back to Transfers
       </Link>
+
       <PageHeader
-        title=""
-        description="" 
-        // icon={}
+        title="Create Transfer Order"
+        description="Transfer inventory items between your active locations."
+        icon={ArrowLeftRight}
       />
+
       <TransferOrderForm
         locations={locations.map((l) => ({
           inflowId: l.inflowId,
           name: l.name,
         }))}
-       />
+      />
     </div>
   );
 }

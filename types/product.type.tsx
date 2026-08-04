@@ -4,6 +4,19 @@
 
 import { Inventory, InventoryBin } from "./location.type";
 
+export type ProductCustomFields = {
+  custom1?: string;
+  custom2?: string;
+  custom3?: string;
+  custom4?: string;
+  custom5?: string;
+  custom6?: string;
+  custom7?: string;
+  custom8?: string;
+  custom9?: string;
+  custom10?: string;
+};
+
 export interface SyncJob {
   id: string;
   source: string;

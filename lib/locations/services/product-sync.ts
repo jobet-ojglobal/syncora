@@ -1,6 +1,6 @@
 import { Prisma, Product, ProductPriceType, ProductType } from "@/generated/prisma/client";
 import { genInflowUniqueSlug } from "@/helpers/genUniqueSlug";
-import { InflowLocation, InflowProduct } from "../types";
+import { InflowLocation, InflowProduct } from "@/lib/inflow/types";
 import { 
   syncBrand, 
   syncGroupFeatures, 
@@ -11,11 +11,11 @@ import {
   syncPurchasingUom, 
   syncSalesUom, 
   toJsonInput
-} from "./helpers";
-import { syncTeamMember } from "./team-member.sync";
-import { syncVendor } from "./vendor.sync";
-import { ensureCategoryShell, ensureLocationShell, ensureOperationTypeShell, ensurePricingSchemeShell, ensureProductShell, ensureTaxCodeShell, ensureTaxingSchemeShell, ensureVendorShell } from "./ensure.service";
-import { productTypeSwitcher, reorderMethodSwitcher } from "@/helpers/product.helper";
+} from "@/lib/inflow/services/helpers";
+import { syncTeamMember } from "@/lib/inflow/services/team-member.sync";
+import { syncVendor } from "@/lib/inflow/services/vendor.sync";
+import { ensureCategoryShell, ensureLocationShell, ensureOperationTypeShell, ensurePricingSchemeShell, ensureProductShell, ensureTaxCodeShell, ensureTaxingSchemeShell, ensureVendorShell } from "@/lib/inflow/services/ensure.service";
+import { reorderMethodSwitcher, productTypeSwitcher } from "@/helpers/product.helper";
 
 type Tx = Prisma.TransactionClient;
 
@@ -57,9 +57,6 @@ export async function syncProduct(
   const verifiedProductIds = caches?.verifiedProductIds ?? new Set<string>();
 
   const brandName = firstProductInGroup?.customFields?.custom1 || product.customFields?.custom1;
-  const rawFeaturesString = firstProductInGroup?.customFields?.custom2 || product.customFields?.custom2;
-  const rawTagsString = firstProductInGroup?.customFields?.custom3  || product.customFields?.custom3;
-
 
   let brandId: string | null = null;
   if (brandName) {
@@ -228,7 +225,7 @@ export async function syncProduct(
   if(product.salesUom?.name !== "") {
     await syncSalesUom(tx, product);
   }
-
+  
   if (product.images !== undefined) {
     await syncImages(tx, product);
   }
@@ -352,22 +349,6 @@ export async function syncProduct(
     }
   }
 
-  // 7. Tax Codes Sync
-  // if (product.taxCodes !== undefined) {
-  //   await tx.productTaxCode.deleteMany({ where: { productId: product.productId } });
-  //   if (product.taxCodes?.length) {
-  //     await tx.productTaxCode.createMany({
-  //       data: product.taxCodes.map((tc) => ({
-  //         productTaxCodeId: tc.productTaxCodeId,
-  //         productId: product.productId,
-  //         taxCodeId: tc.taxCodeId,
-  //         taxingSchemeId: tc.taxingSchemeId,
-  //       })),
-  //       skipDuplicates: true,
-  //     });
-  //   }
-  // }
-
   // 8. Reorder Settings Sync with Foreign Key Shell Guarantees
   if (product.reorderSettings !== undefined) {
     await tx.reorderSetting.deleteMany({ where: { productId: product.productId } });
@@ -489,7 +470,6 @@ export async function syncProduct(
     }
   }
 
-  // 9. Product Operations Sync
   // Product Operations Sync with Foreign Key Shell Guarantees
   if (product.productOperations !== undefined) {
     await tx.productOperation.deleteMany({
@@ -569,50 +549,6 @@ export async function syncProduct(
       }
     }
   }
-  // if (product.productOperations !== undefined) {
-  //   await tx.productOperation.deleteMany({ where: { productId: product.productId } });
-  //   if (product.productOperations?.length) {
-  //     await tx.productOperation.createMany({
-  //       data: product.productOperations.map((po) => ({
-  //         inflowId: po.productOperationId,
-  //         productId: product.productId,
-  //         operationTypeId: po.operationTypeId,
-  //         lineNum: typeof po.lineNum === "string" ? parseInt(po.lineNum, 10) : po.lineNum,
-  //         cost: toDecimal(po.cost) ?? new Prisma.Decimal(0),
-  //         estimatedPerHourCost: toDecimal(po.estimatedPerHourCost) ?? new Prisma.Decimal(0),
-  //         estimatedSeconds: toDecimal(po.estimatedSeconds) ?? new Prisma.Decimal(0),
-  //         instructions: po.instructions,
-  //         trackTime: po.trackTime ?? false,
-  //       })),
-  //       skipDuplicates: true,
-  //     });
-  //   }
-  // }
-
-  // 10. Product Prices Sync
-  // if (product.prices !== undefined) {
-  //   await tx.productPrice.deleteMany({ where: { productId: product.productId } });
-  //   if (product.prices?.length) {
-  //     await tx.productPrice.createMany({
-  //       data: product.prices.map((p) => {
-  //         let normalizedPriceType = "fixedPrice";
-  //         const incomingType = p.priceType?.toLowerCase() || "";
-  //         if (incomingType.includes("markup")) normalizedPriceType = "markup";
-  //         if (incomingType.includes("margin")) normalizedPriceType = "margin";
-
-  //         return {
-  //           inflowId: p.productPriceId,
-  //           pricingSchemeId: p.pricingSchemeId,
-  //           productId: product.productId,
-  //           priceType: normalizedPriceType as any,
-  //           unitPrice: toDecimal(p.unitPrice),
-  //           fixedMarkup: toDecimal(p.fixedMarkup),
-  //         };
-  //       }),
-  //       skipDuplicates: true,
-  //     });
-  //   }
-  // }
 
   // Product Prices Sync with Foreign Key Shell Guarantees
   if (product.prices !== undefined) {
@@ -710,27 +646,6 @@ export async function syncProduct(
     }
   }
 
-  // 12. Item BOM Components Sync
-  // if (product.itemBoms !== undefined) {
-  //   await tx.productBom.deleteMany({ where: { productId: product.productId } });
-  //   if (product.itemBoms?.length) {
-  //     await tx.productBom.createMany({
-  //       data: product.itemBoms.map((bom) => {
-  //         const rawQuantity = typeof bom.quantity === "object" 
-  //           ? bom.quantity?.standardQuantity 
-  //           : bom.quantity;
-
-  //         return {
-  //           inflowId: bom.itemBomId,
-  //           productId: product.productId,
-  //           childProductId: bom.childProductId,
-  //           quantity: toDecimal(rawQuantity) ?? new Prisma.Decimal(0),
-  //         };
-  //       }),
-  //       skipDuplicates: true,
-  //     });
-  //   }
-  // }
 
   // Product BOM (Bill of Materials) Sync with Foreign Key Shell Guarantees
   if (product.itemBoms !== undefined) {
@@ -824,23 +739,6 @@ export async function syncProduct(
     }
   }
 
-  // 13. Product Attachments Sync
-  // if (product.attachments !== undefined) {
-  //   await tx.productAttachment.deleteMany({ where: { productId: product.productId } });
-  //   if (product.attachments?.length) {
-  //     await tx.productAttachment.createMany({
-  //       data: product.attachments.map((att) => ({
-  //         inflowId: att.attachmentId,
-  //         productId: product.productId,
-  //         attachmentUrl: att.attachmentUrl,
-  //         fileName: att.fileName,
-  //         lastModifiedById: att.lastModifiedById,
-  //       })),
-  //       skipDuplicates: true,
-  //     });
-  //   }
-  // }
-
   if (product.attachments !== undefined) {
     // 1. Clear existing relations for full re-sync
     await tx.productAttachment.deleteMany({
@@ -902,494 +800,5 @@ export async function syncProduct(
     }
   }
 
-
-  
-
-
-
-  // 14. Metadata / Features / Tags Dynamic Routing
-  if (groupId) {
-    if (rawFeaturesString) {
-      await syncGroupFeatures(tx, groupId, rawFeaturesString);
-    }
-    if (rawTagsString) {
-      await syncGroupTags(tx, groupId, rawTagsString);
-    }
-  } else {
-    if (rawFeaturesString) {
-      await syncProductFeatures(tx, product.productId, rawFeaturesString);
-    }
-    if (rawTagsString) {
-      await syncProductTags(tx, product.productId, rawTagsString);
-    }
-  }
-
   return validProductData;
 }
-
-// import { InflowProduct } from "../types";
-// import { 
-//   syncBrand, 
-//   syncProductFeatures, 
-//   syncProductTags, 
-//   syncGroupFeatures,
-//   syncGroupTags,
-//   syncImages,
-//   syncPurchasingUom,
-//   syncSalesUom
-// } from "./helpers";
-// import { genInflowUniqueSlug } from "@/helpers/genUniqueSlug";
-// import { syncVendor } from "./vendor.sync";
-
-// import { Prisma } from "@/generated/prisma/client";
-
-// type Tx = Prisma.TransactionClient;
-
-// export async function syncProduct(
-//   tx: Tx,
-//   product: InflowProduct,
-//   groupId?: string
-// ) {
-//   const brandId = await syncBrand(tx, product.customFields?.custom1);
-
-//   // 1. Capture target group parameters safely
-//   const targetGroupId = groupId || product.productVariant?.productGroup?.productGroupId || null;
-  
-//   // 2. Initial attempt to grab categoryId from incoming nested stream
-//   let categoryId = product.productVariant?.productGroup?.categoryId || null;
-
-//   // Fallback gate for category if payload inclusions are missing group contexts
-//   if (!categoryId) {
-//     const existingLocalProduct = await tx.product.findUnique({
-//       where: { inflowId: product.productId },
-//       select: { categoryId: true }
-//     });
-//     if (existingLocalProduct?.categoryId) {
-//       categoryId = existingLocalProduct.categoryId;
-//     }
-//   }
-
-//   // 3. 🛡️ FOREIGN KEY GUARD: Check if the TeamMember exists before assigning lastModifiedById
-//   let validLastModifiedById: string | null = null;
-//   if (product.lastModifiedById) {
-//     const localMember = await tx.teamMember.findUnique({
-//       where: { inflowId: product.lastModifiedById },
-//       select: { inflowId: true }
-//     });
-    
-//     if (localMember) {
-//       validLastModifiedById = localMember.inflowId;
-//     } else {
-//       console.warn(
-//         `[Sync Notification] TeamMember with inflowId "${product.lastModifiedById}" not synced yet. Setting product.lastModifiedById to null to avoid constraint errors.`
-//       );
-//     }
-//   }
-
-//   // 3. 🛡️ SELF-HEALING FOREIGN KEY GUARD: Vendor
-//   let validLastVendorId: string | null = null;
-//   if (product.lastVendorId) {
-//     const localVendor = await tx.vendor.findUnique({
-//       where: { inflowId: product.lastVendorId },
-//       select: { inflowId: true }
-//     });
-    
-//     if (localVendor) {
-//       validLastVendorId = localVendor.inflowId;
-//     } else {
-//       try {
-//         console.log(`[JIT Sync] Vendor "${product.lastVendorId}" missing locally. Fetching from cloud...`);
-//         if (product.lastVendor) {
-//           // Initialize empty caches required by your modular single vendor sync component
-//           const vendorCaches = {
-//             verifiedPaymentTermsIds: new Set<string>(),
-//             verifiedTaxingSchemeIds: new Set<string>(),
-//             verifiedCurrencyIds: new Set<string>(),
-//           };
-//           const syncedVendor = await syncVendor(tx, product.lastVendor, vendorCaches);
-//           validLastVendorId = syncedVendor.inflowId;
-//         }
-//       } catch (err) {
-//         console.error(`[JIT Sync Error] Could not recover Vendor "${product.lastVendorId}":`, err);
-//         // Fallback safely to null to preserve primary process stability if cloud asset was deleted
-//       }
-//     }
-//   }
-
-//   const rawFeaturesString = product?.customFields?.custom2; 
-//   const rawTagsString = product?.customFields?.custom3;
-
-//   const baseSlug = await genInflowUniqueSlug(product.name || "product-variant", tx.product, product.productId);
-
-//   // 4. Core Product Upsert Configuration
-//   const dbProduct = await tx.product.upsert({
-//     where: {
-//       inflowId: product.productId,
-//     },
-//     create: {
-//       inflowId: product.productId,
-//       sku: product.sku,
-//       name: product.name,
-//       slug: baseSlug,
-//       description: product.description,
-//       categoryId, // Safe from accidental null mutation wipes now!
-//       brandId,
-//       itemType: product.itemType,
-//       autoAssemble: product.autoAssemble,
-//       isActive: product.isActive,
-//       isManufacturable: product.isManufacturable,
-//       includeQuantityBuildable: product.includeQuantityBuildable,
-//       standardUomName: product.standardUomName,
-//       trackExpiry: product.trackExpiry,
-//       trackLots: product.trackLots,
-//       trackSerials: product.trackSerials,
-//       shelfLifeDays: product.shelfLifeDays,
-//       sellBeforeExpiryDays: product.sellBeforeExpiryDays,
-//       expiryNotificationDays: product.expiryNotificationDays,
-//       weight: product.weight ? new Prisma.Decimal(product.weight) : null,
-//       width: product.width ? new Prisma.Decimal(product.width) : null,
-//       height: product.height ? new Prisma.Decimal(product.height) : null,
-//       length: product.length ? new Prisma.Decimal(product.length) : null,
-//       originCountry: product.originCountry,
-//       hsTariffNumber: product.hsTariffNumber,
-//       remarks: product.remarks,
-//       lastVendorId: validLastVendorId,
-//       lastModifiedById: validLastModifiedById,
-//       createdDttm: product.createdDttm ? new Date(product.createdDttm) : null,
-//       lastModifiedDateTime: product.lastModifiedDateTime ? new Date(product.lastModifiedDateTime) : null,
-//     },
-//     update: {
-//       sku: product.sku,
-//       name: product.name,
-//       description: product.description,
-//       categoryId, // Kept safe during schema update routines
-//       brandId,
-//       itemType: product.itemType,
-//       autoAssemble: product.autoAssemble,
-//       isActive: product.isActive,
-//       isManufacturable: product.isManufacturable,
-//       includeQuantityBuildable: product.includeQuantityBuildable,
-//       standardUomName: product.standardUomName,
-//       trackExpiry: product.trackExpiry,
-//       trackLots: product.trackLots,
-//       trackSerials: product.trackSerials,
-//       shelfLifeDays: product.shelfLifeDays,
-//       sellBeforeExpiryDays: product.sellBeforeExpiryDays,
-//       expiryNotificationDays: product.expiryNotificationDays,
-//       weight: product.weight ? new Prisma.Decimal(product.weight) : null,
-//       width: product.width ? new Prisma.Decimal(product.width) : null,
-//       height: product.height ? new Prisma.Decimal(product.height) : null,
-//       length: product.length ? new Prisma.Decimal(product.length) : null,
-//       originCountry: product.originCountry,
-//       hsTariffNumber: product.hsTariffNumber,
-//       remarks: product.remarks,
-//       lastVendorId: validLastVendorId,
-//       lastModifiedById: validLastModifiedById,
-//       lastModifiedDateTime: product.lastModifiedDateTime ? new Date(product.lastModifiedDateTime) : null,
-//     },
-//   });
-
-//   // Base Helpers Execution (Check if fields exist in payload down inside helpers)
-//   await syncPurchasingUom(tx, product);
-//   await syncSalesUom(tx, product);
-  
-//   if (product.images) {
-//     await syncImages(tx, product);
-//   }
-
-//   /**
-//    * 2. Barcodes Sync (Guarded from partial check wipes)
-//    */
-//   if (product.productBarcodes !== undefined) {
-//     await tx.productBarcode.deleteMany({ where: { productId: product.productId } });
-//     if (product.productBarcodes?.length) {
-//       await tx.productBarcode.createMany({
-//         data: product.productBarcodes.map((bc) => ({
-//           inflowId: bc.productBarcodeId,
-//           productId: product.productId,
-//           barcode: bc.barcode,
-//           lineNum: typeof bc.lineNum === "string" ? parseInt(bc.lineNum, 10) : bc.lineNum,
-//         })),
-//         skipDuplicates: true,
-//       });
-//     }
-//   }
-
-//   /**
-//    * 3. Tax Codes Sync
-//    */
-//   if (product.taxCodes !== undefined) {
-//     await tx.productTaxCode.deleteMany({ where: { productId: product.productId } });
-//     if (product.taxCodes?.length) {
-//       await tx.productTaxCode.createMany({
-//         data: product.taxCodes.map((tc) => ({
-//           productTaxCodeId: tc.productTaxCodeId,
-//           productId: product.productId,
-//           taxCodeId: tc.taxCodeId,
-//           taxingSchemeId: tc.taxingSchemeId,
-//         })),
-//         skipDuplicates: true,
-//       });
-//     }
-//   }
-
-//   /**
-//    * 4. Reorder Settings Sync
-//    */
-//   if (product.reorderSettings !== undefined) {
-//     await tx.reorderSetting.deleteMany({ where: { productId: product.productId } });
-//     if (product.reorderSettings?.length) {
-//       await tx.reorderSetting.createMany({
-//         data: product.reorderSettings.map((rs) => ({
-//           inflowId: rs.reorderSettingsId,
-//           productId: product.productId,
-//           locationId: rs.locationId,
-//           fromLocationId: rs.fromLocationId,
-//           vendorId: rs.vendorId,
-//           defaultSublocation: rs.defaultSublocation,
-//           enableReordering: rs.enableReordering ?? true,
-//           reorderMethod: rs.reorderMethod || "PurchaseOrder",
-//           reorderPoint: new Prisma.Decimal(rs.reorderPoint || 0),
-//           reorderQuantity: new Prisma.Decimal(rs.reorderQuantity || 0),
-//         })),
-//         skipDuplicates: true,
-//       });
-//     }
-
-    
-//   }
-
-//   /**
-//      * STEP 1: Rich Foreign Key Healing (Locations & Terms)
-//      */
-//     // if (customer.defaultLocation?.locationId && !caches.verifiedLocationIds.has(customer.defaultLocation.locationId)) {
-//     //   await ensureLocationShell(tx, {
-//     //     inflowId: customer.defaultLocation.locationId,
-//     //     name: customer.defaultLocation.name || "Default Warehouse",
-//     //     isActive: customer.defaultLocation.isActive,
-//     //     isDefault: customer.defaultLocation.isDefault,
-//     //     address: customer.defaultLocation.address,
-//     //   });
-//     //   caches.verifiedLocationIds.add(customer.defaultLocation.locationId);
-//     // }
-
-//   /**
-//    * 5. Product Operations Sync
-//    */
-//   if (product.productOperations !== undefined) {
-//     await tx.productOperation.deleteMany({ where: { productId: product.productId } });
-//     if (product.productOperations?.length) {
-//       await tx.productOperation.createMany({
-//         data: product.productOperations.map((po) => ({
-//           inflowId: po.productOperationId,
-//           productId: product.productId,
-//           operationTypeId: po.operationTypeId,
-//           lineNum: typeof po.lineNum === "string" ? parseInt(po.lineNum, 10) : po.lineNum,
-//           cost: new Prisma.Decimal(po.cost || 0),
-//           estimatedPerHourCost: new Prisma.Decimal(po.estimatedPerHourCost || 0),
-//           estimatedSeconds: new Prisma.Decimal(po.estimatedSeconds || 0),
-//           instructions: po.instructions,
-//           trackTime: po.trackTime ?? false,
-//         })),
-//         skipDuplicates: true,
-//       });
-//     }
-//   }
-
-//   /**
-//    * 6. Product Prices Sync
-//    */
-//   if (product.prices !== undefined) {
-//     await tx.productPrice.deleteMany({ where: { productId: product.productId } });
-//     if (product.prices?.length) {
-//       await tx.productPrice.createMany({
-//         data: product.prices.map((p) => {
-//           let normalizedPriceType = "fixedPrice";
-//           const incomingType = p.priceType?.toLowerCase() || "";
-//           if (incomingType.includes("markup")) normalizedPriceType = "markup";
-//           if (incomingType.includes("margin")) normalizedPriceType = "margin";
-
-//           return {
-//             inflowId: p.productPriceId,
-//             pricingSchemeId: p.pricingSchemeId,
-//             productId: product.productId,
-//             priceType: normalizedPriceType as any,
-//             unitPrice: p.unitPrice ? new Prisma.Decimal(p.unitPrice) : null,
-//             fixedMarkup: p.fixedMarkup ? new Prisma.Decimal(p.fixedMarkup) : null,
-//           };
-//         }),
-//         skipDuplicates: true,
-//       });
-//     }
-//   }
-
-//   /**
-//    * 7. Product Cost (1:1 Relation Sync Setup)
-//    */
-//   if (product.cost !== undefined) {
-//     if (product.cost) {
-//       await tx.productCost.upsert({
-//         where: { productId: product.productId },
-//         create: {
-//           inflowId: product.cost.productCostId,
-//           productId: product.productId,
-//           cost: new Prisma.Decimal(product.cost.cost || 0),
-//         },
-//         update: {
-//           inflowId: product.cost.productCostId,
-//           cost: new Prisma.Decimal(product.cost.cost || 0),
-//         },
-//       });
-//     } else {
-//       await tx.productCost.deleteMany({ where: { productId: product.productId } });
-//     }
-//   }
-
-//   /**
-//    * 8. Item BOM (Bill of Materials) Components Sync
-//    */
-//   if (product.itemBoms !== undefined) {
-//     await tx.productBom.deleteMany({ where: { productId: product.productId } });
-//     if (product.itemBoms?.length) {
-//       await tx.productBom.createMany({
-//         data: product.itemBoms.map((bom) => {
-//           const rawQuantity = typeof bom.quantity === "object" 
-//             ? bom.quantity?.standardQuantity 
-//             : bom.quantity;
-
-//           return {
-//             inflowId: bom.itemBomId,
-//             productId: product.productId,
-//             childProductId: bom.childProductId,
-//             quantity: new Prisma.Decimal(rawQuantity || "0"),
-//           };
-//         }),
-//         skipDuplicates: true,
-//       });
-//     }
-//   }
-
-//   /**
-//    * 9. Product Attachments Sync
-//    */
-//   if (product.attachments !== undefined) {
-//     await tx.productAttachment.deleteMany({ where: { productId: product.productId } });
-//     if (product.attachments?.length) {
-//       await tx.productAttachment.createMany({
-//         data: product.attachments.map((att) => ({
-//           inflowId: att.attachmentId,
-//           productId: product.productId,
-//           attachmentUrl: att.attachmentUrl,
-//           fileName: att.fileName,
-//           lastModDttm: att.lastModDttm ? new Date(att.lastModDttm) : null,
-//           lastModifiedById: att.lastModifiedById,
-//         })),
-//         skipDuplicates: true,
-//       });
-//     }
-//   }
-
-//   /**
-//    * 10. Metadata / Features / Tags Dynamic Routing
-//    */
-//   if (targetGroupId) {
-//     await syncGroupFeatures(tx, targetGroupId, rawFeaturesString);
-//     await syncGroupTags(tx, targetGroupId, rawTagsString);
-//   } else {
-//     await syncProductFeatures(tx, product.productId, rawFeaturesString);
-//     await syncProductTags(tx, product.productId, rawTagsString);
-//   }
-
-//   return dbProduct;
-// }
-
-// import { prisma } from "@/lib/prisma";
-// import { InflowProduct } from "../types";
-// import { 
-//   syncBrand, 
-//   syncProductFeatures, 
-//   syncProductTags, 
-//   syncGroupFeatures,
-//   syncGroupTags,
-//   syncImages,
-//   syncPurchasingUom,
-//   syncSalesUom
-// } from "./helpers";
-
-// import { genInflowUniqueSlug } from "@/helpers/genUniqueSlug";
-
-// export async function syncProduct(
-//   tx: any,
-//   product: InflowProduct,
-//   groupId?: string
-// ) {
-//   const brandId = await syncBrand(tx, product.customFields?.custom1);
-
-//   const categoryId =
-//   product.productVariant?.productGroup?.categoryId;
-
-//   const rawFeaturesString = product?.customFields?.custom2; // e.g., "Sensor:Full Frame|Max Resolution:8K 30p"
-//   const rawTagsString = product?.customFields?.custom3;
-
-//   const baseSlug = await genInflowUniqueSlug(product.name || "product-variant", prisma.product, product.productId);
-//   const productSlug = `${baseSlug}-${product.productId.slice(0, 5)}`;
-
-//   const dbProduct = await tx.product.upsert({
-//     where: {
-//       inflowId: product.productId,
-//     },
-//     create: {
-//       inflowId: product.productId,
-//       sku: product.sku,
-//       name: product.name,
-//       slug: productSlug,
-//       description: product.description,
-//       categoryId,
-//       brandId,
-//       itemType: product.itemType,
-//       autoAssemble: product.autoAssemble,
-//       isActive: product.isActive,
-//       isManufacturable:
-//         product.isManufacturable,
-//       includeQuantityBuildable:
-//         product.includeQuantityBuildable,
-//       standardUomName:
-//         product.standardUomName,
-//       trackExpiry: product.trackExpiry,
-//       trackLots: product.trackLots,
-//       trackSerials: product.trackSerials,
-//       weight: product.weight,
-//       width: product.width,
-//       height: product.height,
-//       length: product.length,
-//       remarks: product.remarks,
-//       // timestamp: product.timestamp,
-//     },
-//     update: {
-//       sku: product.sku,
-//       name: product.name,
-//       description: product.description,
-//       categoryId,
-//       brandId,
-//       // timestamp: product.timestamp,
-//     },
-//   });
-
-//   await syncPurchasingUom(tx, product);
-//   await syncSalesUom(tx, product);
-//   await syncImages(tx, product);
-
-//   // 3. Hand off Features & Tags processing to isolated sub-functions 🚀
-//   if (product.productId && groupId) {
-//     await syncGroupFeatures(tx, groupId, rawFeaturesString);
-//     await syncGroupTags(tx, groupId, rawTagsString);
-//   } else {
-//     if (product.productId) {
-//       await syncProductFeatures(tx, product.productId, rawFeaturesString);
-//       await syncProductTags(tx, product.productId, rawTagsString);
-//     }
-//   }
-
-//   return dbProduct;
-// }
-

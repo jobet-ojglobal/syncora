@@ -39,6 +39,7 @@ import { PaymentTermSyncMapService as LocalPaymentTermSyncMapService } from "../
 import { PricingSchemeSyncMapService as LocalPricingSchemeSyncMapService } from "../locations/services/pricing-scheme-sync-map.service";
 import { TaxingSchemeSyncMapService as LocalTaxingSchemeSyncMapService } from "../locations/services/taxing-scheme-sync-map.service";
 import { CustomerSyncMapService as LocalCustomerSyncMapService } from "../locations/services/customer-sync-map.service";
+import { ProductSyncMapService as LocalProductSyncMapService } from "../locations/services/product-sync-map.service";
 
 const testService = new TestSyncService();
 const categoryService = new CategorySyncService();
@@ -79,6 +80,7 @@ const paymentServiceLocal = new LocalPaymentTermSyncMapService();
 const pricingServiceLocal = new LocalPricingSchemeSyncMapService();
 const taxingSchemeServiceLocal = new LocalTaxingSchemeSyncMapService();
 const customerServiceLocal = new LocalCustomerSyncMapService();
+const productServiceLocal = new LocalProductSyncMapService();
 
 interface SyncWebhookJobData {
   jobId: string;
@@ -164,6 +166,12 @@ const worker = new Worker<SyncWebhookJobData>(
             throw new Error(`Cannot sync customer: No location URL found for location ${location?.name}`);
           }
           result = await customerServiceLocal.sync(location, syncOptions, selectedRecords);
+          break;
+        case "products_local":
+          if (!locationUrl) {
+            throw new Error(`Cannot sync product: No location URL found for location ${location?.name}`);
+          }
+          result = await productServiceLocal.sync(location, syncOptions, selectedRecords);
           break;
 
         // Cloud Sync

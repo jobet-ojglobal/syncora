@@ -1,6 +1,32 @@
 // schemas/product.schema.ts
 import { z } from "zod";
 
+export const DEFAULT_CUSTOM_FIELDS = {
+  custom1: "",
+  custom2: "",
+  custom3: "",
+  custom4: "",
+  custom5: "",
+  custom6: "",
+  custom7: "",
+  custom8: "",
+  custom9: "",
+  custom10: "",
+} as const;
+
+export const customFieldsSchema = z.object({
+  custom1: z.string().optional().nullable(),
+  custom2: z.string().optional().nullable(),
+  custom3: z.string().optional().nullable(),
+  custom4: z.string().optional().nullable(),
+  custom5: z.string().optional().nullable(),
+  custom6: z.string().optional().nullable(),
+  custom7: z.string().optional().nullable(),
+  custom8: z.string().optional().nullable(),
+  custom9: z.string().optional().nullable(),
+  custom10: z.string().optional().nullable(),
+});
+
 export const productSchema = z.object({
   inflowId: z.string().optional(),
   productGroupId: z.string().optional().nullable(),
@@ -20,6 +46,15 @@ export const productSchema = z.object({
   trackExpiry: z.boolean(),
   trackLots: z.boolean(),
   trackSerials: z.boolean(),
+
+  customFields: customFieldsSchema,
+  tags: z.array(z.string()),
+  features: z.array(
+    z.object({
+      key: z.string().min(1, "Label/Key is required"),
+      value: z.string().min(1, "Specification is required")
+    })
+  ),
   
   // ⏳ Lifespan Variables
   shelfLifeDays: z.number().int().min(0).nullable().optional(),

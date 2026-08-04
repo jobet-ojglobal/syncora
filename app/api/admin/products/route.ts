@@ -7,6 +7,7 @@ import { getMidSyncQueue } from "@/lib/queues/sync.queue";
 import { WebhookService } from "@/services/webhook.service";
 import { UI_TO_API_ITEM_TYPE } from "@/types/local-location.type";
 import { BrandService } from "@/services/brand.service";
+import { toJsonInput } from "@/lib/inflow/services/helpers";
 
 // export async function GET() {
 //   try {
@@ -234,6 +235,7 @@ export async function POST(request: NextRequest) {
       barcodes = [],
       images = [],
       prices = [],
+      customFields,
       initialCost // 🌟 Extract standard base cost from form values
     } = body;
 
@@ -353,6 +355,7 @@ export async function POST(request: NextRequest) {
         hsTariffNumber: hsTariffNumber?.trim() || null,
         remarks: remarks?.trim() || null,
         standardUomName: standardUomName.trim().toUpperCase(), 
+        customFields: toJsonInput(customFields),
 
         purchasingUom: purchasingUomId ? {
           create: {
@@ -822,6 +825,7 @@ export async function PATCH(request: NextRequest) {
       images = [],
       prices = [],
       initialCost,
+      customFields
     } = body;
 
     // 1. Core Validation Constraints Guard Layer
@@ -907,6 +911,7 @@ export async function PATCH(request: NextRequest) {
           hsTariffNumber: hsTariffNumber?.trim() || null,
           remarks: remarks?.trim() || null,
           standardUomName: standardUomName.trim().toUpperCase(),
+          customFields: toJsonInput(customFields)
         }
       });
 

@@ -2,7 +2,7 @@ import { BranchClient } from "../location.client";
 
 export interface InflowProduct {
   productId: string;
-  itemType: number;
+  itemType: number;  // stockedProduct, nonstockedProduct, service
   name: string;
   description: string;
   remarks: string;
