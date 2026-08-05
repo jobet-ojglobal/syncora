@@ -2,8 +2,15 @@ import { BranchClient } from "../location.client";
 import { LocalProduct } from "../types";
 
 export async function getLocalProducts(url: string) {
- const apiClient = new BranchClient(url)
+  const apiClient = new BranchClient(url)
   return await apiClient.get<LocalProduct[]>(
     `/inflow-local/products`,
+  );
+}
+
+export async function getLocalInventoryLines(url: string) {
+  const apiClient = new BranchClient(url)
+  return await apiClient.get<LocalProduct[]>(
+    `/inflow-local/product-inventory`,
   );
 }

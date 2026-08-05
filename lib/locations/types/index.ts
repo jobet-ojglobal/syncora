@@ -33,8 +33,6 @@ export interface LocalProductCost {
   cost: number;
 }
 
-
-
 export interface LocalCustomFields {
   custom1?: string;
   custom2?: string;
@@ -49,8 +47,8 @@ export interface LocalCustomFields {
 }
 
 export interface LocalProduct {
-  productId: number;
-  categoryId?: number | null;
+  productId: string;
+  categoryId?: string | null;
   itemType: number; // 1 -> StockedProduct, etc.
   isActive: number; // 1 or 0
   isManufacturable: boolean;
@@ -91,7 +89,26 @@ export interface LocalProduct {
   attachments?: any[];
   prices?: LocalProductPrice[];
   serials?: LocalProductSerial[];
-  cost: string | null
+  cost: string | null;
+  inventoryLines?: LocalInventoryLine[];
+}
+
+export interface LocalInventoryLine {
+  locationId: string | null;
+  lotId: string | null;
+  productId: string;
+  quantityOnHand: number;
+  serial: boolean;
+  sublocation: string | null;
+}
+
+export interface LocalLocation {
+  locationId: string;
+  name: string;
+  isActive: number;
+  lastModUserId: string;
+  lastModDttm: string;
+  timestamp: string;
 }
 
 export type SyncOptions = {

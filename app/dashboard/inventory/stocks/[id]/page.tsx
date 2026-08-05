@@ -604,11 +604,13 @@ export default async function InventoryDetailsPage({
                           <TableCell className="text-xs text-muted-foreground max-w-[200px] truncate">
                             {entry.remarks ?? entry.referenceType ?? "—"}
                           </TableCell>
+                          {entry.referenceId && (
                           <TableCell>
                             <Link href={`/dashboard/inventory/ledgers/${entry.referenceId}`} className="text-muted-foreground hover:text-foreground">
                               <Eye className="w-3.5 h-3.5" />
                             </Link>
                           </TableCell>
+                          )}
                         </TableRow>
                       );
                     })

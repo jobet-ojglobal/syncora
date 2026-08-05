@@ -1,17 +1,10 @@
+import { InflowLocation } from "@/lib/inflow/types";
 import { BranchClient } from "../location.client";
+import { LocalLocation } from "../types";
 
-export interface InflowLocation {
-  locationId: string;
-  name: string;
-  timestamp: string;
-  isActive: number;
-  lastModifiedById: string;
-  lastModifiedDttm: string;
-}
-
-export async function getLocations(url: string) {
+export async function getLocalLocations(url: string) {
  const apiClient = new BranchClient(url)
-  return await apiClient.get<InflowLocation[]>(
+  return await apiClient.get<LocalLocation[]>(
     `/inflow-local/locations`,
   );
 }
@@ -22,7 +15,7 @@ export interface UpsertResult {
   data?: any; 
 }
 
-export async function upsertLocation(
+export async function upsertLocalLocation(
   payload: InflowLocation,
   url: string
 ) {

@@ -40,6 +40,9 @@ import { PricingSchemeSyncMapService as LocalPricingSchemeSyncMapService } from 
 import { TaxingSchemeSyncMapService as LocalTaxingSchemeSyncMapService } from "../locations/services/taxing-scheme-sync-map.service";
 import { CustomerSyncMapService as LocalCustomerSyncMapService } from "../locations/services/customer-sync-map.service";
 import { ProductSyncMapService as LocalProductSyncMapService } from "../locations/services/product-sync-map.service";
+import { InventorySyncService as LocalInventorySyncService } from "../locations/services/inventory-line-sync.service";
+import { SublocationSyncMapService as LocalSublocationSyncMapService } from "../locations/services/sublocation-sync-map.service";
+
 
 const testService = new TestSyncService();
 const categoryService = new CategorySyncService();
@@ -81,6 +84,8 @@ const pricingServiceLocal = new LocalPricingSchemeSyncMapService();
 const taxingSchemeServiceLocal = new LocalTaxingSchemeSyncMapService();
 const customerServiceLocal = new LocalCustomerSyncMapService();
 const productServiceLocal = new LocalProductSyncMapService();
+const inventoryServiceLocal = new LocalInventorySyncService();
+const sublocationServiceLocal = new LocalSublocationSyncMapService();
 
 interface SyncWebhookJobData {
   jobId: string;
@@ -167,11 +172,23 @@ const worker = new Worker<SyncWebhookJobData>(
           }
           result = await customerServiceLocal.sync(location, syncOptions, selectedRecords);
           break;
+        case "locations_local":
+          if (!locationUrl) {
+            throw new Error(`Cannot sync product: No location URL found for location ${location?.name}`);
+          }
+          result = await sublocationServiceLocal.sync(location, syncOptions, selectedRecords);
+          break;
         case "products_local":
           if (!locationUrl) {
             throw new Error(`Cannot sync product: No location URL found for location ${location?.name}`);
           }
           result = await productServiceLocal.sync(location, syncOptions, selectedRecords);
+          break;
+        case "inventory_lines_local":
+          if (!locationUrl) {
+            throw new Error(`Cannot sync inventory: No location URL found for location ${location?.name}`);
+          }
+          result = await inventoryServiceLocal.sync(location, syncOptions, selectedRecords);
           break;
 
         // Cloud Sync

@@ -1,15 +1,31 @@
-// app/admin/team-members/page.tsx
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
-import { Plus, Search, Users, Shield, Warehouse, Edit3, Trash2, CheckCircle2, XCircle, Award } from "lucide-react";
+import { Plus, Users, Shield, Warehouse, Edit3, CheckCircle2, XCircle, Award, MoreHorizontalIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { toast } from "sonner";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { DeleteButton } from "@/components/shared/delete-button";
+import { DataTablePagination } from "@/components/shared/data-table-pagination";
+import useSWR from "swr";
+import PageHeader from "@/components/layout/dashboard/PageHeader";
+import SearchInput from "@/components/shared/search-input";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 
 interface LocationNode {
   code: string;
@@ -29,135 +45,142 @@ interface MemberRow {
   assignedLocations: LocationNode[];
 }
 
-export default function TeamMembersListPage() {
-  const [roster, setRoster] = useState<MemberRow[]>([]);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [isLoading, setIsLoading] = useState(true);
+const fetcher = (url: string) => fetch(url).then((res) => {
+  if (!res.ok) throw new Error("Failed to resolve team member directory.");
+  return res.json();
+});
 
-  const fetchRoster = async () => {
-    try {
-      setIsLoading(true);
-      const res = await fetch("/api/admin/team-members/list");
-      if (res.ok) {
-        const payload = await res.json();
-        setRoster(payload);
-      }
-    } catch (err) {
-      toast.error("Roster Load Failure", { description: "Failed compiling account access matrix profiles indices data." });
-    } finally {
-      setIsLoading(false);
-    }
-  };
+export default function TeamMembersListPage() {
+  // 1. Double-state setup for instantaneous typing vs debounced network execution
+  const [searchQuery, setSearchQuery] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+
+  const [pageIndex, setPageIndex] = useState(0);
+  const PAGE_SIZE = 10;
 
   useEffect(() => {
-    fetchRoster();
-  }, []);
+    const timer = setTimeout(() => {
+      setDebouncedSearch(searchQuery);
+      setPageIndex(0);
+    }, 300);
 
-  const handleArchiveMember = async (id: string, name: string, taskCount: number) => {
-    if (taskCount > 0) {
-      toast.error("Safety Violation", { 
-        description: `Cannot drop "${name}". Operative has ${taskCount} active orders, purchase confirmations, or sales portfolios bound to account.` 
-      });
-      return;
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+
+  // 3. SWR list key hook binds directly onto debounced search value variable
+  const {
+    data: payload,
+    error,
+    isLoading,
+    isValidating,
+    mutate,
+  } = useSWR(
+    `/api/admin/team-members/filtered?search=${encodeURIComponent(
+      debouncedSearch
+    )}&page=${pageIndex}&limit=${PAGE_SIZE}`,
+    fetcher,
+    {
+      keepPreviousData: true,
+      revalidateOnFocus: false,
     }
+  );
 
-    if (!confirm(`Are you certain you want to soft-delete "${name}" from the enterprise active user directory? This will drop authorization keys.`)) return;
+  const roster: MemberRow[] = payload?.data || [];
+  const totalRecords = payload?.totalRecords || 0;
+  const pageCount = payload?.pageCount || 0;
 
-    try {
-      const res = await fetch("/api/admin/team-members", {
-        method: "DELETE",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id }),
-      });
-
-      if (!res.ok) throw new Error();
-      toast.success("Personnel record archived safely");
-      setRoster(prev => prev.filter(m => m.id !== id));
-    } catch (err) {
-      toast.error("Pipeline Drop Rejected", { description: "Database transaction model constraints blocked deletion rules configuration sequence." });
-    }
+  // Handle Search input adjustments
+  const handleSearchChange = (value: string) => {
+    setSearchQuery(value);
   };
 
-  const filteredRoster = roster.filter(m => {
-    const term = searchQuery.toLowerCase().trim();
+  if (error) {
     return (
-      m.name.toLowerCase().includes(term) ||
-      m.email.toLowerCase().includes(term) ||
-      m.inflowId.toLowerCase().includes(term)
+      <div className="p-6 text-center text-xs text-red-500 bg-destructive/10 border border-destructive/20 rounded-xl font-medium">
+        Hydration Failure: Failed resolving enterprise personnel authorization directory profiles.
+      </div>
     );
-  });
+  }
 
   return (
-    <div className="w-full max-w-7xl mx-auto p-6 space-y-6 text-xs">
-      
-      {/* Navigation Header Panel block */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b pb-5">
-        <div>
-          <h1 className="text-xl font-bold tracking-tight text-foreground flex items-center gap-2">
-            <Users className="w-5 h-5 text-primary" /> Active Team Directory
-          </h1>
-          <p className="text-xs text-muted-foreground mt-0.5">
-            Manage enterprise clearance rules settings, physical warehouse access configurations, and system authorization tokens tracking handles.
-          </p>
-        </div>
+    <div className="w-full max-w-7xl mx-auto p-4 sm:p-6 space-y-6 text-xs">
+      <PageHeader
+        title="Active Team Directory"
+        description="Manage enterprise clearance rules settings, physical warehouse access configurations, and system authorization tokens tracking handles."
+        icon={Users}
+        className="border-b border-border pb-4"
+      >
         <Button asChild size="sm" className="gap-1.5 shrink-0 text-xs">
           <Link href="/dashboard/team-members/create">
             <Plus className="w-4 h-4" /> Provision New Member
           </Link>
         </Button>
-      </div>
+      </PageHeader>
 
-      {/* Roster Controls Utilities */}
-      <div className="w-full sm:max-w-xs relative">
-        <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground/70" />
-        <Input
-          placeholder="Search directory name, email handle, or system token..."
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          className="pl-9 text-xs h-9"
+      {/* Lookup search component utility filter toolbar segment */}
+      <div className="w-full sm:max-w-md">
+        <SearchInput
+          placeholder="Filter team members by name, email..."
+          searchQuery={searchQuery}
+          setSearchQuery={handleSearchChange}
+          isLoading={isValidating && !isLoading}
         />
       </div>
 
-      {/* Grid Rendering Table Content area */}
-      {isLoading ? (
+      {/* Central data layout directory board canvas */}
+      {isLoading && !payload ? (
         <div className="p-20 text-center text-xs text-muted-foreground bg-card border rounded-xl shadow-3xs italic animate-pulse">
           Parsing systemic active credential indices and access profiles maps array tree structures...
         </div>
-      ) : filteredRoster.length === 0 ? (
+      ) : roster.length === 0 ? (
         <div className="p-20 text-center text-xs text-muted-foreground border-dashed border-2 rounded-xl bg-card">
-          No personnel files mapped matching current directory search parameters query strings.
+          No personnel files mapped matching specified search filters conditions.
         </div>
       ) : (
-        <div className="border rounded-xl bg-card shadow-xs overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse">
-              <thead>
-                <tr className="bg-muted/30 border-b text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-                  <th className="p-4 pl-5 w-[180px]">Identity Handle Profile</th>
-                  <th className="p-4 w-[240px]">Email Coordinates</th>
-                  <th className="p-4 text-center w-[110px]">Sales Capability</th>
-                  <th className="p-4 w-[220px]">Physical Space Scope Clearances</th>
-                  <th className="p-4 w-[110px] text-center">Privileges Count</th>
-                  <th className="p-4 text-center w-[90px]">Status</th>
-                  <th className="p-4 text-right pr-5 w-[100px]">Controls</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border/60 text-xs">
-                {filteredRoster.map((member) => (
-                  <tr key={member.id} className="hover:bg-muted/5 transition-colors">
+        <div className="space-y-4">
+          <div className="border rounded-xl bg-card shadow-2xs overflow-hidden">
+            <Table>
+              <TableHeader>
+                <TableRow className="bg-muted/30 hover:bg-muted/30">
+                  <TableHead className="pl-5 w-[180px] text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                    Name
+                  </TableHead>
+                  <TableHead className="w-[240px] text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                    Email
+                  </TableHead>
+                  <TableHead className="w-[110px] text-center text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                    Sales Rep
+                  </TableHead>
+                  <TableHead className="w-[220px] text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                    Location Access
+                  </TableHead>
+                  <TableHead className="w-[110px] text-center text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                    Permissions
+                  </TableHead>
+                  <TableHead className="w-[90px] text-center text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                    Status
+                  </TableHead>
+                  <TableHead className="pr-5 w-[100px] text-right text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                    Actions
+                  </TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody className="text-xs font-medium">
+                {roster.map((member) => (
+                  <TableRow key={member.id} className="hover:bg-muted/5 transition-colors">
                     
-                    {/* Identification tracking handles column cell */}
-                    <td className="p-4 pl-5 font-medium">
+                    {/* Name */}
+                    <TableCell className="pl-5 font-medium">
                       <div className="font-semibold text-foreground text-[13px]">{member.name}</div>
-                    </td>
+                    </TableCell>
 
-                    {/* Email anchor endpoint layout box cell */}
-                    <td className="p-4 text-muted-foreground font-mono select-all">
+                    {/* Email */}
+                    <TableCell className="text-muted-foreground font-mono select-all">
                       {member.email}
-                    </td>
+                    </TableCell>
 
-                    {/* Sales representation allocation capability flag marker */}
-                    <td className="p-4 text-center">
+                    {/* Sales Rep */}
+                    <TableCell className="text-center">
                       {member.canBeSalesRep ? (
                         <Badge variant="outline" className="text-[10px] bg-emerald-500/5 text-emerald-600 border-emerald-500/20 font-bold tracking-tight">
                           <Award className="w-3 h-3 mr-0.5 shrink-0" /> Rep Active
@@ -165,10 +188,10 @@ export default function TeamMembersListPage() {
                       ) : (
                         <span className="text-muted-foreground/40 text-[11px] font-normal italic">--</span>
                       )}
-                    </td>
+                    </TableCell>
 
-                    {/* Spatial access mapping boundary listings strings column */}
-                    <td className="p-4">
+                    {/* Location Access */}
+                    <TableCell>
                       {member.accessAllLocations ? (
                         <div className="flex items-center gap-1 font-bold text-indigo-600 bg-indigo-500/5 border border-indigo-500/10 rounded-md px-1.5 py-0.5 max-w-max text-[10px]">
                           <Warehouse className="w-3 h-3 text-indigo-500" /> Global Facilities
@@ -190,20 +213,20 @@ export default function TeamMembersListPage() {
                           ))}
                         </div>
                       )}
-                    </td>
+                    </TableCell>
 
-                    {/* Total explicit authorization parameters tally counter node */}
-                    <td className="p-4 text-center">
+                    {/* Permissions Count */}
+                    <TableCell className="text-center">
                       <div className="flex items-center justify-center gap-1">
                         <Shield className="w-3.5 h-3.5 text-slate-400" />
                         <span className="font-mono font-bold text-foreground">
                           {member.rightsList.length}
                         </span>
                       </div>
-                    </td>
+                    </TableCell>
 
-                    {/* Logistical operational execution visibility toggle marker switch icon */}
-                    <td className="p-4 text-center">
+                    {/* Status */}
+                    <TableCell className="text-center">
                       <div className="flex justify-center">
                         <Tooltip>
                           <TooltipTrigger asChild>
@@ -218,36 +241,53 @@ export default function TeamMembersListPage() {
                           </TooltipContent>
                         </Tooltip>
                       </div>
-                    </td>
+                    </TableCell>
 
-                    {/* Command operational buttons block row triggers */}
-                    <td className="p-4 pr-5 text-right">
-                      <div className="flex items-center justify-end gap-1">
-                        <Button asChild variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-foreground" title="Adjust Operative Access Controls">
-                          <Link href={`/dashboard/team-members/${member.id}/edit`}>
-                            <Edit3 className="w-3.5 h-3.5" />
-                          </Link>
-                        </Button>
-                        <DeleteButton
-                          itemId={member.id} 
-                          itemName={member.name} 
-                          endpointUrl={`/api/admin/team-member/${member.id}`}
-                          onSuccess={(id) => {
-                            setRoster(prev => prev.filter(m => m.id !== id));
-                          }} 
-                          variant="icon"
-                        />
-                      </div>
-                    </td>
+                    {/* Actions */}
+                    <TableCell className="p-3.5 pr-5 align-top text-right">
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="icon" className="size-8">
+                            <MoreHorizontalIcon />
+                            <span className="sr-only">Open menu</span>
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem asChild>
+                            <Link href={`/dashboard/team-members/${member.id}/edit`}>
+                              <Edit3 className="w-3.5 h-3.5" /> Edit
+                            </Link>
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem variant="destructive" asChild>
+                            <DeleteButton
+                              itemId={member.id} 
+                              itemName={member.name} 
+                              endpointUrl={`/api/admin/team-members/${member.id}`}
+                              onSuccess={() => mutate()} 
+                              variant="full"
+                            />
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </TableCell>
 
-                  </tr>
+                  </TableRow>
                 ))}
-              </tbody>
-            </table>
+              </TableBody>
+            </Table>
           </div>
+
+          <DataTablePagination
+            pageIndex={pageIndex}
+            pageSize={PAGE_SIZE}
+            pageCount={pageCount}
+            totalRecords={totalRecords}
+            loading={isLoading}
+            onPageChange={(nextIndex: number) => setPageIndex(nextIndex)}
+          />
         </div>
       )}
-
     </div>
   );
 }

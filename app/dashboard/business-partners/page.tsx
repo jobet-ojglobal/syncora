@@ -2,15 +2,30 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Plus, Search, UserCheck, ShieldCheck, Landmark, Edit3, CheckCircle2, XCircle, ShoppingBag, MapPin, Contact2, Truck, HelpCircle, Eye, View, RefreshCw } from "lucide-react";
+import useSWR from "swr";
+import { Plus, UserCheck, ShieldCheck, Landmark, Edit3, ShoppingBag, MapPin, Contact2, Truck, Eye, RefreshCw, MoreHorizontalIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/components/ui/tooltip";
 import { Badge } from "@/components/ui/badge";
 import { DeleteButton } from "@/components/shared/delete-button";
-import PageHeader from "@/components/layout/dashboard/PageHeader";
 import { DataTablePagination } from "@/components/shared/data-table-pagination";
-import useSWR from "swr";
+import SearchInput from "@/components/shared/search-input";
+import PageHeader from "@/components/layout/dashboard/PageHeader";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 
 interface BusinessPartnerRow {
   id: string;
@@ -54,8 +69,9 @@ export default function BusinessPartnerListPage() {
   useEffect(() => {
     const timer = setTimeout(() => {
       setDebouncedSearch(searchQuery);
-      setPageIndex(0); // Reset to first page on search
+      setPageIndex(0);
     }, 300);
+
     return () => clearTimeout(timer);
   }, [searchQuery]);
 
@@ -63,6 +79,10 @@ export default function BusinessPartnerListPage() {
   const handleRoleChange = (newRole: "ALL" | "CUSTOMER" | "VENDOR") => {
     setRoleFilter(newRole);
     setPageIndex(0);
+  };
+
+  const handleSearchChange = (value: string) => {
+    setSearchQuery(value);
   };
 
   const { data: payload, error, isLoading, isValidating, mutate } = useSWR(
@@ -88,226 +108,277 @@ export default function BusinessPartnerListPage() {
   }
 
   return (
-    <TooltipProvider>
-      <div className="w-full max-w-7xl mx-auto p-6 space-y-6 text-xs">
-        {/* Page Header */}
-        <PageHeader 
-          className="border-b pb-5" 
-          title="Central Business Partner Registry" 
-          description="Manage master corporate profiles, toggle structural roles, inspect integrated multi-currency balances, and direct transactional mappings." 
-          icon={Contact2}
-        >
-          
-          <div className="flex items-center gap-2">
-            <Button variant="outline" size="sm" onClick={handleRefresh} disabled={isLoading || isValidating}>
-              <RefreshCw className={`h-3.5 w-3.5 mr-1.5 ${(isLoading || isValidating) ? "animate-spin" : ""}`} />
-              Sync
-            </Button>
-            <Button asChild size="sm" className="gap-1.5 shrink-0 text-xs">
-              <Link href="/dashboard/business-partners/create">
-                <Plus className="w-4 h-4" /> Onboard Business Partner
-              </Link>
-            </Button>
-          </div>
-        </PageHeader>
+    <div className="w-full max-w-7xl mx-auto p-6 space-y-6 text-xs">
+      {/* Page Header */}
+      <PageHeader 
+        className="border-b pb-5" 
+        title="Central Business Partner Registry" 
+        description="Manage master corporate profiles, toggle structural roles, inspect integrated multi-currency balances, and direct transactional mappings." 
+        icon={Contact2}
+      >
+        
+        <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" onClick={handleRefresh} disabled={isLoading || isValidating}>
+            <RefreshCw className={`h-3.5 w-3.5 mr-1.5 ${(isLoading || isValidating) ? "animate-spin" : ""}`} />
+            Sync
+          </Button>
+          <Button asChild size="sm" className="gap-1.5 shrink-0 text-xs">
+            <Link href="/dashboard/business-partners/create">
+              <Plus className="w-4 h-4" /> Onboard Business Partner
+            </Link>
+          </Button>
+        </div>
+      </PageHeader>
 
-        {/* Filter and Search controls */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div className="w-full sm:max-w-md relative">
-            <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground/70" />
-            <Input
-              placeholder="Filter by name, POC, email or phone..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-9 text-xs h-9"
-            />
-          </div>
-
-          {/* Dynamic Role Filter Tabs */}
-          <div className="flex bg-muted p-1 rounded-lg text-xs font-semibold shrink-0">
-            {(["ALL", "CUSTOMER", "VENDOR"] as const).map((role) => (
-              <button
-                key={role}
-                onClick={() => handleRoleChange(role)}
-                className={`px-3 py-1.5 rounded-md capitalize transition-all ${
-                  roleFilter === role ? "bg-card text-foreground shadow-xs" : "text-muted-foreground hover:text-foreground"
-                }`}
-              >
-                {role.toLowerCase()}s
-              </button>
-            ))}
-          </div>
+      {/* Filter and Search controls */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div className="w-full sm:max-w-md">
+          <SearchInput
+            placeholder="Filter team members by name, email..."
+            searchQuery={searchQuery}
+            setSearchQuery={handleSearchChange}
+            isLoading={isValidating && !isLoading}
+          />
         </div>
 
-        {/* Main Grid Ledger */}
-        {isLoading ? (
-          <div className="p-20 text-center text-xs text-muted-foreground bg-card border rounded-xl shadow-3xs italic animate-pulse">
-            Synchronizing joint corporate sub-ledgers and aggregating customer & vendor roles...
-          </div>
-        ) : directory.length === 0 ? (
-          <div className="p-20 text-center text-xs text-muted-foreground border-dashed border-2 rounded-xl bg-card">
-            No registered partners match your active filter settings.
-          </div>
-        ) : (
-          <div className="border rounded-xl bg-card shadow-sm overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse">
-                <thead>
-                  <tr className="bg-muted/30 border-b text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-                    <th className="p-4 pl-5 w-[220px]">Partner Profile Name</th>
-                    <th className="p-4 w-[180px]">Primary Contact Point</th>
-                    <th className="p-4 w-[150px]">Regional HQ Scope</th>
-                    <th className="p-4 w-[160px]">Assigned Roles</th>
-                    <th className="p-4 text-center w-[120px]">Activity Flow</th>
-                    <th className="p-4 text-right w-[180px]">Outstanding Balance (Net)</th>
-                    <th className="p-4 text-center w-[80px]">Status</th>
-                    <th className="p-4 text-right pr-5 w-[100px]">Controls Matrix</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border/60 text-xs font-medium">
-                  {directory.map((partner) => (
-                    <tr key={partner.id} className="hover:bg-muted/5 transition-colors items-start">
-                      
-                      {/* Name */}
-                      <td className="p-4 pl-5">
-                        <div className="font-bold text-foreground text-[13px] leading-snug tracking-tight">
-                          {partner.name}
-                        </div>
-                      </td>
-
-                      {/* Contact Contact */}
-                      <td className="p-4 text-muted-foreground">
-                        <div className="text-foreground font-semibold flex items-center gap-1">
-                          <UserCheck className="w-3.5 h-3.5 text-slate-400" /> {partner.contactName}
-                        </div>
-                        <div className="font-mono text-[10px] select-all mt-0.5 text-muted-foreground/80 lowercase truncate max-w-[170px]" title={partner.email}>
-                          {partner.email}
-                        </div>
-                        <div className="text-[10px] text-muted-foreground mt-0.5 font-sans font-medium">{partner.phone}</div>
-                      </td>
-
-                      {/* Address Location */}
-                      <td className="p-4 text-slate-600">
-                        <div className="flex items-start gap-1 text-[11px] leading-tight">
-                          <MapPin className="w-3.5 h-3.5 text-muted-foreground mt-0.5 shrink-0" />
-                          <span>{partner.regionalScope}</span>
-                        </div>
-                      </td>
-
-                      {/* Roles Visual Identifiers */}
-                      <td className="p-4 space-y-1.5">
-                        <div className="flex flex-wrap gap-1">
-                          {partner.customer && (
-                            <Badge variant="secondary" className="bg-blue-500/10 text-blue-600 border-blue-200/30 gap-1 font-bold text-[10px]">
-                              <ShieldCheck className="w-3 h-3 text-blue-500" /> Customer
-                            </Badge>
-                          )}
-                          {partner.vendor && (
-                            <Badge variant="secondary" className="bg-amber-500/10 text-amber-500 border-amber-200/30 gap-1 font-bold text-[10px]">
-                              <Truck className="w-3 h-3 text-amber-500" /> Vendor
-                            </Badge>
-                          )}
-                        </div>
-                      </td>
-
-                      {/* Activity Flow Counters */}
-                      <td className="p-4 text-center space-y-1">
-                        {partner.customer && (
-                          <div className="flex justify-center items-center gap-1 font-mono text-[10px] text-slate-700 bg-blue-500/5 border border-blue-100 rounded-md px-1.5 py-0.5">
-                            <ShoppingBag className="w-3 h-3 text-blue-400" />
-                            <span>{partner.customer.salesOrderCount} SO</span>
-                          </div>
-                        )}
-                        {partner.vendor && (
-                          <div className="flex justify-center items-center gap-1 font-mono text-[10px] text-slate-700 bg-amber-500/5 border border-amber-100 rounded-md px-1.5 py-0.5">
-                            <Landmark className="w-3 h-3 text-amber-500" />
-                            <span>{partner.vendor.purchaseOrdersCount} PO</span>
-                          </div>
-                        )}
-                      </td>
-
-                      {/* Unified Ledger Balance calculations */}
-                      <td className="p-4 text-right space-y-1 pr-6 font-mono font-bold text-[11px]">
-                        {partner.customer && (
-                          <div className="flex justify-end gap-1.5 items-center">
-                            <span className="text-[9px] text-muted-foreground font-sans">Receivable:</span>
-                            <span className={partner.customer.netBalance > 0 ? "text-rose-600" : "text-emerald-600"}>
-                              {partner.customer.netBalance > 0 ? "+" : ""}
-                              {partner.customer.netBalance.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {partner.customer.currencyIso}
-                            </span>
-                          </div>
-                        )}
-                        {partner.vendor && (
-                          <div className="flex justify-end gap-1.5 items-center">
-                            <span className="text-[9px] text-muted-foreground font-sans">Payable:</span>
-                            <span className={partner.vendor.outstandingBalance > 0 ? "text-amber-600" : "text-muted-foreground"}>
-                              {partner.vendor.outstandingBalance.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {partner.vendor.currencyCode}
-                            </span>
-                            {partner.vendor.hasCriticalPastDue && (
-                              <Badge className="bg-destructive hover:bg-destructive text-destructive-foreground text-[8px] h-3 px-1">Past Due</Badge>
-                            )}
-                          </div>
-                        )}
-                      </td>
-
-                      {/* Status indicator */}
-                      <td className="p-4 text-center">
-                        <div className="flex justify-center">
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              {partner.isActive ? (
-                                <CheckCircle2 className="w-4 h-4 text-emerald-500" />
-                              ) : (
-                                <XCircle className="w-4 h-4 text-slate-300" />
-                              )}
-                            </TooltipTrigger>
-                            <TooltipContent>
-                              <p>{partner.isActive ? "Active Commercial Profile" : "Inactive / On Hold Profile"}</p>
-                            </TooltipContent>
-                          </Tooltip>
-                        </div>
-                      </td>
-
-                      {/* Deleting targets the parent id (Cascades to child rules safely) */}
-                      <td className="p-4 pr-5 text-right">
-                        <div className="flex items-center justify-end gap-1">
-                          <Button asChild variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-foreground">
-                            <Link href={`/dashboard/business-partners/${partner.id}`} title="View">
-                              <View className="w-3.5 h-3.5" />
-                            </Link>
-                          </Button>
-                          <Button asChild variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-foreground">
-                            <Link href={`/dashboard/business-partners/${partner.id}/edit`} title="Edit">
-                              <Edit3 className="w-3.5 h-3.5" />
-                            </Link>
-                          </Button>
-                          <DeleteButton
-                            itemId={partner.id} 
-                            itemName={partner.name} 
-                            endpointUrl={`/api/admin/business-partners/${partner.id}`}
-                            onSuccess={() => mutate()} 
-                            variant="icon"
-                          />
-                        </div>
-                      </td>
-
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-
-            <DataTablePagination
-              pageIndex={pageIndex}
-              pageSize={PAGE_SIZE}
-              pageCount={pageCount}
-              totalRecords={totalRecords}
-              loading={isLoading}
-              onPageChange={(nextIndex: number) => setPageIndex(nextIndex)}
-            />
-          </div>
-        )}
+        {/* Dynamic Role Filter Tabs */}
+        <div className="flex bg-muted p-1 rounded-lg text-xs font-semibold shrink-0">
+          {(["ALL", "CUSTOMER", "VENDOR"] as const).map((role) => (
+            <button
+              key={role}
+              onClick={() => handleRoleChange(role)}
+              className={`px-3 py-1.5 rounded-md capitalize transition-all ${
+                roleFilter === role ? "bg-card text-foreground shadow-xs" : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              {role.toLowerCase()}s
+            </button>
+          ))}
+        </div>
       </div>
-    </TooltipProvider>
+
+      {/* Main Grid Ledger */}
+      {isLoading ? (
+        <div className="p-20 text-center text-xs text-muted-foreground bg-card border rounded-xl shadow-3xs italic animate-pulse">
+          Synchronizing joint corporate sub-ledgers and aggregating customer & vendor roles...
+        </div>
+      ) : directory.length === 0 ? (
+        <div className="p-20 text-center text-xs text-muted-foreground border-dashed border-2 rounded-xl bg-card">
+          No registered partners match your active filter settings.
+        </div>
+      ) : (
+        <div className="space-y-4">
+          <div className="border rounded-xl bg-card shadow-2xs overflow-hidden">
+            <Table>
+              <TableHeader className="bg-muted/40">
+                <TableRow className="border-b border-border hover:bg-transparent">
+                  <TableHead className="w-[220px] pl-5 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                    Partner Profile
+                  </TableHead>
+                  <TableHead className="w-[180px] text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                    Primary Contact
+                  </TableHead>
+                  <TableHead className="w-[160px] text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                    Regional HQ
+                  </TableHead>
+                  <TableHead className="w-[140px] text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                    Roles
+                  </TableHead>
+                  <TableHead className="w-[120px] text-center text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                    Activity Flow
+                  </TableHead>
+                  <TableHead className="w-[190px] text-right text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                    Outstanding Balance
+                  </TableHead>
+                  <TableHead className="w-[100px] text-center text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                    Status
+                  </TableHead>
+                  <TableHead className="w-[110px] text-right pr-5 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                    Actions
+                  </TableHead>
+                </TableRow>
+              </TableHeader>
+
+              <TableBody className="text-xs font-medium divide-y divide-border/60">
+                {directory.map((partner) => (
+                  <TableRow 
+                    key={partner.id} 
+                    className="hover:bg-muted/40 transition-colors group align-top"
+                  >
+                    {/* Partner Profile Name & ID */}
+                    <TableCell className="p-3.5 pl-5 align-top">
+                      <div className="font-semibold text-foreground text-sm leading-tight group-hover:text-primary transition-colors">
+                        {partner.name}
+                      </div>
+                      <div className="font-mono text-[10px] text-muted-foreground/70 mt-1">
+                        ID: {partner.id}
+                      </div>
+                    </TableCell>
+
+                    {/* Primary Contact Details */}
+                    <TableCell className="p-3.5 align-top space-y-0.5">
+                      <div className="text-foreground font-medium flex items-center gap-1.5 text-xs">
+                        <UserCheck className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+                        <span className="truncate">{partner.contactName}</span>
+                      </div>
+                      <div 
+                        className="font-mono text-[11px] text-muted-foreground/90 lowercase truncate max-w-[170px]" 
+                        title={partner.email}
+                      >
+                        {partner.email}
+                      </div>
+                      <div className="text-[11px] text-muted-foreground font-sans">
+                        {partner.phone}
+                      </div>
+                    </TableCell>
+
+                    {/* Regional HQ Scope */}
+                    <TableCell className="p-3.5 align-top">
+                      <div className="flex items-start gap-1.5 text-xs text-muted-foreground leading-snug">
+                        <MapPin className="w-3.5 h-3.5 text-muted-foreground/70 mt-0.5 shrink-0" />
+                        <span>{partner.regionalScope}</span>
+                      </div>
+                    </TableCell>
+
+                    {/* Roles */}
+                    <TableCell className="p-3.5 align-top">
+                      <div className="flex flex-wrap gap-1">
+                        {partner.customer && (
+                          <Badge variant="outline" className="bg-blue-500/10 text-blue-700 dark:text-blue-300 border-blue-500/20 gap-1 font-semibold text-[10px] py-0 px-1.5 h-5">
+                            <ShieldCheck className="w-3 h-3 text-blue-500" /> Customer
+                          </Badge>
+                        )}
+                        {partner.vendor && (
+                          <Badge variant="outline" className="bg-amber-500/10 text-amber-700 dark:text-amber-300 border-amber-500/20 gap-1 font-semibold text-[10px] py-0 px-1.5 h-5">
+                            <Truck className="w-3 h-3 text-amber-500" /> Vendor
+                          </Badge>
+                        )}
+                      </div>
+                    </TableCell>
+
+                    {/* Activity Flow */}
+                    <TableCell className="p-3.5 align-top text-center space-y-1">
+                      {partner.customer && (
+                        <div className="inline-flex items-center gap-1.5 font-mono text-[10px] font-medium text-muted-foreground bg-blue-500/5 border border-blue-200/50 dark:border-blue-900/30 rounded-md px-2 py-0.5 w-full justify-center">
+                          <ShoppingBag className="w-3 h-3 text-blue-500" />
+                          <span>{partner.customer.salesOrderCount} SO</span>
+                        </div>
+                      )}
+                      {partner.vendor && (
+                        <div className="inline-flex items-center gap-1.5 font-mono text-[10px] font-medium text-muted-foreground bg-amber-500/5 border border-amber-200/50 dark:border-amber-900/30 rounded-md px-2 py-0.5 w-full justify-center">
+                          <Landmark className="w-3 h-3 text-amber-500" />
+                          <span>{partner.vendor.purchaseOrdersCount} PO</span>
+                        </div>
+                      )}
+                    </TableCell>
+
+                    {/* Outstanding Balance */}
+                    <TableCell className="p-3.5 align-top text-right space-y-1 font-mono text-[11px]">
+                      {partner.customer && (
+                        <div className="flex items-center justify-end gap-1.5">
+                          <span className="text-[10px] text-muted-foreground font-sans">Rec:</span>
+                          <span className={`font-semibold ${partner.customer.netBalance > 0 ? "text-destructive" : "text-emerald-600 dark:text-emerald-400"}`}>
+                            {partner.customer.netBalance > 0 ? "+" : ""}
+                            {partner.customer.netBalance.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {partner.customer.currencyIso}
+                          </span>
+                        </div>
+                      )}
+                      {partner.vendor && (
+                        <div className="flex items-center justify-end gap-1.5">
+                          <span className="text-[10px] text-muted-foreground font-sans">Pay:</span>
+                          <span className={`font-semibold ${partner.vendor.outstandingBalance > 0 ? "text-amber-600 dark:text-amber-400" : "text-muted-foreground"}`}>
+                            {partner.vendor.outstandingBalance.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {partner.vendor.currencyCode}
+                          </span>
+                          {partner.vendor.hasCriticalPastDue && (
+                            <Badge variant="destructive" className="text-[8px] h-3.5 px-1 uppercase tracking-tight font-bold">
+                              Overdue
+                            </Badge>
+                          )}
+                        </div>
+                      )}
+                    </TableCell>
+
+                    {/* Status Indicator */}
+                    <TableCell className="p-3.5 align-top text-center">
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <div className="inline-flex items-center justify-center">
+                              {partner.isActive ? (
+                                <Badge variant="outline" className="bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/20 text-[10px] px-1.5 py-0 h-5 gap-1">
+                                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                                  Active
+                                </Badge>
+                              ) : (
+                                <Badge variant="outline" className="bg-muted text-muted-foreground border-border text-[10px] px-1.5 py-0 h-5 gap-1">
+                                  <span className="h-1.5 w-1.5 rounded-full bg-muted-foreground/40" />
+                                  Inactive
+                                </Badge>
+                              )}
+                            </div>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p>{partner.isActive ? "Active Commercial Profile" : "Inactive / On Hold Profile"}</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                    </TableCell>
+
+                    {/* Controls */}
+                    <TableCell className="p-3.5 pr-5 align-top text-right">
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="icon" className="size-8">
+                            <MoreHorizontalIcon />
+                            <span className="sr-only">Open menu</span>
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem asChild >
+                            <Link 
+                              href={`/dashboard/business-partners/${partner.id}`} 
+                              title="View Details"
+                              >
+                              <Eye className="w-3.5 h-3.5" /> View
+                            </Link>
+                          </DropdownMenuItem>
+                          <DropdownMenuItem asChild>
+                            <Link 
+                              href={`/dashboard/business-partners/${partner.id}/edit`} 
+                              title="Edit Profile"
+                              >
+                              <Edit3 className="w-3.5 h-3.5" /> Edit
+                            </Link>
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem variant="destructive" asChild>
+                            <DeleteButton
+                              itemId={partner.id} 
+                              itemName={partner.name} 
+                              endpointUrl={`/api/admin/business-partners/${partner.id}`}
+                              onSuccess={() => mutate()} 
+                              variant="full"
+                            />
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+
+          <DataTablePagination
+            pageIndex={pageIndex}
+            pageSize={PAGE_SIZE}
+            pageCount={pageCount}
+            totalRecords={totalRecords}
+            loading={isLoading}
+            onPageChange={(nextIndex: number) => setPageIndex(nextIndex)}
+          />
+        </div>
+      )}
+    </div>
   );
 }

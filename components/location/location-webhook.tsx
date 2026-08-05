@@ -321,6 +321,7 @@ export const LocationWebhookWorkspace = ({ selectedLocationInflowId }: LocationW
                 <SyncButtonPreviewOptions source="taxing_schemes_local" title="Taxing Schemes" locationId={selectedLocationInflowId} isDisabled={!webhook} />
                 <SyncButtonPreviewOptions source="pricing_schemes_local" title="Pricing Schemes" locationId={selectedLocationInflowId} isDisabled={!webhook} />
                 <SyncButtonPreviewOptions source="products_local" title="Products" locationId={selectedLocationInflowId} isDisabled={!webhook} />
+                <SyncButtonPreviewOptions source="inventory_lines_local" title="Inventory Lines" locationId={selectedLocationInflowId} isDisabled={!webhook} />
                 <SyncButtonPreviewOptions source="payment_terms_local" title="Payment Terms" locationId={selectedLocationInflowId} isDisabled={!webhook} />
                 <SyncButtonPreviewOptions source="customers_local" title="Customers" locationId={selectedLocationInflowId} isDisabled={!webhook} />
                 <SyncButtonPreviewOptions source="locations_local" title="Locations" locationId={selectedLocationInflowId} isDisabled={!webhook} />

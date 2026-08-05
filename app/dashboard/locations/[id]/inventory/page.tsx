@@ -8,7 +8,7 @@ import { Warehouse, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 // Custom Sub-components
-import { StorageInspectionModal, InspectionItem } from "@/components/inventory/storage-inspection-modal";
+import { StorageInspectionModalEnhance, InspectionItem } from "@/components/inventory/storage-inspection-modal";
 import { InboundTransitMonitor } from "@/components/transfer/inbound-pipeline-card";
 import { InventoryTable } from "./InventoryTable";
 import { ReplenishmentSettingsModal } from "@/components/inventory/replenishment-settings-modal";
@@ -76,7 +76,7 @@ export default function LocationInventoryPage() {
               Refresh Data
             </Button>
             <Button asChild size="sm" className="h-8 gap-1.5 text-xs">
-              <Link href="/dashboard/inventory/new">Post Adjustment</Link>
+              <Link href="/dashboard/inventory/stocks/new">Post Adjustment</Link>
             </Button>
           </div>
         </div>
@@ -101,7 +101,7 @@ export default function LocationInventoryPage() {
       />
 
       {/* 🔍 Storage Layout Inspection Modal */}
-      <StorageInspectionModal
+      <StorageInspectionModalEnhance
         item={activeInspectionItem}
         locationName={location?.name}
         onClose={() => setActiveInspectionItem(null)}

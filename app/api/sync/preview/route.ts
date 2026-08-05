@@ -7,9 +7,8 @@ import { getCurrencies } from "@/lib/locations/data/currency";
 import { getCategories } from "@/lib/locations/data/category";
 import { getPricingSchemes } from "@/lib/locations/data/pricing-scheme";
 import { getPaymentTerms } from "@/lib/locations/data/payment-term";
-import { getLocations } from "@/lib/locations/data/location";
-import { getProducts } from "@/lib/locations/data/product";
-import { getLocalProducts } from "@/lib/locations/data/product-local";
+import { getLocalLocations } from "@/lib/locations/data/location";
+import { getLocalInventoryLines, getLocalProducts } from "@/lib/locations/data/product-local";
 
 export const dynamic = "force-dynamic";
 
@@ -61,11 +60,11 @@ export async function GET(request: NextRequest) {
       const rawCustomer = await getCustomers(location.url);
       
       // Transform records into a uniform preview structure
-      const previewItems = rawCustomer.map((getLocations: any) => ({
-        id: String(getLocations.customerId), // incoming original ID
-        name: getLocations.name,
-        description: `${getLocations.dues?.length || 0} nested dues present. ${getLocations.balances?.length || 0} nested balances present. ${getLocations.credits?.length || 0} nested credits present.`,
-        rawData: getLocations, // Cache full object to pass back later
+      const previewItems = rawCustomer.map((customer: any) => ({
+        id: String(customer.customerId), // incoming original ID
+        name: customer.name,
+        description: `${customer.dues?.length || 0} nested dues present. ${customer.balances?.length || 0} nested balances present. ${customer.credits?.length || 0} nested credits present.`,
+        rawData: customer, // Cache full object to pass back later
       }));
 
       return NextResponse.json({ items: previewItems });
@@ -106,7 +105,7 @@ export async function GET(request: NextRequest) {
 
       return NextResponse.json({ items: previewItems });
     } else if (source === "locations_local") {
-      const rawLocations = await getLocations(location.url);
+      const rawLocations = await getLocalLocations(location.url);
       
       // Transform records into a uniform preview structure
       const previewItems = rawLocations.map((item: any) => ({
@@ -129,7 +128,21 @@ export async function GET(request: NextRequest) {
       }));
 
       return NextResponse.json({ items: previewItems });
+    } else if (source === "inventory_lines_local") {
+      const rawInventory = await getLocalInventoryLines(location.url);
+      
+      // Transform records into a uniform preview structure
+      const previewItems = rawInventory.map((item: any) => ({
+        id: String(item.productId), // incoming original ID
+        name: item.name,
+        description:`${item.inventoryLines?.length || 0} nested inventory.`,
+        rawData: item, // Cache full object to pass back later
+      }));
+
+      return NextResponse.json({ items: previewItems });
     }
+
+    
     
 
     return NextResponse.json({ items: [] });

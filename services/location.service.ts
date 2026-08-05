@@ -98,6 +98,7 @@ export class LocationService {
             localProductMappings: true,
             localCustomerMappings: true,
             localVendorMappings: true,
+            sublocationLocalMappings: true,
           }
         },
         salesOrders: {
@@ -151,6 +152,7 @@ export class LocationService {
         customersCount: loc._count.localCustomerMappings,
         vendorsCount: loc._count.localVendorMappings,
         productsCount: loc._count.localProductMappings,
+        locationsCount: loc._count.sublocationLocalMappings,
       }
     }
   }
