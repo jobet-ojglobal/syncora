@@ -10,6 +10,8 @@ import {
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
+import { FormattedInventoryItem } from "@/types/inventory.dto";
+import Image from "next/image";
 
 const fetcher = (url: string) => fetch(url).then((res) => res.json());
 
@@ -53,7 +55,7 @@ export function InventoryTable({
     fetcher
   );
 
-  const inventory = data?.inventory ?? [];
+  const inventory: FormattedInventoryItem[] = data?.inventory ?? [];
   const pagination = data?.pagination;
 
   // Sync single product with cloud / upstream
@@ -139,8 +141,8 @@ export function InventoryTable({
                 </tr>
               </thead>
               <tbody className="divide-y">
-                {inventory.map((item: any) => {
-                  const isItemSyncing = syncingProductId === item.productId;
+                {inventory.map((item: FormattedInventoryItem) => {
+                  const isItemSyncing = syncingProductId === item.product.inflowId;
                   const isOutOfStock = item.quantityAvailable <= 0;
                   const isLowStock =
                     item.reorderThreshold > 0 &&
@@ -160,16 +162,44 @@ export function InventoryTable({
                       }`}
                     >
                       <td className="p-4 max-w-[300px]">
-                        <div className="flex items-center gap-2.5">
+                        {/* <div className="flex items-center gap-2.5">
                           <div className="w-7 h-7 bg-muted border rounded-md flex items-center justify-center shrink-0">
                             <Package className="w-3.5 h-3.5 text-muted-foreground/80" />
                           </div>
                           <div className="min-w-0">
                             <span className="font-semibold text-foreground block truncate">
-                              {item.productName}
+                              {item.product.name}
                             </span>
                             <span className="font-mono text-[10px] text-muted-foreground block truncate">
-                              {item.productSlug}
+                              {item.product.slug}
+                            </span>
+                          </div>
+                          {isLowStock && (
+                            <span className="bg-amber-100 text-amber-800 dark:bg-amber-900/50 dark:text-amber-200 text-[9px] font-bold px-1.5 py-0.5 rounded-md flex items-center gap-0.5 shrink-0">
+                              <AlertCircle className="w-2.5 h-2.5" /> LOW
+                            </span>
+                          )}
+                        </div> */}
+                        <div className="flex items-center gap-2.5 max-w-[220px]">
+                          <div className="w-9 h-9 bg-muted border rounded-lg overflow-hidden flex items-center justify-center shrink-0 relative">
+                            {item.product.thumbnail ? (
+                              <Image
+                                src={item.product.thumbnail}
+                                alt={item.product.name}
+                                className="w-full h-full object-cover"
+                                width={36}
+                                height={36}
+                              />
+                            ) : (
+                              <Package className="w-4 h-4 text-muted-foreground/50" />
+                            )}
+                          </div>
+                          <div className="min-w-0">
+                            <span className="font-semibold text-foreground text-[13px] block truncate">
+                              {item.product.name}
+                            </span>
+                            <span className="font-mono text-[10px] text-muted-foreground block truncate">
+                              {item.product.slug}
                             </span>
                           </div>
                           {isLowStock && (
@@ -246,7 +276,7 @@ export function InventoryTable({
                             disabled={isItemSyncing}
                             onClick={() => handleSyncSingleProduct(item)}
                             className="h-8 w-8 text-muted-foreground hover:text-indigo-600 hover:bg-indigo-500/5"
-                            title={`Fetch Latest Cloud Inventory for ${item.productName}`}
+                            title={`Fetch Latest Cloud Inventory for ${item.product.name}`}
                           >
                             <RefreshCw
                               className={`w-3.5 h-3.5 ${
@@ -266,7 +296,7 @@ export function InventoryTable({
                           </Button>
 
                           <Button asChild variant="ghost" size="sm" className="h-7 px-2 text-xs font-semibold gap-1">
-                            <Link href={`/dashboard/inventory/${item.id}/edit`}>
+                            <Link href={`/dashboard/inventory/stocks/${item.id}/adjust`}>
                               <Edit className="w-3 h-3" /> Adjust
                             </Link>
                           </Button>

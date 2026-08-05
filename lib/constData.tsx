@@ -327,15 +327,11 @@ export const data = {
           icon: Users,
         },
         {
-          title: "Create Customer",
-          url: "/dashboard/customers/create",
+          title: "Create Partner",
+          url: "/dashboard/business-partners/create",
           icon: UserPlus,
         },
-        {
-          title: "Create Vendor",
-          url: "/dashboard/vendors/create",
-          icon: PlusCircle,
-        },
+       
       ],
     },
   

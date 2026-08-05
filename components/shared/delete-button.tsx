@@ -92,7 +92,7 @@ export function DeleteButton({
               type="button" 
               variant="destructive" 
               size="sm"
-              className="w-full gap-1.5 text-xs font-semibold rounded-xl h-9 shadow-2xs"
+              className="w-full gap-1.5 text-xs font-semibold " // rounded-xl h-9 shadow-2xs
             >
               <Trash2Icon className="w-3.5 h-3.5" /> {isSoftDelete ? "Archive" : "Delete"}
             </Button>

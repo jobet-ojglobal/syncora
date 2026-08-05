@@ -274,7 +274,7 @@ export function ProductForm({  brands, uoms, groups: productGroups, pricingSchem
     },
   });
 
-  const { register, control, handleSubmit, setValue, watch, formState: { errors, isSubmitting } } = form;
+  const { register, reset, control, handleSubmit, setValue, watch, formState: { errors, isSubmitting, isDirty } } = form;
   const { fields: priceFields, append: appendPrice, remove: removePrice } = useFieldArray({
     control,
     name: "prices"
@@ -632,7 +632,7 @@ export function ProductForm({  brands, uoms, groups: productGroups, pricingSchem
                   label="Variant Slot"
                   placeholder="-- Select Variant Slot --"
                   options={variantOptions}
-                  emptyMessage="No attribute slot available"
+                  emptyMessage="No variant slot available"
                   classNameLabel="text-muted-foreground font-semibold"
                 />
               )}
@@ -1716,17 +1716,33 @@ export function ProductForm({  brands, uoms, groups: productGroups, pricingSchem
       </div>
 
       {/* Form Action Controls Bar */}
-      <div className="flex items-center justify-between gap-4 border-t pt-5 mt-6">
-        <Button type="button" variant="ghost" size="sm" onClick={() => router.back()} className="text-xs gap-1.5">
-          <ArrowLeft className="w-4 h-4" /> Cancel
+      <div className="flex items-center justify-between gap-2">
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={() => router.back()}
+        >
+          <ArrowLeft className="w-4 h-4 mr-1" />
+          Cancel
         </Button>
-        <Button type="submit" size="sm" disabled={isSubmitting} className="gap-1.5 text-xs px-5">
-          {isSubmitting ? (
-            <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Saving Data...</>
-          ) : (
-            <><Save className="w-3.5 h-3.5" /> {isEditMode ? "Commit Modifications" : "Save Product"}</>
+        <div className="flex gap-2">
+          { isEditMode && (
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => reset()}
+              disabled={!isDirty}
+            >
+              Reset
+            </Button>
           )}
-        </Button>
+          <Button type="submit" size="sm" disabled={isSubmitting}>
+            {isSubmitting ? 
+            <><Loader2 className="w-3.5 h-3.5 animate-spin" />Processing...</> 
+            : isEditMode ? "Update Scheme" : "Create Scheme"}
+          </Button>
+        </div>
       </div>
     </form>
   );

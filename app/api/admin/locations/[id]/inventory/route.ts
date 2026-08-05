@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { FormattedInventoryItem } from "@/types/inventory.dto";
 
 interface Props {
   params: Promise<{
@@ -57,7 +58,20 @@ export async function GET(request: NextRequest, { params }: Props) {
       prisma.inventory.findMany({
         where: tableWhereClause,
         include: {
-          product: { select: { name: true, slug: true } },
+          product: {
+            select: {
+              inflowId: true,
+              name: true,
+              slug: true,
+              sku: true,
+              trackSerials: true,
+              images: {
+                orderBy: { position: "asc" },
+                take: 1,
+                select: { thumbUrl: true, originalUrl: true },
+              },
+            },
+          },
           bins: {
             include: { sublocation: { select: { name: true } } },
           },
@@ -91,26 +105,38 @@ export async function GET(request: NextRequest, { params }: Props) {
     }
 
     // 6. Format Final Response
-    const formattedInventory = stockItems.map((item) => ({
-      id: item.id,
-      productId: item.productId,
-      productName: item.product.name,
-      productSlug: item.product.slug,
-      locationId: item.locationId,
-      quantityOnHand: Number(item.quantityOnHand || 0),
-      quantityReserved: Number(item.quantityReserved || 0),
-      quantityAvailable: Number(item.quantityAvailable || 0),
-      quantityInTransit: inTransitMap[item.productId] || 0,
-      isAutoReorderEnabled: Boolean(item.isAutoReorderEnabled),
-      reorderThreshold: Number(item.reorderThreshold || 0),
-      reorderQuantity: Number(item.reorderQuantity || 0),
-      preferredSourceLocationId: item.preferredSourceLocationId,
-      bins: item.bins.map((b) => ({
-        id: b.id,
-        sublocationName: b.sublocation.name,
-        quantity: Number(b.quantity || 0),
-      })),
-    }));
+    const formattedInventory: FormattedInventoryItem[] = stockItems.map((item) => {
+      const formattedProduct = {
+        inflowId: item.product.inflowId,
+        name: item.product.name,
+        sku: item.product.sku,
+        slug: item.product.slug,
+        thumbnail:
+          item.product.images[0]?.thumbUrl ||
+          item.product.images[0]?.originalUrl ||
+          null,
+        trackSerials: item.product.trackSerials,
+      };
+
+      return {
+        id: item.id,
+        product: formattedProduct,
+        locationId: item.locationId,
+        quantityOnHand: Number(item.quantityOnHand || 0),
+        quantityReserved: Number(item.quantityReserved || 0),
+        quantityAvailable: Number(item.quantityAvailable || 0),
+        quantityInTransit: inTransitMap[item.productId] || 0,
+        isAutoReorderEnabled: Boolean(item.isAutoReorderEnabled),
+        reorderThreshold: Number(item.reorderThreshold || 0),
+        reorderQuantity: Number(item.reorderQuantity || 0),
+        preferredSourceLocationId: item.preferredSourceLocationId,
+        bins: item.bins.map((b) => ({
+          id: b.id,
+          sublocationName: b.sublocation.name,
+          quantity: Number(b.quantity || 0),
+        })),
+      };
+    });
 
     return NextResponse.json(
       {

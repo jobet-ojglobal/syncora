@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Package } from "lucide-react";
 import PageHeader from "@/components/layout/dashboard/PageHeader";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
@@ -75,7 +75,14 @@ export default async function EditProductPage({ params }: Props) {
             thumbUrl: true,
           },
           orderBy: { position: "asc" }
-        }
+        },
+        features: {
+          include: {
+            feature: true,
+            featureValue: { select: { value: true } },
+          },
+        },
+        tags: { include: { tag: true } },
       }
     })
   ]);
@@ -132,12 +139,17 @@ export default async function EditProductPage({ params }: Props) {
       custom9: customFields.custom9 ?? "",
       custom10: customFields.custom10 ?? "",
     },
+    tags: prodData.tags.map((pt) => pt.tag.name),
+    features: prodData.features.map((f) => ({
+      key: f.feature.name,
+      value: f.featureValue?.value,
+    })),
   };
 
   delete (formattedPayload as any).cost;
 
   return (
-    <div className="w-full max-w-[90rem] mx-auto mx-auto p-6 space-y-6">
+    <div className="w-full max-w-[80rem] mx-auto mx-auto px-6 py-12 space-y-6">
       <Link
         href="/dashboard/products"
         className="mb-4 inline-flex items-center gap-2 text-sm font-medium text-slate-600 hover:text-slate-900"
@@ -146,7 +158,11 @@ export default async function EditProductPage({ params }: Props) {
         Back to Products
       </Link>
       
-      <PageHeader title="Edit Product" description="Edit a product." />
+      <PageHeader 
+        title="Edit Product" 
+        description="Update product details, stock settings, pricing schemes, and variant configurations."
+        icon={Package}
+      />
       <ProductForm initialData={formattedPayload} {...metadata} />
     </div>
   );

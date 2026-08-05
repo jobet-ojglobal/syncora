@@ -5,11 +5,19 @@ import Link from "next/link";
 import { Plus, Edit3, CheckCircle2, XCircle, CalendarClock, ShieldAlert, FileText } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
-import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from "@/components/ui/tooltip";
+import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 import { DeleteButton } from "@/components/shared/delete-button";
 import PageHeader from "@/components/layout/dashboard/PageHeader";
 import SearchInput from "@/components/shared/search-input";
 import { DataTablePagination } from "@/components/shared/data-table-pagination";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table"
 
 interface PaymentTermRow {
   id: string;
@@ -98,9 +106,9 @@ export default function PaymentTermsListPage() {
 
       {/* Search bar filter strip */}
       <div className="w-full sm:max-w-md">
-        <SearchInput 
-          placeholder="Filter settlement terms by title name, integration ID..."
-          searchQuery={searchQuery} 
+        <SearchInput
+          placeholder="Filter schemes by system name, ID token..."
+          searchQuery={searchQuery}
           setSearchQuery={handleSearchChange}
         />
       </div>
@@ -117,122 +125,134 @@ export default function PaymentTermsListPage() {
       ) : (
         <div className="space-y-4">
           <div className="border rounded-xl bg-card shadow-xs overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse">
-                <thead>
-                  <tr className="bg-muted/30 border-b text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-                    <th className="p-4 pl-5 w-[240px]">Maturity Framework Profile</th>
-                    <th className="p-4 w-[180px]">Receivables Aging Threshold Window</th>
-                    <th className="p-4 text-right w-[130px]">Bound Debtors</th>
-                    <th className="p-4 text-right w-[130px]">Trade Creditors</th>
-                    <th className="p-4 text-right w-[130px]">Live Orders Logs</th>
-                    <th className="p-4 text-center w-[90px]">Status</th>
-                    <th className="p-4 text-right pr-5 w-[100px]">Controls Matrix</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border/60 text-xs font-medium">
-                  {paginatedTerms.map((term) => (
-                    <tr key={term.id} className="hover:bg-muted/5 transition-colors">
-                      
-                      {/* Title Identity Cell */}
-                      <td className="p-4 pl-5">
-                        <div className="font-semibold text-foreground text-[13px] leading-snug">
-                          {term.name}
-                        </div>
-                      </td>
+            <Table>
+              <TableHeader>
+                <TableRow className="bg-muted/30 hover:bg-muted/30">
+                  <TableHead className="pl-5 w-[240px] text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                    Term Name
+                  </TableHead>
+                  <TableHead className="w-[180px] text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                    Due Window
+                  </TableHead>
+                  <TableHead className="w-[130px] text-right text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                    Customers
+                  </TableHead>
+                  <TableHead className="w-[130px] text-right text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                    Vendors
+                  </TableHead>
+                  <TableHead className="w-[130px] text-right text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                    Sales Orders
+                  </TableHead>
+                  <TableHead className="w-[90px] text-center text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                    Status
+                  </TableHead>
+                  <TableHead className="pr-5 w-[100px] text-right text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                    Actions
+                  </TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody className="text-xs font-medium">
+                {paginatedTerms.map((term) => (
+                  <TableRow key={term.id} className="hover:bg-muted/5 transition-colors">
+                    
+                    {/* Term Name */}
+                    <TableCell className="pl-5">
+                      <div className="font-semibold text-foreground text-[13px] leading-snug">
+                        {term.name}
+                      </div>
+                    </TableCell>
 
-                      {/* Receivables Aging Threshold Window */}
-                      <td className="p-4">
-                        {term.daysDue !== null ? (
-                          <div className="text-foreground font-bold flex items-center gap-1 font-mono text-[13px]">
-                            <CalendarClock className="w-4 h-4 text-primary shrink-0" />
-                            <span>
-                              {term.daysDue}{" "}
-                              <span className="text-[10px] text-muted-foreground font-sans font-medium">
-                                Calendar Days
-                              </span>
+                    {/* Due Window */}
+                    <TableCell>
+                      {term.daysDue !== null ? (
+                        <div className="text-foreground font-bold flex items-center gap-1 font-mono text-[13px]">
+                          <CalendarClock className="w-4 h-4 text-primary shrink-0" />
+                          <span>
+                            {term.daysDue}{" "}
+                            <span className="text-[10px] text-muted-foreground font-sans font-medium">
+                              Calendar Days
                             </span>
-                          </div>
-                        ) : (
-                          <div className="text-amber-600 font-bold flex items-center gap-1 tracking-tight">
-                            <ShieldAlert className="w-3.5 h-3.5 text-amber-500 shrink-0" /> Due On Receipt (COD)
-                          </div>
-                        )}
-                      </td>
-
-                      {/* Customer Count */}
-                      <td className="p-4 text-right font-mono pr-6 text-slate-600">
-                        {term.customerUsageCount.toLocaleString()}
-                      </td>
-
-                      {/* Vendor Count */}
-                      <td className="p-4 text-right font-mono pr-6 text-slate-600">
-                        {term.vendorUsageCount.toLocaleString()}
-                      </td>
-
-                      {/* Live Orders Logs */}
-                      <td className="p-4 text-right pr-6">
-                        <div className="inline-flex items-center gap-1 font-mono font-bold text-slate-700 bg-muted/60 border rounded-md px-2 py-0.5">
-                          <span>{term.salesOrderUsageCount.toLocaleString()}</span>
+                          </span>
                         </div>
-                      </td>
-
-                      {/* Status Toggle */}
-                      <td className="p-4 text-center">
-                        <div className="flex justify-center">
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <div>
-                                {term.isActive ? (
-                                  <CheckCircle2 className="w-4 h-4 text-emerald-500" />
-                                ) : (
-                                  <XCircle className="w-4 h-4 text-slate-300" />
-                                )}
-                              </div>
-                            </TooltipTrigger>
-                            <TooltipContent>
-                              <p>
-                                {term.isActive 
-                                  ? "Active billing routing standard enabled" 
-                                  : "Suspended temporal matrix configuration"}
-                              </p>
-                            </TooltipContent>
-                          </Tooltip>
+                      ) : (
+                        <div className="text-amber-600 font-bold flex items-center gap-1 tracking-tight">
+                          <ShieldAlert className="w-3.5 h-3.5 text-amber-500 shrink-0" /> Due On Receipt (COD)
                         </div>
-                      </td>
+                      )}
+                    </TableCell>
 
-                      {/* Controls Action Cell */}
-                      <td className="p-4 pr-5 text-right">
-                        <div className="flex items-center justify-end gap-1">
-                          <Button 
-                            asChild 
-                            variant="ghost" 
-                            size="icon" 
-                            className="h-8 w-8 text-muted-foreground hover:text-foreground"
-                          >
-                            <Link href={`/dashboard/settings/financial/payment-terms/${term.id}/edit`}>
-                              <Edit3 className="w-3.5 h-3.5" />
-                            </Link>
-                          </Button>
-                          <DeleteButton
-                            itemId={term.id} 
-                            itemName={term.name} 
-                            endpointUrl={`/api/admin/settings/financial/payment-terms/${term.id}`}
-                            onSuccess={(id) => {
-                              setTerms(prev => prev.filter(t => t.id !== id));
-                            }} 
-                            variant="icon"
-                          />
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                    {/* Customers */}
+                    <TableCell className="text-right font-mono pr-6 text-slate-600">
+                      {term.customerUsageCount.toLocaleString()}
+                    </TableCell>
+
+                    {/* Vendors */}
+                    <TableCell className="text-right font-mono pr-6 text-slate-600">
+                      {term.vendorUsageCount.toLocaleString()}
+                    </TableCell>
+
+                    {/* Sales Orders */}
+                    <TableCell className="text-right pr-6">
+                      <div className="inline-flex items-center gap-1 font-mono font-bold text-slate-700 bg-muted/60 border rounded-md px-2 py-0.5">
+                        <span>{term.salesOrderUsageCount.toLocaleString()}</span>
+                      </div>
+                    </TableCell>
+
+                    {/* Status */}
+                    <TableCell className="text-center">
+                      <div className="flex justify-center">
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <div>
+                              {term.isActive ? (
+                                <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+                              ) : (
+                                <XCircle className="w-4 h-4 text-slate-300" />
+                              )}
+                            </div>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p>
+                              {term.isActive ? "Active payment term" : "Disabled payment term"}
+                            </p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </div>
+                    </TableCell>
+
+                    {/* Actions */}
+                    <TableCell className="pr-5 text-right">
+                      <div className="flex items-center justify-end gap-1">
+                        <Button 
+                          asChild 
+                          variant="ghost" 
+                          size="icon" 
+                          className="h-8 w-8 text-muted-foreground hover:text-foreground"
+                          title="Edit Payment Term"
+                        >
+                          <Link href={`/dashboard/settings/financial/payment-terms/${term.id}/edit`}>
+                            <Edit3 className="w-3.5 h-3.5" />
+                          </Link>
+                        </Button>
+                        <DeleteButton
+                          itemId={term.id} 
+                          itemName={term.name} 
+                          endpointUrl={`/api/admin/settings/financial/payment-terms/${term.id}`}
+                          onSuccess={(id) => {
+                            setTerms(prev => prev.filter(t => t.id !== id));
+                          }} 
+                          variant="icon"
+                        />
+                      </div>
+                    </TableCell>
+
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
           </div>
 
-          {/* Pagination Controls Footer Component */}
+          {/* Pagination Controls */}
           <DataTablePagination
             pageIndex={pageIndex}
             pageSize={PAGE_SIZE}

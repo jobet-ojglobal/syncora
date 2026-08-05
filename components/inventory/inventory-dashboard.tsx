@@ -14,7 +14,11 @@ import {
   Warehouse,
   History,
   RefreshCw,
+  Layers,
+  Sliders,
 } from "lucide-react";
+import { Button } from "../ui/button";
+import Link from "next/link";
 
 // Types matching API response structure
 interface DashboardData {
@@ -93,19 +97,28 @@ export default function InventoryDashboard() {
 
         {/* Quick Actions & Refresh Bar */}
         <div className="flex flex-wrap items-center gap-2">
-          <button
+          <Button
             onClick={fetchDashboardData}
             disabled={loading}
-            className="p-2 text-slate-500 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 disabled:opacity-50 transition-colors shadow-sm"
             title="Refresh Data"
+            variant="outline"
+            size="icon"
           >
-            <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
-          </button>
-          <button className="inline-flex items-center gap-2 px-3 py-2 text-xs font-medium text-white bg-slate-900 rounded-lg hover:bg-slate-800 transition-colors shadow-sm">
-            <PlusCircle className="w-4 h-4" />
-            Adjust Inventory
-          </button>
-          <button className="inline-flex items-center gap-2 px-3 py-2 text-xs font-medium text-slate-700 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors shadow-sm">
+            <RefreshCw className={`w-4 h-4 text-xs ${loading ? "animate-spin" : ""}`} />
+          </Button>
+          <Button asChild variant="outline" size="sm" className="h-7 px-2 text-muted-foreground hover:text-foreground gap-1">
+            <Link href={`/dashboard/inventory/stocks`}>
+              <Layers className="h-4 w-4 mr-2" />
+              Stocks
+            </Link>
+          </Button>
+          <Button asChild variant="outline" size="sm" className="h-7 px-2 text-muted-foreground hover:text-foreground gap-1">
+            <Link href={`/dashboard/inventory/adjustments`}>
+              <Sliders className="h-4 w-4 mr-2" />
+              Adjustments
+            </Link>
+          </Button>
+          {/* <button className="inline-flex items-center gap-2 px-3 py-2 text-xs font-medium text-slate-700 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors shadow-sm">
             <Truck className="w-4 h-4 text-slate-500" />
             Receive Purchase
           </button>
@@ -116,7 +129,7 @@ export default function InventoryDashboard() {
           <button className="inline-flex items-center gap-2 px-3 py-2 text-xs font-medium text-slate-700 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors shadow-sm">
             <Barcode className="w-4 h-4 text-slate-500" />
             Search Serial
-          </button>
+          </button> */}
         </div>
       </div>
 

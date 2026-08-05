@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, PackagePlus } from "lucide-react";
 import PageHeader from "@/components/layout/dashboard/PageHeader";
 import { ProductForm } from "@/components/product/product-form";
 import { getProductMetadata } from "@/services/product-metadata";
@@ -8,7 +8,7 @@ export default async function CreateProductPage() {
   const metadata = await getProductMetadata();
 
   return (
-    <div className="w-full max-w-[90rem] mx-auto p-6 space-y-6">
+    <div className="w-full max-w-[90rem] mx-auto px-6 py-12 space-y-6">
       {/* NAVIGATION CONTROLS */}
       <Link
         href="/dashboard/products"
@@ -20,10 +20,10 @@ export default async function CreateProductPage() {
 
       <PageHeader 
         title="Create Product"
-        description="Register a new master inventory item with multi-tier measurement rules." 
+        description="Add a new product to your inventory catalog with custom pricing, variants, and units." 
+        icon={PackagePlus}
       />
-
-      {/* PRODUCT CONFIGURATION FORM */}
+      
       <ProductForm 
         {...metadata}
       />

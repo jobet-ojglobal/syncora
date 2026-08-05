@@ -11,6 +11,8 @@ interface RowActionProps {
   isActive: boolean;
   endpointUrl?: string;
   onSuccess?: () => void;
+  icon1?: React.ComponentType<{ className?: string }>; 
+  icon2?: React.ComponentType<{ className?: string }>; 
 }
 
 export function StatusAction({
@@ -19,6 +21,9 @@ export function StatusAction({
   isActive,
   endpointUrl = "/api/admin/adjustment-reasons/status",
   onSuccess,
+  icon1: Icon1 = Power, 
+  icon2: Icon2 = PowerOff, 
+
 }: RowActionProps) {
   const [isPending, setIsPending] = React.useState(false);
 
@@ -68,9 +73,9 @@ export function StatusAction({
             }`}
           >
             {isActive ? (
-              <Power className={`w-3.5 h-3.5 ${isPending ? "animate-pulse" : ""}`} />
+              <Icon1 className={`w-3.5 h-3.5 ${isPending ? "animate-pulse" : ""}`} />
             ) : (
-              <PowerOff className={`w-3.5 h-3.5 ${isPending ? "animate-pulse" : ""}`} />
+              <Icon2 className={`w-3.5 h-3.5 ${isPending ? "animate-pulse" : ""}`} />
             )}
           </button>
         </TooltipTrigger>

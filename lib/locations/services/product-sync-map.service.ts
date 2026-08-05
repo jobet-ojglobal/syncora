@@ -46,7 +46,7 @@ export class ProductSyncMapService {
   
 
     const syncResults: Array<{
-      productLocalId: number;
+      productLocalId: string;
       productInflowId?: string;
       status: "synced" | "skipped_not_found";
     }> = [];

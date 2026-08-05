@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { stockAdjustmentSchema } from "@/schemas/stock-adjustment.schema";
+import { StockAdjustmentInput, stockAdjustmentSchema } from "@/schemas/stock-adjustment.schema";
 import {
   InventoryTransactionType,
   InventoryReferenceType,
@@ -61,7 +61,7 @@ export async function POST(req: Request) {
     const body = await req.json();
 
     // 1. Validate request body against Zod Schema
-    const validatedData = stockAdjustmentSchema.parse(body);
+    // const validatedData = stockAdjustmentSchema.parse(body);
     const {
       id: existingAdjustmentId,
       reasonId,
@@ -69,7 +69,7 @@ export async function POST(req: Request) {
       remarks,
       status,
       lines,
-    } = validatedData;
+    } = body as StockAdjustmentInput;
     
     // TODO: Replace with dynamic user context from session / auth header
     const performedById = "cc920c31-bcb2-4264-9946-4b7693c9c7e0";

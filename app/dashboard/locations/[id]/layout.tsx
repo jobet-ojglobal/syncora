@@ -33,7 +33,7 @@ export default async function LocationLayout({
   const statusKey = location.isActive ? "Active" : "Inactive";
 
   return (
-    <div className="w-full">
+    <div className="w-full pb-12">
       <div className="border-b border-border bg-card">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 space-y-3">
           

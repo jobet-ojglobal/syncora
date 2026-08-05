@@ -1,4 +1,4 @@
-import { Coins, Tags, Users2, Settings2, Link2, ShoppingBag, Landmark, Users } from "lucide-react";
+import { Coins, Tags, Users2, Settings2, Link2, ShoppingBag, Landmark, Users, MapPin } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { BasicLocationResponse } from "@/types/location.type"; // adjust path as needed
 
@@ -45,6 +45,13 @@ export function LocationMappingGrid({ location }: LocationMappingGridProps) {
 
   // Core tracking entities added below the override matrices
   const coreEntities = [
+    {
+      label: "Mapped Locations",
+      count: location.mappings.locationsCount ?? 0,
+      description: "Local Location tied to sublocation",
+      icon: MapPin,
+      color: "text-rose-500 bg-rose-500/5 dark:bg-rose-500/10 border-rose-200/30"
+    },
     {
       label: "Mapped Customers",
       count: location.mappings.customersCount ?? 0,
@@ -130,7 +137,7 @@ export function LocationMappingGrid({ location }: LocationMappingGridProps) {
           </p>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           {coreEntities.map((entity, idx) => {
             const EntityIcon = entity.icon;
             return (
