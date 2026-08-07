@@ -162,11 +162,21 @@ export async function syncProduct(
   let validProductData: Product | null = null;
 
   if (hasCoreProductData) {
+<<<<<<< HEAD
     const baseSlug = await genInflowUniqueSlug(
       product.name || "product-variant", 
       tx.product, 
       product.productId
     );
+=======
+    const slugToUse = localProduct?.slug 
+      ? localProduct.slug 
+      : await genInflowUniqueSlug(
+          product.name || "product-variant", 
+          tx.product, 
+          product.productId
+        );
+>>>>>>> 5b8a697f694ad91ac1815e935520b5c9374ef5c2
 
     // Payload structure for Upsert
     const productPayload = {
@@ -208,7 +218,7 @@ export async function syncProduct(
       create: {
         ...productPayload,
         inflowId: product.productId,
-        slug: baseSlug,
+        slug: slugToUse,
       },
       update: productPayload,
     });
