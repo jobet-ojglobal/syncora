@@ -26,8 +26,35 @@ export const genUniqueSlug = async (text: string, model: any, currentId?: string
 /* eslint-enable @typescript-eslint/no-explicit-any */
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
-export const genInflowUniqueSlug = async (text: string, model: any, currentId?: string): Promise<string> => {
-  const baseSlug = slugify(text, { lower: true, strict: true, trim: true });
+// export const genInflowUniqueSlug = async (text: string, model: any, currentId?: string): Promise<string> => {
+//   const baseSlug = slugify(text, { lower: true, strict: true, trim: true });
+//   let slug = baseSlug;
+
+//   let counter = 1;
+
+//   while (true) {
+//     const existing = await model.findFirst({
+//       where: {
+//         slug,
+//         NOT: currentId ? { inflowId: currentId } : undefined,
+//       },
+//     });
+
+//     if (!existing) break;
+
+//     slug = `${baseSlug}-${counter}`;
+//     counter++;
+//   }
+
+//   return slug;
+// };
+
+export const genInflowUniqueSlug = async (
+  text: string, 
+  model: any, 
+  currentId?: string
+): Promise<string> => {
+  const baseSlug = slugify(text, { lower: true, strict: true, trim: true }) || "product";
   let slug = baseSlug;
 
   let counter = 1;
@@ -38,11 +65,19 @@ export const genInflowUniqueSlug = async (text: string, model: any, currentId?: 
         slug,
         NOT: currentId ? { inflowId: currentId } : undefined,
       },
+      select: { inflowId: true },
     });
 
     if (!existing) break;
 
-    slug = `${baseSlug}-${counter}`;
+    // Append counter first; if multiple collisions occur, append a sliced ID snippet
+    if (counter > 5 && currentId) {
+      const idSnippet = currentId.slice(-6);
+      slug = `${baseSlug}-${idSnippet}-${counter}`;
+    } else {
+      slug = `${baseSlug}-${counter}`;
+    }
+    
     counter++;
   }
 
