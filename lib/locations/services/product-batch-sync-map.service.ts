@@ -7,6 +7,11 @@ import { localProductItemType } from "@/helpers/product.helper";
 import { syncProduct } from "./product-sync";
 
 export class ProductSyncMapService {
+  // Utility delay method for rate-limiting loop iterations
+  private sleep(ms: number) {
+    return new Promise((resolve) => setTimeout(resolve, ms));
+  }
+
   async sync(
     location: {
       inflowId: string;
@@ -15,13 +20,15 @@ export class ProductSyncMapService {
     },
     options: SyncOptions,
     selectedRecords?: any[],
-    syncedAll?: boolean
+    syncedAll?: boolean,
+    brandCustomName?: string, 
+    after: string | undefined = undefined
   ) {
     const { onProgress } = options;
-    const BATCH_SIZE = 10; //50
+    const BATCH_SIZE = options?.batchSize ?? 30;
+    const INTER_BATCH_DELAY = options?.delayBetweenBatchesMs ?? 300;
 
     let totalProcessed = 0;
-    let afterCursor: string | undefined = undefined;
     let hasMore = true;
 
     // Build the filtering Set ONLY if syncedAll is NOT true and selectedRecords exist
@@ -49,13 +56,26 @@ export class ProductSyncMapService {
       verifiedProductIds: new Set<string>(),
     };
 
+    console.log(`Starting optimized product sync (Batch Size: ${BATCH_SIZE}, Throttle: ${INTER_BATCH_DELAY}ms)...`);
+    let batchNo = 0;
+
     while (hasMore) {
+      // Check for cancellation before calling remote API
+      if (options?.checkSignal) {
+        await options.checkSignal();
+      }
+
       // 1. Fetch current batch from local endpoint
       const rawBatch: LocalProduct[] = await getLocalBatchProducts(
         location.url,
         BATCH_SIZE,
-        afterCursor
+        after
       );
+
+      // Check for cancellation before executing database transaction
+      if (options?.checkSignal) {
+        await options.checkSignal();
+      }
 
 
       if (!rawBatch || rawBatch.length === 0) {
@@ -63,7 +83,7 @@ export class ProductSyncMapService {
       }
 
       // Track cursor for pagination
-      afterCursor = String(rawBatch[rawBatch.length - 1].productId);
+      after = String(rawBatch[rawBatch.length - 1].productId);
       if (rawBatch.length < BATCH_SIZE) {
         hasMore = false;
       }
@@ -88,13 +108,10 @@ export class ProductSyncMapService {
             batch.map(async (product, idx) => {
               let match = await tx.product.findFirst({
                 where: {
-                  name: product.name
+                  name: product.name.trim()
                 },
                 select: { inflowId: true },
               });
-
-      console.log('batch  syncing...', idx)
-
 
               if (!match) {
                 const generatedInflowId = crypto.randomUUID().toLowerCase();
@@ -283,13 +300,22 @@ export class ProductSyncMapService {
           batchProcessed = validProducts.length;
           return batchProcessed;
         },
-        { timeout: 30000 }
+        { timeout: 40000, }
       );
 
+      // Update pagination cursor and progress tracking
+      // after = batch[batch.length - 1].productId;
       totalProcessed += batchProcessedCount;
+      batchNo++;
 
+      console.log(`Batch #${batchNo} completed. Processed ${totalProcessed} products.`);
+      
       if (onProgress) {
         await onProgress(totalProcessed);
+      }
+      // Pace out requests to eliminate HTTP 429 rate limit triggers
+      if (INTER_BATCH_DELAY > 0) {
+        await this.sleep(INTER_BATCH_DELAY);
       }
     }
 
