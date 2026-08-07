@@ -8,7 +8,7 @@ export const dynamic = "force-dynamic";
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { source, includes, locationIds, locationId, selectedRecords } = body;
+    const { source, includes, locationIds, locationId, selectedRecords, syncedAll, after, brandCustomName } = body;
 
     if (!source) {
       return NextResponse.json(
@@ -43,6 +43,9 @@ export async function POST(request: NextRequest) {
         location,
         includes: includes || locationIds || [],
         selectedRecords: selectedRecords || [],
+        syncedAll,
+        brandCustomName,
+        after,
         timestamp: new Date().toISOString() 
       },
       { attempts: 3, backoff: { type: "exponential", delay: 2000 } }
@@ -62,38 +65,53 @@ export async function POST(request: NextRequest) {
   }
 }
 
-
 export async function GET(request: NextRequest) {
   try {
     const searchParams = request.nextUrl.searchParams;
     const jobId = searchParams.get("jobId");
+    const source = searchParams.get("source");
 
-    if (!jobId) {
-      const queueCount = await getSyncQueue().count();
-      const pendingJobs = await prisma.syncJob.findMany({
-        where: { status: "pending" },
-        take: 10,
+    // Scenario A: Check for existing active/in-progress job for a specific source
+    if (source) {
+      const activeJob = await prisma.syncJob.findFirst({
+        where: {
+          source,
+          status: { in: ["pending", "processing", "retrying"] },
+        },
+        orderBy: { createdAt: "desc" },
       });
-      
-      return NextResponse.json({
-        queued: queueCount,
-        pending: pendingJobs,
-        timestamp: new Date().toISOString(),
+
+      return NextResponse.json({ activeJob }, {
+        headers: { "Cache-Control": "no-store" },
       });
     }
 
-    const syncJob = await prisma.syncJob.findUnique({
-      where: { id: jobId },
+    // Scenario B: Query specific job status by jobId
+    if (jobId) {
+      const syncJob = await prisma.syncJob.findUnique({
+        where: { id: jobId },
+      });
+
+      if (!syncJob) {
+        return NextResponse.json({ error: "Job not found" }, { status: 404 });
+      }
+
+      return NextResponse.json(syncJob, {
+        headers: { "Cache-Control": "no-store" },
+      });
+    }
+
+    // Default overview response
+    const queueCount = await getSyncQueue().count();
+    const pendingJobs = await prisma.syncJob.findMany({
+      where: { status: "pending" },
+      take: 10,
     });
-
-    if (!syncJob) {
-      return NextResponse.json({ error: "Job not found" }, { status: 404 });
-    }
-
-    return NextResponse.json(syncJob, {
-      headers: {
-        "Cache-Control": "no-store",
-      },
+    
+    return NextResponse.json({
+      queued: queueCount,
+      pending: pendingJobs,
+      timestamp: new Date().toISOString(),
     });
   } catch (error) {
     console.error("API error:", error);
@@ -103,3 +121,45 @@ export async function GET(request: NextRequest) {
     );
   }
 }
+
+// export async function GET(request: NextRequest) {
+//   try {
+//     const searchParams = request.nextUrl.searchParams;
+//     const jobId = searchParams.get("jobId");
+    
+
+//     if (!jobId) {
+//       const queueCount = await getSyncQueue().count();
+//       const pendingJobs = await prisma.syncJob.findMany({
+//         where: { status: "pending" },
+//         take: 10,
+//       });
+      
+//       return NextResponse.json({
+//         queued: queueCount,
+//         pending: pendingJobs,
+//         timestamp: new Date().toISOString(),
+//       });
+//     }
+
+//     const syncJob = await prisma.syncJob.findUnique({
+//       where: { id: jobId },
+//     });
+
+//     if (!syncJob) {
+//       return NextResponse.json({ error: "Job not found" }, { status: 404 });
+//     }
+
+//     return NextResponse.json(syncJob, {
+//       headers: {
+//         "Cache-Control": "no-store",
+//       },
+//     });
+//   } catch (error) {
+//     console.error("API error:", error);
+//     return NextResponse.json(
+//       { error: "Failed to fetch job status" },
+//       { status: 500 }
+//     );
+//   }
+// }

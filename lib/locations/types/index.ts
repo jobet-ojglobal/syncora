@@ -113,4 +113,5 @@ export interface LocalLocation {
 
 export type SyncOptions = {
   onProgress?: (processedCount: number) => Promise<void>;
+  batchSize?: number;
 };

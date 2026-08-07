@@ -1125,6 +1125,13 @@ export const breadcrumbsMap = [
             id: "admin-inv-adjustments",
             href: "/dashboard/inventory/adjustments",
             label: "Stock Adjustments",
+            children: [
+              {
+                id: "admin-inv-adjustments-reason",
+                href: "/dashboard/inventory/adjustments/reasons",
+                label: "Adjustment Reasons",
+              },
+            ]
           },
 
           {

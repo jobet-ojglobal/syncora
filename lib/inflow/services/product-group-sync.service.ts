@@ -16,17 +16,32 @@ type SyncOptions = {
 //   verifiedVendorIds: Set<string>;
 // };
 
+//  const cleanIncludes = (includes ?? []).filter((item) => item !== "coreData");
+//     const hasCoreGroupData = (includes ?? []).includes("coreData");
+//     const mergedIncludes = [...baseIncludes, ...(cleanIncludes || [])];
+
+//     const baseIncludes = [""];
+
 export class ProductGroupSyncService {
   async sync(options?: SyncOptions, includes?: string[]) {
     const BATCH_SIZE = options?.batchSize || 10;
+    let brandCustomName = undefined;
     
     let after: string | undefined = undefined;
     let totalProcessed = 0;
 
     const baseIncludes = ["options.optionValues"];
-    const cleanIncludes = (includes ?? []).filter((item) => item !== "coreData");
+   
+    const EXCLUDED_INCLUDES = new Set(["coreData", "brand", "brandCustomName"]);
+    const cleanIncludes = (includes ?? []).filter((item) => !EXCLUDED_INCLUDES.has(item));
+
     const hasCoreGroupData = (includes ?? []).includes("coreData");
+    const hasBrand = (includes ?? []).includes("brand");
     const mergedIncludes = [...baseIncludes, ...(cleanIncludes || [])];
+
+    if(hasBrand) {
+      brandCustomName = includes?.filter(i => i === "brandCustomName")[0];
+    }
 
     // Runtime cache across service execution
     const caches = {
@@ -76,6 +91,7 @@ export class ProductGroupSyncService {
                     group.productGroupId,
                     fallbackProductContext,
                     true,
+                    brandCustomName,
                     caches
                   );
                 }

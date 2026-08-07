@@ -1,4 +1,3 @@
-// app/api/sync/preview/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getTaxingSchemes } from "@/lib/locations/data/taxing-scheme";
@@ -8,7 +7,7 @@ import { getCategories } from "@/lib/locations/data/category";
 import { getPricingSchemes } from "@/lib/locations/data/pricing-scheme";
 import { getPaymentTerms } from "@/lib/locations/data/payment-term";
 import { getLocalLocations } from "@/lib/locations/data/location";
-import { getLocalInventoryLines, getLocalProducts } from "@/lib/locations/data/product-local";
+import { getLocalBatchProducts, getLocalInventoryLines } from "@/lib/locations/data/product-local";
 
 export const dynamic = "force-dynamic";
 
@@ -17,6 +16,10 @@ export async function GET(request: NextRequest) {
     const searchParams = request.nextUrl.searchParams;
     const source = searchParams.get("source");
     const locationId = searchParams.get("locationId");
+    
+    // Pagination params
+    const limit = Math.min(Math.max(parseInt(searchParams.get("limit") || "50", 10), 1), 100);
+    const after = searchParams.get("after") || undefined;
 
     if (!source || !locationId) {
       return NextResponse.json({ error: "Missing parameters" }, { status: 400 });
@@ -31,123 +34,250 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Location endpoint URL not configured" }, { status: 400 });
     }
 
-    // Dynamic routing depending on your source
+    let previewItems: any[] = [];
+    let nextCursor: string | null = null;
+    let hasMore = false;
+
     if (source === "taxing_schemes_local") {
       const rawSchemes = await getTaxingSchemes(location.url);
-      
-      // Transform records into a uniform preview structure
-      const previewItems = rawSchemes.map((scheme: any) => ({
-        id: String(scheme.taxingSchemeId), // incoming original ID
+      previewItems = rawSchemes.map((scheme: any) => ({
+        id: String(scheme.taxingSchemeId),
         name: scheme.name,
         description: `${scheme.taxCodes?.length || 0} nested tax codes present`,
-        rawData: scheme, // Cache full object to pass back later
+        rawData: scheme,
       }));
-
-      return NextResponse.json({ items: previewItems });
     } else if (source === "pricing_schemes_local") {
       const rawSchemes = await getPricingSchemes(location.url);
-      
-      // Transform records into a uniform preview structure
-      const previewItems = rawSchemes.map((scheme: any) => ({
-        id: String(scheme.pricingSchemeId), // incoming original ID
+      previewItems = rawSchemes.map((scheme: any) => ({
+        id: String(scheme.pricingSchemeId),
         name: scheme.name,
         description: `0 nested tax codes present`,
-        rawData: scheme, // Cache full object to pass back later
+        rawData: scheme,
       }));
-
-      return NextResponse.json({ items: previewItems });
     } else if (source === "customers_local") {
       const rawCustomer = await getCustomers(location.url);
-      
-      // Transform records into a uniform preview structure
-      const previewItems = rawCustomer.map((customer: any) => ({
-        id: String(customer.customerId), // incoming original ID
+      previewItems = rawCustomer.map((customer: any) => ({
+        id: String(customer.customerId),
         name: customer.name,
-        description: `${customer.dues?.length || 0} nested dues present. ${customer.balances?.length || 0} nested balances present. ${customer.credits?.length || 0} nested credits present.`,
-        rawData: customer, // Cache full object to pass back later
+        description: `${customer.dues?.length || 0} dues. ${customer.balances?.length || 0} balances. ${customer.credits?.length || 0} credits.`,
+        rawData: customer,
       }));
-
-      return NextResponse.json({ items: previewItems });
     } else if (source === "currencies_local") {
       const rawCurrency = await getCurrencies(location.url);
-      
-      // Transform records into a uniform preview structure
-      const previewItems = rawCurrency.map((item: any) => ({
-        id: String(item.currencyId), // incoming original ID
+      previewItems = rawCurrency.map((item: any) => ({
+        id: String(item.currencyId),
         name: item.description,
         description: `${item.address?.length || 0} nested items present`,
-        rawData: item, // Cache full object to pass back later
+        rawData: item,
       }));
-
-      return NextResponse.json({ items: previewItems });
     } else if (source === "payment_terms_local") {
       const rawPayment = await getPaymentTerms(location.url);
-      
-      // Transform records into a uniform preview structure
-      const previewItems = rawPayment.map((item: any) => ({
-        id: String(item.paymentTermsId), // incoming original ID
+      previewItems = rawPayment.map((item: any) => ({
+        id: String(item.paymentTermsId),
         name: item.name,
         description: `0 nested items present`,
-        rawData: item, // Cache full object to pass back later
+        rawData: item,
       }));
-
-      return NextResponse.json({ items: previewItems });
     } else if (source === "categories_local") {
       const rawCategories = await getCategories(location.url);
-      
-      // Transform records into a uniform preview structure
-      const previewItems = rawCategories.map((item: any) => ({
-        id: String(item.categoryId), // incoming original ID
+      previewItems = rawCategories.map((item: any) => ({
+        id: String(item.categoryId),
         name: item.name,
         description: `0 nested items present`,
-        rawData: item, // Cache full object to pass back later
+        rawData: item,
       }));
-
-      return NextResponse.json({ items: previewItems });
     } else if (source === "locations_local") {
       const rawLocations = await getLocalLocations(location.url);
-      
-      // Transform records into a uniform preview structure
-      const previewItems = rawLocations.map((item: any) => ({
-        id: String(item.locationId), // incoming original ID
+      previewItems = rawLocations.map((item: any) => ({
+        id: String(item.locationId),
         name: item.name,
         description: `0 nested items present`,
-        rawData: item, // Cache full object to pass back later
+        rawData: item,
       }));
-
-      return NextResponse.json({ items: previewItems });
-    }  else if (source === "products_local") {
-      const rawLocations = await getLocalProducts(location.url);
-      
-      // Transform records into a uniform preview structure
-      const previewItems = rawLocations.map((item: any) => ({
-        id: String(item.productId), // incoming original ID
+    } else if (source === "products_local") {
+      // Use batched fetching with cursor pagination
+      const batch = await getLocalBatchProducts(location.url, limit, after);
+      previewItems = (batch || []).map((item: any) => ({
+        id: String(item.productId),
         name: item.name,
-        description:`${item.serials?.length || 0} nested serials. ${item.prices?.length || 0} nested prices`,
-        rawData: item, // Cache full object to pass back later
+        description: `${item.serials?.length || 0} nested serials. ${item.prices?.length || 0} nested prices`,
+        rawData: item,
       }));
 
-      return NextResponse.json({ items: previewItems });
+      hasMore = batch.length === limit;
+      nextCursor = batch.length > 0 ? String(batch[batch.length - 1].productId) : null;
     } else if (source === "inventory_lines_local") {
       const rawInventory = await getLocalInventoryLines(location.url);
-      
-      // Transform records into a uniform preview structure
-      const previewItems = rawInventory.map((item: any) => ({
-        id: String(item.productId), // incoming original ID
+      previewItems = rawInventory.map((item: any) => ({
+        id: String(item.productId),
         name: item.name,
-        description:`${item.inventoryLines?.length || 0} nested inventory.`,
-        rawData: item, // Cache full object to pass back later
+        description: `${item.inventoryLines?.length || 0} nested inventory.`,
+        rawData: item,
       }));
-
-      return NextResponse.json({ items: previewItems });
     }
 
-    
-    
+    return NextResponse.json({
+      items: previewItems,
+      pagination: {
+        limit,
+        nextCursor,
+        hasMore,
+      },
+    });
 
-    return NextResponse.json({ items: [] });
   } catch (error) {
     console.error("Preview payload error:", error);
     return NextResponse.json({ error: "Failed to generate preview dataset" }, { status: 500 });
   }
 }
+
+// // app/api/sync/preview/route.ts
+// import { NextRequest, NextResponse } from "next/server";
+// import { prisma } from "@/lib/prisma";
+// import { getTaxingSchemes } from "@/lib/locations/data/taxing-scheme";
+// import { getCustomers } from "@/lib/locations/data/customer";
+// import { getCurrencies } from "@/lib/locations/data/currency";
+// import { getCategories } from "@/lib/locations/data/category";
+// import { getPricingSchemes } from "@/lib/locations/data/pricing-scheme";
+// import { getPaymentTerms } from "@/lib/locations/data/payment-term";
+// import { getLocalLocations } from "@/lib/locations/data/location";
+// import { getLocalInventoryLines, getLocalProducts } from "@/lib/locations/data/product-local";
+
+// export const dynamic = "force-dynamic";
+
+// export async function GET(request: NextRequest) {
+//   try {
+//     const searchParams = request.nextUrl.searchParams;
+//     const source = searchParams.get("source");
+//     const locationId = searchParams.get("locationId");
+
+//     if (!source || !locationId) {
+//       return NextResponse.json({ error: "Missing parameters" }, { status: 400 });
+//     }
+
+//     const location = await prisma.location.findUnique({
+//       where: { id: locationId },
+//       select: { url: true }
+//     });
+
+//     if (!location?.url) {
+//       return NextResponse.json({ error: "Location endpoint URL not configured" }, { status: 400 });
+//     }
+
+//     // Dynamic routing depending on your source
+//     if (source === "taxing_schemes_local") {
+//       const rawSchemes = await getTaxingSchemes(location.url);
+      
+//       // Transform records into a uniform preview structure
+//       const previewItems = rawSchemes.map((scheme: any) => ({
+//         id: String(scheme.taxingSchemeId), // incoming original ID
+//         name: scheme.name,
+//         description: `${scheme.taxCodes?.length || 0} nested tax codes present`,
+//         rawData: scheme, // Cache full object to pass back later
+//       }));
+
+//       return NextResponse.json({ items: previewItems });
+//     } else if (source === "pricing_schemes_local") {
+//       const rawSchemes = await getPricingSchemes(location.url);
+      
+//       // Transform records into a uniform preview structure
+//       const previewItems = rawSchemes.map((scheme: any) => ({
+//         id: String(scheme.pricingSchemeId), // incoming original ID
+//         name: scheme.name,
+//         description: `0 nested tax codes present`,
+//         rawData: scheme, // Cache full object to pass back later
+//       }));
+
+//       return NextResponse.json({ items: previewItems });
+//     } else if (source === "customers_local") {
+//       const rawCustomer = await getCustomers(location.url);
+      
+//       // Transform records into a uniform preview structure
+//       const previewItems = rawCustomer.map((customer: any) => ({
+//         id: String(customer.customerId), // incoming original ID
+//         name: customer.name,
+//         description: `${customer.dues?.length || 0} nested dues present. ${customer.balances?.length || 0} nested balances present. ${customer.credits?.length || 0} nested credits present.`,
+//         rawData: customer, // Cache full object to pass back later
+//       }));
+
+//       return NextResponse.json({ items: previewItems });
+//     } else if (source === "currencies_local") {
+//       const rawCurrency = await getCurrencies(location.url);
+      
+//       // Transform records into a uniform preview structure
+//       const previewItems = rawCurrency.map((item: any) => ({
+//         id: String(item.currencyId), // incoming original ID
+//         name: item.description,
+//         description: `${item.address?.length || 0} nested items present`,
+//         rawData: item, // Cache full object to pass back later
+//       }));
+
+//       return NextResponse.json({ items: previewItems });
+//     } else if (source === "payment_terms_local") {
+//       const rawPayment = await getPaymentTerms(location.url);
+      
+//       // Transform records into a uniform preview structure
+//       const previewItems = rawPayment.map((item: any) => ({
+//         id: String(item.paymentTermsId), // incoming original ID
+//         name: item.name,
+//         description: `0 nested items present`,
+//         rawData: item, // Cache full object to pass back later
+//       }));
+
+//       return NextResponse.json({ items: previewItems });
+//     } else if (source === "categories_local") {
+//       const rawCategories = await getCategories(location.url);
+      
+//       // Transform records into a uniform preview structure
+//       const previewItems = rawCategories.map((item: any) => ({
+//         id: String(item.categoryId), // incoming original ID
+//         name: item.name,
+//         description: `0 nested items present`,
+//         rawData: item, // Cache full object to pass back later
+//       }));
+
+//       return NextResponse.json({ items: previewItems });
+//     } else if (source === "locations_local") {
+//       const rawLocations = await getLocalLocations(location.url);
+      
+//       // Transform records into a uniform preview structure
+//       const previewItems = rawLocations.map((item: any) => ({
+//         id: String(item.locationId), // incoming original ID
+//         name: item.name,
+//         description: `0 nested items present`,
+//         rawData: item, // Cache full object to pass back later
+//       }));
+
+//       return NextResponse.json({ items: previewItems });
+//     }  else if (source === "products_local") {
+//       const rawLocations = await getLocalProducts(location.url);
+      
+//       // Transform records into a uniform preview structure
+//       const previewItems = rawLocations.map((item: any) => ({
+//         id: String(item.productId), // incoming original ID
+//         name: item.name,
+//         description:`${item.serials?.length || 0} nested serials. ${item.prices?.length || 0} nested prices`,
+//         rawData: item, // Cache full object to pass back later
+//       }));
+
+//       return NextResponse.json({ items: previewItems });
+//     } else if (source === "inventory_lines_local") {
+//       const rawInventory = await getLocalInventoryLines(location.url);
+      
+//       // Transform records into a uniform preview structure
+//       const previewItems = rawInventory.map((item: any) => ({
+//         id: String(item.productId), // incoming original ID
+//         name: item.name,
+//         description:`${item.inventoryLines?.length || 0} nested inventory.`,
+//         rawData: item, // Cache full object to pass back later
+//       }));
+
+//       return NextResponse.json({ items: previewItems });
+//     }
+
+//     return NextResponse.json({ items: [] });
+//   } catch (error) {
+//     console.error("Preview payload error:", error);
+//     return NextResponse.json({ error: "Failed to generate preview dataset" }, { status: 500 });
+//   }
+// }

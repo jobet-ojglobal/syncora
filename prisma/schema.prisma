@@ -3268,8 +3268,8 @@ model PurchaseOrderAttachment {
   attachmentUrl    String
   fileName         String
   fileSize         Json?         // Empty or structured size metadata
-  lastModifiedById String?
-
+  lastModifiedById String? 
+  
   @@index([purchaseOrderId])
 
   @@map("purchase_order_attachment")

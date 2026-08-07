@@ -176,7 +176,8 @@ export default function InventoryAdjustmentsListPage() {
               Adjustment Reasons
             </Link>
           </Button>
-          <Button asChild size="sm" className="h-8 text-xs gap-1.5 shrink-0">
+          {/* implement */}
+          <Button asChild size="sm" className="h-8 text-xs gap-1.5 shrink-0 hidden">
             <Link href="/dashboard/inventory/adjustments/new">
               <Plus className="h-4 w-4" />
               Create Adjustment

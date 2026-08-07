@@ -1,18 +1,18 @@
 "use client"
 
 import { ColumnDef } from "@tanstack/react-table"
-import { ArrowUpDown, Barcode, CalendarClock, ImageOff, Power, PowerOff, ShieldCheck } from "lucide-react"
+import { ArrowUpDown, Barcode, CalendarClock, ShieldCheck } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import Image from "next/image"
 import { CellAction } from "./status-cell-action"
 import { RowActions } from "./row-actions"
 import { Checkbox } from "@/components/ui/checkbox"
+import { ThumbnailCell } from "./thumbnail-cell"
 
 // Shape matching your API Map payload precisely
 export type ParsedProduct = {
   id: string
-  inflowId: string | null
+  inflowId: string
   sku: string
   name: string
   groupName?: string
@@ -25,10 +25,12 @@ export type ParsedProduct = {
   brandName: string
   categoryName: string
   thumbnail: string | null
+  originalImage: string | null
   barcodesCount: number
   primaryBarcode: string | null
   purchasingUomText: string
   salesUomText: string
+  createdAt: string
 }
 
 export const columns: ColumnDef<ParsedProduct>[] = [
@@ -62,25 +64,7 @@ export const columns: ColumnDef<ParsedProduct>[] = [
   {
     accessorKey: "thumbnail",
     header: "Img",
-    cell: ({ row }) => {
-      const src = row.getValue("thumbnail") as string | null
-      return (
-        <div className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-md border bg-muted overflow-hidden">
-          {src ? (
-            <Image
-              src={src}
-              alt={row.getValue("name") || "Product Image"}
-              fill
-              sizes="40px"
-              className="object-cover"
-              unoptimized // Use if referencing raw external URL addresses directly
-            />
-          ) : (
-            <ImageOff className="h-4 w-4 text-muted-foreground" />
-          )}
-        </div>
-      )
-    },
+    cell: ({ row }) => <ThumbnailCell row={row} />,
   },
   {
     accessorKey: "sku",
@@ -220,6 +204,41 @@ export const columns: ColumnDef<ParsedProduct>[] = [
             </span>
             )}
         </div>
+      )
+    }
+  },
+  {
+    accessorKey: "createdAt",
+    header: ({ column }) => (
+      <Button
+        variant="ghost"
+        onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+        className="-ml-4 h-8"
+      >
+        Created At
+        <ArrowUpDown className="ml-2 h-4 w-4" />
+      </Button>
+    ),
+    cell: ({ row }) => {
+      const rawDate = row.getValue<string>("createdAt")
+      const formattedDateTime = rawDate
+        ? new Date(rawDate).toLocaleString("en-US", {
+            month: "short",
+            day: "numeric",
+            year: "numeric",
+            hour: "numeric",
+            minute: "2-digit",
+          })
+        : "N/A"
+
+      return (
+        <Badge
+          variant="outline"
+          className="bg-background text-xs font-normal shadow-2xs inline-flex items-center gap-1.5"
+        >
+          <CalendarClock className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+          <span>{formattedDateTime}</span>
+        </Badge>
       )
     }
   },
