@@ -1,5 +1,5 @@
 import { Prisma, Product, ProductPriceType, ProductType } from "@/generated/prisma/client";
-import { genLocalUniqueSlug } from "@/helpers/genUniqueSlug";
+import { genInflowUniqueSlug, genLocalUniqueSlug } from "@/helpers/genUniqueSlug";
 import { InflowLocation, InflowProduct } from "@/lib/inflow/types";
 import { 
   syncBrand, 
@@ -162,11 +162,10 @@ export async function syncProduct(
   let validProductData: Product | null = null;
 
   if (hasCoreProductData) {
-    const baseSlug = await genLocalUniqueSlug(
+    const baseSlug = await genInflowUniqueSlug(
       product.name || "product-variant", 
       tx.product, 
-      product.productId,
-      product.name
+      product.productId
     );
 
     // Payload structure for Upsert

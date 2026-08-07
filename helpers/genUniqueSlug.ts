@@ -55,7 +55,6 @@ export const genLocalUniqueSlug = async (
   text: string,
   model: any,
   currentInflowId: string,
-  name: string,
 ): Promise<string> => {
   const baseSlug = slugify(text, { lower: true, strict: true, trim: true }) || "product";
 
@@ -66,7 +65,7 @@ export const genLocalUniqueSlug = async (
         startsWith: baseSlug,
       },
       // Exclude the current record if we are updating an existing item
-      NOT: { inflowId: currentInflowId, name }
+      NOT: { inflowId: currentInflowId }
     },
     select: { slug: true },
   });

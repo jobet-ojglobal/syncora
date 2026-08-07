@@ -113,5 +113,20 @@ export interface LocalLocation {
 
 export type SyncOptions = {
   onProgress?: (processedCount: number) => Promise<void>;
+  /** 
+   * Function to check for abort/cancellation signals.
+   * Should throw an error (e.g. SyncCancelledError) if the job was cancelled.
+   */
+  checkSignal?: () => Promise<void>;
+  /** 
+   * Number of items per API call. 
+   * Recommended max: 20-30 when using heavy `includes` to avoid HTTP 429 Rate Limits.
+   * Default: 30
+   */
   batchSize?: number;
+  /**
+   * Pause time in milliseconds between API batch fetches to prevent rate limit spikes.
+   * Default: 300ms
+   */
+  delayBetweenBatchesMs?: number;
 };

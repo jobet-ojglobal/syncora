@@ -9,6 +9,8 @@ import { localProductItemType } from "@/helpers/product.helper";
 import { syncProduct } from "./product-sync";
 
 export class ProductSyncMapService {
+  
+
   async sync(
     location: {
       inflowId: string;

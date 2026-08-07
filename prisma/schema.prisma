@@ -211,8 +211,8 @@ model CategoryLocationMap {
 
 model ProductGroup {
   id                String   @id @default(cuid())
-  inflowId String   @unique
-  name              String
+  inflowId          String   @unique
+  name              String 
   slug              String   @unique 
   description       String?  @db.Text
   brandId           String?
@@ -275,7 +275,6 @@ model ProductVariant {
   @@unique([productGroupId, signature])
   @@index([productGroupId])
   @@index([productId])
-  
 
   @@map("product_variant")
 }
