@@ -1,5 +1,5 @@
 import { Prisma, Product, ProductPriceType, ProductType } from "@/generated/prisma/client";
-import { genInflowUniqueSlug } from "@/helpers/genUniqueSlug";
+import { genLocalUniqueSlug } from "@/helpers/genUniqueSlug";
 import { InflowLocation, InflowProduct } from "@/lib/inflow/types";
 import { 
   syncBrand, 
@@ -162,10 +162,11 @@ export async function syncProduct(
   let validProductData: Product | null = null;
 
   if (hasCoreProductData) {
-    const baseSlug = await genInflowUniqueSlug(
+    const baseSlug = await genLocalUniqueSlug(
       product.name || "product-variant", 
       tx.product, 
-      product.productId
+      product.productId,
+      product.name
     );
 
     // Payload structure for Upsert
@@ -201,7 +202,10 @@ export async function syncProduct(
 
      // 5. Core Product Upsert
     const dbProduct = await tx.product.upsert({
-      where: { inflowId: product.productId },
+      where: { 
+        inflowId: product.productId,
+        name: product.name
+      },
       create: {
         ...productPayload,
         inflowId: product.productId,
@@ -802,3 +806,92 @@ export async function syncProduct(
 
   return validProductData;
 }
+
+
+
+  // let validProductData: (Product & { productId?: string }) | null = null;
+
+  // if (hasCoreProductData) {
+  //   const baseSlug = await genLocalUniqueSlug(
+  //     product.name || "product-variant",
+  //     tx.product,
+  //     product.name,
+  //     product.productId,
+  //     product.productBarcodes ? product.productBarcodes[0]?.barcode : undefined
+  //   );
+
+  //   // Payload structure for Create/Update
+  //   const productPayload = {
+  //     sku: product.sku,
+  //     name: product.name,
+  //     description: product.description,
+  //     categoryId: validCategoryId,
+  //     brandId,
+  //     itemType: productTypeSwitcher(product.itemType),
+  //     autoAssemble: product.autoAssemble,
+  //     isActive: product.isActive,
+  //     isManufacturable: product.isManufacturable,
+  //     includeQuantityBuildable: product.includeQuantityBuildable,
+  //     standardUomName: product.standardUomName,
+  //     trackExpiry: product.trackExpiry,
+  //     trackLots: product.trackLots,
+  //     trackSerials: product.trackSerials,
+  //     shelfLifeDays: product.shelfLifeDays,
+  //     sellBeforeExpiryDays: product.sellBeforeExpiryDays,
+  //     expiryNotificationDays: product.expiryNotificationDays,
+  //     weight: toDecimal(product.weight),
+  //     width: toDecimal(product.width),
+  //     height: toDecimal(product.height),
+  //     length: toDecimal(product.length),
+  //     originCountry: product.originCountry,
+  //     hsTariffNumber: product.hsTariffNumber,
+  //     remarks: product.remarks,
+  //     lastVendorId: validLastVendorId,
+  //     lastModifiedById: validLastModifiedById,
+  //     customFields: toJsonInput(product.customFields),
+  //   };
+
+  //   // 1. Locate existing product by inflowId, name, or barcode/sku
+  //   const existingMatch = await tx.product.findFirst({
+  //     where: {
+  //       OR: [
+  //         { inflowId: product.productId },
+  //         { name: product.name },
+  //         ...(product.productBarcodes?.[0]?.barcode
+  //           ? [{ sku: product.productBarcodes[0].barcode }]
+  //           : []),
+  //       ],
+  //     },
+  //     select: { inflowId: true },
+  //   });
+
+  //   // 2. Perform Upsert based on match outcome
+  //   let dbProduct: Product;
+
+  //   if (existingMatch) {
+  //     dbProduct = await tx.product.update({
+  //       where: { inflowId: existingMatch.inflowId },
+  //       data: productPayload,
+  //     });
+  //   } else {
+  //     dbProduct = await tx.product.create({
+  //       data: {
+  //         ...productPayload,
+  //         inflowId: product.productId,
+  //         slug: baseSlug,
+  //       },
+  //     });
+  //   }
+
+  //   // Attach productId to match validProductData format
+  //   validProductData = {
+  //     ...dbProduct,
+  //     productId: dbProduct.inflowId,
+  //   };
+  // } else {
+  //   validProductData = localProduct
+  //     ? { ...localProduct, productId: localProduct.inflowId }
+  //     : null;
+  // }
+
+  // if (!validProductData) return null;

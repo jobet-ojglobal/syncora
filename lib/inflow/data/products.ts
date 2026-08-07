@@ -2,7 +2,7 @@ import { inflow } from "@/lib/inflow/inflow.client";
 import { InflowProduct } from "../types";
 
 export async function getEntireCatalogs(
-  count = 100,
+  count = 30,
   after?: string,
   includes: string[] = []
 ) {
@@ -21,34 +21,34 @@ export async function getEntireCatalogs(
 }
 
 export async function getProducts(
-  count = 100,
+  count = 30,
   after?: string,
   includes: string[] = []
 ) {
-  // 1. Core nesting fields required by your system architecture
-  const baseIncludes = [
-    "",
-  ];
-
-  // 2. Merge unique structural values & join them as a comma-separated string
-  const mergedIncludes = Array.from(new Set([...baseIncludes, ...includes])).join(",");
+  // 1. Filter out empty strings to prevent leading/trailing/double commas in URL params
+  const validIncludes = includes.filter((inc) => Boolean(inc) && inc.trim() !== "");
+  const mergedIncludes = Array.from(new Set(validIncludes)).join(",");
 
   const params = new URLSearchParams({
     count: String(count),
-    include: mergedIncludes,
   });
+
+  if (mergedIncludes) {
+    params.append("include", mergedIncludes);
+  }
 
   if (after) {
     params.append("after", after);
   }
 
-  return inflow.get<InflowProduct[]>(
-    `/products?${params.toString()}`
-  );
+  return inflow.get<InflowProduct[]>(`/products?${params.toString()}`);
 }
 
+  // filter: "filter[isActive]=true"   &${filter}
+
+
 export async function getProductsInclude(
-  count = 100,
+  count = 30,
   after?: string,
   includes: string[] = []
 ) {

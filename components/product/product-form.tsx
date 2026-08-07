@@ -482,14 +482,8 @@ export function ProductForm({  brands, uoms, groups: productGroups, pricingSchem
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-6 ">
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        
-        {/* Left Column */}
-        <div className="space-y-6">
-          {/* <ProductProfileForm /> */}
 
-          {/* Core Profile */}
-          <div className="bg-card border rounded-xl p-5 space-y-4 shadow-xs">
+      <div className="bg-card border rounded-xl p-5 space-y-4 shadow-xs">
             <div className="space-y-0.5 border-b pb-2">
               <FieldLegend className="flex items-center gap-2 text-sm font-semibold ">
                 <Package className="w-4 h-4 text-primary" /> 
@@ -598,6 +592,15 @@ export function ProductForm({  brands, uoms, groups: productGroups, pricingSchem
               )}
             />
           </div>
+          
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        
+        {/* Left Column */}
+        <div className="space-y-6">
+          {/* <ProductProfileForm /> */}
+
+          {/* Core Profile */}
+          
 
           {/* Matrix Relationship Binding Section */}
           <div className="bg-card border rounded-xl p-5 space-y-4 shadow-xs">

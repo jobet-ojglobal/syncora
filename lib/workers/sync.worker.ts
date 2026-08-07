@@ -39,7 +39,7 @@ import { PaymentTermSyncMapService as LocalPaymentTermSyncMapService } from "../
 import { PricingSchemeSyncMapService as LocalPricingSchemeSyncMapService } from "../locations/services/pricing-scheme-sync-map.service";
 import { TaxingSchemeSyncMapService as LocalTaxingSchemeSyncMapService } from "../locations/services/taxing-scheme-sync-map.service";
 import { CustomerSyncMapService as LocalCustomerSyncMapService } from "../locations/services/customer-sync-map.service";
-import { ProductSyncMapService as LocalProductSyncMapService } from "../locations/services/product-sync-map.service";
+import { ProductSyncMapService as LocalProductSyncMapService } from "../locations/services/product-batch-sync-map.service";
 import { InventorySyncService as LocalInventorySyncService } from "../locations/services/inventory-line-sync.service";
 import { SublocationSyncMapService as LocalSublocationSyncMapService } from "../locations/services/sublocation-sync-map.service";
 
@@ -87,11 +87,21 @@ const productServiceLocal = new LocalProductSyncMapService();
 const inventoryServiceLocal = new LocalInventorySyncService();
 const sublocationServiceLocal = new LocalSublocationSyncMapService();
 
+export class SyncCancelledError extends Error {
+  constructor(message = "Sync job was cancelled by user.") {
+    super(message);
+    this.name = "SyncCancelledError";
+  }
+}
+
 interface SyncWebhookJobData {
   jobId: string;
   source: string;
   includes: any;
   selectedRecords: string[];
+  syncedAll: boolean;
+  brandCustomName: string;
+  after: string;
   location: {
     inflowId: string;
     name: string;
@@ -101,29 +111,53 @@ interface SyncWebhookJobData {
 
 type SyncOptions = {
   onProgress?: (progress: number) => Promise<void>;
+  checkSignal?: () => Promise<void>;
+};
+
+const checkCancellation = async (jobId: string) => {
+  const syncJob = await prisma.syncJob.findUnique({
+    where: { id: jobId },
+    select: { status: true },
+  });
+
+  if (syncJob?.status === "cancelled") {
+    throw new SyncCancelledError();
+  }
 };
 
 const worker = new Worker<SyncWebhookJobData>(
   "sync",
   async (job: Job<SyncWebhookJobData>) => {
-    const { jobId, source, includes, location, selectedRecords } = job.data;
+    const { jobId, source, includes, location, selectedRecords, syncedAll, brandCustomName, after } = job.data;
 
     const locationUrl = (location?.url && location.url.trim() !== "") ? location.url : null;
 
     console.log(`[Sync Worker] Processing job source: ${source} for location ${location?.name || "cloud"}`);
     
     const syncOptions: SyncOptions = {
-      onProgress: async (progress) => {
-        await job.updateProgress(progress);
+      checkSignal: async () => {
+        await checkCancellation(jobId);
+      },
+      onProgress: async (processedCount) => {
+        // Confirm job isn't cancelled before writing progress updates
+        await checkCancellation(jobId);
+
+        await job.updateProgress(processedCount);
 
         await prisma.syncJob.update({
           where: { id: jobId },
-          data: { progress },
+          data: { 
+            status: "processing",
+            progress: processedCount 
+          },
         });
       },
     };
 
     try {
+      // Check cancellation state right before starting execution
+      await checkCancellation(jobId);
+
       await prisma.syncJob.update({
         where: { id: jobId },
         data: {
@@ -182,7 +216,7 @@ const worker = new Worker<SyncWebhookJobData>(
           if (!locationUrl) {
             throw new Error(`Cannot sync product: No location URL found for location ${location?.name}`);
           }
-          result = await productServiceLocal.sync(location, syncOptions, selectedRecords);
+          result = await productServiceLocal.sync(location, syncOptions, selectedRecords, syncedAll);
           break;
         case "inventory_lines_local":
           if (!locationUrl) {
@@ -205,7 +239,7 @@ const worker = new Worker<SyncWebhookJobData>(
         //   result = await productVariantService.sync(syncOptions);
         //   break;
         case "products":
-          result = await productService.sync(syncOptions, includes);
+          result = await productService.sync(syncOptions, includes, brandCustomName, after);
           break;
         // case "product_images":
         //   result = await productImageService.sync(syncOptions);
@@ -294,26 +328,34 @@ const worker = new Worker<SyncWebhookJobData>(
 
       return result;
     } catch (error) {
+      // Handle user-initiated cancellation: exit cleanly without triggering worker retries
+      if (error instanceof SyncCancelledError) {
+        console.log(`[Sync Worker] Job ${jobId} was safely aborted mid-process.`);
+        await job.discard();
+        return { cancelled: true };
+      }
+
+      const maxAttempts = job.opts.attempts || 1;
+      const isFinalAttempt = job.attemptsMade >= maxAttempts;
+      const errorMessage = error instanceof Error ? error.message : "Unknown error";
+
       await prisma.syncJob.update({
         where: { id: jobId },
         data: {
-          status: "failed",
-          error:
-            error instanceof Error
-              ? error.message
-              : "Unknown error",
+          status: isFinalAttempt ? "failed" : "retrying",
+          error: isFinalAttempt
+            ? errorMessage
+            : `Attempt ${job.attemptsMade}/${maxAttempts} failed. Retrying... (${errorMessage})`,
         },
       });
 
-      throw error;
+      throw error; // Re-throw standard runtime errors so BullMQ schedules retries
     }
   },
   { 
     connection,
-    // Concurrency controls how many webhooks this worker processes simultaneously.
-    // Webhooks are fast, so you can safely handle multiple concurrently.
     concurrency: 5 
-    }
+  }
 );
 
 worker.on("completed", (job) => {
@@ -337,3 +379,19 @@ process.on("SIGTERM", async () => {
   await prisma.$disconnect();
   process.exit(0);
 });
+
+
+ // } catch (error) {
+    //   await prisma.syncJob.update({
+    //     where: { id: jobId },
+    //     data: {
+    //       status: "failed",
+    //       error:
+    //         error instanceof Error
+    //           ? error.message
+    //           : "Unknown error",
+    //     },
+    //   });
+
+    //   throw error;
+    // }

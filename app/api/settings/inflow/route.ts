@@ -11,7 +11,7 @@ import { InflowEvent } from "@/lib/inflow/types/inflow";
 export async function GET() {
   try {
     const webhook = await findInflowWebhook();
-    return NextResponse.json({ success: true, webhook: webhook ?? null });
+    return NextResponse.json({ success: true, webhook: webhook ?? null, hasUrl: true });
   } catch (error) {
     return NextResponse.json(
       { success: false, error: error instanceof Error ? error.message : "Failed to fetch" },

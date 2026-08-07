@@ -12,7 +12,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { toast } from "sonner";
 
 import { INFLOW_EVENTS } from "@/lib/locations/types/webhook.type";
-import { SyncButtonPreviewOptions } from "./sync-button-preview";
+import { SyncButtonPreviewOptions } from "./sync-button-preview-paginated";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../ui/select";
 import { FilterX, RefreshCw } from "lucide-react";
 import { DataTablePagination } from "../shared/data-table-pagination";

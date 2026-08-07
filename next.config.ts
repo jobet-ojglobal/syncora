@@ -22,6 +22,13 @@ const nextConfig: NextConfig = {
         port: '',
         pathname: '/**', // This allows any path under the hostname
       },
+      {
+        protocol: 'https',
+        hostname: 'inflowclouduser.blob.core.windows.net',
+        port: '',
+        pathname: '/**', // This allows any path under the hostname
+        
+      }
     ],
   }
 };

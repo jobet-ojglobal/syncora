@@ -14,3 +14,35 @@ export async function getLocalInventoryLines(url: string) {
     `/inflow-local/product-inventory`,
   );
 }
+
+export async function getLocalBatchProducts(
+  url: string,
+  count = 4,
+  after?: string,
+  includes: string[] = []
+) {
+  // 1. Specify base relation includes here if needed
+  const baseIncludes: string[] = [];
+
+  // 2. Filter empty strings to prevent trailing/leading commas in the query string
+  const mergedIncludes = Array.from(new Set([...baseIncludes, ...includes]))
+    .filter(Boolean)
+    .join(",");
+
+  const params = new URLSearchParams({
+    count: String(count),
+  });
+
+  if (mergedIncludes) {
+    params.append("include", mergedIncludes);
+  }
+
+  if (after) {
+    params.append("after", after);
+  }
+
+  const apiClient = new BranchClient(url);
+  return apiClient.get<LocalProduct[]>(
+    `/inflow-local/products?${params.toString()}`
+  );
+}

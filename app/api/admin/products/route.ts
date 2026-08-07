@@ -146,7 +146,7 @@ export async function GET(request: NextRequest) {
 
     // Sort evaluation block
     let orderByClause: any = { updatedAt: "desc" }
-    if (sortBy === "sku" || sortBy === "name") {
+    if (sortBy === "sku" || sortBy === "name" || sortBy === "createdAt") {
       orderByClause = { [sortBy]: sortOrder }
     }
 
@@ -189,7 +189,7 @@ export async function GET(request: NextRequest) {
         trackSerials: prod.trackSerials,
         brandName: prod.brand?.name || "Generic / White-label",
         categoryName: prod.category?.name || "Unassigned Dept",
-        thumbnail: prod.images[0]?.thumbUrl || prod.images[0]?.originalUrl || null,
+        thumbnail: prod.images[0]?.originalUrl || prod.images[0]?.thumbUrl || null,
         barcodesCount: prod.barcodes.length,
         primaryBarcode: prod.barcodes[0]?.barcode || null,
         purchasingUomText: prod.purchasingUom && purchasingCode
@@ -198,6 +198,7 @@ export async function GET(request: NextRequest) {
         salesUomText: prod.salesUom && salesCode
           ? `${salesCode} (${Number(prod.salesUom.standardQuantity)}:${Number(prod.salesUom.uomQuantity)})`
           : "Not Set",
+        createdAt: prod.createdAt
       };
     });
 
