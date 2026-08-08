@@ -16,7 +16,8 @@ export class InventorySyncService {
       url: string;
     },
     options: SyncOptions,
-    selectedRecords?: any[]
+    selectedRecords?: any[],
+    syncedAll?: boolean
   ) {
     const { onProgress, batchSize = 50 } = options;
 
@@ -24,7 +25,7 @@ export class InventorySyncService {
     let inventoryLines: LocalProduct[] = await getLocalInventoryLines(location.url);
 
     // 2. Filter records if selectedRecords is provided
-    if (selectedRecords && selectedRecords.length > 0) {
+    if (!syncedAll && selectedRecords && selectedRecords.length > 0) {
       const allowedIds = new Set(selectedRecords.map((item) => String(item.id)));
       inventoryLines = inventoryLines.filter((data) =>
         allowedIds.has(String(data.productId))

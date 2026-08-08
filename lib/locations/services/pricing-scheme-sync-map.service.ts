@@ -16,14 +16,15 @@ export class PricingSchemeSyncMapService {
       url: string;
     },
     options: SyncOptions,
-    selectedRecords?: any[]
+    selectedRecords?: any[],
+    syncedAll?: boolean
   ) {
     const { onProgress } = options;
     
     // Fetch pricing schemes from your source location endpoint
     let pricingSchemes = await getPricingSchemes(location.url);
 
-    if (selectedRecords && selectedRecords.length > 0) {
+    if (!syncedAll && selectedRecords && selectedRecords.length > 0) {
       const allowedIds = selectedRecords.map(item => String(item.id));
       pricingSchemes = pricingSchemes.filter((data: any) => 
         allowedIds.includes(String(data.pricingSchemeId))

@@ -1,10 +1,12 @@
+export interface CurrencyRules {
+  isSymbolFirst: boolean;
+  negativeType: "Leading" | "Trailing" | "Parentheses";
+}
+
 /**
  * Resolves standard formatting rules based on a currency ISO code.
  */
-export function getCurrencyFormattingRules(isoCode: string): {
-  isSymbolFirst: boolean;
-  negativeType: "Leading" | "Trailing" | "Parentheses";
-} {
+export function getCurrencyFormattingRules(isoCode: string): CurrencyRules {
   const code = isoCode?.trim().toUpperCase();
 
   // Currencies that traditionally place the symbol AFTER the number (e.g., 10.00 €)

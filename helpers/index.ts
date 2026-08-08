@@ -3,3 +3,4 @@ export const locationStatusColors = {
   Offline: "bg-slate-500 text-white shadow-slate-100",
   Maintenance: "bg-amber-500 text-white shadow-amber-100"
 };
+

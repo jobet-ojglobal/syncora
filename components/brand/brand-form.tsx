@@ -24,11 +24,10 @@ interface BrandFormProps {
     description: string | null;
     logoUrl: string | null;
     websiteUrl: string | null;
-  } | null;
-  onSuccess?: () => void;
+  };
 }
 
-export function BrandForm({ initialData, onSuccess }: BrandFormProps) {
+export function BrandForm({ initialData }: BrandFormProps) {
   const router = useRouter();
   const isEditMode = !!initialData;
 
@@ -43,7 +42,7 @@ export function BrandForm({ initialData, onSuccess }: BrandFormProps) {
     },
   });
 
-  const { register, handleSubmit, reset, formState: { errors, isSubmitting } } = form;
+  const { register, handleSubmit, formState: { errors, isSubmitting } } = form;
 
   const onSubmit = async (values: BrandInput) => {
     try {
@@ -67,19 +66,13 @@ export function BrandForm({ initialData, onSuccess }: BrandFormProps) {
 
       router.push("/dashboard/brands");
       router.refresh();
-
-      // if (!isEditMode) {
-      //   reset(); // Clear form values if creating fresh profiles
-      // }
-
-      // if (onSuccess) onSuccess();
     } catch (err: any) {
       toast.error("Transaction Error", { description: err.message || "Failed to save profile structural assets." });
     }
   };
 
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className="w-full max-w-xl mx-auto p-6 bg-card border rounded-xl shadow-sm">
+    <form onSubmit={handleSubmit(onSubmit)} className="w-full  p-6 bg-card border rounded-xl shadow-sm">
       <FieldGroup className="gap-5">
         <FieldSet>
           <FieldLegend>{isEditMode ? `Modify ${initialData?.name} Profile` : "Register Manufacturer Brand"}</FieldLegend>

@@ -271,7 +271,6 @@ export default function TeamMembersListPage() {
                         </DropdownMenuContent>
                       </DropdownMenu>
                     </TableCell>
-
                   </TableRow>
                 ))}
               </TableBody>

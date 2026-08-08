@@ -15,14 +15,15 @@ export class SublocationSyncMapService {
       url: string;
     },
     options: SyncOptions,
-    selectedRecords?: any[]
+    selectedRecords?: any[],
+    syncedAll?: boolean
   ) {
     const { onProgress } = options;
 
     // Fetch sublocations from the remote location endpoint
     let sublocations = await getLocalLocations(location.url);
 
-    if (selectedRecords && selectedRecords.length > 0) {
+    if (!syncedAll && selectedRecords && selectedRecords.length > 0) {
       const allowedIds = selectedRecords.map((item) => String(item.id));
       sublocations = sublocations.filter((data: any) =>
         allowedIds.includes(String(data.locationId ?? data.id))

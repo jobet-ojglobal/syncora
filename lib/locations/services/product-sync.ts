@@ -1,6 +1,6 @@
 import { Prisma, Product, ProductPriceType, ProductType } from "@/generated/prisma/client";
 import { genInflowUniqueSlug, genLocalUniqueSlug } from "@/helpers/genUniqueSlug";
-import { InflowLocation, InflowProduct } from "@/lib/inflow/types";
+import { InflowCustomFields, InflowLocation, InflowProduct } from "@/lib/inflow/types";
 import { 
   syncBrand, 
   syncGroupFeatures, 
@@ -43,6 +43,7 @@ export async function syncProduct(
   groupId?: string,
   firstProductInGroup?: InflowProduct,
   hasCoreProductData?: boolean,
+  brandCustomName?: string | null,
   caches?: SyncCache
 ) {
   // Initialize caches if not passed
@@ -56,11 +57,26 @@ export async function syncProduct(
   const verifiedPricingSchemeIds = caches?.verifiedPricingSchemeIds ?? new Set<string>();
   const verifiedProductIds = caches?.verifiedProductIds ?? new Set<string>();
 
-  const brandName = firstProductInGroup?.customFields?.custom1 || product.customFields?.custom1;
+  // const brandName = firstProductInGroup?.customFields?.custom1 || product.customFields?.custom1;
+
+  // let brandId: string | null = null;
+  // if (brandName) {
+  //   brandId = await syncBrand(tx, brandName);
+  // }
 
   let brandId: string | null = null;
-  if (brandName) {
-    brandId = await syncBrand(tx, brandName);
+  
+  if (brandCustomName) {
+    // Normalize key name (e.g., "Custom1" -> "custom1")
+    const customKey = brandCustomName.toLowerCase() as keyof InflowCustomFields;
+
+    const brandName =
+      firstProductInGroup?.customFields?.[customKey] ||
+      product.customFields?.[customKey];
+
+    if (brandName) {
+      brandId = await syncBrand(tx, brandName);
+    }
   }
 
   let validCategoryId: string | null = null;

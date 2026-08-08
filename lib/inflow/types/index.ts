@@ -10,7 +10,7 @@ export interface InflowProductGroup {
   defaultProductId: string | null;
   isActive: boolean;
   name: string;
-  timestamp: string;
+  timestamp?: string;
 
   category?: InflowCategory;
   images?: InflowProductGroupImage[];
@@ -30,7 +30,7 @@ export interface InflowCategory {
   name: string;
   parentCategoryId: string | null;
   parentCategory?: InflowCategory;
-  timestamp: string;
+  timestamp?: string;
 }
 
 // =====================================
@@ -132,7 +132,7 @@ export interface InflowProduct {
   lastModifiedById: string | null;
   createdDttm: string;
   lastModifiedDateTime: string;
-  timestamp: string;
+  timestamp?: string;
   
   purchasingUom: InflowPurchasingUom | null;
   salesUom: InflowSalesUom | null;
@@ -163,7 +163,7 @@ export interface InflowProductBarcode {
   barcode: string;
   lineNum: number | string; // Handled as number or string from variations
   productId: string;
-  timestamp: string;
+  timestamp?: string;
   product?: InflowProduct;
 }
 
@@ -172,7 +172,7 @@ export interface InflowProductTaxCode {
   productId: string;
   taxCodeId: string;
   taxingSchemeId: string;
-  timestamp: string;
+  timestamp?: string;
   product?: InflowProduct;
   taxCode?: InflowTaxCode;
   taxingScheme?: InflowTaxingScheme;
@@ -188,7 +188,7 @@ export interface InflowReorderSetting {
   reorderMethod: "purchaseOrder" | "PurchaseOrder" | string;
   reorderPoint: string;
   reorderQuantity: string;
-  timestamp: string;
+  timestamp?: string;
   vendorId: string | null;
   fromLocation?: InflowLocation;
   location?: InflowLocation;
@@ -202,7 +202,7 @@ export interface InflowOperationType {
   estimatedPerHourCost: string;
   isActive: boolean;
   isDefault: boolean;
-  timestamp: string;
+  timestamp?: string;
   trackTime: boolean;
 }
 
@@ -215,7 +215,7 @@ export interface InflowProductOperation {
   estimatedSeconds: string;
   instructions: string | null;
   lineNum: number | string;
-  timestamp: string;
+  timestamp?: string;
   trackTime: boolean;
   operationType?: InflowOperationType;
   product?: InflowProduct;
@@ -228,7 +228,7 @@ export interface InflowProductPrice {
   priceType: "fixedPrice" | "FixedPrice" | string;
   fixedMarkup?: string | null;
   unitPrice: string;
-  timestamp: string;
+  timestamp?: string;
   pricingScheme?: InflowPricingScheme;
   product?: InflowProduct;
 }
@@ -252,7 +252,7 @@ export interface InflowItemBom {
   productId: string;
   childProductId: string;
   quantity: InflowBomQuantity;
-  timestamp: string;
+  timestamp?: string;
   childProduct?: InflowProduct;
   product?: InflowProduct;
 }
@@ -278,7 +278,7 @@ export interface InflowInventoryLine {
   quantityOnHand: string;
   serial: string;
   sublocation: string; // ex. "Rack A"
-  timestamp: string;
+  timestamp?: string;
   location: InflowLocation
 }
 
@@ -521,7 +521,7 @@ export interface InflowTaxCode {
   isActive: boolean;
   tax1Rate: string;
   tax2Rate: string;
-  timestamp: string;
+  timestamp?: string;
   taxingScheme?: InflowTaxingScheme;
 }
 
@@ -538,7 +538,7 @@ export interface InflowTaxingScheme {
   tax2Name: string | null;
   tax2OnShipping: boolean;
   defaultTaxCodeId: string | null;
-  timestamp: string;
+  timestamp?: string;
   defaultTaxCode?: InflowTaxCode;
   taxCodes?: InflowTaxCode[];
 }
@@ -550,7 +550,7 @@ export interface InflowCurrencyConversion {
   currencyId: string;
   exchangeRate: number;
   isManual: boolean;
-  timestamp: string;
+  timestamp?: string;
 }
 
 export interface InflowCurrency {
@@ -563,7 +563,7 @@ export interface InflowCurrency {
   negativeType: string;
   symbol: string;
   thousandsSeparator: string;
-  timestamp: string;
+  timestamp?: string;
   currencyConversions?: InflowCurrencyConversion[];
 }
 
@@ -598,7 +598,7 @@ export interface InflowProductCostAdjustment {
   lastModifiedById?: string | null;
   productId: string;
   serial?: string | null;
-  timestamp: string;
+  timestamp?: string;
   unitCost: string;
   lastModifiedBy?: InflowTeamMember;
   product?: InflowProduct;
@@ -610,7 +610,7 @@ export interface InflowPaymentTerms {
   name: string;
   daysDue: number;
   isActive: boolean;
-  timestamp: string;
+  timestamp?: string;
 }
 
 
@@ -622,7 +622,7 @@ export interface InflowAttachment {
   fileUrl: string | null;
   fileSize: number | null;
   contentType: string | null;
-  timestamp: string | null;
+  timestamp?: string | null;
 }
 
 
@@ -779,7 +779,7 @@ export interface InflowVendorItem {
   leadTimeDays: number | null;
   lineNum: number | null;
   productId: string;
-  timestamp: string;
+  timestamp?: string;
   vendorId: string;
   vendorItemCode: string | null; // Maps to Prisma vendorSku
   product: InflowProduct
@@ -869,7 +869,7 @@ export interface InflowSalesOrderLine {
   tax1Rate: string;
   tax2Rate: string;
   taxCodeId: string | null;
-  timestamp: string;
+  timestamp?: string;
   unitPrice: string;
   product?: Partial<InflowProduct>;
 }
@@ -880,7 +880,7 @@ export interface InflowPackLine {
   description: string | null;
   productId: string;
   quantity: Partial<InflowQuantity>;
-  timestamp: string;
+  timestamp?: string;
   product?: Partial<InflowProduct>;
 }
 
@@ -892,7 +892,7 @@ export interface InflowPickLine {
   pickDate: string | null;
   productId: string;
   quantity: InflowQuantity;
-  timestamp: string;
+  timestamp?: string;
   description?: string | null;
 }
 
@@ -905,7 +905,7 @@ export interface InflowSalesPaymentLine {
   paymentType: string | null;
   referenceNumber: string | null;
   remarks: string | null;
-  timestamp: string;
+  timestamp?: string;
 }
 
 export interface InflowShipLine {
@@ -917,7 +917,7 @@ export interface InflowShipLine {
   easyPostShipmentStatus: string | null;
   easyPostConfirmationEmailAddress: string | null;
   containers: any[]; 
-  timestamp: string;
+  timestamp?: string;
 }
 
 export interface InflowAllocationLine {
@@ -927,7 +927,7 @@ export interface InflowAllocationLine {
   locationId?: string | null;
   sublocation?: string | null;
   quantity?: any | null;
-  timestamp: string;
+  timestamp?: string;
 }
 
 export interface InflowAllocationFailure {
@@ -936,7 +936,7 @@ export interface InflowAllocationFailure {
   lineNum?: string | number | null;
   hasExpiredLotsInStock: boolean;
   quantity?: any | null;
-  timestamp: string;
+  timestamp?: string;
 }
 
 export interface InflowRestockLine {
@@ -947,7 +947,7 @@ export interface InflowRestockLine {
   sublocation?: string | null;
   restockDate?: string | null;
   quantity?: any | null;
-  timestamp: string;
+  timestamp?: string;
 }
 
 export interface InflowCostOfGoodsSold {
@@ -1010,7 +1010,7 @@ export interface InflowSalesOrder {
   shipRemarks: string | null;
   shipToCompanyName: string | null;
   showShipping: boolean;
-  timestamp: string;
+  timestamp?: string;
   
   // Addresses & Custom Data
   billingAddress: InflowAddress | null;
@@ -1098,7 +1098,7 @@ export interface InflowPurchaseOrderLine {
   tax1Rate: string;
   tax2Rate: string;
   taxCodeId: string | null;
-  timestamp: string;
+  timestamp?: string;
   unitPrice: string;
   vendorItemCode: string | null;
   product?: InflowProduct;
@@ -1118,7 +1118,7 @@ export interface InflowPurchaseReceiveLine {
   quantity: InflowQuantity;
   receiveDate: string | null;
   sublocation: string | null; // e.g., "A-01"
-  timestamp: string;
+  timestamp?: string;
   vendorItemCode: string | null;
   location?: Record<string, any> | null;
   product?: Record<string, any> | null;
@@ -1178,7 +1178,7 @@ export interface InflowPurchaseOrder {
   tax2OnShipping: boolean;
   tax2Rate: string;
   taxingSchemeId: string;
-  timestamp: string;
+  timestamp?: string;
   total: string;
   unstockRemarks: string;
   vendorAddress: InflowAddress;
@@ -1209,7 +1209,7 @@ export interface InflowPurchasePaymentLine {
   paymentType: string | null;
   referenceNumber: string | null;
   remarks: string | null;
-  timestamp: string;
+  timestamp?: string;
 }
 
 export interface InflowPurchaseUnstockLine {
@@ -1221,7 +1221,7 @@ export interface InflowPurchaseUnstockLine {
   sublocation: string;
   vendorItemCode: string;
   unstockDate: string;
-  timestamp: string;
+  timestamp?: string;
   location?: InflowLocation;
   product?: InflowProduct;
 }

@@ -1,6 +1,6 @@
 import { BranchClient } from "../location.client";
 
-export interface InflowCategory {
+export interface LocalCategory {
   categoryId: string;
   parentCategoryId: string | null;
   name: string;
@@ -10,8 +10,40 @@ export interface InflowCategory {
 
 export async function getCategories(url: string) {
  const apiClient = new BranchClient(url)
-  return await apiClient.get<InflowCategory[]>(
+  return await apiClient.get<LocalCategory[]>(
     `/inflow-local/categories`,
+  );
+}
+
+export async function getLocalBatchCategories(
+  url: string,
+  count = 50,
+  after?: string,
+  includes: string[] = []
+) {
+  // 1. Specify base relation includes here if needed
+  const baseIncludes: string[] = [];
+
+  // 2. Filter empty strings to prevent trailing/leading commas in the query string
+  const mergedIncludes = Array.from(new Set([...baseIncludes, ...includes]))
+    .filter(Boolean)
+    .join(",");
+
+  const params = new URLSearchParams({
+    count: String(count),
+  });
+
+  if (mergedIncludes) {
+    params.append("include", mergedIncludes);
+  }
+
+  if (after) {
+    params.append("after", after);
+  }
+
+  const apiClient = new BranchClient(url);
+  return apiClient.get<LocalCategory[]>(
+    `/inflow-local/categories?${params.toString()}`
   );
 }
 
@@ -22,7 +54,7 @@ export interface UpsertResult {
 }
 
 export async function upsertCategory(
-  payload: InflowCategory,
+  payload: LocalCategory,
   url: string
 ) {
   const apiClient = new BranchClient(url)

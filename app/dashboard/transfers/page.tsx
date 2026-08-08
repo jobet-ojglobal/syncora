@@ -11,15 +11,13 @@ import {
   Building2,
   MessageSquare,
   FileSpreadsheet,
-  Pencil
+  Pencil,
+  MoreHorizontalIcon
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Textarea } from "@/components/ui/textarea";
-import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
-import { DeleteButton } from "@/components/shared/delete-button";
 
 import {
   Dialog,
@@ -28,16 +26,35 @@ import {
   DialogTitle,
   DialogDescription,
   DialogFooter,
-  DialogTrigger,
-  DialogClose,
 } from "@/components/ui/dialog";
 import { TransferOrderRow } from "@/types/transfer-dto.type";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { FieldGroup } from "@/components/ui/field";
 import { TransferStatusUpdateForm, UnifiedStatusUpdateValues } from "@/components/transfer/status-form";
+import PageHeader from "@/components/layout/dashboard/PageHeader";
+import SearchInput from "@/components/shared/search-input";
+import { formatReasonLabel, getStatusBadgeVariant } from "@/helpers/transferOrder.helper";
+import { DataTablePagination } from "@/components/shared/data-table-pagination";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 
-// Interfaces
+import useSWR from "swr";
+import { TransferFilters } from "@/components/transfer/transfer-filter";
+
+  const PAGE_SIZE = 10;
 
 interface ActionPayload {
   order: TransferOrderRow;
@@ -47,99 +64,99 @@ interface ActionPayload {
   toastSuccess: string;
 }
 
+const fetcher = (url: string) => fetch(url).then((res) => {
+  if (!res.ok) throw new Error("Failed to resolve team member directory.");
+  return res.json();
+});
+
 export default function TransferOrdersListPage() {
- const [orders, setOrders] = useState<TransferOrderRow[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
-  const [isLoading, setIsLoading] = useState(true);
-  const [expandedRows, setExpandedRows] = useState<Record<string, boolean>>({});
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [pageIndex, setPageIndex] = useState(0);
+  const PAGE_SIZE = 10;
 
-  // View Modal State
-  const [viewingOrder, setViewingOrder] = useState<TransferOrderRow | null>(null);
-
-  // Status Action Modal State
-  const [activeAction, setActiveAction] = useState<ActionPayload | null>(null);
-  // const [actionRemarks, setActionRemarks] = useState("");
-  // const [receivedLinesState, setReceivedLinesState] = useState<
-  //   Record<
-  //     string,
-  //     {
-  //       quantityReceived: number;
-  //       targetSublocationId?: string;
-  //       discrepancyReason: string;
-  //     }
-  //   >
-  // >({});
-  // const [isSubmitting, setIsSubmitting] = useState(false);
-
-  const fetchTransfers = async () => {
-    setIsLoading(true);
-    try {
-      const res = await fetch("/api/admin/transfers");
-      if (res.ok) {
-        const data = await res.json();
-        setOrders(data);
-      } else {
-        toast.error("Pipeline Exception", {
-          description: "Failed synchronizing transfer order indices.",
-        });
-      }
-    } catch {
-      toast.error("Pipeline Exception", {
-        description: "Failed synchronizing transfer order indices.",
-      });
-    } finally {
-      setIsLoading(false);
-    }
-  };
+  const [status, setStatus] = useState("ALL");
+  const [sourceLocationId, setSourceLocationId] = useState("ALL");
+  const [targetLocationId, setTargetLocationId] = useState("ALL");
 
   useEffect(() => {
-    fetchTransfers();
-  }, []);
+    const timer = setTimeout(() => {
+      setDebouncedSearch(searchQuery);
+      setPageIndex(0);
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+
+  // Reset page to 1 whenever any dropdown filter changes
+  const handleStatusChange = (val: string) => {
+    setStatus(val);
+    setPageIndex(0);
+  };
+
+  const handleSourceChange = (val: string) => {
+    setSourceLocationId(val);
+    setPageIndex(0);
+  };
+
+  const handleTargetChange = (val: string) => {
+    setTargetLocationId(val);
+    setPageIndex(0);
+  };
+
+  const handleResetFilters = () => {
+    setSearchQuery("");
+    setDebouncedSearch("");
+    setStatus("ALL");
+    setSourceLocationId("ALL");
+    setTargetLocationId("ALL");
+    setPageIndex(0);
+  };
+
+  const { data: locationsData } = useSWR("/api/locations/lookup", fetcher);
+  const locations = locationsData?.data || [];
+
+  const [expandedRows, setExpandedRows] = useState<Record<string, boolean>>({});
+  const [viewingOrder, setViewingOrder] = useState<TransferOrderRow | null>(null);
+  const [activeAction, setActiveAction] = useState<ActionPayload | null>(null);
+
+  const queryString = new URLSearchParams({
+    search: encodeURIComponent(debouncedSearch),
+    status,
+    sourceLocationId,
+    targetLocationId,
+    page: String(pageIndex),
+    limit: String(PAGE_SIZE),
+  }).toString();
+
+  const {
+    data: payload,
+    error,
+    isLoading,
+    isValidating,
+    mutate,
+  } = useSWR(
+    `/api/admin/transfers/filtered?${queryString}`,
+    fetcher,
+    {
+      keepPreviousData: true,
+      revalidateOnFocus: false,
+    }
+  );
+
+  // Directly use the server response (Server handles search & pagination)
+  const transfers: TransferOrderRow[] = payload?.data || [];
+  const totalRecords = payload?.totalRecords || 0;
+  const pageCount = payload?.pageCount || 0;
+
+  const handleSearchChange = (value: string) => {
+    setSearchQuery(value);
+  };
 
   const toggleRowExpand = (id: string) => {
     setExpandedRows((prev) => ({ ...prev, [id]: !prev[id] }));
   };
 
-  const getStatusBadgeVariant = (status: string) => {
-    switch (status) {
-      case "DRAFT":
-        return "bg-slate-100 text-slate-700 border-slate-200 dark:bg-slate-800 dark:text-slate-300";
-      case "PENDING":
-        return "bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/50 dark:text-blue-300";
-      case "IN_TRANSIT":
-        return "bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-950/50 dark:text-purple-300";
-      case "RECEIVED":
-        return "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/50 dark:text-emerald-300";
-      case "PARTIALLY_RECEIVED":
-        return "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/50 dark:text-amber-300";
-      case "RECEIVED_DISCREPANCY":
-        return "bg-indigo-50 text-indigo-700 border-indigo-200 dark:bg-indigo-950/50 dark:text-indigo-300";
-      case "CANCELLED":
-        return "bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-950/50 dark:text-rose-300";
-      default:
-        return "bg-muted text-muted-foreground";
-    }
-  };
-
-  const formatReasonLabel = (reason?: string | null) => {
-    if (!reason) return "N/A";
-    switch (reason) {
-      case "DAMAGED_IN_TRANSIT":
-        return "Damaged In Transit";
-      case "MISSING_BOX":
-        return "Missing Box / Shrinkage";
-      case "VENDOR_SHORTAGE":
-        return "Vendor / Dispatch Shortage";
-      case "OVERAGE_UNCOUNTED":
-        return "Overage / Extra Shipped";
-      case "OTHER":
-        return "Other Variance";
-      default:
-        return reason;
-    }
-  };
-
-  // Prepare & open status transition dialog
   const openStatusActionModal = (
     order: TransferOrderRow,
     targetStatus: TransferOrderRow["status"],
@@ -147,87 +164,13 @@ export default function TransferOrdersListPage() {
     description: string,
     toastSuccess: string
   ) => {
-    // setActionRemarks(order.remarks || "");
-
-    // Initialize line-item state for partial/full receiving updates
-    const initialLinesState: Record<
-      string,
-      { quantityReceived: number; targetSublocationId?: string; discrepancyReason: string }
-    > = {};
-
-    order.lines.forEach((line) => {
-      initialLinesState[line.id] = {
-        quantityReceived: line.quantityReceived ?? line.quantity,
-        targetSublocationId: line.targetSublocationId || undefined,
-        discrepancyReason: line.discrepancyReason || "",
-      };
-    });
-
-    // setReceivedLinesState(initialLinesState);
     setActiveAction({ order, targetStatus, title, description, toastSuccess });
   };
-
-  // Submit Status Change with Payload
-  // const handleExecuteStatusUpdate = async () => {
-  //   if (!activeAction) return;
-  //   setIsSubmitting(true);
-
-  //   const formattedReceivedLines = activeAction.order.lines.map((line) => ({
-  //     lineId: line.id,
-  //     quantityReceived: receivedLinesState[line.id]?.quantityReceived ?? line.quantity,
-  //     discrepancyReason: receivedLinesState[line.id]?.discrepancyReason || null,
-  //     targetSublocationId:
-  //       receivedLinesState[line.id]?.targetSublocationId || line.targetSublocationId,
-  //   }));
-
-  //   const payload = {
-  //     id: activeAction.order.id,
-  //     status: activeAction.targetStatus,
-  //     remarks: actionRemarks,
-  //     receivedLines:
-  //       activeAction.targetStatus === "RECEIVED" ? formattedReceivedLines : undefined,
-  //   };
-
-  //   try {
-  //     const r = await fetch(`/api/admin/transfers/${activeAction.order.id}/status`, {
-  //       method: "PATCH",
-  //       headers: { "Content-Type": "application/json" },
-  //       body: JSON.stringify(payload),
-  //     });
-
-  //     if (r.ok) {
-  //       if (activeAction.targetStatus === "CANCELLED") {
-  //         toast.warning(activeAction.toastSuccess);
-  //       } else {
-  //         toast.success(activeAction.toastSuccess);
-  //       }
-  //       await fetchTransfers();
-  //       setActiveAction(null);
-  //     } else {
-  //       const err = await r.json();
-  //       toast.error(err.error || "Execution pipeline failure.");
-  //     }
-  //   } catch {
-  //     toast.error("Network communication failure.");
-  //   } finally {
-  //     setIsSubmitting(false);
-  //   }
-  // };
-
-  const filteredOrders = orders.filter((order) => {
-    const normalized = searchQuery.toLowerCase();
-    return (
-      order.transferNumber.toLowerCase().includes(normalized) ||
-      order.sourceLocationName.toLowerCase().includes(normalized) ||
-      order.targetLocationName.toLowerCase().includes(normalized) ||
-      (order.remarks?.toLowerCase().includes(normalized) ?? false)
-    );
-  });
 
   const handleFormSubmit = async (values: UnifiedStatusUpdateValues) => {
     if (!activeAction) return;
 
-    const payload = {
+    const bodyPayload = {
       id: activeAction.order.id,
       status: values.status,
       remarks: values.remarks,
@@ -245,7 +188,7 @@ export default function TransferOrdersListPage() {
       const r = await fetch(`/api/admin/transfers/${activeAction.order.id}/status`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
+        body: JSON.stringify(bodyPayload),
       });
 
       if (r.ok) {
@@ -254,7 +197,7 @@ export default function TransferOrdersListPage() {
         } else {
           toast.success(activeAction.toastSuccess);
         }
-        await fetchTransfers();
+        await mutate();
         setActiveAction(null);
       } else {
         const err = await r.json();
@@ -265,135 +208,157 @@ export default function TransferOrdersListPage() {
     }
   };
 
-  return (
-    <div className="p-6 space-y-6 max-w-[1600px] mx-auto">
+  if (error) {
+    return (
+      <div className="p-6 text-center text-xs text-red-500 bg-destructive/10 border border-destructive/20 rounded-xl font-medium">
+        Hydration Failure: Failed resolving enterprise personnel authorization directory profiles.
+      </div>
+    );
+  }
 
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b pb-5">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight text-foreground flex items-center gap-2.5">
-            <FileSpreadsheet className="h-6 w-6 text-primary" />
-            Transfer Orders
-          </h1>
-          <p className="text-xs text-muted-foreground mt-1">
-            Manage multi-location inventory dispatches, verify incoming stock, and reconcile receiving discrepancies.
-          </p>
-        </div>
+  return (
+    <div className="w-full max-w-7xl mx-auto p-4 sm:p-6 space-y-6 text-xs">
+      <PageHeader
+        title="Transfer Orders"
+        description="Manage multi-location inventory dispatches, verify incoming stock, and reconcile receiving discrepancies."
+        icon={FileSpreadsheet}
+        className="border-b border-border pb-4"
+      >
         <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" onClick={fetchTransfers} disabled={isLoading}>
-            <RefreshCw className={`h-3.5 w-3.5 mr-1.5 ${isLoading ? "animate-spin" : ""}`} />
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => mutate()}
+            disabled={isLoading || isValidating}
+          >
+            <RefreshCw
+              className={`h-3.5 w-3.5 mr-1.5 ${
+                isLoading || isValidating ? "animate-spin" : ""
+              }`}
+            />
             Sync
           </Button>
-          <Button size="sm" onClick={() => (window.location.href = "/dashboard/transfers/create")}>
-            <Plus className="h-3.5 w-3.5 mr-1.5" />
-            New Transfer Order
+          <Button asChild size="sm">
+            <Link href="/dashboard/transfers/create">
+              <Plus className="h-3.5 w-3.5 mr-1.5" />
+              New Transfer Order
+            </Link>
           </Button>
         </div>
-      </div>
+      </PageHeader>
+
 
       {/* Toolbar / Search Filter */}
       <div className="flex items-center justify-between gap-4">
-        <div className="relative w-full max-w-md">
-          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-          <Input
-            type="search"
-            placeholder="Filter by transfer #, origin, destination, or remarks..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-9 text-xs h-9"
+        {/* <TransferFilters
+        searchQuery={searchQuery}
+        onSearchChange={setSearchQuery}
+        status={status}
+        onStatusChange={handleStatusChange}
+        sourceLocationId={sourceLocationId}
+        onSourceLocationChange={handleSourceChange}
+        targetLocationId={targetLocationId}
+        onTargetLocationChange={handleTargetChange}
+        locations={locations}
+        onResetFilters={handleResetFilters}
+      /> */}
+
+        <div className="w-full flex gap-2 sm:max-w-lg">
+          <SearchInput
+            placeholder="Filter team members by name, email..."
+            searchQuery={searchQuery}
+            setSearchQuery={handleSearchChange}
+            isLoading={isValidating && !isLoading}
           />
+          <div className="w-full sm:w-44">
+            <Select value={status} onValueChange={handleStatusChange}>
+              <SelectTrigger className="h-9 text-xs">
+                <SelectValue placeholder="Filter by status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="ALL">All Statuses</SelectItem>
+                <SelectItem value="DRAFT">Draft</SelectItem>
+                <SelectItem value="POSTED">Approved</SelectItem>
+                <SelectItem value="VOIDED">Cancelled</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
         </div>
         <div className="text-xs text-muted-foreground font-medium bg-muted/50 border px-3 py-1.5 rounded-lg flex items-center gap-1.5 self-start sm:self-auto">
           <ArrowRightLeft className="w-3.5 h-3.5 text-muted-foreground" />
-          Active Manifest lines: <span className="font-bold text-foreground">{orders.length}</span>
+          Active Manifest Lines:{" "}
+          <span className="font-bold text-foreground">{totalRecords}</span>
         </div>
       </div>
-      
-      {/* Top Header Row Panel */}
-      {/* <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b pb-5">
-        <div>
-          <h1 className="text-xl font-bold tracking-tight">Stock Transfer Dispatches</h1>
-          <p className="text-xs text-muted-foreground mt-0.5">
-            Track physical consignment logs, authorize inter-depot movements, and verify received stock balances.
-          </p>
-        </div>
-        <Button asChild size="sm" className="gap-1.5 shrink-0">
-          <Link href="/dashboard/transfers/create">
-            <Plus className="w-4 h-4" /> Issue Transfer Order
-          </Link>
-        </Button>
-      </div> */}
 
-      {/* Control Utility Toolbar */}
-      {/* <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div className="relative w-full sm:max-w-sm">
-          <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground/70" />
-          <Input
-            placeholder="Search transfer number, site label..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-9 text-xs"
-          />
-        </div>
 
-        <div className="text-xs text-muted-foreground font-medium bg-muted/50 border px-3 py-1.5 rounded-lg flex items-center gap-1.5 self-start sm:self-auto">
-          <ArrowRightLeft className="w-3.5 h-3.5 text-muted-foreground" />
-          Active Manifest lines: <span className="font-bold text-foreground">{orders.length}</span>
-        </div>
-      </div> */}
-
-      {/* Main Table Matrix Render */}
       {/* Orders Table */}
-      <div className="border rounded-lg bg-card shadow-sm overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs">
-            <thead className="bg-muted/50 border-b text-[11px] uppercase tracking-wider font-semibold text-muted-foreground">
-              <tr>
-                <th className="p-3 w-10 text-center"></th>
-                <th className="p-3">Transfer #</th>
-                <th className="p-3">Source Location</th>
-                <th className="p-3">Destination</th>
-                <th className="p-3 text-center">Status</th>
-                <th className="p-3 text-center">Lines</th>
-                <th className="p-3 text-right">Created At</th>
-                <th className="p-3 text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y">
+      <div className="space-y-4">
+        <div className="border rounded-xl bg-card shadow-2xs overflow-hidden">
+          <Table>
+            <TableHeader className="bg-muted/40">
+              <TableRow className="border-b border-border hover:bg-transparent">
+                <TableHead className="w-[40px] p-3 text-center" />
+                <TableHead className="w-[140px] text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                  Transfer #
+                </TableHead>
+                <TableHead className="w-[180px] text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                  Source Location
+                </TableHead>
+                <TableHead className="w-[180px] text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                  Destination
+                </TableHead>
+                <TableHead className="w-[120px] text-center text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                  Status
+                </TableHead>
+                <TableHead className="w-[100px] text-center text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                  Lines
+                </TableHead>
+                <TableHead className="w-[120px] text-right text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                  Created At
+                </TableHead>
+                <TableHead className="w-[110px] text-right pr-5 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                  Actions
+                </TableHead>
+              </TableRow>
+            </TableHeader>
+
+            <TableBody className="text-xs font-medium divide-y divide-border/60">
               {isLoading ? (
-                <tr>
-                  <td colSpan={8} className="p-8 text-center text-muted-foreground">
+                <TableRow>
+                  <TableCell colSpan={8} className="p-20 text-center text-xs text-muted-foreground bg-card italic">
                     <RefreshCw className="h-5 w-5 animate-spin mx-auto mb-2 text-primary" />
                     Synchronizing transfer manifests...
-                  </td>
-                </tr>
-              ) : filteredOrders.length === 0 ? (
-                <tr>
-                  <td colSpan={8} className="p-8 text-center text-muted-foreground">
-                    No transfer orders match the given criteria.
-                  </td>
-                </tr>
+                  </TableCell>
+                </TableRow>
+              ) : transfers.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={8}>
+                    <div className="border border-dashed rounded-xl p-6 text-center bg-muted/20">
+                      <Truck className="w-8 h-8 text-muted-foreground/50 mx-auto mb-2" />
+                      <p className="text-xs font-medium text-muted-foreground">
+                        No transfer orders match the given criteria.
+                      </p>
+                    </div>
+                  </TableCell>
+                </TableRow>
               ) : (
-                filteredOrders.map((order) => {
+                transfers.map((order) => {
                   const isExpanded = !!expandedRows[order.id];
                   const totalShipped = order.lines.reduce((acc, l) => acc + l.quantity, 0);
-                  const totalReceived = order.lines.reduce(
-                    (acc, l) => acc + (l.quantityReceived ?? 0),
-                    0
-                  );
-                  const hasDiscrepancy = order.lines.some(
-                    (l) => l.discrepancyQuantity !== null && l.discrepancyQuantity !== 0
-                  );
+                  const totalReceived = order.lines.reduce((acc, l) => acc + (l.quantityReceived ?? 0), 0);
                   const isClosedRecord = order.status === "RECEIVED" || order.status === "CANCELLED";
                   const canEdit = order.status === "DRAFT" || order.status === "PENDING";
 
                   return (
                     <React.Fragment key={order.id}>
-                      <tr className={`hover:bg-muted/30 transition-colors ${isClosedRecord ? "bg-muted/5 opacity-80" : ""}`}>
-                        <td className="p-3 text-center">
+                      <TableRow className={`hover:bg-muted/40 transition-colors group align-middle ${isClosedRecord ? "bg-muted/5 opacity-80" : ""}`}>
+                        {/* Expand Toggle Button */}
+                        <TableCell className="p-3 text-center align-middle">
                           <Button
                             variant="ghost"
                             size="icon"
-                            className="h-6 w-6"
+                            className="size-7"
                             onClick={() => toggleRowExpand(order.id)}
                           >
                             {isExpanded ? (
@@ -402,37 +367,50 @@ export default function TransferOrdersListPage() {
                               <ChevronRight className="h-4 w-4" />
                             )}
                           </Button>
-                        </td>
-                        <td className="p-3 font-semibold font-mono text-foreground">
-                          {order.transferNumber}
-                        </td>
-                        <td className="p-3">
-                          <div className="flex items-center gap-1.5">
-                            <Building2 className="h-3.5 w-3.5 text-muted-foreground" />
-                            <span>{order.sourceLocationName}</span>
+                        </TableCell>
+
+                        {/* Transfer # */}
+                        <TableCell className="p-3.5 align-middle">
+                          <div className="font-semibold font-mono text-foreground text-sm leading-tight group-hover:text-primary transition-colors">
+                            {order.transferNumber}
                           </div>
-                        </td>
-                        <td className="p-3">
-                          <div className="flex items-center gap-1.5">
-                            <Building2 className="h-3.5 w-3.5 text-muted-foreground" />
-                            <span>{order.targetLocationName}</span>
+                        </TableCell>
+
+                        {/* Source Location */}
+                        <TableCell className="p-3.5 align-middle">
+                          <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                            <Building2 className="w-3.5 h-3.5 text-muted-foreground/70 shrink-0" />
+                            <span className="truncate">{order.sourceLocationName}</span>
                           </div>
-                        </td>
-                        <td className="p-3 text-center">
+                        </TableCell>
+
+                        {/* Destination Location */}
+                        <TableCell className="p-3.5 align-middle">
+                          <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                            <Building2 className="w-3.5 h-3.5 text-muted-foreground/70 shrink-0" />
+                            <span className="truncate">{order.targetLocationName}</span>
+                          </div>
+                        </TableCell>
+
+                        {/* Status Badge */}
+                        <TableCell className="p-3.5 align-middle text-center">
                           <Badge
                             variant="outline"
-                            className={`text-[10px] font-semibold border ${getStatusBadgeVariant(
-                              order.status
-                            )}`}
+                            className={`text-[10px] px-1.5 py-0 h-5 font-semibold border ${getStatusBadgeVariant(order.status)}`}
                           >
                             {order.status.replace(/_/g, " ")}
                           </Badge>
-                        </td>
-                        <td className="p-3 text-center font-mono">
+                        </TableCell>
+
+                        {/* Line Item Count */}
+                        <TableCell className="p-3.5 align-middle text-center font-mono text-muted-foreground">
                           {order.lines.length} items
-                        </td>
-                        <td className="p-3 text-right font-mono text-muted-foreground">
+                        </TableCell>
+
+                        {/* Created At Date */}
+                        <TableCell className="p-3.5 align-middle text-right font-mono text-[11px] text-muted-foreground">
                           {new Date(order.createdAt).toLocaleDateString()}
+<<<<<<< HEAD
                         </td>
                         <td className="p-3 text-right">
                           <div className="flex items-center justify-end gap-1.5">
@@ -451,96 +429,106 @@ export default function TransferOrdersListPage() {
                                 <TooltipContent>Inspect Manifest</TooltipContent>
                               </Tooltip>
                             </TooltipProvider> */}
+=======
+                        </TableCell>
+>>>>>>> fba1f3a8f1cd8a24a0a45fcdfa13eedebab9d025
 
-                            {order.status === "DRAFT" && (
-                              <Button
-                                size="sm"
-                                className="h-7 text-[11px] gap-1"
-                                asChild
-                              >
-                                <Link href={`/dashboard/transfers/${order.id}/edit`}>
-                                  <Pencil className="h-3.5 w-3.5" />
-                                  Edit Manifest
-                                </Link>
+                        {/* Unified Action Dropdown Menu */}
+                        <TableCell className="p-3.5 pr-5 align-middle text-right">
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="icon" className="size-8">
+                                <MoreHorizontalIcon className="w-4 h-4" />
+                                <span className="sr-only">Open menu</span>
                               </Button>
-                            )}
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem onClick={() => setViewingOrder(order)}>
+                                <Eye className="w-3.5 h-3.5 mr-2" /> Inspect 
+                              </DropdownMenuItem>
 
-                            { order.status === "PENDING" && (
-                              <Button
-                                size="sm"
-                                className="h-7 text-[11px] gap-1"
-                                onClick={() =>
-                                  openStatusActionModal(
-                                    order,
-                                    "IN_TRANSIT",
-                                    "Dispatch Transfer Order",
-                                    "Confirm dispatching line items from source location. Stock will be debited.",
-                                    "Transfer order dispatched and in transit."
-                                  )
-                                }
-                              >
-                                <Truck className="h-3.5 w-3.5" />
-                                Dispatch
-                              </Button>
-                            )}
+                              {order.status === "DRAFT" && (
+                                <DropdownMenuItem asChild>
+                                  <Link href={`/dashboard/transfers/${order.id}/edit`}>
+                                    <Edit3 className="w-3.5 h-3.5 mr-2" /> Edit 
+                                  </Link>
+                                </DropdownMenuItem>
+                              )}
 
-                            {order.status === "IN_TRANSIT" && (
-                              <Button
-                                size="sm"
-                                className="h-7 text-[11px] gap-1 bg-emerald-600 hover:bg-emerald-700 text-white"
-                                onClick={() =>
-                                  openStatusActionModal(
-                                    order,
-                                    "RECEIVED",
-                                    "Receive & Verify Manifest",
-                                    "Verify counts and log any damaged or missing inventory prior to crediting target stock.",
-                                    "Transfer order processed and target inventory updated."
-                                  )
-                                }
-                              >
-                                <PackageCheck className="h-3.5 w-3.5" />
-                                Receive
-                              </Button>
-                            )}
-
-                            { order.status !== "IN_TRANSIT" && order.status !== "RECEIVED" &&
-                              order.status !== "PARTIALLY_RECEIVED" &&
-                              order.status !== "RECEIVED_DISCREPANCY" &&
-                              order.status !== "CANCELLED" && (
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  className="h-7 w-7 text-destructive hover:bg-destructive/10"
+                              {order.status === "PENDING" && (
+                                <DropdownMenuItem
                                   onClick={() =>
                                     openStatusActionModal(
                                       order,
-                                      "CANCELLED",
-                                      "Cancel Transfer Order",
-                                      "Are you sure you want to cancel this transfer order?",
-                                      "Transfer order cancelled."
+                                      "IN_TRANSIT",
+                                      "Dispatch Transfer Order",
+                                      "Confirm dispatching line items from source location. Stock will be debited.",
+                                      "Transfer order dispatched and in transit."
                                     )
                                   }
                                 >
-                                  <Ban className="h-3.5 w-3.5" />
-                                </Button>
+                                  <Truck className="w-3.5 h-3.5 mr-2" /> Dispatch
+                                </DropdownMenuItem>
                               )}
-                          </div>
-                        </td>
-                      </tr>
+
+                              {order.status === "IN_TRANSIT" && (
+                                <DropdownMenuItem
+                                  className="text-emerald-600 focus:text-emerald-700"
+                                  onClick={() =>
+                                    openStatusActionModal(
+                                      order,
+                                      "RECEIVED",
+                                      "Receive & Verify Manifest",
+                                      "Verify counts and log any damaged or missing inventory prior to crediting target stock.",
+                                      "Transfer order processed and target inventory updated."
+                                    )
+                                  }
+                                >
+                                  <PackageCheck className="w-3.5 h-3.5 mr-2" /> Receive
+                                </DropdownMenuItem>
+                              )}
+
+                              {order.status !== "IN_TRANSIT" &&
+                                order.status !== "RECEIVED" &&
+                                order.status !== "PARTIALLY_RECEIVED" &&
+                                order.status !== "RECEIVED_DISCREPANCY" &&
+                                order.status !== "CANCELLED" && (
+                                  <>
+                                    <DropdownMenuSeparator />
+                                    <DropdownMenuItem
+                                      variant="destructive"
+                                      onClick={() =>
+                                        openStatusActionModal(
+                                          order,
+                                          "CANCELLED",
+                                          "Cancel Transfer Order",
+                                          "Are you sure you want to cancel this transfer order?",
+                                          "Transfer order cancelled."
+                                        )
+                                      }
+                                    >
+                                      <Ban className="w-3.5 h-3.5 mr-2" /> Cancel Order
+                                    </DropdownMenuItem>
+                                  </>
+                                )}
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </TableCell>
+                      </TableRow>
 
                       {/* Expanded Accordion Line Breakdown */}
                       {isExpanded && (
-                        <tr className="bg-muted/15 border-b">
-                          <td colSpan={8} className="p-4">
+                        <TableRow className="bg-muted/15 border-b hover:bg-muted/15">
+                          <TableCell colSpan={8} className="p-4">
                             <div className="space-y-3 pl-8">
                               <div className="flex flex-col sm:flex-row justify-between sm:items-center text-[11px] text-muted-foreground border-b pb-2 gap-2">
-                                <div className="flex flex-wrap gap-4">
+                                <div className="flex flex-wrap gap-4 font-mono">
                                   <div>Issued Date: <strong className="text-foreground">{new Date(order.createdAt).toLocaleDateString()}</strong></div>
                                   {order.transferredAt && <div>Dispatched: <strong className="text-foreground">{new Date(order.transferredAt).toLocaleDateString()}</strong></div>}
                                   {order.receivedAt && <div>Arrived: <strong className="text-foreground">{new Date(order.receivedAt).toLocaleDateString()}</strong></div>}
                                 </div>
                                 {canEdit && (
-                                  <Button asChild variant="outline" size="xs" className="h-6 text-[10px] gap-1 shrink-0">
+                                  <Button asChild variant="outline" size="sm" className="h-6 text-[10px] gap-1 shrink-0">
                                     <Link href={`/dashboard/transfers/${order.id}/edit`}>
                                       <Edit3 className="w-3 h-3" /> Edit Manifest
                                     </Link>
@@ -549,7 +537,7 @@ export default function TransferOrdersListPage() {
                               </div>
 
                               <div className="flex items-center justify-between">
-                                <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                                <h4 className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
                                   Manifest Line Items & Breakdown
                                 </h4>
                                 {(order.status === "RECEIVED" ||
@@ -573,52 +561,50 @@ export default function TransferOrdersListPage() {
                                 )}
                               </div>
 
-                              <div className="border rounded bg-background overflow-hidden">
-                                <table className="w-full text-left text-xs">
-                                  <thead className="bg-muted/40 border-b text-[10px] uppercase font-semibold">
-                                    <tr>
-                                      <th className="p-2">Item SKU</th>
-                                      <th className="p-2">Product</th>
-                                      <th className="p-2 text-center">Shipped</th>
-                                      <th className="p-2 text-center">Received</th>
-                                      <th className="p-2 text-center">Variance</th>
-                                      <th className="p-2">Reason / Tag</th>
-                                    </tr>
-                                  </thead>
-                                  <tbody className="divide-y">
+                              {/* Sub-table for Items */}
+                              <div className="border rounded-lg bg-card overflow-hidden shadow-2xs">
+                                <Table>
+                                  <TableHeader className="bg-muted/40">
+                                    <TableRow className="border-b text-[10px] uppercase font-semibold">
+                                      <TableHead className="p-2 h-8">Item SKU</TableHead>
+                                      <TableHead className="p-2 h-8">Product</TableHead>
+                                      <TableHead className="p-2 h-8 text-center">Shipped</TableHead>
+                                      <TableHead className="p-2 h-8 text-center">Received</TableHead>
+                                      <TableHead className="p-2 h-8 text-center">Variance</TableHead>
+                                      <TableHead className="p-2 h-8">Reason / Tag</TableHead>
+                                    </TableRow>
+                                  </TableHeader>
+                                  <TableBody className="divide-y text-xs font-medium">
                                     {order.lines.map((line) => {
                                       const variance = line.discrepancyQuantity ?? 0;
                                       return (
-                                        <tr key={line.id}>
-                                          <td className="p-2 font-mono text-muted-foreground">
+                                        <TableRow key={line.id} className="hover:bg-muted/30 transition-colors">
+                                          <TableCell className="p-2 font-mono text-muted-foreground">
                                             {line.productSku}
-                                          </td>
-                                          <td className="p-2 font-medium">{line.productName}</td>
-                                          <td className="p-2 text-center font-mono font-semibold">
+                                          </TableCell>
+                                          <TableCell className="p-2 font-medium text-foreground">
+                                            {line.productName}
+                                          </TableCell>
+                                          <TableCell className="p-2 text-center font-mono font-semibold">
                                             {line.quantity}
-                                          </td>
-                                          <td className="p-2 text-center font-mono">
+                                          </TableCell>
+                                          <TableCell className="p-2 text-center font-mono">
                                             {line.quantityReceived ?? "—"}
-                                          </td>
-                                          <td className="p-2 text-center font-mono">
-                                            {line.quantityReceived === undefined ||
-                                            line.quantityReceived === null ? (
+                                          </TableCell>
+                                          <TableCell className="p-2 text-center font-mono">
+                                            {line.quantityReceived === undefined || line.quantityReceived === null ? (
                                               "—"
                                             ) : variance === 0 ? (
                                               <span className="text-muted-foreground">0</span>
                                             ) : variance < 0 ? (
-                                              <span className="text-amber-600 font-semibold">
-                                                {variance}
-                                              </span>
+                                              <span className="text-amber-600 font-semibold">{variance}</span>
                                             ) : (
-                                              <span className="text-blue-600 font-semibold">
-                                                +{variance}
-                                              </span>
+                                              <span className="text-blue-600 font-semibold">+{variance}</span>
                                             )}
-                                          </td>
-                                          <td className="p-2">
+                                          </TableCell>
+                                          <TableCell className="p-2">
                                             {line.discrepancyReason ? (
-                                              <Badge variant="outline" className="text-[10px]">
+                                              <Badge variant="outline" className="text-[10px] py-0 px-1.5 h-4">
                                                 {formatReasonLabel(line.discrepancyReason)}
                                               </Badge>
                                             ) : (
@@ -626,49 +612,60 @@ export default function TransferOrdersListPage() {
                                                 None
                                               </span>
                                             )}
-                                          </td>
-                                        </tr>
+                                          </TableCell>
+                                        </TableRow>
                                       );
                                     })}
-                                  </tbody>
-                                </table>
+                                  </TableBody>
+                                </Table>
                               </div>
 
                               {order.remarks && (
-                                <p className="text-[11px] text-muted-foreground italic">
-                                  <span className="font-semibold text-foreground">Remarks:</span>{" "}
+                                <p className="text-[11px] text-muted-foreground italic pt-1">
+                                  <span className="font-semibold text-foreground not-italic">Remarks:</span>{" "}
                                   {order.remarks}
                                 </p>
                               )}
                             </div>
-                          </td>
-                        </tr>
+                          </TableCell>
+                        </TableRow>
                       )}
                     </React.Fragment>
                   );
                 })
               )}
-            </tbody>
-          </table>
+            </TableBody>
+          </Table>
         </div>
+
+        <DataTablePagination
+          pageIndex={pageIndex}
+          pageSize={PAGE_SIZE}
+          pageCount={pageCount}
+          totalRecords={totalRecords}
+          loading={isLoading}
+          onPageChange={(nextIndex: number) => setPageIndex(nextIndex)}
+        />
       </div>
 
       {/* INSPECTION VIEW MODAL */}
 
       <Dialog open={!!viewingOrder} onOpenChange={(open) => !open && setViewingOrder(null)}>
-        <DialogContent className="sm:max-w-2xl">
-          <DialogHeader>
-            <div className="flex items-center justify-between">
-              <DialogTitle className="text-lg font-mono flex items-center gap-2">
-                {viewingOrder?.transferNumber}
-                <Badge
-                  variant="outline"
-                  className={`text-[10px] font-semibold border ${getStatusBadgeVariant(
-                    viewingOrder?.status || ""
-                  )}`}
-                >
-                  {viewingOrder?.status.replace(/_/g, " ")}
-                </Badge>
+        <DialogContent className="w-full max-h-[90vh] flex flex-col p-0 gap-0 overflow-hidden">
+          <DialogHeader className="p-6 pb-4 border-b">
+            <div className="flex items-center justify-between gap-2 pr-6">
+              <DialogTitle className="text-lg font-mono flex items-center gap-2 flex-wrap">
+                <span>{viewingOrder?.transferNumber}</span>
+                {viewingOrder?.status && (
+                  <Badge
+                    variant="outline"
+                    className={`text-[10px] font-semibold border ${getStatusBadgeVariant(
+                      viewingOrder.status
+                    )}`}
+                  >
+                    {viewingOrder.status.replace(/_/g, " ")}
+                  </Badge>
+                )}
               </DialogTitle>
             </div>
             <DialogDescription className="text-xs">
@@ -677,25 +674,25 @@ export default function TransferOrdersListPage() {
           </DialogHeader>
 
           {viewingOrder && (
-            <div className="space-y-5 my-2 text-xs">
+            <div className="flex-1 overflow-y-auto p-6 space-y-5 text-xs">
               {/* Route Card */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 border rounded-lg p-3 bg-muted/20">
-                <div className="space-y-1">
-                  <span className="text-[10px] uppercase font-bold text-muted-foreground">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 border rounded-lg p-3 bg-muted/20">
+                <div className="space-y-1 min-w-0">
+                  <span className="text-[10px] uppercase font-bold text-muted-foreground block">
                     Origin (Source)
                   </span>
-                  <div className="font-semibold text-sm flex items-center gap-1.5">
-                    <Building2 className="h-4 w-4 text-primary" />
-                    {viewingOrder.sourceLocationName}
+                  <div className="font-semibold text-sm flex items-center gap-1.5 truncate">
+                    <Building2 className="h-4 w-4 text-primary shrink-0" />
+                    <span className="truncate">{viewingOrder.sourceLocationName}</span>
                   </div>
                 </div>
-                <div className="space-y-1">
-                  <span className="text-[10px] uppercase font-bold text-muted-foreground">
+                <div className="space-y-1 min-w-0">
+                  <span className="text-[10px] uppercase font-bold text-muted-foreground block">
                     Destination (Target)
                   </span>
-                  <div className="font-semibold text-sm flex items-center gap-1.5">
-                    <Building2 className="h-4 w-4 text-primary" />
-                    {viewingOrder.targetLocationName}
+                  <div className="font-semibold text-sm flex items-center gap-1.5 truncate">
+                    <Building2 className="h-4 w-4 text-primary shrink-0" />
+                    <span className="truncate">{viewingOrder.targetLocationName}</span>
                   </div>
                 </div>
               </div>
@@ -705,61 +702,77 @@ export default function TransferOrdersListPage() {
                 <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
                   Manifest Line Breakdown
                 </h4>
-                <div className="border rounded-md overflow-hidden">
-                  <table className="w-full text-left text-xs">
-                    <thead className="bg-muted/50 border-b text-[10px] uppercase font-semibold">
-                      <tr>
-                        <th className="p-2">SKU</th>
-                        <th className="p-2">Product</th>
-                        <th className="p-2 text-center">Shipped</th>
-                        <th className="p-2 text-center">Received</th>
-                        <th className="p-2 text-center">Variance</th>
-                        <th className="p-2">Discrepancy Tag</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y">
-                      {viewingOrder.lines.map((line) => {
-                        const variance = line.discrepancyQuantity ?? 0;
-                        return (
-                          <tr key={line.id}>
-                            <td className="p-2 font-mono text-muted-foreground">
-                              {line.productSku}
-                            </td>
-                            <td className="p-2 font-medium">{line.productName}</td>
-                            <td className="p-2 text-center font-mono font-semibold">
-                              {line.quantity}
-                            </td>
-                            <td className="p-2 text-center font-mono">
-                              {line.quantityReceived ?? "—"}
-                            </td>
-                            <td className="p-2 text-center font-mono">
-                              {line.quantityReceived === undefined ||
-                              line.quantityReceived === null ? (
-                                "—"
-                              ) : variance === 0 ? (
-                                <span className="text-muted-foreground">0</span>
-                              ) : variance < 0 ? (
-                                <span className="text-amber-600 font-semibold">{variance}</span>
-                              ) : (
-                                <span className="text-blue-600 font-semibold">+{variance}</span>
-                              )}
-                            </td>
-                            <td className="p-2">
-                              {line.discrepancyReason ? (
-                                <Badge variant="outline" className="text-[10px]">
-                                  {formatReasonLabel(line.discrepancyReason)}
-                                </Badge>
-                              ) : (
-                                <span className="text-muted-foreground italic text-[10px]">
-                                  None
-                                </span>
-                              )}
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
+
+                {/* Table Container with Horizontal Scroll */}
+                <div className="border rounded-xl bg-card shadow-2xs overflow-hidden">
+                  <div className="w-full overflow-x-auto">
+                    <Table className="min-w-[550px] w-full">
+                      <TableHeader className="bg-muted/40">
+                        <TableRow className="border-b text-[10px] uppercase font-semibold">
+                          <TableHead className="p-2 h-8">Item SKU</TableHead>
+                          <TableHead className="p-2 h-8">Product</TableHead>
+                          <TableHead className="p-2 h-8 text-center">Shipped</TableHead>
+                          <TableHead className="p-2 h-8 text-center">Received</TableHead>
+                          <TableHead className="p-2 h-8 text-center">Variance</TableHead>
+                          <TableHead className="p-2 h-8">Discrepancy Tag</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody className="divide-y text-xs font-medium">
+                        {viewingOrder.lines.map((line) => {
+                          const variance = line.discrepancyQuantity ?? 0;
+                          return (
+                            <TableRow
+                              key={line.id}
+                              className="hover:bg-muted/30 transition-colors"
+                            >
+                              <TableCell className="p-2 font-mono text-muted-foreground whitespace-nowrap">
+                                {line.productSku}
+                              </TableCell>
+                              <TableCell className="p-2 font-medium text-foreground max-w-[180px] truncate">
+                                {line.productName}
+                              </TableCell>
+                              <TableCell className="p-2 text-center font-mono font-semibold">
+                                {line.quantity}
+                              </TableCell>
+                              <TableCell className="p-2 text-center font-mono">
+                                {line.quantityReceived ?? "—"}
+                              </TableCell>
+                              <TableCell className="p-2 text-center font-mono">
+                                {line.quantityReceived === undefined ||
+                                line.quantityReceived === null ? (
+                                  "—"
+                                ) : variance === 0 ? (
+                                  <span className="text-muted-foreground">0</span>
+                                ) : variance < 0 ? (
+                                  <span className="text-amber-600 font-semibold">
+                                    {variance}
+                                  </span>
+                                ) : (
+                                  <span className="text-blue-600 font-semibold">
+                                    +{variance}
+                                  </span>
+                                )}
+                              </TableCell>
+                              <TableCell className="p-2 whitespace-nowrap">
+                                {line.discrepancyReason ? (
+                                  <Badge
+                                    variant="outline"
+                                    className="text-[10px] py-0 px-1.5 h-4 inline-flex"
+                                  >
+                                    {formatReasonLabel(line.discrepancyReason)}
+                                  </Badge>
+                                ) : (
+                                  <span className="text-muted-foreground italic text-[10px]">
+                                    None
+                                  </span>
+                                )}
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })}
+                      </TableBody>
+                    </Table>
+                  </div>
                 </div>
               </div>
 
@@ -769,7 +782,7 @@ export default function TransferOrdersListPage() {
                   <span className="text-[10px] uppercase font-bold text-muted-foreground flex items-center gap-1">
                     <MessageSquare className="h-3 w-3" /> Audit Remarks & Inspection Findings
                   </span>
-                  <p className="text-xs text-foreground whitespace-pre-wrap">
+                  <p className="text-xs text-foreground whitespace-pre-wrap break-words">
                     {viewingOrder.remarks}
                   </p>
                 </div>
@@ -777,25 +790,28 @@ export default function TransferOrdersListPage() {
             </div>
           )}
 
-          <DialogFooter>
-            <Button size="sm" variant="outline" onClick={() => setViewingOrder(null)}>
+          <div className="p-4 border-t bg-muted/10 flex justify-end gap-2 sm:gap-2 ">
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => setViewingOrder(null)}
+            >
               Close Audit View
             </Button>
-            { (viewingOrder?.status === "DRAFT" || viewingOrder?.status  === "PENDING") && (
-                <Button asChild size="sm">
-                  <Link href={`/dashboard/transfers/${viewingOrder.id}/edit`}>
-                    <Edit3 className="w-3 h-3" /> Edit Manifest
-                  </Link>
-                </Button>
-              )
-            }
-          </DialogFooter>
+            {(viewingOrder?.status === "DRAFT" || viewingOrder?.status === "PENDING") && (
+              <Button asChild size="sm">
+                <Link href={`/dashboard/transfers/${viewingOrder.id}/edit`}>
+                  <Edit3 className="w-3.5 h-3.5 mr-1" /> Edit Manifest
+                </Link>
+              </Button>
+            )}
+          </div>
         </DialogContent>
       </Dialog>
       
       {/* UPDATE STATUS & REMARKS/RECEIVE MODAL */}
       <Dialog open={!!activeAction} onOpenChange={(open) => !open && setActiveAction(null)}>
-        <DialogContent className="sm:max-w-2xl">
+        <DialogContent className=" sm:max-w-xl">
           <DialogHeader>
             <DialogTitle>
               {activeAction?.title}
@@ -804,8 +820,6 @@ export default function TransferOrdersListPage() {
               {activeAction?.description}
             </DialogDescription>
           </DialogHeader>
-
-          
 
           {activeAction && (
             <>

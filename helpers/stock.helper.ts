@@ -1,5 +1,5 @@
 
-export function formatReasonLabel(reason: string): string {
+export function formatAdjustReasonLabel(reason: string): string {
   const map: Record<string, string> = {
     STOCK_COUNT: "Restock",
     DAMAGE: "Damaged",

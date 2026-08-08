@@ -16,14 +16,15 @@ export class PaymentTermSyncMapService {
       url: string;
     },
     options: SyncOptions,
-    selectedRecords?: any[]
+    selectedRecords?: any[],
+    syncedAll?: boolean
   ) {
     const { onProgress } = options;
     
     // Fetch payment terms from the location endpoint
     let paymentTerms = await getPaymentTerms(location.url);
     
-    if (selectedRecords && selectedRecords.length > 0) {
+    if (!syncedAll && selectedRecords && selectedRecords.length > 0) {
       const allowedIds = selectedRecords.map(item => String(item.id));
       paymentTerms = paymentTerms.filter((data: any) => 
         allowedIds.includes(String(data.paymentTermId))

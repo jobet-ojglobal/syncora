@@ -334,6 +334,7 @@ export class ProductSyncMapService {
                 undefined,
                 undefined,
                 true,
+                brandCustomName,
                 caches
               );
             }
