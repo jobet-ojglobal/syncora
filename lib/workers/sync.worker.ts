@@ -33,8 +33,8 @@ import { SalesOrderSyncService } from "../inflow/services/sales-order-sync.servi
 import { PurchaseOrderSyncService } from "../inflow/services/purchase-order-sync.service";
 
 // Local Imports
-import { CategorySyncMapService as LocalCategorySyncMapService } from "../locations/services/category-sync-map.service";
-import { CurrencySyncMapService as LocalCurrencySyncMapService } from "../locations/services/currency-sync-map.service";
+import { CategorySyncMapService as LocalCategorySyncMapService } from "../locations/services/batch-category-sync-map";
+import { CurrencySyncMapService as LocalCurrencySyncMapService } from "../locations/services/batch-currency-sync-map";
 import { PaymentTermSyncMapService as LocalPaymentTermSyncMapService } from "../locations/services/payment-term-sync-map.service";
 import { PricingSchemeSyncMapService as LocalPricingSchemeSyncMapService } from "../locations/services/pricing-scheme-sync-map.service";
 import { TaxingSchemeSyncMapService as LocalTaxingSchemeSyncMapService } from "../locations/services/taxing-scheme-sync-map.service";
@@ -170,64 +170,64 @@ const worker = new Worker<SyncWebhookJobData>(
 
       switch (source) {
         // Local Sync
-        case "categories_local":
+        case "categories_local": // OK
           if (!locationUrl) {
             throw new Error(`Cannot sync category: No location URL found for location ${location?.name}`);
           }
-          result = await categoryServiceLocal.sync(location, syncOptions, selectedRecords);
+          result = await categoryServiceLocal.sync(location, syncOptions, selectedRecords, syncedAll);
           break;
-        case "currencies_local":
+        case "currencies_local": 
           if (!locationUrl) {
             throw new Error(`Cannot sync currency: No location URL found for location ${location?.name}`);
           }
-          result = await currencyServiceLocal.sync(location, syncOptions, selectedRecords);
+          result = await currencyServiceLocal.sync(location, syncOptions, selectedRecords, syncedAll);
           break;
         case "payment_terms_local":
           if (!locationUrl) {
             throw new Error(`Cannot sync payment term: No location URL found for location ${location?.name}`);
           }
-          result = await paymentServiceLocal.sync(location, syncOptions, selectedRecords);
+          result = await paymentServiceLocal.sync(location, syncOptions, selectedRecords, syncedAll);
           break;
         case "pricing_schemes_local":
           if (!locationUrl) {
             throw new Error(`Cannot sync pricing scheme: No location URL found for location ${location?.name}`);
           }
-          result = await pricingServiceLocal.sync(location, syncOptions, selectedRecords);
+          result = await pricingServiceLocal.sync(location, syncOptions, selectedRecords, syncedAll);
           break;
         case "taxing_schemes_local":
           if (!locationUrl) {
             throw new Error(`Cannot sync taxing scheme: No location URL found for location ${location?.name}`);
           }
-          result = await taxingSchemeServiceLocal.sync(location, syncOptions, selectedRecords);
+          result = await taxingSchemeServiceLocal.sync(location, syncOptions, selectedRecords, syncedAll);
           break;
         case "customers_local":
           if (!locationUrl) {
             throw new Error(`Cannot sync customer: No location URL found for location ${location?.name}`);
           }
-          result = await customerServiceLocal.sync(location, syncOptions, selectedRecords);
+          result = await customerServiceLocal.sync(location, syncOptions, selectedRecords, syncedAll);
           break;
         case "locations_local":
           if (!locationUrl) {
             throw new Error(`Cannot sync product: No location URL found for location ${location?.name}`);
           }
-          result = await sublocationServiceLocal.sync(location, syncOptions, selectedRecords);
+          result = await sublocationServiceLocal.sync(location, syncOptions, selectedRecords, syncedAll);
           break;
         case "products_local":
           if (!locationUrl) {
             throw new Error(`Cannot sync product: No location URL found for location ${location?.name}`);
           }
-          result = await productServiceLocal.sync(location, syncOptions, selectedRecords, syncedAll);
+          result = await productServiceLocal.sync(location, syncOptions, selectedRecords, syncedAll, "custom7");
           break;
         case "inventory_lines_local":
           if (!locationUrl) {
             throw new Error(`Cannot sync inventory: No location URL found for location ${location?.name}`);
           }
-          result = await inventoryServiceLocal.sync(location, syncOptions, selectedRecords);
+          result = await inventoryServiceLocal.sync(location, syncOptions, selectedRecords, syncedAll);
           break;
 
         // Cloud Sync
         case "categories":
-          result = await categoryService.sync(syncOptions);
+          result = await categoryService.sync(syncOptions, after, selectedRecords, syncedAll);
           break;
         case "product_groups":
           result = await productGroupService.sync(syncOptions, includes);

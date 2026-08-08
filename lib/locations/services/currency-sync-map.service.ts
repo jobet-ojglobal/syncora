@@ -15,12 +15,13 @@ export class CurrencySyncMapService {
       url: string;
     },
     options: SyncOptions,
-    selectedRecords?: any[]
+    selectedRecords?: any[],
+    syncedAll?: boolean,
   ) {
     const { onProgress } = options;
     let currencies = await getCurrencies(location.url);
 
-    if (selectedRecords && selectedRecords.length > 0) {
+    if (!syncedAll && selectedRecords && selectedRecords.length > 0) {
       const allowedIds = selectedRecords.map(item => String(item.id));
       currencies = currencies.filter((data: any) => 
         allowedIds.includes(String(data.currencyId))

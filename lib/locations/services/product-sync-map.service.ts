@@ -18,14 +18,15 @@ export class ProductSyncMapService {
       url: string;
     },
     options: SyncOptions,
-    selectedRecords?: any[]
+    selectedRecords?: any[],
+    syncedAll?: boolean,
   ) {
     const { onProgress } = options;
 
     // Fetch local products from the location endpoint
     let products: LocalProduct[] = await getLocalProducts(location.url);
 
-    if (selectedRecords && selectedRecords.length > 0) {
+    if (!syncedAll && selectedRecords && selectedRecords.length > 0) {
       const allowedIds = selectedRecords.map((item) => String(item.id ?? item.productId));
       products = products.filter((data) =>
         allowedIds.includes(String(data.productId))
@@ -210,6 +211,7 @@ export class ProductSyncMapService {
                 undefined,
                 undefined,
                 true,
+                "custom7",
                 caches
               );
             }

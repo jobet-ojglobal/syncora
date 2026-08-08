@@ -16,19 +16,20 @@ export class CategorySyncMapService {
       url: string;
     },
     options: SyncOptions,
-    selectedRecords?: any[]
+    selectedRecords?: any[],
+    syncedAll?: boolean,
   ) {
     const { onProgress } = options;
     
     let categories = await getCategories(location.url);
 
-    if (selectedRecords && selectedRecords.length > 0) {
+    // Skip filtering by selectedRecords if syncedAll is true
+    if (!syncedAll && selectedRecords && selectedRecords.length > 0) {
       const allowedIds = selectedRecords.map(item => String(item.id));
       categories = categories.filter((data: any) => 
         allowedIds.includes(String(data.categoryId))
       );
     }
-
 
     let processed = 0;
 

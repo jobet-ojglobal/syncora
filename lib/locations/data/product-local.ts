@@ -17,7 +17,7 @@ export async function getLocalInventoryLines(url: string) {
 
 export async function getLocalBatchProducts(
   url: string,
-  count = 4,
+  count = 30,
   after?: string,
   includes: string[] = []
 ) {

@@ -16,12 +16,13 @@ export class CustomerSyncMapService {
       url: string;
     },
     options: SyncOptions,
-    selectedRecords?: any[]
+    selectedRecords?: any[],
+    syncedAll?: boolean
   ) {
     const { onProgress } = options;
     let incomingCustomers = await getCustomers(location.url);
 
-    if (selectedRecords && selectedRecords.length > 0) {
+    if (!syncedAll && selectedRecords && selectedRecords.length > 0) {
       const allowedIds = selectedRecords.map(item => String(item.id));
       incomingCustomers = incomingCustomers.filter((data: any) => 
         allowedIds.includes(String(data.customerId))

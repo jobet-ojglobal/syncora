@@ -16,14 +16,15 @@ export class TaxingSchemeSyncMapService {
       url: string;
     },
     options: SyncOptions,
-    selectedRecords?: any[]
+    selectedRecords?: any[],
+    syncedAll?: boolean
   ) {
     const { onProgress } = options;
     
     // Fetch taxing schemes from your source location endpoint
     let taxingSchemes = await getTaxingSchemes(location.url);
 
-    if (selectedRecords && selectedRecords.length > 0) {
+    if (!syncedAll && selectedRecords && selectedRecords.length > 0) {
       const allowedIds = selectedRecords.map(item => String(item.id));
       taxingSchemes = taxingSchemes.filter((data: any) => 
         allowedIds.includes(String(data.taxingSchemeId))

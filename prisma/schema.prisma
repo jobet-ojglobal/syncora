@@ -181,7 +181,7 @@ model Category {
   description String?
   imageUrl    String?
   parentId          String?
-  parent            Category?  @relation("CategoryToCategory", fields: [parentId], references: [inflowId])
+  parent            Category?  @relation("CategoryToCategory", fields: [parentId], references: [inflowId], onUpdate: Cascade)
   children          Category[] @relation("CategoryToCategory")
   productGroups     ProductGroup[]
   products          Product[]
@@ -202,7 +202,7 @@ model CategoryLocationMap {
   localId        Int          // The unique INT assigned by that specific local database
 
   location       Location? @relation(fields: [locationId], references: [inflowId])
-  category       Category     @relation(fields: [categoryId], references: [inflowId], onDelete: Cascade)
+  category       Category     @relation(fields: [categoryId], references: [inflowId], onDelete: Cascade, onUpdate: Cascade)
 
   @@unique([categoryId, locationId])
   @@index([locationId, localId])
@@ -220,7 +220,7 @@ model ProductGroup {
   isActive          Boolean
 
   brand             Brand?   @relation(fields: [brandId], references: [id])
-  category          Category? @relation(fields: [categoryId], references: [inflowId])
+  category          Category? @relation(fields: [categoryId], references: [inflowId], onUpdate: Cascade)
 
   variants          ProductVariant[]
   images            ProductImage[]
@@ -331,7 +331,7 @@ model Product {
   brandId           String?
   brand             Brand? @relation(fields: [brandId], references: [id])
   categoryId        String?
-  category          Category? @relation(fields: [categoryId], references: [inflowId])
+  category          Category? @relation(fields: [categoryId], references: [inflowId], onUpdate: Cascade)
   lastModifiedBy    TeamMember? @relation(fields: [lastModifiedById], references: [inflowId])
   lastVendor        Vendor? @relation(fields: [lastVendorId], references: [inflowId])
 

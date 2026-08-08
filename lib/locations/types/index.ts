@@ -1,5 +1,20 @@
 // lib/locations/types/product-sync.types.ts
 
+export interface LocalCurrency {
+  currencyId: string;
+  code: string;
+  description: string;
+  symbol: string;
+  timestamp: string;
+  isActive: number;
+  decimalPlaces: number;
+  decimalSeparator: string;
+  thousandsSeparator: string;
+  cRCurrencyPositionType: string;
+  cRNegativeType: string;
+  syncedAt: string;
+}
+
 export interface LocalProductSerial {
   serialId: string;
   productId: string;
