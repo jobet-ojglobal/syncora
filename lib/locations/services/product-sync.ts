@@ -16,6 +16,7 @@ import { syncTeamMember } from "@/lib/inflow/services/team-member.sync";
 import { syncVendor } from "@/lib/inflow/services/vendor.sync";
 import { ensureCategoryShell, ensureLocationShell, ensureOperationTypeShell, ensurePricingSchemeShell, ensureProductShell, ensureTaxCodeShell, ensureTaxingSchemeShell, ensureVendorShell } from "@/lib/inflow/services/ensure.service";
 import { reorderMethodSwitcher, productTypeSwitcher } from "@/helpers/product.helper";
+import { CategorySyncMapService } from "./batch-category-sync-map";
 
 type Tx = Prisma.TransactionClient;
 
@@ -57,12 +58,15 @@ export async function syncProduct(
   const verifiedPricingSchemeIds = caches?.verifiedPricingSchemeIds ?? new Set<string>();
   const verifiedProductIds = caches?.verifiedProductIds ?? new Set<string>();
 
-  // const brandName = firstProductInGroup?.customFields?.custom1 || product.customFields?.custom1;
+  const localProduct = await tx.product.findUnique({
+    where: { inflowId: product.productId }
+  });
 
-  // let brandId: string | null = null;
-  // if (brandName) {
-  //   brandId = await syncBrand(tx, brandName);
-  // }
+  // for initial sync only : NOT UPSERT PRODUCT DATA
+  if(localProduct) {
+    verifiedProductIds?.add(localProduct.inflowId);
+    return localProduct;
+  }
 
   let brandId: string | null = null;
   
@@ -96,7 +100,8 @@ export async function syncProduct(
         console.warn(
           `[Sync Notification] Category "${product.categoryId}" missing locally. Syncing JIT...`
         );
-        const newCategory = await ensureCategoryShell(tx, product.category);
+        const categorySyncService = new CategorySyncMapService();
+        const newCategory = await categorySyncService.syncCategory(tx, product.category);
         if (newCategory?.inflowId) {
           validCategoryId = newCategory.inflowId;
           verifiedCategories.add(newCategory.inflowId);
@@ -171,13 +176,12 @@ export async function syncProduct(
   }
   
 
-  const localProduct = await tx.product.findUnique({
-    where: { inflowId: product.productId }
-  });
+ 
 
   let validProductData: Product | null = null;
 
   if (hasCoreProductData) {
+<<<<<<< HEAD
 <<<<<<< HEAD
     const baseSlug = await genInflowUniqueSlug(
       product.name || "product-variant", 
@@ -188,6 +192,17 @@ export async function syncProduct(
     const slugToUse = localProduct?.slug 
       ? localProduct.slug 
       : await genInflowUniqueSlug(
+=======
+    // const slugToUse = localProduct?.slug 
+    //   ? localProduct.slug 
+    //   : await genInflowUniqueSlug(
+    //       product.name || "product-variant", 
+    //       tx.product, 
+    //       product.productId
+    //     );
+
+    const slugToUse = await genInflowUniqueSlug(
+>>>>>>> 9b0281acf4667ec0825b359671271742fc0f346e
           product.name || "product-variant", 
           tx.product, 
           product.productId

@@ -1,10 +1,15 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { getEntireCatalogs } from '@/lib/inflow/data/products';
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
-    const data =
-        await getEntireCatalogs();
+    const { searchParams } = new URL(request.url);
+    
+    // Parse pagination parameters
+    const limitParam = searchParams.get('count');
+    const limit = limitParam ? Math.min(Math.max(parseInt(limitParam, 10), 1), 100) : 50;
+    const after = searchParams.get('after') || undefined;
+    const data = await getEntireCatalogs(limit, after);
 
     return NextResponse.json({
       success: true,

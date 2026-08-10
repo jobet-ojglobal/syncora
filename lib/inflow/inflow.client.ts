@@ -24,8 +24,7 @@ export class InflowClient {
             "Authorization": `Bearer ${env.INFLOW_API_KEY}`,
             "Content-Type": "application/json",
             "Accept": "application/json;version=2026-07-10",
-            ...options?.headers,
-            "X-OverrideAllowNegativeInventory": "TRUE"
+            ...options?.headers
           },
           cache: "no-store",
         }
@@ -71,8 +70,8 @@ export class InflowClient {
     }
   }
 
-  get<T>(endpoint: string): Promise<T> {
-    return this.request<T>(endpoint);
+  get<T>(endpoint: string, retries?: number, delay?: number): Promise<T> {
+    return this.request<T>(endpoint, undefined, retries, delay);
   }
 
   post<T>(endpoint: string, body: unknown): Promise<T> {
@@ -82,10 +81,11 @@ export class InflowClient {
     });
   }
 
-  put<T>(endpoint: string, body: unknown): Promise<T> {
+  put<T>(endpoint: string, body: unknown, options?: RequestInit): Promise<T> {
     return this.request<T>(endpoint, {
       method: "PUT",
       body: JSON.stringify(body),
+      ...options?.headers
     });
   }
 

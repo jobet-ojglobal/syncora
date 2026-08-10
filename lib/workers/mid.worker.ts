@@ -9,8 +9,9 @@ import { upsertCategory as upsertLocalCategory } from "../locations/data/categor
 import { upsertTaxingScheme as upsertLocalTaxingScheme } from "../locations/data/taxing-scheme";
 import { upsertPricingScheme as upsertLocalPricingScheme } from "../locations/data/pricing-scheme";
 import { upsertProduct as upsertLocalProductScheme, upsertProductImage as upsertLocalProductImageScheme } from "../locations/data/product";
+import { upsertStockAdjust as upsertCloudStockAdjust } from "../inflow/data/inventory";
 
-interface MidWebhookJobData {
+export interface MidWebhookJobData {
   source: string;
   model: string;
   payload: any;
@@ -86,6 +87,10 @@ const midWorker = new Worker<MidWebhookJobData>(
               await upsertCloudCustomer(payload);
               result = { success: true}
             }
+            break;
+          case "STOCK_ADJUST_UPSERT_CLOUD": 
+            await upsertCloudStockAdjust(payload);
+            result = { success: true}
             break;
           
           default:

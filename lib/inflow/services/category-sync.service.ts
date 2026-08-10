@@ -1,6 +1,5 @@
 import { prisma } from "@/lib/prisma";
 import { getCategories } from "../data/categories";
-import { syncCategory, CategorySyncCache } from "./category-sync";
 import { InflowCategory } from "../types";
 import { genInflowUniqueSlug } from "@/helpers/genUniqueSlug";
 import { Prisma } from "@/generated/prisma/client";

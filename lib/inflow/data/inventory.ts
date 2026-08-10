@@ -1,13 +1,15 @@
 import { inflow } from "@/lib/inflow/inflow.client";
-import { InflowProduct } from "../types";
+import { InflowProduct, InflowStockAdjustInput } from "../types";
 
 export async function getInventoryLevels(
   count = 100,
-  after?: string
+  after?: string,
+  retries: number =  5,
+  delayMs: number = 1000
 ) {
   const params = new URLSearchParams({
     count: String(count),
-    include: "inventoryLines.location",
+    include: "inventoryLines.location"
   });
 
   if (after) {
@@ -15,7 +17,9 @@ export async function getInventoryLevels(
   }
 
  return await inflow.get<InflowProduct[]>(
-    `/products?${params.toString()}`
+    `/products?${params.toString()}`,
+    retries,
+    delayMs
   );
 }
 
@@ -26,4 +30,8 @@ export async function getInventoryByProduct(
     `/products/${productId}?include=inventoryLines.location`
   );
   return data;
+}
+
+export async function upsertStockAdjust(payload: InflowStockAdjustInput) {
+  return inflow.put<InflowStockAdjustInput>("/stock-adjustments", payload);
 }

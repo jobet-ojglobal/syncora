@@ -53,7 +53,6 @@ async function generateAdjustmentNumber(tx: Prisma.TransactionClient): Promise<s
   const nextNum = (currentMax + 1).toString().padStart(5, "0");
 
   return `ADJ-${nextNum}`;
-
 }
 
 export async function POST(req: Request) {

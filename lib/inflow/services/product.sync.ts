@@ -61,6 +61,16 @@ export async function syncProduct(
   const rawFeaturesString = firstProductInGroup?.customFields?.custom2 || product.customFields?.custom2;
   const rawTagsString = firstProductInGroup?.customFields?.custom3  || product.customFields?.custom3;
 
+  const localProduct = await tx.product.findUnique({
+    where: { inflowId: product.productId }
+  });
+
+  // for initial sync only : NOT UPSERT PRODUCT DATA
+  if(localProduct) {
+    verifiedProductIds?.add(localProduct.inflowId);
+    return localProduct;
+  }
+
   let brandId: string | null = null;
 
   if (brandCustomName) {
@@ -168,9 +178,9 @@ export async function syncProduct(
   }
   
 
-  const localProduct = await tx.product.findUnique({
-    where: { inflowId: product.productId }
-  });
+  // const localProduct = await tx.product.findUnique({
+  //   where: { inflowId: product.productId }
+  // });
 
   let validProductData: Product | null = null;
 

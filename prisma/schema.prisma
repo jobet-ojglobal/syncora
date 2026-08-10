@@ -1137,6 +1137,7 @@ model Location {
   inventories         Inventory[]
   inventoryBinItems   InventoryBinItem[]
   sublocations        Sublocation[]
+  linkedSublocation   Sublocation[] @relation("LocationLink")
   adjustmentLines     InventoryAdjustmentLine[]
   inventoryLedger     InventoryLedger[]
   teamLocations       TeamMemberLocation[]
@@ -1220,10 +1221,13 @@ model Sublocation {
   locationId      String
   name            String
 
-  location        Location @relation(fields: [locationId],references: [inflowId], onDelete: Cascade)
+  location        Location @relation(fields: [locationId], references: [inflowId], onDelete: Cascade)
   inventoryBins   InventoryBin[]
   sourceTransferLines TransferOrderLine[] @relation("TransferSourceSublocation")
   targetTransferLines TransferOrderLine[] @relation("TransferTargetSublocation")
+  
+  linkedLocationId     String?
+  linkedLocation       Location? @relation("LocationLink", fields: [linkedLocationId], references: [inflowId], onDelete: SetNull)
   
   localMappings       SublocationLocationMap[]
   inventoryLedgers    InventoryLedger[]

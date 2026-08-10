@@ -2,7 +2,6 @@
 import { prisma } from "@/lib/prisma";
 import { syncCustomer } from "@/lib/inflow/services/customer.sync";
 import { getCustomer } from "../data/customer";
-import { Prisma } from "@/generated/prisma/client";
 import crypto from "crypto";
 
 export interface CustomerSyncResult {

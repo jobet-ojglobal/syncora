@@ -18,17 +18,7 @@ import { ProductCostAdjustmentSyncService } from "../inflow/services/product-cos
 import { PaymentTermSyncService } from "../inflow/services/payment-term-sync.service";
 import { VendorSyncService } from "../inflow/services/vendor-sync.service";
 import { ProductSyncService } from "@/lib/inflow/services/product-sync.service";
-import { ProductBarcodeSyncService } from "../inflow/services/produc-barcode-sync.service";
-import { ProductImageSyncService } from "../inflow/services/product-image-sync.service";
-import { ProductTaxCodeSyncService } from "../inflow/services/product-tax-code-sync.service";
-import { ProductReorderSettingSyncService } from "../inflow/services/product-reorder-setting-sync.service";
-import { ProductOperationSyncService } from "../inflow/services/product-operation-sync.service";
-import { ProductPriceSyncService } from "../inflow/services/product-price-sync.service";
-import { ProductItemBomSyncService } from "../inflow/services/product-item-bom-sync.service";
-import { ProductAttachmentSyncService } from "../inflow/services/product-attachment-sync.service";
 import { ProductGroupSyncService } from "../inflow/services/product-group-sync.service";
-import { ProductVariantSyncService } from "../inflow/services/product-variant-sync.service";
-import { ProductGroupImageSyncService } from "../inflow/services/product-group-image-sync.service";
 import { SalesOrderSyncService } from "../inflow/services/sales-order-sync.service";
 import { PurchaseOrderSyncService } from "../inflow/services/purchase-order-sync.service";
 
@@ -39,28 +29,15 @@ import { PaymentTermSyncMapService as LocalPaymentTermSyncMapService } from "../
 import { PricingSchemeSyncMapService as LocalPricingSchemeSyncMapService } from "../locations/services/pricing-scheme-sync-map.service";
 import { TaxingSchemeSyncMapService as LocalTaxingSchemeSyncMapService } from "../locations/services/taxing-scheme-sync-map.service";
 import { CustomerSyncMapService as LocalCustomerSyncMapService } from "../locations/services/customer-sync-map.service";
-import { ProductSyncMapService as LocalProductSyncMapService } from "../locations/services/product-batch-sync-map.service";
-import { InventorySyncService as LocalInventorySyncService } from "../locations/services/inventory-line-sync.service";
+import { ProductSyncMapService as LocalProductSyncMapService } from "../locations/services/batch-product-sync-map";
+import { InventorySyncService as LocalInventorySyncService } from "../locations/services/batch-inventory-lines-sync-map";
 import { SublocationSyncMapService as LocalSublocationSyncMapService } from "../locations/services/sublocation-sync-map.service";
 
 
 const testService = new TestSyncService();
 const categoryService = new CategorySyncService();
-
 const productGroupService = new ProductGroupSyncService();
-const productGroupImageService = new ProductGroupImageSyncService();
-const productVariantService = new ProductVariantSyncService();
-
 const productService = new ProductSyncService();
-const productImageService = new ProductImageSyncService();
-const productBarcodeService = new ProductBarcodeSyncService();
-const productTaxService = new ProductTaxCodeSyncService();
-const productReorderService = new ProductReorderSettingSyncService();
-const productOperationService = new ProductOperationSyncService();
-const productPriceService = new ProductPriceSyncService();
-const productBomService = new ProductItemBomSyncService();
-const productAttachmentService = new ProductAttachmentSyncService();
-
 const customerService = new CustomerSyncService();
 const vendorService = new VendorSyncService();
 const inventoryService = new InventorySyncService();
@@ -72,7 +49,6 @@ const adjustmentReasonService = new AdjustmentReasonSyncService();
 const pricingSchemeService = new PricingSchemeSyncService();
 const productCostAdjustmentService = new ProductCostAdjustmentSyncService();
 const paymentTermService = new PaymentTermSyncService();
-
 const salesOrderService = new SalesOrderSyncService();
 const purchaseOrderService = new PurchaseOrderSyncService();
 
@@ -86,6 +62,45 @@ const customerServiceLocal = new LocalCustomerSyncMapService();
 const productServiceLocal = new LocalProductSyncMapService();
 const inventoryServiceLocal = new LocalInventorySyncService();
 const sublocationServiceLocal = new LocalSublocationSyncMapService();
+
+// export class SyncCancelledError extends Error {
+//   constructor(message = "Sync job was cancelled by user.") {
+//     super(message);
+//     this.name = "SyncCancelledError";
+//   }
+// }
+
+// interface SyncWebhookJobData {
+//   jobId: string;
+//   source: string;
+//   includes: any;
+//   selectedRecords: string[];
+//   syncedAll: boolean;
+//   brandCustomName: string;
+//   after: string;
+//   location: {
+//     inflowId: string;
+//     name: string;
+//     url: string;
+//   };
+// }
+
+// type SyncOptions = {
+//   onProgress?: (progress: number) => Promise<void>;
+//   checkSignal?: () => Promise<void>;
+// };
+
+// const checkCancellation = async (jobId: string) => {
+//   const syncJob = await prisma.syncJob.findUnique({
+//     where: { id: jobId },
+//     select: { status: true },
+//   });
+
+//   if (syncJob?.status === "cancelled") {
+//     throw new SyncCancelledError();
+//   }
+// };
+
 
 export class SyncCancelledError extends Error {
   constructor(message = "Sync job was cancelled by user.") {
@@ -102,11 +117,7 @@ interface SyncWebhookJobData {
   syncedAll: boolean;
   brandCustomName: string;
   after: string;
-  location: {
-    inflowId: string;
-    name: string;
-    url: string;
-  };
+  location: { inflowId: string; name: string; url: string };
 }
 
 type SyncOptions = {
@@ -114,6 +125,9 @@ type SyncOptions = {
   checkSignal?: () => Promise<void>;
 };
 
+/**
+ * Ensures job isn't cancelled. Throws SyncCancelledError if cancelled.
+ */
 const checkCancellation = async (jobId: string) => {
   const syncJob = await prisma.syncJob.findUnique({
     where: { id: jobId },
@@ -121,6 +135,26 @@ const checkCancellation = async (jobId: string) => {
   });
 
   if (syncJob?.status === "cancelled") {
+    throw new SyncCancelledError();
+  }
+};
+
+/**
+ * Safely updates syncJob status without overwriting 'cancelled'
+ */
+const safeUpdateJob = async (jobId: string, progress: number) => {
+  const result = await prisma.syncJob.updateMany({
+    where: {
+      id: jobId,
+      status: { not: "cancelled" }, // 🟢 Prevents race condition
+    },
+    data: {
+      status: "processing",
+      progress,
+    },
+  });
+
+  if (result.count === 0) {
     throw new SyncCancelledError();
   }
 };
@@ -134,37 +168,54 @@ const worker = new Worker<SyncWebhookJobData>(
 
     console.log(`[Sync Worker] Processing job source: ${source} for location ${location?.name || "cloud"}`);
     
+    // const syncOptions: SyncOptions = {
+    //   checkSignal: async () => {
+    //     await checkCancellation(jobId);
+    //   },
+    //   onProgress: async (processedCount) => {
+    //     // Confirm job isn't cancelled before writing progress updates
+    //     await checkCancellation(jobId);
+
+    //     await job.updateProgress(processedCount);
+
+    //     await prisma.syncJob.update({
+    //       where: { id: jobId },
+    //       data: { 
+    //         status: "processing",
+    //         progress: processedCount 
+    //       },
+    //     });
+    //   },
+    // };
+
     const syncOptions: SyncOptions = {
       checkSignal: async () => {
         await checkCancellation(jobId);
       },
       onProgress: async (processedCount) => {
-        // Confirm job isn't cancelled before writing progress updates
         await checkCancellation(jobId);
-
         await job.updateProgress(processedCount);
-
-        await prisma.syncJob.update({
-          where: { id: jobId },
-          data: { 
-            status: "processing",
-            progress: processedCount 
-          },
-        });
+        // Atomically update DB only if not cancelled
+        await safeUpdateJob(jobId, processedCount);
       },
     };
 
     try {
-      // Check cancellation state right before starting execution
-      await checkCancellation(jobId);
+      // // Check cancellation state right before starting execution
+      // await checkCancellation(jobId);
 
-      await prisma.syncJob.update({
-        where: { id: jobId },
-        data: {
-          status: "processing",
-          progress: 0,
-        },
-      });
+      // await prisma.syncJob.update({
+      //   where: { id: jobId },
+      //   data: {
+      //     status: "processing",
+      //     progress: 0,
+      //   },
+      // });
+
+      // let result;
+
+      await checkCancellation(jobId);
+      await safeUpdateJob(jobId, 0);
 
       let result;
 
@@ -222,7 +273,7 @@ const worker = new Worker<SyncWebhookJobData>(
           if (!locationUrl) {
             throw new Error(`Cannot sync inventory: No location URL found for location ${location?.name}`);
           }
-          result = await inventoryServiceLocal.sync(location, syncOptions, selectedRecords, syncedAll);
+          result = await inventoryServiceLocal.sync(location, syncOptions, selectedRecords, syncedAll, after);
           break;
 
         // Cloud Sync
@@ -232,39 +283,12 @@ const worker = new Worker<SyncWebhookJobData>(
         case "product_groups":
           result = await productGroupService.sync(syncOptions, includes);
           break;
-        // case "product_group_images":
-        //   result = await productGroupImageService.sync(syncOptions);
-        //   break;
-        // case "product_variants":
-        //   result = await productVariantService.sync(syncOptions);
-        //   break;
         case "products":
           result = await productService.sync(syncOptions, includes, brandCustomName, after);
           break;
-        // case "product_images":
-        //   result = await productImageService.sync(syncOptions);
-        //   break;
-        // case "product_barcodes":
-        //   result = await productBarcodeService.sync(syncOptions);
-        //   break;
-        // case "product_taxes":
-        //   result = await productTaxService.sync(syncOptions);
-        //   break;
-        // case "product_reorder_settings":
-        //   result = await productReorderService.sync(syncOptions);
-        //   break;
-        // case "product_operations":
-        //   result = await productOperationService.sync(syncOptions);
-        //   break;
-        // case "product_prices":
-        //   result = await productPriceService.sync(syncOptions);
-        //   break;
         case "product_boms":
           result = await productService.sync(syncOptions, ["itemBoms"]);
           break;
-        // case "product_attachments":
-        //   result = await productAttachmentService.sync(syncOptions);
-        //   break;
         case "customers":
           result = await customerService.sync(syncOptions);
           break;

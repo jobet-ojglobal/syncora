@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getTaxingSchemes } from "@/lib/locations/data/taxing-scheme";
 import { getCustomers } from "@/lib/locations/data/customer";
-import { getCurrencies } from "@/lib/locations/data/currency";
+import { getCurrencies, getLocalBatchCurrencies } from "@/lib/locations/data/currency";
 import { getCategories } from "@/lib/locations/data/category";
 import { getPricingSchemes } from "@/lib/locations/data/pricing-scheme";
 import { getPaymentTerms } from "@/lib/locations/data/payment-term";
@@ -63,13 +63,25 @@ export async function GET(request: NextRequest) {
         rawData: customer,
       }));
     } else if (source === "currencies_local") {
-      const rawCurrency = await getCurrencies(location.url);
-      previewItems = rawCurrency.map((item: any) => ({
+      // const rawCurrency = await getCurrencies(location.url);
+      
+      // Use batched fetching with cursor pagination
+      const batch = await getLocalBatchCurrencies(location.url, limit, after);
+      // previewItems = (batch || []).map((item: any) => ({
+      //   id: String(item.productId),
+      //   name: item.name,
+      //   description: `${item.serials?.length || 0} nested serials. ${item.prices?.length || 0} nested prices`,
+      //   rawData: item,
+      // }));
+      previewItems = (batch || []).sort((a, b) => (a.description || '').localeCompare(b.description || '')).map((item: any) => ({
         id: String(item.currencyId),
         name: item.description,
-        description: `${item.address?.length || 0} nested items present`,
+        description: `0 nested items present`,
         rawData: item,
       }));
+
+      hasMore = batch.length === limit;
+      nextCursor = batch.length > 0 ? String(batch[batch.length - 1].currencyId) : null;
     } else if (source === "payment_terms_local") {
       const rawPayment = await getPaymentTerms(location.url);
       previewItems = rawPayment.map((item: any) => ({

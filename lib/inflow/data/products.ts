@@ -23,7 +23,9 @@ export async function getEntireCatalogs(
 export async function getProducts(
   count = 30,
   after?: string,
-  includes: string[] = []
+  includes: string[] = [],
+  retries: number =  5,
+  delayMs: number = 1000
 ) {
   // 1. Filter out empty strings to prevent leading/trailing/double commas in URL params
   const validIncludes = includes.filter((inc) => Boolean(inc) && inc.trim() !== "");
@@ -41,7 +43,11 @@ export async function getProducts(
     params.append("after", after);
   }
 
-  return inflow.get<InflowProduct[]>(`/products?${params.toString()}`);
+  return inflow.get<InflowProduct[]>(
+    `/products?${params.toString()}`,
+    retries,
+    delayMs
+  );
 }
 
   // filter: "filter[isActive]=true"   &${filter}
@@ -86,7 +92,6 @@ export async function getProduct(productId: string) {
 }
 
 export async function upsertProduct(payload: Partial<InflowProduct>) {
-  console.log("OUTBOUND INFLOW PRODUCT PAYLOAD:", JSON.stringify(payload, null, 2));
   return inflow.put<InflowProduct>("/products", payload);
 }
 

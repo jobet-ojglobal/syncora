@@ -1,7 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { getLocalBatchProducts } from "../data/product-local";
 import crypto from "crypto";
-import { LocalProduct, SyncOptions } from "../types";
+import { LocalProduct } from "../types";
 import { InflowProduct } from "@/lib/inflow/types";
 import { localProductItemType } from "@/helpers/product.helper";
 import { syncProduct } from "./product-sync";
@@ -29,6 +29,13 @@ function generateSlug(name: string, fallbackId: string): string {
 
   return baseSlug || `product-${fallbackId}`;
 }
+
+type SyncOptions = {
+  onProgress?: (processedCount: number) => Promise<void>;
+  checkSignal?: () => Promise<void>;
+  batchSize?: number;
+  delayBetweenBatchesMs?: number;
+};
 
 export class ProductSyncMapService {
 <<<<<<< HEAD
@@ -58,9 +65,15 @@ export class ProductSyncMapService {
     after: string | undefined = undefined
   ) {
     const { onProgress, checkSignal } = options;
+<<<<<<< HEAD:lib/locations/services/product-batch-sync-map.service.ts
 >>>>>>> 5b8a697f694ad91ac1815e935520b5c9374ef5c2
     const BATCH_SIZE = options?.batchSize ?? 30;
+=======
+    // higher batch size
+    const BATCH_SIZE = options?.batchSize ?? 100; 
+>>>>>>> 9b0281acf4667ec0825b359671271742fc0f346e:lib/locations/services/batch-product-sync-map.ts
     const INTER_BATCH_DELAY = options?.delayBetweenBatchesMs ?? 300;
+    const CLIENT_RETRIES = 1;
 
     let totalProcessed = 0;
     let hasMore = true;
@@ -110,7 +123,9 @@ export class ProductSyncMapService {
       const rawBatch: LocalProduct[] = await getLocalBatchProducts(
         location.url,
         BATCH_SIZE,
-        after
+        after,
+        [],
+        CLIENT_RETRIES
       );
 
 <<<<<<< HEAD
@@ -393,15 +408,18 @@ export class ProductSyncMapService {
       totalProcessed += batchProcessedCount;
       batchNo++;
 
+<<<<<<< HEAD:lib/locations/services/product-batch-sync-map.service.ts
       console.log(`Batch #${batchNo} completed. Processed ${totalProcessed} products.`);
 <<<<<<< HEAD
       
       if (onProgress) {
         await onProgress(totalProcessed);
 =======
+=======
+      console.log(`Batch #${batchNo} completed. Processed ${totalProcessed} products. `);
+>>>>>>> 9b0281acf4667ec0825b359671271742fc0f346e:lib/locations/services/batch-product-sync-map.ts
 
       if (onProgress) await onProgress(totalProcessed);
-
       if (checkSignal) await checkSignal();
 
       if (INTER_BATCH_DELAY > 0) {
