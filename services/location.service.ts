@@ -109,8 +109,22 @@ export class LocationService {
           select: {
             id: true,
             name: true,
+            linkedLocationId: true, // Included linkedLocationId field
+            linkedLocation: {      // Included linked location details
+              select: {
+                id: true,
+                inflowId: true,
+                name: true,
+              }
+            }
           },
           orderBy: { name: "asc" }
+        },
+        linkedSublocation: { 
+          select: {
+            id: true,
+            name: true,
+          },
         }
       },
     });
@@ -137,6 +151,8 @@ export class LocationService {
       
       sublocationsList: loc.sublocations,
 
+      linkedSublocation: loc.linkedSublocation,
+
       // Flattened structural counts sent downstream to your dashboard grids
       mappings: {
         taxingSchemesCount: loc._count.localTaxingSchemeMappings,
@@ -154,6 +170,6 @@ export class LocationService {
         productsCount: loc._count.localProductMappings,
         locationsCount: loc._count.sublocationLocalMappings,
       }
-    }
+    };
   }
 }

@@ -1,7 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { getLocalBatchProducts } from "../data/product-local";
 import crypto from "crypto";
-import { LocalProduct, SyncOptions } from "../types";
+import { LocalProduct } from "../types";
 import { InflowProduct } from "@/lib/inflow/types";
 import { localProductItemType } from "@/helpers/product.helper";
 import { syncProduct } from "./product-sync";
@@ -30,6 +30,13 @@ function generateSlug(name: string, fallbackId: string): string {
   return baseSlug || `product-${fallbackId}`;
 }
 
+type SyncOptions = {
+  onProgress?: (processedCount: number) => Promise<void>;
+  checkSignal?: () => Promise<void>;
+  batchSize?: number;
+  delayBetweenBatchesMs?: number;
+};
+
 export class ProductSyncMapService {
   private sleep(ms: number) {
     return new Promise((resolve) => setTimeout(resolve, ms));
@@ -48,8 +55,10 @@ export class ProductSyncMapService {
     after: string | undefined = undefined
   ) {
     const { onProgress, checkSignal } = options;
-    const BATCH_SIZE = options?.batchSize ?? 30;
+    // higher batch size
+    const BATCH_SIZE = options?.batchSize ?? 100; 
     const INTER_BATCH_DELAY = options?.delayBetweenBatchesMs ?? 300;
+    const CLIENT_RETRIES = 1;
 
     let totalProcessed = 0;
     let hasMore = true;
@@ -86,7 +95,9 @@ export class ProductSyncMapService {
       const rawBatch: LocalProduct[] = await getLocalBatchProducts(
         location.url,
         BATCH_SIZE,
-        after
+        after,
+        [],
+        CLIENT_RETRIES
       );
 
       if (!rawBatch || rawBatch.length === 0) break;
@@ -328,10 +339,9 @@ export class ProductSyncMapService {
       totalProcessed += batchProcessedCount;
       batchNo++;
 
-      console.log(`Batch #${batchNo} completed. Processed ${totalProcessed} products.`);
+      console.log(`Batch #${batchNo} completed. Processed ${totalProcessed} products. `);
 
       if (onProgress) await onProgress(totalProcessed);
-
       if (checkSignal) await checkSignal();
 
       if (INTER_BATCH_DELAY > 0) {

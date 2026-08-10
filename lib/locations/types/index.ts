@@ -108,6 +108,14 @@ export interface LocalProduct {
   inventoryLines?: LocalInventoryLine[];
 }
 
+
+export interface LocalProductInventory {
+  productId: string;
+  name: string;
+  serials?: LocalProductSerial[];
+  inventoryLines?: LocalInventoryLine[];
+}
+
 export interface LocalInventoryLine {
   locationId: string | null;
   lotId: string | null;

@@ -40,8 +40,8 @@ export async function GET(request: NextRequest) {
       orderByClause = { brand: { name: sortOrder } };
     } else if (sortBy === "categoryName") {
       orderByClause = { category: { name: sortOrder } };
-    }
-
+    } 
+    
     // 3. Run parallel database execution transactions to save performance cycle costs
     const [catalogItems, totalRecords] = await prisma.$transaction([
       prisma.product.findMany({

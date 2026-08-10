@@ -576,6 +576,68 @@ export interface InflowAdjustmentReason {
   name: string;
 }
 
+// Stock Adjustment
+
+// "adjustmentNumber": "SA-000123",
+// "adjustmentReasonId": "00000000-0000-0000-0000-000000000000",
+// "customFields": {},
+// "date": "2020-01-31",
+// "isCancelled": true,
+// "lastModifiedById": "00000000-0000-0000-0000-000000000000",
+// "lastModifiedDateTime": "2020-01-31",
+// "locationId": "00000000-0000-0000-0000-000000000000",
+// "remarks": "string",
+// "stockAdjustmentId": "00000000-0000-0000-0000-000000000000",
+// "timestamp": "0000000000310AB6",
+
+export interface InflowStockAdjustment {
+  adjustmentNumber: string;
+  adjustmentReasonId: string;
+  locationId: string;
+  isCancelled: boolean;
+  date: string;
+  remarks?: string;
+  customFields: string;
+  stockAdjustmentId: string;
+  lastModifiedById: string;
+  lastModifiedDateTime: string;
+  timestamp?: string;
+  attachments?: InflowAttachment[];
+  lastModifiedBy?: InflowTeamMember;
+  lines: InflowStockAdjustmentLine[];
+  location?: InflowLocation;
+}
+
+
+export interface InflowStockAdjustmentLine {
+  productId: string;
+  stockAdjustmentLineId: string;
+  quantity: InflowQuantity;
+  sublocation: string;
+  description?: string;
+  timestamp?: string;
+  product?: InflowProduct;
+}
+
+export interface InflowStockAdjustInput {
+  adjustmentNumber: string;
+  adjustmentReasonId: string;
+  stockAdjustmentId: string;
+  date: string;
+  isCancelled: boolean;
+  lastModifiedById: string;
+  locationId: string;
+  remarks: string;
+  lines: InflowStockAdjustmentLine[]
+  customFields?: InflowCustomFields | null;
+  lastModifiedDateTime?: string;
+  timestamp?: string;
+  attachments?: InflowAttachment[];
+  lastModifiedBy?: InflowTeamMember;
+  location?: InflowLocation;
+  adjustmentReason?: InflowAdjustmentReason;
+}
+
 // PRICING SCHEMES
 
 export interface InflowPricingScheme {
@@ -833,8 +895,8 @@ export interface InflowDiscount {
 }
 
 export interface InflowQuantity {
-  standardQuantity: string;
-  uomQuantity: string;
+  standardQuantity: string | null;
+  uomQuantity: string | null;
   uom: string;
   serialNumbers: string[];
 }

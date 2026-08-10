@@ -8,10 +8,23 @@ export async function getLocalProducts(url: string) {
   );
 }
 
-export async function getLocalInventoryLines(url: string) {
+export async function getLocalInventoryLines(
+  url: string,
+  count = 30,
+  after?: string,
+  retries: number =  5,
+) {
+   const params = new URLSearchParams({
+    count: String(count),
+  });
+
+  if (after) {
+    params.append("after", after);
+  }
+
   const apiClient = new BranchClient(url)
   return await apiClient.get<LocalProduct[]>(
-    `/inflow-local/product-inventory`,
+    `/inflow-local/product-inventory?${params.toString()}`,
   );
 }
 
@@ -19,7 +32,8 @@ export async function getLocalBatchProducts(
   url: string,
   count = 30,
   after?: string,
-  includes: string[] = []
+  includes: string[] = [],
+  retries: number =  5,
 ) {
   // 1. Specify base relation includes here if needed
   const baseIncludes: string[] = [];
@@ -34,7 +48,7 @@ export async function getLocalBatchProducts(
   });
 
   if (mergedIncludes) {
-    params.append("include", mergedIncludes);
+    params.append("includes", mergedIncludes);
   }
 
   if (after) {

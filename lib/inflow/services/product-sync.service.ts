@@ -1,4 +1,3 @@
-// services/sync/products/product-sync.service.ts
 import { prisma } from "@/lib/prisma";
 import { getProducts } from "../data/products"; 
 import { syncVariant } from "./variant.sync";
@@ -7,43 +6,24 @@ import { syncProductGroup } from "./product-group-sync";
 
 type SyncOptions = {
   onProgress?: (processedCount: number) => Promise<void>;
-  /** 
-   * Function to check for abort/cancellation signals.
-   * Should throw an error (e.g. SyncCancelledError) if the job was cancelled.
-   */
   checkSignal?: () => Promise<void>;
-  /** 
-   * Number of items per API call. 
-   * Recommended max: 20-30 when using heavy `includes` to avoid HTTP 429 Rate Limits.
-   * Default: 30
-   */
   batchSize?: number;
-  /**
-   * Pause time in milliseconds between API batch fetches to prevent rate limit spikes.
-   * Default: 300ms
-   */
   delayBetweenBatchesMs?: number;
 };
 
 export class ProductSyncService {
-  // Utility delay method for rate-limiting loop iterations
   private sleep(ms: number) {
     return new Promise((resolve) => setTimeout(resolve, ms));
   }
 
   async sync(options?: SyncOptions, includes?: string[], brandCustomName?: string, after: string | undefined = undefined) {
-    // 1. Reduced default batch size from 100 -> 30 to lower API payload weight & burst load
-    const BATCH_SIZE = options?.batchSize ?? 30;
-    
-    // 2. Configurable inter-batch delay (300ms default) to space out requests
+    const BATCH_SIZE = options?.batchSize ?? 100;
     const INTER_BATCH_DELAY = options?.delayBetweenBatchesMs ?? 300;
+    const CLIENT_RETRIES = 1;
     
-    // Track synced IDs across the entire execution to prevent duplicate DB writes
     const syncedGroupIds = new Set<string>();
-
     const EXCLUDED_INCLUDES = new Set(["coreData", "brand"]);
     const cleanIncludes = (includes ?? []).filter((item) => !EXCLUDED_INCLUDES.has(item));
-
     const hasCoreProductData = (includes ?? []).includes("coreData");
     const mergedIncludes = [...cleanIncludes];
 
@@ -61,25 +41,19 @@ export class ProductSyncService {
       verifiedProductIds: new Set<string>(),
     };
 
-    console.log(`Starting optimized product sync (Batch Size: ${BATCH_SIZE}, Throttle: ${INTER_BATCH_DELAY}ms)...`);
+    console.log(`Starting product sync (Batch Size: ${BATCH_SIZE})...`);
     let batchNo = 0;
 
     while (true) {
-      // Check for cancellation before calling remote API
-      if (options?.checkSignal) {
-        await options.checkSignal();
-      }
+      // 1. Check signal before starting remote fetch
+      if (options?.checkSignal) await options.checkSignal();
 
-      // Fetch the batch (includes deep relations)
-      const batch = await getProducts(BATCH_SIZE, after, mergedIncludes);
+      const batch = await getProducts(BATCH_SIZE, after, mergedIncludes, CLIENT_RETRIES);
       if (!batch || batch.length === 0) break;
 
-      // Check for cancellation before executing database transaction
-      if (options?.checkSignal) {
-        await options.checkSignal();
-      }
+      // 2. Check signal before starting long DB transaction
+      if (options?.checkSignal) await options.checkSignal();
 
-      // Process batch in database transaction
       try {
         await prisma.$transaction(
           async (tx) => {
@@ -88,18 +62,8 @@ export class ProductSyncService {
               const groupData = variantRelation?.productGroup;
               const groupDefaultProduct = variantRelation?.productGroup?.defaultProduct;
 
-              if (
-                groupData &&
-                !syncedGroupIds.has(groupData.productGroupId)
-              ) {
-                await syncProductGroup(
-                  tx,
-                  groupData,
-                  fullProduct,
-                  true,
-                  caches
-                );
-
+              if (groupData && !syncedGroupIds.has(groupData.productGroupId)) {
+                await syncProductGroup(tx, groupData, fullProduct, true, caches);
                 syncedGroupIds.add(groupData.productGroupId);
               }
 
@@ -114,33 +78,24 @@ export class ProductSyncService {
               );
 
               if (variantRelation && groupData) {
-                await syncVariant(
-                  tx,
-                  groupData.productGroupId,
-                  variantRelation
-                );
+                await syncVariant(tx, groupData.productGroupId, variantRelation);
               }
             }
           },
-          {
-            timeout: 40000, // 40-second transaction limit
-          }
+          { timeout: 40000 }
         );
       } catch (transactionError) {
-        console.error(
-          `[Batch Transaction Error] Failed for batch ending with ID ${after}:`,
-          transactionError
-        );
+        console.error(`[Batch Transaction Error] Batch ending with ID ${after}:`, transactionError);
         throw transactionError;
       }
 
-      // Update pagination cursor and progress tracking
       after = batch[batch.length - 1].productId;
       totalProcessed += batch.length;
       batchNo++;
 
       console.log(`Batch #${batchNo} completed. Processed ${totalProcessed} products.`);
       
+      // 3. Update progress (this will throw if cancelled mid-batch)
       if (options?.onProgress) {
         await options.onProgress(totalProcessed);
       }
@@ -157,6 +112,167 @@ export class ProductSyncService {
     };
   }
 }
+
+// // services/sync/products/product-sync.service.ts
+// import { prisma } from "@/lib/prisma";
+// import { getProducts } from "../data/products"; 
+// import { syncVariant } from "./variant.sync";
+// import { syncProduct } from "./product.sync";
+// import { syncProductGroup } from "./product-group-sync";
+
+// type SyncOptions = {
+//   onProgress?: (processedCount: number) => Promise<void>;
+//   /** 
+//    * Function to check for abort/cancellation signals.
+//    * Should throw an error (e.g. SyncCancelledError) if the job was cancelled.
+//    */
+//   checkSignal?: () => Promise<void>;
+//   /** 
+//    * Number of items per API call. 
+//    * Recommended max: 20-30 when using heavy `includes` to avoid HTTP 429 Rate Limits.
+//    * Default: 30
+//    */
+//   batchSize?: number;
+//   /**
+//    * Pause time in milliseconds between API batch fetches to prevent rate limit spikes.
+//    * Default: 300ms
+//    */
+//   delayBetweenBatchesMs?: number;
+// };
+
+// export class ProductSyncService {
+//   // Utility delay method for rate-limiting loop iterations
+//   private sleep(ms: number) {
+//     return new Promise((resolve) => setTimeout(resolve, ms));
+//   }
+
+//   async sync(options?: SyncOptions, includes?: string[], brandCustomName?: string, after: string | undefined = undefined) {
+//     // 1. Reduced default batch size from 100 -> 30 to lower API payload weight & burst load
+//     const BATCH_SIZE = options?.batchSize ?? 50;
+    
+//     // 2. Configurable inter-batch delay (300ms default) to space out requests
+//     const INTER_BATCH_DELAY = options?.delayBetweenBatchesMs ?? 300;
+//     const CLIENT_RETRIES = 1
+    
+//     // Track synced IDs across the entire execution to prevent duplicate DB writes
+//     const syncedGroupIds = new Set<string>();
+
+//     const EXCLUDED_INCLUDES = new Set(["coreData", "brand"]);
+//     const cleanIncludes = (includes ?? []).filter((item) => !EXCLUDED_INCLUDES.has(item));
+
+//     const hasCoreProductData = (includes ?? []).includes("coreData");
+//     const mergedIncludes = [...cleanIncludes];
+
+//     let totalProcessed = 0;
+
+//     const caches = {
+//       verifiedTeamMemberIds: new Set<string>(),
+//       verifiedCategoryIds: new Set<string>(),
+//       verifiedVendorIds: new Set<string>(),
+//       verifiedLocationIds: new Set<string>(),
+//       verifiedTaxingSchemes: new Set<string>(),
+//       verifiedTaxCodes: new Set<string>(),
+//       verifiedOperationTypes: new Set<string>(),
+//       verifiedPricingSchemeIds: new Set<string>(),
+//       verifiedProductIds: new Set<string>(),
+//     };
+
+//     console.log(`Starting optimized product sync (Batch Size: ${BATCH_SIZE}, Throttle: ${INTER_BATCH_DELAY}ms)...`);
+//     let batchNo = 0;
+
+//     while (true) {
+//       // Check for cancellation before calling remote API
+//       if (options?.checkSignal) {
+//         await options.checkSignal();
+//       }
+
+//       // Fetch the batch (includes deep relations)
+//       const batch = await getProducts(BATCH_SIZE, after, mergedIncludes, CLIENT_RETRIES, INTER_BATCH_DELAY);
+//       if (!batch || batch.length === 0) break;
+
+//       // Check for cancellation before executing database transaction
+//       if (options?.checkSignal) {
+//         await options.checkSignal();
+//       }
+
+//       // Process batch in database transaction 3fc966bb-79ab-42d1-afb5-b8446e06d0f2  f8386830-c729-4965-a453-65f8772ee0dd
+//       try {
+//         await prisma.$transaction(
+//           async (tx) => {
+//             for (const fullProduct of batch) {
+//               const variantRelation = fullProduct.productVariant;
+//               const groupData = variantRelation?.productGroup;
+//               const groupDefaultProduct = variantRelation?.productGroup?.defaultProduct;
+
+//               if (
+//                 groupData &&
+//                 !syncedGroupIds.has(groupData.productGroupId)
+//               ) {
+//                 await syncProductGroup(
+//                   tx,
+//                   groupData,
+//                   fullProduct,
+//                   true,
+//                   caches
+//                 );
+
+//                 syncedGroupIds.add(groupData.productGroupId);
+//               }
+
+//               await syncProduct(
+//                 tx,
+//                 fullProduct,
+//                 groupData?.productGroupId,
+//                 groupDefaultProduct,
+//                 hasCoreProductData,
+//                 brandCustomName,
+//                 caches
+//               );
+
+//               if (variantRelation && groupData) {
+//                 await syncVariant(
+//                   tx,
+//                   groupData.productGroupId,
+//                   variantRelation
+//                 );
+//               }
+//             }
+//           },
+//           {
+//             timeout: 40000, // 40-second transaction limit
+//           }
+//         );
+//       } catch (transactionError) {
+//         console.error(
+//           `[Batch Transaction Error] Failed for batch ending with ID ${after}:`,
+//           transactionError
+//         );
+//         throw transactionError;
+//       }
+
+//       // Update pagination cursor and progress tracking
+//       after = batch[batch.length - 1].productId;
+//       totalProcessed += batch.length;
+//       batchNo++;
+
+//       console.log(`Batch #${batchNo} completed. Processed ${totalProcessed} products. Starting with ID ${batch[0].productId}`);
+      
+//       if (options?.onProgress) {
+//         await options.onProgress(totalProcessed);
+//       }
+
+//       // Pace out requests to eliminate HTTP 429 rate limit triggers
+//       // if (INTER_BATCH_DELAY > 0) {
+//       //   await this.sleep(INTER_BATCH_DELAY);
+//       // }
+//     }
+
+//     return {
+//       productsProcessed: totalProcessed,
+//       syncedAt: new Date().toISOString(),
+//     };
+//   }
+// }
 
 // // services/sync/products/product-sync.service.ts
 // import { prisma } from "@/lib/prisma";

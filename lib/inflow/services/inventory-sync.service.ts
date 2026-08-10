@@ -6,12 +6,20 @@ import { syncSingleProductInventory } from "./inventory-single.sync";
 
 type SyncOptions = {
   onProgress?: (processedCount: number) => Promise<void>;
+  checkSignal?: () => Promise<void>;
   batchSize?: number;
+  delayBetweenBatchesMs?: number;
 };
 
 export class InventorySyncService {
+  private sleep(ms: number) {
+    return new Promise((resolve) => setTimeout(resolve, ms));
+  }
+  
   async sync(options?: SyncOptions, locationIds?: string[]) {
-    const BATCH_SIZE = options?.batchSize || 50;
+    const BATCH_SIZE = options?.batchSize ?? 100;
+    const INTER_BATCH_DELAY = options?.delayBetweenBatchesMs ?? 300;
+    const CLIENT_RETRIES = 1;
 
     const caches = {
       verifiedLocationIds: new Set<string>(),
@@ -21,12 +29,22 @@ export class InventorySyncService {
     let after: string | undefined = undefined;
     let totalProcessed = 0;
 
-    console.log("Starting hyper-optimized batched inventory sync...");
+    console.log(`Starting inventory sync (Batch Size: ${BATCH_SIZE})...`);
+    let batchNo = 0;
 
     while (true) {
       // 1. Fetch the paginated batch
-      const batch = await getInventoryLevels(BATCH_SIZE, after);
+      // const batch = await getInventoryLevels(BATCH_SIZE, after);
+      // if (!batch || batch.length === 0) break;
+
+      // 1. Check signal before starting remote fetch
+      if (options?.checkSignal) await options.checkSignal();
+
+      const batch = await getInventoryLevels(BATCH_SIZE, after, CLIENT_RETRIES);
       if (!batch || batch.length === 0) break;
+
+      // 2. Check signal before starting long DB transaction
+      if (options?.checkSignal) await options.checkSignal();
 
       // 2. Wrap chunk operations in database transaction
       try {
@@ -83,19 +101,40 @@ export class InventorySyncService {
           }
         );
       } catch (transactionError) {
-        console.error(
-          `Transaction failed for inventory batch ending with ID ${after}:`,
-          transactionError
-        );
+        console.error(`[Batch Transaction Error] Batch ending with ID ${after}:`, transactionError);
+        throw transactionError;
       }
 
-      // 3. Move pagination variables forward
       after = batch[batch.length - 1].productId;
       totalProcessed += batch.length;
+      batchNo++;
 
+      console.log(`Batch #${batchNo} completed. Processed ${totalProcessed} inventory lines.`);
+      
+      // 3. Update progress (this will throw if cancelled mid-batch)
       if (options?.onProgress) {
         await options.onProgress(totalProcessed);
       }
+
+      // Pace out requests to eliminate HTTP 429 rate limit triggers
+      if (INTER_BATCH_DELAY > 0) {
+        await this.sleep(INTER_BATCH_DELAY);
+      }
+
+      // } catch (transactionError) {
+      //   console.error(
+      //     `Transaction failed for inventory batch ending with ID ${after}:`,
+      //     transactionError
+      //   );
+      // }
+
+      // // 3. Move pagination variables forward
+      // after = batch[batch.length - 1].productId;
+      // totalProcessed += batch.length;
+
+      // if (options?.onProgress) {
+      //   await options.onProgress(totalProcessed);
+      // }
     }
 
     return {

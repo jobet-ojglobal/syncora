@@ -50,11 +50,7 @@ export class InventorySyncService {
           async (tx) => {
             for (const product of batch) {
               const localProductId =product.productId;
-            //   if (isNaN(localProductIdNum)) {
-            //     console.warn(`[Sync Warning] Invalid local product ID: ${product.productId}`);
-            //     continue;
-            //   }
-
+       
               const cacheKey = `${location.inflowId}_${localProductId}`;
               let validProductId: string | null = caches.productMapCache.get(cacheKey) ?? null;
 
