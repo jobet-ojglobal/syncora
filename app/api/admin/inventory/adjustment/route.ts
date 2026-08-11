@@ -1,36 +1,16 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { StockAdjustmentInput, stockAdjustmentSchema } from "@/schemas/stock-adjustment.schema";
+import { StockAdjustmentInput } from "@/schemas/stock-adjustment.schema";
 import {
-  InventoryTransactionType,
-  InventoryReferenceType,
   AdjustmentStatus,
   InventorySerialAdjustmentAction,
   Prisma,
   InventoryAdjustmentLineReason,
 } from "@/generated/prisma/client";
 import { ZodError } from "zod";
+import { InflowStockAdjustInput } from "@/lib/inflow/types";
+import { getMidSyncQueue } from "@/lib/queues/sync.queue";
 
-/**
- * Generates the next sequential adjustment number using transactional locking
- * to prevent duplicate key race conditions under high concurrency.
- */
-// async function generateAdjustmentNumber(tx: Prisma.TransactionClient): Promise<string> {
-//   const result = await tx.$queryRaw<Array<{ count: bigint | number }>>`
-//     SELECT COUNT(*)::bigint FROM "inventory_adjustment"
-//   `;
-
-//   // Number(...) cleanly parses both JS numbers and BigInts
-//   const count = Number(result[0]?.count ?? 0); 
-//   const nextNum = (count + 1).toString().padStart(5, "0");
-  
-//   return `ADJ-${nextNum}`;
-// }
-
-/**
- * Generates the next sequential adjustment number using explicit table locking
- * to prevent duplicate key race conditions under high concurrency.
- */
 async function generateAdjustmentNumber(tx: Prisma.TransactionClient): Promise<string> {
   // Explicitly lock the table in EXCLUSIVE mode for the duration of this transaction.
   // Other concurrent transactions will wait until this transaction commits.
@@ -71,12 +51,20 @@ export async function POST(req: Request) {
     } = body as StockAdjustmentInput;
     
     // TODO: Replace with dynamic user context from session / auth header
-    const performedById = "cc920c31-bcb2-4264-9946-4b7693c9c7e0";
+    const performedById = "56bfcf3b-3e98-4098-ae8f-2adcb657cb57";
 
     // Execute atomic transaction with custom timeout
     const result = await prisma.$transaction(
       async (tx) => {
         let adjustment: any;
+
+        const createdAdjustmentLines: Array<{
+          inflowId: string | null;
+          productId: string;
+          quantityOnHand: number;
+          sublocation: string | null;
+          serials: string[];
+        }> = [];
 
         if (status === AdjustmentStatus.DRAFT && !existingAdjustmentId) {
           const existingDraft = await tx.inventoryAdjustment.findFirst({
@@ -144,9 +132,11 @@ export async function POST(req: Request) {
           });
         } else {
           const adjustmentNumber = await generateAdjustmentNumber(tx);
+          const computedInflowId = crypto.randomUUID().toLowerCase();
 
           adjustment = await tx.inventoryAdjustment.create({
             data: {
+              inflowId: computedInflowId,
               adjustmentNumber,
               adjustmentReasonId: reasonId || null,
               performedById,
@@ -177,11 +167,13 @@ export async function POST(req: Request) {
             const currentQtyBefore = inventory ? Number(inventory.quantityOnHand) : 0;
             const totalTargetQty = Number(line.quantityOnHand) || 0;
             const netAdjustmentQty = totalTargetQty - currentQtyBefore;
+            const computedInflowId = crypto.randomUUID().toLowerCase();
 
             // In DRAFT mode, we create 1 line per product input
             const createdLine = await tx.inventoryAdjustmentLine.create({
               data: {
-                adjustmentId: adjustment.id,
+                inflowId: computedInflowId,
+                adjustmentId: adjustment.inflowId,
                 inventoryId: inventory?.id || null,
                 productId: line.productId,
                 locationId,
@@ -436,6 +428,13 @@ export async function POST(req: Request) {
               for (const binData of bins) {
                 if (!binData.sublocationId) continue;
 
+                const sublocation = await tx.sublocation.findUnique({
+                  where: { id: binData.sublocationId },
+                  select: { name: true }
+                });
+
+                if (!sublocation?.name) continue;
+
                 const targetBinQty = Number(binData.quantity) || 0;
                 const committedBinId = sublocationToBinMap.get(binData.sublocationId) || null;
 
@@ -489,10 +488,13 @@ export async function POST(req: Request) {
                   });
                 }
 
+                const computedInflowId = crypto.randomUUID().toLowerCase();
+
                 // 4. Create Line Item with accurate quantityBefore (0)
-                await tx.inventoryAdjustmentLine.create({
+                const createdLine = await tx.inventoryAdjustmentLine.create({
                   data: {
-                    adjustmentId: adjustment.id,
+                    inflowId: computedInflowId,
+                    adjustmentId: adjustment.inflowId,
                     inventoryId: inventory.id,
                     productId,
                     locationId,
@@ -504,12 +506,24 @@ export async function POST(req: Request) {
                     reason: (line.reason as InventoryAdjustmentLineReason) || null,
                   },
                 });
+
+                // Keep track of the created line data for the payload
+                createdAdjustmentLines.push({
+                  inflowId: createdLine.inflowId,
+                  productId: line.productId,
+                  quantityOnHand: targetBinQty,
+                  sublocation: sublocation.name,
+                  serials: [],
+                });
               }
             } else {
               // Non-bin tracked line
-              await tx.inventoryAdjustmentLine.create({
+              const computedInflowId = crypto.randomUUID().toLowerCase();
+
+              const createdLine = await tx.inventoryAdjustmentLine.create({
                 data: {
-                  adjustmentId: adjustment.id,
+                  inflowId: computedInflowId,
+                  adjustmentId: adjustment.inflowId,
                   inventoryId: inventory.id,
                   productId,
                   locationId,
@@ -521,15 +535,26 @@ export async function POST(req: Request) {
                   reason: (line.reason as InventoryAdjustmentLineReason) || null,
                 },
               });
+
+              // Keep track of the created line data for the payload
+              createdAdjustmentLines.push({
+                inflowId: createdLine.inflowId,
+                productId: line.productId,
+                quantityOnHand: Number(line.quantityOnHand) || 0,
+                sublocation: null,
+                serials: [],
+              });
             }
-          }
-          else {
+          } else {
+
+            const computedInflowId = crypto.randomUUID().toLowerCase();
           
             // SERIALIZED PATH:
             // Single line representing the primary serial transaction
             const createdLine = await tx.inventoryAdjustmentLine.create({
               data: {
-                adjustmentId: adjustment.id,
+                inflowId: computedInflowId,
+                adjustmentId: adjustment.inflowId,
                 inventoryId: inventory.id,
                 productId,
                 locationId,
@@ -556,6 +581,7 @@ export async function POST(req: Request) {
 
             for (const b of bins) {
               const binId = sublocationToBinMap.get(b.sublocationId) || null;
+              
               if (Array.isArray(b.serials)) {
                 for (const binSerial of b.serials) {
                   const cleaned = binSerial.trim();
@@ -567,6 +593,54 @@ export async function POST(req: Request) {
                   }
                 }
               }
+            }
+
+            // BUILD QUEUE PAYLOAD FOR SERIALS
+            if (bins.length > 0) {
+              // Collect serials mapped to specific sublocations vs unallocated
+              const allocatedSerials = new Set<string>();
+
+              for (const b of bins) {
+                const sublocation = await tx.sublocation.findUnique({
+                  where: { id: b.sublocationId },
+                  select: { name: true },
+                });
+
+                const binSerials = (b.serials || []).map((s) => s.trim()).filter(Boolean);
+                binSerials.forEach((s) => allocatedSerials.add(s));
+
+                createdAdjustmentLines.push({
+                  inflowId: createdLine.inflowId,
+                  productId: line.productId,
+                  quantityOnHand: Number(b.quantity) || binSerials.length,
+                  sublocation: sublocation?.name || null,
+                  serials: binSerials,
+                });
+              }
+
+              // Capture remaining unallocated master serials (not in any bin)
+              const unallocatedSerials = allIncomingSerials.filter(
+                (sn) => !allocatedSerials.has(sn)
+              );
+
+              if (unallocatedSerials.length > 0) {
+                createdAdjustmentLines.push({
+                  inflowId: createdLine.inflowId,
+                  productId: line.productId,
+                  quantityOnHand: unallocatedSerials.length,
+                  sublocation: null,
+                  serials: unallocatedSerials,
+                });
+              }
+            } else {
+              // Serialized product with no sublocations/bins
+              createdAdjustmentLines.push({
+                inflowId: createdLine.inflowId,
+                productId: line.productId,
+                quantityOnHand: Number(line.quantityOnHand) || 0,
+                sublocation: null,
+                serials: allIncomingSerials,
+              });
             }
 
             const existingSerials = await tx.inventoryBinItem.findMany({
@@ -671,10 +745,51 @@ export async function POST(req: Request) {
           await tx.inventoryAdjustmentSerial.createMany({ data: serialAuditsToCreate });
         }
 
-        return adjustment;
+        return {
+          adjustment,
+          createdAdjustmentLines,
+        };
       },
       { timeout: 15000 }
     );
+
+    // =================================================================
+    // DISPATCH BACKGROUND WORKER JOB
+    // =================================================================
+    // Only dispatch background sync when posted (or handle draft sync if applicable)
+    if (status === AdjustmentStatus.POSTED) {
+      const inflowPayload: InflowStockAdjustInput = {
+        // Send inFlow UUID if present, otherwise generate a valid v4 UUID
+        stockAdjustmentId: result.adjustment.inflowId,
+        adjustmentNumber: result.adjustment.adjustmentNumber,
+        adjustmentReasonId: reasonId || "",
+        date: new Date().toISOString(),
+        isCancelled: false,
+        lastModifiedById: performedById,
+        locationId: locationId,
+        remarks: remarks || "",
+        // Map using the created db line records
+        lines: result.createdAdjustmentLines.map((createdLine: any) => ({
+          stockAdjustmentLineId: createdLine.inflowId, // Matches computedInflowId saved in DB
+          productId: createdLine.productId,
+          sublocation: createdLine.sublocation,
+          quantity: {
+            standardQuantity: String(createdLine.quantityOnHand),
+            uomQuantity: String(createdLine.quantityOnHand),
+            uom: "ea.",
+            serialNumbers: createdLine.serials,
+          },
+        })),
+      };
+
+      const midQueue = getMidSyncQueue();
+      await midQueue.add("stock_adjust_upsert", {
+        source: "STOCK_ADJUST_UPSERT_CLOUD",
+        model: "StockAdjustment",
+        payload: inflowPayload,
+        timestamp: new Date().toISOString(),
+      });
+    }
 
     return NextResponse.json(
       {
@@ -771,6 +886,28 @@ export async function PATCH(req: Request) {
     );
   }
 }
+
+
+/**
+ * Generates the next sequential adjustment number using transactional locking
+ * to prevent duplicate key race conditions under high concurrency.
+ */
+// async function generateAdjustmentNumber(tx: Prisma.TransactionClient): Promise<string> {
+//   const result = await tx.$queryRaw<Array<{ count: bigint | number }>>`
+//     SELECT COUNT(*)::bigint FROM "inventory_adjustment"
+//   `;
+
+//   // Number(...) cleanly parses both JS numbers and BigInts
+//   const count = Number(result[0]?.count ?? 0); 
+//   const nextNum = (count + 1).toString().padStart(5, "0");
+  
+//   return `ADJ-${nextNum}`;
+// }
+
+/**
+ * Generates the next sequential adjustment number using explicit table locking
+ * to prevent duplicate key race conditions under high concurrency.
+ */
 
 // if (!trackSerials) {
 //             // NON-SERIALIZED PATH:

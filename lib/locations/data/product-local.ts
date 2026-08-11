@@ -1,5 +1,5 @@
 import { BranchClient } from "../location.client";
-import { LocalProduct } from "../types";
+import { LocalProduct, LocalProductInventory } from "../types";
 
 export async function getLocalProducts(url: string) {
   const apiClient = new BranchClient(url)
@@ -16,6 +16,7 @@ export async function getLocalInventoryLines(
 ) {
    const params = new URLSearchParams({
     count: String(count),
+    // prodId: String(25326)
   });
 
   if (after) {
@@ -23,7 +24,7 @@ export async function getLocalInventoryLines(
   }
 
   const apiClient = new BranchClient(url)
-  return await apiClient.get<LocalProduct[]>(
+  return await apiClient.get<LocalProductInventory[]>(
     `/inflow-local/product-inventory?${params.toString()}`,
   );
 }

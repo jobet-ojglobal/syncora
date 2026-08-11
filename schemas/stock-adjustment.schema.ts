@@ -113,7 +113,25 @@ export const adjustmentLineSchema = z
       }
     });
   });
-  // .refine((data) => data.quantityReserved <= data.quantityOnHand, {
+
+export const stockAdjustmentSchema = z.object({
+  id: z.string().optional(),
+  inventoryId: z.string().optional().nullable(),
+  locationId: z.string().min(1, "Target facility is required"),
+  lines: z
+    .array(adjustmentLineSchema)
+    .min(1, "At least one product line is required"),
+  performedById: z.string().min(1, "Performed by user is required"),
+  reasonId: z.string().min(1, "AdjustmentReason is required"),
+  remarks: z.string().optional().nullable(),
+  status: z.enum(["DRAFT", "POSTED"]),
+});
+
+export type StockAdjustmentInput = z.infer<typeof stockAdjustmentSchema>;
+export type StockAdjustmentLineInput = z.infer<typeof adjustmentLineSchema>;
+
+
+ // .refine((data) => data.quantityReserved <= data.quantityOnHand, {
   //   message: "Reserved quantity cannot exceed On Hand quantity",
   //   path: ["quantityReserved"],
   // })
@@ -182,19 +200,3 @@ export const adjustmentLineSchema = z
   //   });
   // });
   
-
-export const stockAdjustmentSchema = z.object({
-  id: z.string().optional(),
-  inventoryId: z.string().optional().nullable(),
-  locationId: z.string().min(1, "Target facility is required"),
-  lines: z
-    .array(adjustmentLineSchema)
-    .min(1, "At least one product line is required"),
-  performedById: z.string().min(1, "Performed by user is required"),
-  reasonId: z.string().min(1, "AdjustmentReason is required"),
-  remarks: z.string().optional().nullable(),
-  status: z.enum(["DRAFT", "POSTED"]),
-});
-
-export type StockAdjustmentInput = z.infer<typeof stockAdjustmentSchema>;
-export type StockAdjustmentLineInput = z.infer<typeof adjustmentLineSchema>;

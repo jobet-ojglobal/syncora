@@ -23,13 +23,24 @@ import {
 } from "@/components/ui/popover"
 import { Separator } from "@/components/ui/separator"
 
-export interface DataTableMultiSelectProps<TData, TValue> {
+export interface Option {
+  label: string
+  value: string
+  icon?: React.ComponentType<{ className?: string }>
+}
+
+export interface TableMultiSelectProps<TData, TValue> {
+  /** Optional TanStack Column instance */
   column?: Column<TData, TValue>
+  /** Title / Placeholder displayed on button and search */
   title?: string
-  options: {
-    label: string
-    value: string
-  }[]
+  /** Available options to select from */
+  options: Option[]
+  /** Controlled value state (used if column is not provided) */
+  value?: string[]
+  /** Callback for value changes (used if column is not provided) */
+  onValueChange?: (values: string[]) => void
+  /** Visual sizing variant */
   size?: "sm" | "default" | "lg"
   className?: string
   classNameTrigger?: string
@@ -42,35 +53,72 @@ const sizeVariants = {
     button: "h-8 px-2 text-xs",
     icon: "h-3.5 w-3.5",
     badge: "text-[10px] px-1 py-0",
-    content: "w-[180px]",
+    content: "w-[190px]",
   },
   default: {
     button: "h-9 px-3 text-sm",
     icon: "h-4 w-4",
     badge: "text-xs px-1.5 py-0.5",
-    content: "w-[200px]",
+    content: "w-[220px]",
   },
   lg: {
     button: "h-10 px-4 text-base",
     icon: "h-5 w-5",
     badge: "text-sm px-2 py-0.5",
-    content: "w-[240px]",
+    content: "w-[260px]",
   },
 }
 
-export function DataTableMultiSelect<TData, TValue>({
+export function TableMultiSelect<TData, TValue>({
   column,
-  title,
-  options,
+  title = "Filter",
+  options = [],
+  value: controlledValue,
+  onValueChange,
   size = "default",
   className,
   classNameTrigger,
   classNameContent,
   classNameBadge,
-}: DataTableMultiSelectProps<TData, TValue>) {
-  // Get currently selected values from TanStack column filter state
-  const selectedValues = new Set(column?.getFilterValue() as string[])
+}: TableMultiSelectProps<TData, TValue>) {
+  // 1. Resolve selected values from TanStack column or custom state
+  const rawValues = column
+    ? (column.getFilterValue() as string[])
+    : controlledValue
+
+  const selectedValues = React.useMemo(
+    () => new Set(rawValues || []),
+    [rawValues]
+  )
+
   const variants = sizeVariants[size]
+
+  // 2. Uniform change handler updates TanStack column or triggers callback
+  const handleSelect = (optionValue: string) => {
+    const nextValues = new Set(selectedValues)
+
+    if (nextValues.has(optionValue)) {
+      nextValues.delete(optionValue)
+    } else {
+      nextValues.add(optionValue)
+    }
+
+    const updatedArray = Array.from(nextValues)
+
+    if (column) {
+      column.setFilterValue(updatedArray.length ? updatedArray : undefined)
+    } else if (onValueChange) {
+      onValueChange(updatedArray)
+    }
+  }
+
+  const handleClear = () => {
+    if (column) {
+      column.setFilterValue(undefined)
+    } else if (onValueChange) {
+      onValueChange([])
+    }
+  }
 
   return (
     <Popover>
@@ -79,7 +127,7 @@ export function DataTableMultiSelect<TData, TValue>({
           variant="outline"
           size="sm"
           className={cn(
-            "border-dashed flex items-center gap-2 font-medium",
+            "border-dashed flex items-center gap-2 font-medium bg-background hover:bg-accent/50",
             variants.button,
             classNameTrigger,
             className
@@ -87,11 +135,10 @@ export function DataTableMultiSelect<TData, TValue>({
         >
           <PlusCircle className={cn(variants.icon, "text-muted-foreground")} />
           <span>{title}</span>
-          
+
           {selectedValues.size > 0 && (
             <>
               <Separator orientation="vertical" className="mx-1 h-4" />
-              {/* Show counter badge if more than 2 items are selected */}
               {selectedValues.size > 2 ? (
                 <Badge
                   variant="secondary"
@@ -129,33 +176,24 @@ export function DataTableMultiSelect<TData, TValue>({
         align="start"
       >
         <Command>
-          <CommandInput placeholder={title} />
+          <CommandInput placeholder={`Search ${title.toLowerCase()}...`} />
           <CommandList>
             <CommandEmpty>No results found.</CommandEmpty>
-            
+
             <CommandGroup>
               {options.map((option) => {
                 const isSelected = selectedValues.has(option.value)
+                const Icon = option.icon
+
                 return (
                   <CommandItem
                     key={option.value}
-                    onSelect={() => {
-                      if (isSelected) {
-                        selectedValues.delete(option.value)
-                      } else {
-                        selectedValues.add(option.value)
-                      }
-                      const filterValues = Array.from(selectedValues)
-                      // Update column state with array of strings, or undefined to clear
-                      column?.setFilterValue(
-                        filterValues.length ? filterValues : undefined
-                      )
-                    }}
+                    onSelect={() => handleSelect(option.value)}
                     className="flex items-center gap-2 cursor-pointer"
                   >
                     <div
                       className={cn(
-                        "flex h-4 w-4 items-center justify-center rounded-sm border border-primary",
+                        "flex h-4 w-4 shrink-0 items-center justify-center rounded-sm border border-primary transition-colors",
                         isSelected
                           ? "bg-primary text-primary-foreground"
                           : "opacity-50 [&_svg]:invisible"
@@ -163,19 +201,24 @@ export function DataTableMultiSelect<TData, TValue>({
                     >
                       <Check className="h-3 w-3" />
                     </div>
-                    <span>{option.label}</span>
+
+                    {Icon && (
+                      <Icon className="h-4 w-4 shrink-0 text-muted-foreground" />
+                    )}
+
+                    <span className="truncate">{option.label}</span>
                   </CommandItem>
                 )
               })}
             </CommandGroup>
-            
+
             {selectedValues.size > 0 && (
               <>
                 <CommandSeparator />
                 <CommandGroup>
                   <CommandItem
-                    onSelect={() => column?.setFilterValue(undefined)}
-                    className="justify-center text-center text-sm font-medium text-destructive focus:text-destructive cursor-pointer"
+                    onSelect={handleClear}
+                    className="justify-center text-center text-xs font-medium text-destructive focus:text-destructive cursor-pointer py-2"
                   >
                     Clear filters
                   </CommandItem>

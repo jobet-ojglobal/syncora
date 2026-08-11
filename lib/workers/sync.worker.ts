@@ -30,7 +30,7 @@ import { PricingSchemeSyncMapService as LocalPricingSchemeSyncMapService } from 
 import { TaxingSchemeSyncMapService as LocalTaxingSchemeSyncMapService } from "../locations/services/taxing-scheme-sync-map.service";
 import { CustomerSyncMapService as LocalCustomerSyncMapService } from "../locations/services/customer-sync-map.service";
 import { ProductSyncMapService as LocalProductSyncMapService } from "../locations/services/batch-product-sync-map";
-import { InventorySyncService as LocalInventorySyncService } from "../locations/services/batch-inventory-lines-sync-map";
+import { InventorySyncService as LocalInventorySyncService } from "../locations/services/batch-inventory-sync-adjustment.service";
 import { SublocationSyncMapService as LocalSublocationSyncMapService } from "../locations/services/sublocation-sync-map.service";
 
 

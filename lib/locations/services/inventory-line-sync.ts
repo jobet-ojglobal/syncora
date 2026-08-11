@@ -3,7 +3,8 @@
 import { Prisma } from "@/generated/prisma/client";
 import { LocalInventoryLine } from "../types";
 import { toDecimal } from "@/helpers";
-import { InflowStockAdjustmentLine } from "@/lib/inflow/types";
+// import { InflowStockAdjustmentLine } from "@/lib/inflow/types";
+import { StockAdjustmentLineInput } from "@/schemas/stock-adjustment.schema";
 
 type Tx = Prisma.TransactionClient;
 
@@ -19,20 +20,29 @@ type SyncCache = {
   >;
 };
 
+// Extended adjustment line interface to safely pass targetLocationId upstream
+export type SyncAdjustmentLine = StockAdjustmentLineInput & {
+  targetLocationId: string;
+  description?: string;
+};
+
 export async function syncInventoryLines(
   tx: Tx,
   productId: string,
   inventoryLines: LocalInventoryLine[],
   caches?: SyncCache,
   selectedLocationIds?: string[]
-): Promise<InflowStockAdjustmentLine[]> {
-  const adjustmentLines: InflowStockAdjustmentLine[] = [];
+): Promise<SyncAdjustmentLine[]> {
+  const adjustmentLines: SyncAdjustmentLine[] = [];
   if (!inventoryLines.length) return adjustmentLines;
 
-  // 1. Filter inventory lines by target parent location IDs if provided
   const targetLocationIds = selectedLocationIds?.length ? selectedLocationIds : [];
 
-  // Cache lookups to avoid redundant database reads across loops
+  // Ensure map exists on cache object if passed
+  if (caches && !caches.mappedSublocations) {
+    caches.mappedSublocations = new Map();
+  }
+
   const sublocationMapCache =
     caches?.mappedSublocations ??
     new Map<
@@ -44,7 +54,6 @@ export async function syncInventoryLines(
       }
     >();
 
-  // 2. Resolve local integer location IDs to mid-server locationId and sublocationId
   const linesToSync: (LocalInventoryLine & {
     resolvedLocationId: string;
     resolvedSublocationId: string;
@@ -53,16 +62,15 @@ export async function syncInventoryLines(
   for (const line of inventoryLines) {
     if (line.locationId === null || line.locationId === undefined) continue;
 
-    const rawLocalId = Number(line.locationId);
-    if (isNaN(rawLocalId)) continue;
+    const rawLocalId = String(line.locationId);
+    if (isNaN(Number(rawLocalId))) continue;
 
-    let mapped = sublocationMapCache.get(String(rawLocalId));
+    let mapped = sublocationMapCache.get(rawLocalId);
 
     if (!mapped) {
-      // Look up sublocation and include its linked target location ID if set
       const dbMap = await tx.sublocationLocationMap.findFirst({
         where: {
-          localId: rawLocalId,
+          localId: Number(rawLocalId),
           ...(targetLocationIds.length > 0
             ? { locationId: { in: targetLocationIds } }
             : {}),
@@ -80,12 +88,11 @@ export async function syncInventoryLines(
 
       if (dbMap) {
         mapped = {
-          // Prefer linkedLocationId if mapped, otherwise default to locationId
           locationId: dbMap.locationId,
           sublocationId: dbMap.sublocationId,
-          linkedLocationId: dbMap.sublocation?.linkedLocationId 
+          linkedLocationId: dbMap.sublocation?.linkedLocationId,
         };
-        sublocationMapCache.set(String(rawLocalId), mapped);
+        sublocationMapCache.set(rawLocalId, mapped);
       }
     }
 
@@ -104,9 +111,7 @@ export async function syncInventoryLines(
 
   if (!linesToSync.length) return adjustmentLines;
 
-  // 3. Aggregate quantities per mid-server location and sublocation
   const locationTotals = new Map<string, Prisma.Decimal>();
-  // Define structure for sublocationTotals
   const sublocationTotals = new Map<
     string,
     {
@@ -127,7 +132,6 @@ export async function syncInventoryLines(
     const currentLocTotal = locationTotals.get(locId) ?? new Prisma.Decimal(0);
     locationTotals.set(locId, currentLocTotal.plus(lineQty));
 
-    // Retrieve cached mapping details for linkedLocationId
     const cached = sublocationMapCache.get(rawLocalId);
 
     const subKey = `${locId}_${sublocId}`;
@@ -142,7 +146,6 @@ export async function syncInventoryLines(
     sublocationTotals.set(subKey, existingSub);
   }
 
-  // 4. Update Inventory and InventoryBin records
   const activeLocationIds = [...locationTotals.keys()];
   const existingInventories = await tx.inventory.findMany({
     where: {
@@ -179,7 +182,7 @@ export async function syncInventoryLines(
 
     const existingBins = await tx.inventoryBin.findMany({
       where: { inventoryId: inventory.id },
-      include: { 
+      include: {
         sublocation: {
           select: {
             id: true,
@@ -197,8 +200,8 @@ export async function syncInventoryLines(
 
     const updatedSublocationIds = new Set<string>();
 
-    // Active sublocation updates
-    for (const [subKey, { sublocationId, totalQty, rawSublocationName, linkedLocationId }] of sublocationTotals) {
+    // Global Location sublocations update inventory bin
+    for (const [subKey, { sublocationId, totalQty, linkedLocationId }] of sublocationTotals) {
       if (!subKey.startsWith(locationId)) continue;
 
       updatedSublocationIds.add(sublocationId);
@@ -222,6 +225,7 @@ export async function syncInventoryLines(
         },
       });
 
+        // Write ledger entry ONLY when there is an actual quantity change
       if (!binQtyChange.equals(0)) {
         await tx.inventoryLedger.create({
           data: {
@@ -235,25 +239,125 @@ export async function syncInventoryLines(
             remarks: "System Inbound Inventory Sync",
           },
         });
+      }
 
-        // Collect Stock Adjustment Line Delta for Cloud Payload
-        // Set sublocation to rawSublocationName or fallback to sublocationId
-        adjustmentLines.push({
-          stockAdjustmentLineId: crypto.randomUUID().toLowerCase(),
-          productId,
-          sublocation: linkedLocationId || "",
-          quantity: {
-            standardQuantity: String(binQtyChange),
-            uomQuantity: null,
-            uom: "pcs.",
-            serialNumbers: [],
+      // Linked Location Process for Adjustments Payload
+      if (linkedLocationId) {
+        const targetLocationId = linkedLocationId;
+
+        // 1. Fetch existing inventory along with product tracking settings
+        const linkedInventory = await tx.inventory.findUnique({
+          where: {
+            productId_locationId: {
+              productId,
+              locationId: targetLocationId,
+            },
           },
-          description: "System Inbound Inventory Delta Sync",
+          include: {
+            product: {
+              select: {
+                trackSerials: true,
+              },
+            },
+          },
         });
+
+        // If product is missing or not initialized at this location yet, fetch product details
+        const trackSerials =
+          linkedInventory?.product?.trackSerials ??
+          (
+            await tx.product.findUnique({
+              where: { id: productId },
+              select: { trackSerials: true },
+            })
+          )?.trackSerials ??
+          false;
+        
+        // temporary skip serialize item
+        if(trackSerials) continue;
+
+        // 2. Extract current target values safely (Convert Prisma.Decimal -> Decimal / Number)
+        const targetBinBefore =
+          linkedInventory?.quantityOnHand ?? new Prisma.Decimal(0);
+        const targetBinReserve =
+          linkedInventory?.quantityReserved ?? new Prisma.Decimal(0);
+
+        // Compute the delta change
+        const linkedBinQtyChange = totalQty.minus(targetBinBefore);
+
+        // console.log("LINKED QTY BEFORE: ", targetBinBefore.toString());
+        // console.log("TARGET QTY AFTER: ", totalQty.toString());
+
+        // 3. Push adjustment payload if a delta exists
+        if (!linkedBinQtyChange.equals(0)) {
+          adjustmentLines.push({
+            targetLocationId,
+            productId,
+            quantityAdjusted: linkedBinQtyChange.toNumber(),
+            quantityOnHand: totalQty.toNumber(),
+            quantityReserved: targetBinReserve.toNumber(),
+            quantityAvailable: Math.max(
+              0,
+              totalQty.minus(targetBinReserve).toNumber()
+            ),
+            trackSerials,
+            bins: [],
+            serials: [],
+            description: "System Inbound Inventory Delta Sync",
+          });
+        }
       }
     }
 
-    // Zero-out cleared bins
+    // (alias) type StockAdjustmentLineInput = {
+    //   productId: string;
+    //   trackSerials: boolean;
+    //   quantityAdjusted: number;
+    //   quantityOnHand: number;
+    //   quantityReserved: number;
+    //   quantityAvailable: number;
+    //   bins: {
+    //   sublocationId: string;
+    //   quantity: number;
+    //   serials: string[];
+    //   id?: string | undefined;
+    //   }[];
+    //   serials: string[];
+    //   id?: string | undefined;
+    //   reason?: string | null | undefined;
+    //   }
+    //   import StockAdjustmentLineInput
+
+    // export const binAllocationSchema = z.object({
+    //   id: z.string().optional(),
+    //   sublocationId: z.string().min(1, "Must select a sublocation zone slot"),
+    //   quantity: z
+    //     .number({ error: "Must be a number" }),
+    //   serials: z.array(z.string()),
+    // });
+    
+    // export const adjustmentLineSchema = z
+    //   .object({
+    //     id: z.string().optional(),
+    //     productId: z.string().min(1, "Product is required"),
+    //     trackSerials: z.boolean(),
+    //     quantityAdjusted: z.number({ error: "Must be a number" }),
+    //     quantityOnHand: z
+    //       .number({ error: "Must be a number" })
+    //       .min(0, "Stock balance cannot be negative"),
+    //     quantityReserved: z
+    //       .number({ error: "Must be a number" })
+    //       .min(0, "Reserved values cannot be negative"),
+    //     quantityAvailable: z.number(),
+        
+    //     reason: z.string().optional().nullable(),
+    //     bins: z.array(binAllocationSchema),
+    //     serials: z.array(z.string()),
+    //   })
+
+
+
+    // to clear global location bins
     for (const bin of existingBins) {
       if (!updatedSublocationIds.has(bin.sublocationId) && !bin.quantity.equals(0)) {
         await tx.inventoryBin.update({
@@ -274,26 +378,62 @@ export async function syncInventoryLines(
           },
         });
 
-        // Collect negative delta adjustment line for cloud sync
-        // Set sublocation to bin's sublocation name or ID
-        adjustmentLines.push({
-          stockAdjustmentLineId: crypto.randomUUID().toLowerCase(),
-          productId,
-          sublocation: bin.sublocation?.linkedLocationId || "",
-          quantity: {
-            standardQuantity: String(bin.quantity.negated().toNumber()),
-            uomQuantity: null,
-            uom: "pcs.",
-            serialNumbers: [],
-          },
-          description: "System Inbound Inventory Sync - Cleared Bin",
-        });
+        // adjustmentLines.push({
+        //   stockAdjustmentLineId: crypto.randomUUID().toLowerCase(),
+        //   productId,
+        //   sublocation: bin.sublocationId,
+        //   targetLocationId: bin.sublocation?.linkedLocationId || locationId,
+        //   quantity: {
+        //     standardQuantity: String(bin.quantity.negated().toNumber()),
+        //     uomQuantity: null,
+        //     uom: "pcs.",
+        //     serialNumbers: [],
+        //   },
+        //   description: "System Inbound Inventory Sync - Cleared Bin",
+        // });
       }
     }
   }
 
+  // console.log("LINES: ", JSON.stringify(adjustmentLines, null, 2));
+
   return adjustmentLines;
 }
+
+
+
+      // if (!binQtyChange.equals(0)) {
+      //   await tx.inventoryLedger.create({
+      //     data: {
+      //       productId,
+      //       locationId,
+      //       sublocationId,
+      //       transactionType: "OPENING_BALANCE",
+      //       quantityBefore: binQtyBefore,
+      //       quantityChange: binQtyChange,
+      //       quantityAfter: totalQty,
+      //       remarks: "System Inbound Inventory Sync",
+      //     },
+      //   });
+
+      //   adjustmentLines.push({
+      //     stockAdjustmentLineId: crypto.randomUUID().toLowerCase(),
+      //     productId,
+      //     sublocation: sublocationId,
+      //     targetLocationId: linkedLocationId || locationId,
+      //     quantity: {
+      //       standardQuantity: String(binQtyChange),
+      //       uomQuantity: null,
+      //       uom: "pcs.",
+      //       serialNumbers: [],
+      //     },
+      //     description: "System Inbound Inventory Delta Sync",
+      //   });
+      // }
+
+
+
+// ====================== RETU
 
 // 8/10/26 no midsync
 // export async function syncInventoryLines(

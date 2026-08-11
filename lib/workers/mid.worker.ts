@@ -104,14 +104,14 @@ const midWorker = new Worker<MidWebhookJobData>(
         
         // Extract the new local ID returned by your child system
         // 👉 FIX 1 & 2: Safely read the property out of the Axios/Fetch wrapped response object
-        const newLocalId = result.data?.data?.localId || result.data?.localId;
+        // const newLocalId = result.data?.data?.localId || result.data?.localId;
 
-        if (!newLocalId) {
-          console.warn(`[Mid Worker Warning] Sync succeeded but 'localId' was missing from API response metadata.`);
-          return;
-        }
+        // if (!newLocalId) {
+        //   console.warn(`[Mid Worker Warning] Sync succeeded but 'localId' was missing from API response metadata.`);
+        //   return;
+        // }
 
-        if (location?.inflowId && payload.taxingSchemeId) {
+        // if (location?.inflowId && payload.taxingSchemeId) {
           // 👉 FIX 4: Use an upsert strategy to prevent runtime crashes if a mapping row already exists
           // await prisma.taxingSchemeLocationMap.upsert({
           //   where: {
@@ -129,8 +129,8 @@ const midWorker = new Worker<MidWebhookJobData>(
           //     localId: Number(newLocalId)
           //   }
           // });
-          console.log(`[Mapping Registry] Saved Identity Map: Central String (${payload.taxingSchemeId}) ⇄ Local Int (${newLocalId}) for Location: ${location.name}`);
-        }
+          // console.log(`[Mapping Registry] Saved Identity Map: Central String (${payload.taxingSchemeId}) ⇄ Local Int (${newLocalId}) for Location: ${location.name}`);
+        // }
         
       } else if (result) {
         console.error(`[Mid Worker Sync Warn] API did not return success for ${model}. Message: ${result.message}`);

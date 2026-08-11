@@ -230,6 +230,7 @@ export function ProductDataTable<TData extends ParsedProduct, TValue>({
               column={table.getColumn("brandName")}
               title="Brands"
               options={brandOptions}
+              size="sm"
             />
           )}
           {table.getColumn("categoryName") && (
@@ -237,6 +238,7 @@ export function ProductDataTable<TData extends ParsedProduct, TValue>({
               column={table.getColumn("categoryName")}
               title="Category"
               options={categoryOptions}
+              size="sm"
             />
           )}
           <DataTableBulkDelete
@@ -270,9 +272,9 @@ export function ProductDataTable<TData extends ParsedProduct, TValue>({
             </DropdownMenuContent>
           </DropdownMenu>
 
-          <div className="text-sm text-muted-foreground whitespace-nowrap">
+          {/* <div className="text-sm text-muted-foreground whitespace-nowrap">
             Total Records: {totalRecords}
-          </div>
+          </div> */}
         </div>
       </div>
 
