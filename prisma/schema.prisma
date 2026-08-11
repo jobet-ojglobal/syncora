@@ -1369,8 +1369,10 @@ enum AdjustmentStatus {
 }
 
 model InventoryAdjustment {
-  id                    String                    @id @default(cuid())
-  adjustmentNumber      String                    @unique
+  id                    String                @id @default(cuid())
+  inflowId              String                @unique
+  adjustmentNumber      String                @unique
+
   adjustmentReasonId    String?
   remarks               String?
 
@@ -1394,6 +1396,7 @@ model InventoryAdjustment {
 
 model InventoryAdjustmentLine {
   id               String   @id @default(cuid())
+  inflowId         String   @unique
   adjustmentId     String
   inventoryId      String?
   productId        String
@@ -1406,11 +1409,12 @@ model InventoryAdjustmentLine {
   quantityReserved Decimal? @db.Decimal(18, 4)
 
   reason           InventoryAdjustmentLineReason?
+  description      String?
 
-  adjustment       InventoryAdjustment       @relation(fields: [adjustmentId], references: [id], onDelete: Cascade)
+  adjustment       InventoryAdjustment       @relation(fields: [adjustmentId], references: [inflowId], onDelete: Cascade)
   product          Product                   @relation(fields: [productId], references: [inflowId], onDelete: Restrict)
   location         Location                  @relation(fields: [locationId], references: [inflowId], onDelete: Restrict)
-  inventoryBin     InventoryBin?              @relation(fields: [inventoryBinId], references: [id], onDelete: SetNull)
+  inventoryBin     InventoryBin?             @relation(fields: [inventoryBinId], references: [id], onDelete: SetNull)
 
   // Track exact serial numbers modified by this adjustment line
   serials          InventoryAdjustmentSerial[]

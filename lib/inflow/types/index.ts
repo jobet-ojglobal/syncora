@@ -609,11 +609,18 @@ export interface InflowStockAdjustment {
 }
 
 
+export interface InflowQuantity {
+  standardQuantity: string | null;
+  uomQuantity: string | null;
+  uom: string;
+  serialNumbers: string[];
+}
+
 export interface InflowStockAdjustmentLine {
   productId: string;
   stockAdjustmentLineId: string;
   quantity: InflowQuantity;
-  sublocation: string;
+  sublocation: string | null;
   description?: string;
   timestamp?: string;
   product?: InflowProduct;

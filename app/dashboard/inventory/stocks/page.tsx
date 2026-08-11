@@ -15,10 +15,13 @@ import {
   Truck, 
   Eye, 
   MoreHorizontalIcon,
-  Edit3
+  Edit3,
+  SlidersHorizontal,
+  RotateCcw,
+  CheckCircle2,
+  XCircle
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import useSWR from "swr";
 import PageHeader from "@/components/layout/dashboard/PageHeader";
 import SearchInput from "@/components/shared/search-input";
@@ -39,6 +42,15 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Input } from "@/components/ui/input";
+import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
+import { TableMultiSelect } from "@/components/shared/table-multiselect";
+
+interface LocationOption {
+  inflowId: string;
+  name: string;
+}
 
 interface BinDetail {
   id: string;
@@ -53,6 +65,7 @@ interface Product {
   slug: string;
   thumbnail: string | null;
   trackSerials: boolean;
+  isActive: boolean;
 }
 
 interface InventoryStockRow {
@@ -79,8 +92,12 @@ export default function InventoryList() {
   const [searchQuery, setSearchQuery] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
 
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [selectedLocations, setSelectedLocations] = useState<string[]>([]);
+  const [minQty, setMinQty] = useState("");
+  const [maxQty, setMaxQty] = useState("");
   const [pageIndex, setPageIndex] = useState(0);
-  const PAGE_SIZE = 10;
+  const [pageSize, setPageSize] = useState(10);
 
   const [activeInspectionItem, setActiveInspectionItem] = useState<InspectionItem | null>(null);
 
@@ -95,39 +112,59 @@ export default function InventoryList() {
   }, [searchQuery]);
 
   // 3. SWR list key hook binds directly onto debounced search parameter
+  const queryParams = new URLSearchParams({
+    search: debouncedSearch,
+    status: statusFilter,
+    page: String(pageIndex),
+    limit: String(pageSize),
+  });
+
+  // Pass array of location IDs as comma-separated values
+  if (selectedLocations.length > 0) {
+    queryParams.append("locationIds", selectedLocations.join(","));
+  }
+
+  if (minQty !== "") queryParams.append("minQty", minQty);
+  if (maxQty !== "") queryParams.append("maxQty", maxQty);
+
   const {
     data: payload,
     error,
     isLoading,
     isValidating,
-  } = useSWR(
-    `/api/admin/inventory/filtered?search=${encodeURIComponent(
-      debouncedSearch
-    )}&page=${pageIndex}&limit=${PAGE_SIZE}`,
-    fetcher,
-    {
-      keepPreviousData: true,
-      revalidateOnFocus: false,
-    }
-  );
+  } = useSWR(`/api/admin/inventory/filtered?${queryParams.toString()}`, fetcher, {
+    keepPreviousData: true,
+    revalidateOnFocus: false,
+  });
+
+  const locations: LocationOption[] = payload?.locations || [];
+
+  const handleResetFilters = () => {
+    setSearchQuery("");
+    setStatusFilter("all");
+    setSelectedLocations([]);
+    setMinQty("");
+    setMaxQty("");
+    setPageIndex(0);
+  };
 
   // Fallback support for either paginated object payload or flat array responses
   const inventory: InventoryStockRow[] = Array.isArray(payload)
     ? payload
     : payload?.data || [];
   const totalRecords = payload?.totalRecords || inventory.length;
-  const pageCount = payload?.pageCount || Math.ceil(totalRecords / PAGE_SIZE) || 1;
-
-  // Handle Search input adjustments
-  const handleSearchChange = (value: string) => {
-    setSearchQuery(value);
-  };
+  const pageCount = payload?.pageCount || Math.ceil(totalRecords / pageSize) || 1;
 
   // Calculate total units held in Bulk Floor / Unassigned storage across active dataset
   const totalBulkStockOverall = inventory.reduce((acc, item) => {
     const binSum = item.bins?.reduce((bAcc, b) => bAcc + b.quantity, 0) || 0;
     return acc + Math.max(0, item.quantityOnHand - binSum);
   }, 0);
+
+  const locationOptions = locations.map((loc) => ({
+    label: loc.name,
+    value: loc.inflowId,
+  }));
 
   if (error) {
     return (
@@ -154,13 +191,104 @@ export default function InventoryList() {
 
       {/* Filter Options & Quick Metrics Bar Segment */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div className="w-full sm:max-w-md">
-          <SearchInput
-            placeholder="Filter stock by name, SKU slug, or facility..."
-            searchQuery={searchQuery}
-            setSearchQuery={handleSearchChange}
-            isLoading={isValidating && !isLoading}
+        <div className="flex flex-wrap items-center gap-2.5 w-full sm:max-w-2xl">
+          <div className="w-full sm:w-72">
+            <SearchInput
+              placeholder="Filter by name, SKU, facility..."
+              searchQuery={searchQuery}
+              setSearchQuery={setSearchQuery}
+              isLoading={isValidating && !isLoading}
+            />
+          </div>
+
+          <Select
+            value={statusFilter}
+            onValueChange={(value) => {
+              setStatusFilter(value);
+              setPageIndex(0);
+            }}
+          >
+            <SelectTrigger className="w-[140px] h-9">
+              <SelectValue placeholder="All Statuses" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Statuses</SelectItem>
+              <SelectItem value="active">Active Only</SelectItem>
+              <SelectItem value="inactive">Archived Only</SelectItem>
+            </SelectContent>
+          </Select>
+
+          {/* Multi-Select Location Filter */}
+          <TableMultiSelect
+            title="Locations"
+            options={locationOptions}
+            value={selectedLocations}
+            onValueChange={(values) => {
+              setSelectedLocations(values);
+              setPageIndex(0);
+            }}
+            size="sm"
           />
+
+          <div className="flex items-center gap-1.5 border rounded-md px-2 py-0.5 bg-background h-9">
+            <SlidersHorizontal className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+            <span className="text-[11px] text-muted-foreground font-medium">Qty:</span>
+            <Input
+              type="number"
+              placeholder="Min"
+              value={minQty}
+              onChange={(e) => {
+                setMinQty(e.target.value);
+                setPageIndex(0);
+              }}
+              className="w-14 h-6 p-1 text-xs border-0 focus-visible:ring-0 text-center"
+            />
+            <span className="text-muted-foreground">-</span>
+            <Input
+              type="number"
+              placeholder="Max"
+              value={maxQty}
+              onChange={(e) => {
+                setMaxQty(e.target.value);
+                setPageIndex(0);
+              }}
+              className="w-14 h-6 p-1 text-xs border-0 focus-visible:ring-0 text-center"
+            />
+          </div>
+
+          <Select
+            value={String(pageSize)}
+            onValueChange={(value) => {
+              setPageSize(Number(value));
+              setPageIndex(0);
+            }}
+          >
+            <SelectTrigger className="w-[110px] h-9">
+              <SelectValue placeholder="10 per page" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="10">10 / page</SelectItem>
+              <SelectItem value="25">25 / page</SelectItem>
+              <SelectItem value="50">50 / page</SelectItem>
+              <SelectItem value="100">100 / page</SelectItem>
+              <SelectItem value="500">500 / page</SelectItem>
+            </SelectContent>
+          </Select>
+
+          {(statusFilter !== "all" ||
+            selectedLocations.length > 0 ||
+            minQty !== "" ||
+            maxQty !== "" ||
+            searchQuery !== "") && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleResetFilters}
+              className="h-9 px-2.5 text-xs text-muted-foreground hover:text-foreground"
+            >
+              <RotateCcw className="w-3.5 h-3.5 mr-1" /> Clear
+            </Button>
+          )}
         </div>
 
         <div className="flex flex-wrap items-center gap-2 self-start sm:self-auto">
@@ -257,9 +385,27 @@ export default function InventoryList() {
                               {item.product.slug}
                             </span>
                           </div>
+                          <div className="flex justify-center">
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <div>
+                                  {item.product.isActive ? (
+                                    <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+                                  ) : (
+                                    <XCircle className="w-4 h-4 text-amber-500" />
+                                  )}
+                                </div>
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                <p>
+                                  {item.product.isActive ? "Active product" : "Disabled product"}
+                                </p>
+                              </TooltipContent>
+                            </Tooltip>
+                          </div>
                         </div>
                       </TableCell>
-
+                 
                       {/* Location */}
                       <TableCell className="text-muted-foreground font-medium">
                         <div className="flex items-center gap-1.5 truncate max-w-[150px]">
@@ -378,7 +524,7 @@ export default function InventoryList() {
           {/* Table Pagination */}
           <DataTablePagination
             pageIndex={pageIndex}
-            pageSize={PAGE_SIZE}
+            pageSize={pageSize}
             pageCount={pageCount}
             totalRecords={totalRecords}
             loading={isLoading}

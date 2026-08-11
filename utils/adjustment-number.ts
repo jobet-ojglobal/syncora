@@ -1,6 +1,6 @@
-import { Prisma } from "@/generated/prisma/client";
+import { Prisma, PrismaClient } from "@/generated/prisma/client";
 
-export async function generateAdjustmentNumber(tx: Prisma.TransactionClient): Promise<string> {
+export async function generateAdjustmentNumber(tx: Prisma.TransactionClient | PrismaClient): Promise<string> {
   // Explicitly lock the table in EXCLUSIVE mode for the duration of this transaction.
   // Other concurrent transactions will wait until this transaction commits.
   await tx.$executeRaw`
