@@ -1,21 +1,19 @@
 "use client";
 
-import React, { useEffect, useState, Fragment } from "react";
+import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import { 
-  Plus, Search, ArrowRightLeft, Warehouse, ArrowRight, 
-  FileText, ChevronDown, ChevronUp, Edit3, Eye, CheckCircle2, 
-  AlertCircle, PackageCheck, Truck, Ban, Calendar, User,
+  Plus, ArrowRightLeft, 
+  ChevronDown, Edit3, Eye,
+  PackageCheck, Truck, Ban, 
   RefreshCw,
   ChevronRight,
   Building2,
   MessageSquare,
   FileSpreadsheet,
-  Pencil,
   MoreHorizontalIcon
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 
@@ -25,10 +23,8 @@ import {
   DialogHeader,
   DialogTitle,
   DialogDescription,
-  DialogFooter,
 } from "@/components/ui/dialog";
 import { TransferOrderRow } from "@/types/transfer-dto.type";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { TransferStatusUpdateForm, UnifiedStatusUpdateValues } from "@/components/transfer/status-form";
 import PageHeader from "@/components/layout/dashboard/PageHeader";
 import SearchInput from "@/components/shared/search-input";
@@ -52,9 +48,6 @@ import {
 } from "@/components/ui/dropdown-menu"
 
 import useSWR from "swr";
-import { TransferFilters } from "@/components/transfer/transfer-filter";
-
-  const PAGE_SIZE = 10;
 
 interface ActionPayload {
   order: TransferOrderRow;
@@ -250,19 +243,6 @@ export default function TransferOrdersListPage() {
 
       {/* Toolbar / Search Filter */}
       <div className="flex items-center justify-between gap-4">
-        {/* <TransferFilters
-        searchQuery={searchQuery}
-        onSearchChange={setSearchQuery}
-        status={status}
-        onStatusChange={handleStatusChange}
-        sourceLocationId={sourceLocationId}
-        onSourceLocationChange={handleSourceChange}
-        targetLocationId={targetLocationId}
-        onTargetLocationChange={handleTargetChange}
-        locations={locations}
-        onResetFilters={handleResetFilters}
-      /> */}
-
         <div className="w-full flex gap-2 sm:max-w-lg">
           <SearchInput
             placeholder="Filter team members by name, email..."
@@ -649,7 +629,6 @@ export default function TransferOrdersListPage() {
       </div>
 
       {/* INSPECTION VIEW MODAL */}
-
       <Dialog open={!!viewingOrder} onOpenChange={(open) => !open && setViewingOrder(null)}>
         <DialogContent className="w-full max-h-[90vh] flex flex-col p-0 gap-0 overflow-hidden">
           <DialogHeader className="p-6 pb-4 border-b">

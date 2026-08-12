@@ -1,9 +1,10 @@
 import { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { MapPin } from "lucide-react";
+import { ArrowLeft, MapPin } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import PageHeader from "@/components/layout/dashboard/PageHeader";
 import { LocationForm } from "@/components/location/location-form";
+import Link from "next/link";
 
 interface EditLocationProps {
   params: Promise<{ id: string }>;
@@ -74,12 +75,20 @@ export default async function EditLocationPage({ params }: EditLocationProps) {
 
   return (
     <div className="w-full max-w-7xl mx-auto p-4 sm:p-6 space-y-6 text-xs">
+      {/* HEADER */}
+      <Link
+        href="/dashboard/locations"
+        className="inline-flex items-center gap-2 text-sm font-medium text-slate-600 hover:text-slate-900"
+      >
+        <ArrowLeft className="h-4 w-4" />
+         Back to Locations
+      </Link>
       <PageHeader
-        title={`Edit ${locationRecord.name}`}
+        title={`Edit Location: ${locationRecord.name}`}
         description="Manage location parameters, physical address details, and connected sublocation bins."
         icon={MapPin}
+        className="border-b border-border pb-4"
       />
-
       <LocationForm initialData={initialData} />
     </div>
   );

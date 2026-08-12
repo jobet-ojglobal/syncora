@@ -50,6 +50,28 @@ export async function getProducts(
   );
 }
 
+export async function getSingleProduct(
+  productId: string,
+  includes: string[] = [],
+  retries: number =  5,
+  delayMs: number = 1000
+) {
+  const validIncludes = includes.filter((inc) => Boolean(inc) && inc.trim() !== "");
+  const mergedIncludes = Array.from(new Set(validIncludes)).join(",");
+
+  const params = new URLSearchParams({});
+
+  if (mergedIncludes) {
+    params.append("include", mergedIncludes);
+  }
+  
+  return inflow.get<InflowProduct>(
+    `/products/${productId}?${params.toString()}`,
+    retries,
+    delayMs
+  );
+}
+
   // filter: "filter[isActive]=true"   &${filter}
 
 

@@ -4,8 +4,19 @@ import { useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import useSWR from "swr";
-import { Warehouse, RefreshCw } from "lucide-react";
+import { Warehouse, RefreshCw, CloudSync, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { toast } from "sonner";
 
 // Custom Sub-components
 import { StorageInspectionModalEnhance, InspectionItem } from "@/components/inventory/storage-inspection-modal";
@@ -24,6 +35,10 @@ export default function LocationInventoryPage() {
   const [activeInspectionItem, setActiveInspectionItem] = useState<InspectionItem | null>(null);
   const [selectedReplenishItem, setSelectedReplenishItem] = useState<any | null>(null);
   const [isReplenishModalOpen, setIsReplenishModalOpen] = useState(false);
+
+  // Sync Modal & State
+  const [isSyncConfirmOpen, setIsSyncConfirmOpen] = useState(false);
+  const [isSyncing, setIsSyncing] = useState(false);
 
   // 1. Fetch Location Metadata
   const { data: location, mutate: mutateLocation } = useSWR<Location>(
@@ -45,6 +60,29 @@ export default function LocationInventoryPage() {
 
   const refreshAllData = async () => {
     await Promise.all([mutateLocation(), mutateInbound()]);
+  };
+
+  const handleCloudSync = async () => {
+    try {
+      setIsSyncing(true);
+      const res = await fetch(`/api/admin/locations/${locationId}/inventory/sync`, {
+        method: "POST",
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.error || "Failed to trigger cloud sync");
+      }
+
+      toast.success(data.message || "Cloud sync jobs queued successfully!");
+      await refreshAllData();
+    } catch (err: any) {
+      toast.error(err.message || "Cloud sync failed");
+    } finally {
+      setIsSyncing(false);
+      setIsSyncConfirmOpen(false);
+    }
   };
 
   return (
@@ -69,6 +107,20 @@ export default function LocationInventoryPage() {
             <Button
               variant="outline"
               size="sm"
+              onClick={() => setIsSyncConfirmOpen(true)}
+              disabled={isSyncing}
+              className="h-8 gap-1.5 text-xs"
+            >
+              {isSyncing ? (
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              ) : (
+                <CloudSync className="w-3.5 h-3.5" />
+              )}
+              Sync to Cloud
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
               onClick={refreshAllData}
               className="h-8 gap-1.5 text-xs"
             >
@@ -85,10 +137,10 @@ export default function LocationInventoryPage() {
       {/* Summary Card */}
       <InventorySummaryCards locationId={locationId} />
 
-      {/* 🚀 Inbound Freight Pipeline */}
+      {/* Inbound Freight Pipeline */}
       <InboundTransitMonitor locationId={locationId} />
 
-      {/* 📦 Paginated Inventory Table Component */}
+      {/* Paginated Inventory Table Component */}
       <InventoryTable
         locationId={locationId}
         locationInflowId={location?.inflowId}
@@ -100,14 +152,14 @@ export default function LocationInventoryPage() {
         onDataChanged={refreshAllData}
       />
 
-      {/* 🔍 Storage Layout Inspection Modal */}
+      {/* Storage Layout Inspection Modal */}
       <StorageInspectionModalEnhance
         item={activeInspectionItem}
         locationName={location?.name}
         onClose={() => setActiveInspectionItem(null)}
       />
 
-      {/* ⚙️ Auto-Replenishment Settings Modal */}
+      {/* Auto-Replenishment Settings Modal */}
       {selectedReplenishItem && (
         <ReplenishmentSettingsModal
           isOpen={isReplenishModalOpen}
@@ -129,6 +181,26 @@ export default function LocationInventoryPage() {
           onSaveSuccess={refreshAllData}
         />
       )}
+
+      {/* Cloud Sync Confirmation Dialog */}
+      <AlertDialog open={isSyncConfirmOpen} onOpenChange={setIsSyncConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Confirm Cloud Sync</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to push all inventory lines and product definitions for{" "}
+              <strong>{location?.name || "this location"}</strong> to the cloud queue? This operation
+              will enqueue individual synchronization jobs.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isSyncing}>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleCloudSync} disabled={isSyncing}>
+              {isSyncing ? "Syncing..." : "Confirm & Sync"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

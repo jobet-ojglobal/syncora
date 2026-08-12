@@ -511,46 +511,6 @@ export function SyncButtonOptions({ source, title }: SyncButtonProps) {
         </DialogContent>
       </Dialog>
 
-      {/* Progress & Error indicators */}
-      {/* {showProgress && jobId && (
-        <div className="rounded-xl border bg-card p-3 shadow-sm text-card-foreground animate-in fade-in slide-in-from-top-1 duration-200">
-          <div className="flex items-center justify-between text-sm font-medium mb-1.5">
-            <span className="capitalize text-muted-foreground">Status</span>
-            <span className="flex items-center gap-1.5 font-semibold">
-              {status === "completed" && (
-                <span className="text-green-600 flex items-center gap-1">
-                  <CheckCircle2 className="h-4 w-4" /> Finished
-                </span>
-              )}
-              {status === "failed" && (
-                <span className="text-red-600 flex items-center gap-1">
-                  <XCircle className="h-4 w-4" /> Failed
-                </span>
-              )}
-              {status !== "completed" && status !== "failed" && (
-                <span className="text-blue-600 animate-pulse">{status}</span>
-              )}
-            </span>
-          </div>
-
-          <div className="h-2.5 overflow-hidden rounded-full bg-secondary">
-            <div
-              className={`h-full transition-all duration-300 ease-out rounded-full ${
-                status === "completed"
-                  ? "bg-green-500"
-                  : status === "failed"
-                  ? "bg-red-500"
-                  : "bg-blue-600"
-              }`}
-              style={{ width: `${progress}%` }}
-            />
-          </div>
-          <div className="text-right text-xs text-muted-foreground mt-1">
-            {progress}%
-          </div>
-        </div>
-      )} */}
-
       {showProgress && jobId && (
         <div className="rounded-xl border bg-card p-3 shadow-sm text-card-foreground space-y-2">
           <div className="flex items-center justify-between text-sm font-medium">
@@ -624,6 +584,46 @@ export function SyncButtonOptions({ source, title }: SyncButtonProps) {
     </div>
   );
 }
+
+ {/* Progress & Error indicators */}
+      {/* {showProgress && jobId && (
+        <div className="rounded-xl border bg-card p-3 shadow-sm text-card-foreground animate-in fade-in slide-in-from-top-1 duration-200">
+          <div className="flex items-center justify-between text-sm font-medium mb-1.5">
+            <span className="capitalize text-muted-foreground">Status</span>
+            <span className="flex items-center gap-1.5 font-semibold">
+              {status === "completed" && (
+                <span className="text-green-600 flex items-center gap-1">
+                  <CheckCircle2 className="h-4 w-4" /> Finished
+                </span>
+              )}
+              {status === "failed" && (
+                <span className="text-red-600 flex items-center gap-1">
+                  <XCircle className="h-4 w-4" /> Failed
+                </span>
+              )}
+              {status !== "completed" && status !== "failed" && (
+                <span className="text-blue-600 animate-pulse">{status}</span>
+              )}
+            </span>
+          </div>
+
+          <div className="h-2.5 overflow-hidden rounded-full bg-secondary">
+            <div
+              className={`h-full transition-all duration-300 ease-out rounded-full ${
+                status === "completed"
+                  ? "bg-green-500"
+                  : status === "failed"
+                  ? "bg-red-500"
+                  : "bg-blue-600"
+              }`}
+              style={{ width: `${progress}%` }}
+            />
+          </div>
+          <div className="text-right text-xs text-muted-foreground mt-1">
+            {progress}%
+          </div>
+        </div>
+      )} */}
 
 // 8/7/26
 // "use client";

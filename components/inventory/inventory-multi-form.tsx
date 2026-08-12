@@ -10,7 +10,7 @@ import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 import { Field, FieldGroup, FieldLabel, FieldLegend, FieldSet } from "@/components/ui/field";
 import { ProductLineCard } from "./product-line-card";
-import { InventoryLineModal } from "./inventory-line-modal";
+import { InventoryLineModal } from "./inventory-line-filtered-modal";
 import { FormSelect } from "../shared/form-select";
 import { FormTextarea } from "../shared/form-textarea";
 
@@ -47,6 +47,8 @@ export function InventoryFormV2({ locations, initialData }: InventoryFormProps) 
   const [products, setProducts] = useState<LookupItem[]>([]);
   const [sublocations, setSublocations] = useState<SublocationOption[]>([]);
   const [isLoadingLocationData, setIsLoadingLocationData] = useState(false);
+
+  const [allSelectedProducts, setAllSelectedProducts] = useState<LookupItem[]>([]);
 
   const form = useForm<InventoryInput>({
     resolver: zodResolver(inventorySchema),
@@ -343,6 +345,30 @@ export function InventoryFormV2({ locations, initialData }: InventoryFormProps) 
         <InventoryLineModal
           isOpen={modalOpen}
           onClose={() => setModalOpen(false)}
+          locationId={watchedLocationId}
+          existingLines={lineFields}
+          onSave={(selectedItems) => {
+            // Retain newly selected products in parent memory
+            setAllSelectedProducts((prev) => [...prev, ...selectedItems]);
+
+            selectedItems.forEach((item) => {
+              appendLine({
+                productId: item.inflowId,
+                trackSerials: item.trackSerials,
+                quantityOnHand: 0,
+                quantityReserved: 0,
+                quantityAvailable: 0,
+                serials: [],
+                bins: [],
+              });
+            });
+          }}
+        />
+      )}
+      {/* {modalOpen && (
+        <InventoryLineModal
+          isOpen={modalOpen}
+          onClose={() => setModalOpen(false)}
           products={products}
           existingLines={lineFields}
           onSave={(selectedItems) => {
@@ -364,7 +390,7 @@ export function InventoryFormV2({ locations, initialData }: InventoryFormProps) 
             setModalOpen(false);
           }}
         />
-      )}
+      )} */}
     </form>
   );
 }

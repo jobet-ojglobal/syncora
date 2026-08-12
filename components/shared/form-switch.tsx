@@ -16,6 +16,7 @@ interface FormSwitchProps<
   description?: string;
   inlineText?: string;
   variant?: "card" | "field" | "inline"; // Supports all 3 UI styles
+  classNameLabel?: string;
   className?: string;
 }
 
@@ -29,6 +30,7 @@ export function FormSwitch<
   description,
   inlineText,
   variant = "card",
+  classNameLabel = "",
   className = "",
 }: FormSwitchProps<TFieldValues, TName>) {
   const switchId = `form-switch-${name}`;
@@ -48,7 +50,7 @@ export function FormSwitch<
               />
               <label
                 htmlFor={switchId}
-                className="text-xs font-bold cursor-pointer text-muted-foreground"
+                className={ `cursor-pointer ${className}`}
               >
                 {label}
               </label>
@@ -70,8 +72,8 @@ export function FormSwitch<
                 <label
                   htmlFor={switchId}
                   className={cn(
-                    "font-semibold text-foreground cursor-pointer select-none",
-                    description ? "text-sm" : "text-xs"
+                    "cursor-pointer",
+                    classNameLabel
                   )}
                 >
                   {label}
@@ -95,7 +97,7 @@ export function FormSwitch<
         // Variant 2: Standard field block (Label on top, switch inside bordered inline box with helper text)
         return (
           <Field className={className}>
-            <FieldLabel htmlFor={switchId}>{label}</FieldLabel>
+            <FieldLabel htmlFor={switchId} className={ `cursor-pointer ${className}`}>{label}</FieldLabel>
             <div className="flex items-center h-9 space-x-2 border px-3 rounded-md bg-muted/20">
               <Switch
                 id={switchId}

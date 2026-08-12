@@ -16,7 +16,8 @@ import { INFLOW_EVENTS } from "@/lib/inflow/types/inflow";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { FilterX, RefreshCw, Loader2, Activity } from "lucide-react";
 import { DataTablePagination } from "../shared/data-table-pagination";
-import { SyncButtonOptions } from "./sync-button";
+import { SyncButtonOptionsPreview } from "./sync-button-preview";
+
 
 // Fetcher utility for SWR
 const fetcher = async (url: string) => {
@@ -353,23 +354,23 @@ export const InflowWebhookWorkspace = () => {
                   </div>
                 ) : (
                   <>
-                    <SyncButtonOptions source="categories" title="Categories" />
-                    <SyncButtonOptions source="locations" title="Locations" />
-                    <SyncButtonOptions source="team_members" title="Team Members" />
-                    <SyncButtonOptions source="taxing_schemes" title="Taxing Schemes" />
-                    <SyncButtonOptions source="currencies" title="Currencies" />
-                    <SyncButtonOptions source="pricing_schemes" title="Pricing Schemes" />
-                    <SyncButtonOptions source="payment_terms" title="Payment Terms" />
-                    <SyncButtonOptions source="adjustment_reasons" title="Adjustment Reasons" />
-                    <SyncButtonOptions source="product_groups" title="Product Groups" />
-                    <SyncButtonOptions source="products" title="Products" />
-                    <SyncButtonOptions source="inventory" title="Inventory Levels" />
-                    <SyncButtonOptions source="product_cost_adjustments" title="Cost Adjustments" />
-                    <SyncButtonOptions source="product_boms" title="Bills of Materials" />
-                    <SyncButtonOptions source="customers" title="Customers" />
-                    <SyncButtonOptions source="vendors" title="Vendors" />
-                    <SyncButtonOptions source="sales_orders" title="Sales Orders" />
-                    <SyncButtonOptions source="purchase_orders" title="Purchase Orders" />
+                    <SyncButtonOptionsPreview source="categories" title="Categories" />
+                    <SyncButtonOptionsPreview source="locations" title="Locations" />
+                    <SyncButtonOptionsPreview source="team_members" title="Team Members" />
+                    <SyncButtonOptionsPreview source="taxing_schemes" title="Taxing Schemes" />
+                    <SyncButtonOptionsPreview source="currencies" title="Currencies" />
+                    <SyncButtonOptionsPreview source="pricing_schemes" title="Pricing Schemes" />
+                    <SyncButtonOptionsPreview source="payment_terms" title="Payment Terms" />
+                    <SyncButtonOptionsPreview source="adjustment_reasons" title="Adjustment Reasons" />
+                    <SyncButtonOptionsPreview source="product_groups" title="Product Groups" />
+                    <SyncButtonOptionsPreview source="products" title="Products" />
+                    <SyncButtonOptionsPreview source="inventory" title="Inventory Levels" />
+                    <SyncButtonOptionsPreview source="product_cost_adjustments" title="Cost Adjustments" />
+                    <SyncButtonOptionsPreview source="product_boms" title="Bills of Materials" />
+                    <SyncButtonOptionsPreview source="customers" title="Customers" />
+                    <SyncButtonOptionsPreview source="vendors" title="Vendors" />
+                    <SyncButtonOptionsPreview source="sales_orders" title="Sales Orders" />
+                    <SyncButtonOptionsPreview source="purchase_orders" title="Purchase Orders" />
                   </>
                 )}
               </CardContent>
