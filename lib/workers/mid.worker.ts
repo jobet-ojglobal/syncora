@@ -10,6 +10,7 @@ import { upsertTaxingScheme as upsertLocalTaxingScheme } from "../locations/data
 import { upsertPricingScheme as upsertLocalPricingScheme } from "../locations/data/pricing-scheme";
 import { upsertProduct as upsertLocalProductScheme, upsertProductImage as upsertLocalProductImageScheme } from "../locations/data/product";
 import { upsertStockAdjust as upsertCloudStockAdjust } from "../inflow/data/inventory";
+import { upsertProduct as upsertCloudProduct } from "../inflow/data/products";
 
 export interface MidWebhookJobData {
   source: string;
@@ -92,6 +93,10 @@ const midWorker = new Worker<MidWebhookJobData>(
             await upsertCloudStockAdjust(payload);
             result = { success: true}
             break;
+          case "PRODUCT_UPSERT_CLOUD": 
+            await upsertCloudProduct(payload);
+            result = { success: true}
+            break;
           
           default:
             throw new Error(`Unsupported mid sync source: ${source}`);
@@ -144,7 +149,11 @@ const midWorker = new Worker<MidWebhookJobData>(
   },
   { 
     connection,
-    concurrency: 5 
+    concurrency: 5,
+    limiter: {
+      max: 1,        // Max 1 job...
+      duration: 300, // ...every 300ms
+    }
   }
 );
 

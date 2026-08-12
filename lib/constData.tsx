@@ -901,7 +901,7 @@ export const breadcrumbsMap = [
 
               {
                 id: "admin-locations-webhook",
-                href: "/dashboard/locations/[id]/integrations/webhooks",
+                href: "/dashboard/locations/[id]/webhooks",
                 label: "Webhooks",
               },
             ],

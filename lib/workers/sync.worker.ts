@@ -284,7 +284,7 @@ const worker = new Worker<SyncWebhookJobData>(
           result = await productGroupService.sync(syncOptions, includes);
           break;
         case "products":
-          result = await productService.sync(syncOptions, includes, brandCustomName, after);
+          result = await productService.syncBatch(syncOptions, includes, brandCustomName, selectedRecords, syncedAll, after);
           break;
         case "product_boms":
           result = await productService.sync(syncOptions, ["itemBoms"]);
@@ -303,7 +303,7 @@ const worker = new Worker<SyncWebhookJobData>(
           result = await inventoryService.syncSingle(selectedRecords[0], includes);
           break;
         case "locations":
-          result = await locationService.sync(syncOptions);
+          result = await locationService.sync(syncOptions, selectedRecords, syncedAll);
           break;
         case "team_members":
           result = await teamMemberService.sync(syncOptions);

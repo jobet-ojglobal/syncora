@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import { getProducts } from "../data/products"; 
+import { getProducts, getSingleProduct } from "../data/products"; 
 import { syncVariant } from "./variant.sync";
 import { syncProduct } from "./product.sync";
 import { syncProductGroup } from "./product-group-sync";
@@ -16,7 +16,11 @@ export class ProductSyncService {
     return new Promise((resolve) => setTimeout(resolve, ms));
   }
 
-  async sync(options?: SyncOptions, includes?: string[], brandCustomName?: string, after: string | undefined = undefined) {
+  async sync(options?: SyncOptions, includes?: string[], 
+    brandCustomName?: string, 
+    selectedRecords?: any[],
+    syncedAll?: boolean,
+    after: string | undefined = undefined) {
     const BATCH_SIZE = options?.batchSize ?? 100;
     const INTER_BATCH_DELAY = options?.delayBetweenBatchesMs ?? 300;
     const CLIENT_RETRIES = 1;
@@ -26,6 +30,11 @@ export class ProductSyncService {
     const cleanIncludes = (includes ?? []).filter((item) => !EXCLUDED_INCLUDES.has(item));
     const hasCoreProductData = (includes ?? []).includes("coreData");
     const mergedIncludes = [...cleanIncludes];
+
+    const allowedIds =
+      !syncedAll && selectedRecords && selectedRecords.length > 0
+        ? new Set(selectedRecords.map((item) => String(item.id ?? item.productId)))
+        : null;
 
     let totalProcessed = 0;
 
@@ -48,7 +57,12 @@ export class ProductSyncService {
       // 1. Check signal before starting remote fetch
       if (options?.checkSignal) await options.checkSignal();
 
-      const batch = await getProducts(BATCH_SIZE, after, mergedIncludes, CLIENT_RETRIES);
+      let batch = await getProducts(BATCH_SIZE, after, mergedIncludes, CLIENT_RETRIES);
+
+      if (allowedIds) {
+        batch = batch.filter((item) => allowedIds.has(String(item.productId)));
+      }
+
       if (!batch || batch.length === 0) break;
 
       // 2. Check signal before starting long DB transaction
@@ -103,6 +117,158 @@ export class ProductSyncService {
       // Pace out requests to eliminate HTTP 429 rate limit triggers
       if (INTER_BATCH_DELAY > 0) {
         await this.sleep(INTER_BATCH_DELAY);
+      }
+    }
+
+    return {
+      productsProcessed: totalProcessed,
+      syncedAt: new Date().toISOString(),
+    };
+  }
+
+  async syncBatch(
+    options?: SyncOptions,
+    includes?: string[],
+    brandCustomName?: string,
+    selectedRecords?: any[],
+    syncedAll?: boolean,
+    after: string | undefined = undefined
+  ) {
+    const BATCH_SIZE = options?.batchSize ?? 100;
+    const INTER_BATCH_DELAY = options?.delayBetweenBatchesMs ?? 300;
+    const CLIENT_RETRIES = 1;
+
+    const syncedGroupIds = new Set<string>();
+    const EXCLUDED_INCLUDES = new Set(["coreData", "brand"]);
+    const cleanIncludes = (includes ?? []).filter((item) => !EXCLUDED_INCLUDES.has(item));
+    const hasCoreProductData = (includes ?? []).includes("coreData");
+    const mergedIncludes = [...cleanIncludes];
+
+    let totalProcessed = 0;
+
+    const caches = {
+      verifiedTeamMemberIds: new Set<string>(),
+      verifiedCategoryIds: new Set<string>(),
+      verifiedVendorIds: new Set<string>(),
+      verifiedLocationIds: new Set<string>(),
+      verifiedTaxingSchemes: new Set<string>(),
+      verifiedTaxCodes: new Set<string>(),
+      verifiedOperationTypes: new Set<string>(),
+      verifiedPricingSchemeIds: new Set<string>(),
+      verifiedProductIds: new Set<string>(),
+    };
+
+    console.log(`Starting product sync (Batch Size: ${BATCH_SIZE})...`);
+
+    // Helper closure to process an array of fetched products through DB transaction
+    const processBatch = async (batch: any[], currentBatchNo: number) => {
+      if (options?.checkSignal) await options.checkSignal();
+
+      try {
+        await prisma.$transaction(
+          async (tx) => {
+            for (const fullProduct of batch) {
+              const variantRelation = fullProduct.productVariant;
+              const groupData = variantRelation?.productGroup;
+              const groupDefaultProduct = variantRelation?.productGroup?.defaultProduct;
+
+              if (groupData && !syncedGroupIds.has(groupData.productGroupId)) {
+                await syncProductGroup(tx, groupData, fullProduct, true, caches);
+                syncedGroupIds.add(groupData.productGroupId);
+              }
+
+              await syncProduct(
+                tx,
+                fullProduct,
+                groupData?.productGroupId,
+                groupDefaultProduct,
+                hasCoreProductData,
+                brandCustomName,
+                caches
+              );
+
+              if (variantRelation && groupData) {
+                await syncVariant(tx, groupData.productGroupId, variantRelation);
+              }
+            }
+          },
+          { timeout: 40000 }
+        );
+      } catch (transactionError) {
+        console.error(`[Batch Transaction Error] Batch #${currentBatchNo}:`, transactionError);
+        throw transactionError;
+      }
+
+      totalProcessed += batch.length;
+      console.log(`Batch #${currentBatchNo} completed. Processed ${totalProcessed} products.`);
+
+      if (options?.onProgress) {
+        await options.onProgress(totalProcessed);
+      }
+
+      if (INTER_BATCH_DELAY > 0) {
+        await this.sleep(INTER_BATCH_DELAY);
+      }
+    };
+
+    // BRANCH 1: Sync specific selected records using getSingleProduct
+    if (!syncedAll && selectedRecords && selectedRecords.length > 0) {
+      const selectedIds = Array.from(
+        new Set(
+          selectedRecords
+            .map((item) => {
+              // 1. If selectedRecords is an array of string IDs directly
+              if (typeof item === "string") return item;
+              
+              // 2. Safely resolve object properties
+              const rawId = item?.id ?? item?.productId;
+              return rawId ? String(rawId) : null;
+            })
+            .filter((id): id is string => Boolean(id) && id !== "undefined")
+        )
+      );
+
+      let batchNo = 0;
+      for (let i = 0; i < selectedIds.length; i += BATCH_SIZE) {
+        batchNo++;
+        if (options?.checkSignal) await options.checkSignal();
+
+        const chunkIds = selectedIds.slice(i, i + BATCH_SIZE);
+
+        // Fetch individual products in parallel within the chunk
+        const batchResults = await Promise.allSettled(
+          chunkIds.map((id) =>
+            getSingleProduct(id, mergedIncludes, CLIENT_RETRIES)
+          )
+        );
+
+        const validBatch = batchResults
+          .filter(
+            (res): res is PromiseFulfilledResult<any> =>
+              res.status === "fulfilled" && Boolean(res.value)
+          )
+          .map((res) => res.value);
+
+        if (validBatch.length > 0) {
+          await processBatch(validBatch, batchNo);
+        }
+      }
+    } 
+    // BRANCH 2: Sync all records paginated using getProducts
+    else {
+      let batchNo = 0;
+
+      while (true) {
+        if (options?.checkSignal) await options.checkSignal();
+
+        const batch = await getProducts(BATCH_SIZE, after, mergedIncludes, CLIENT_RETRIES);
+
+        if (!batch || batch.length === 0) break;
+
+        batchNo++;
+        await processBatch(batch, batchNo);
+
+        after = batch[batch.length - 1].productId;
       }
     }
 

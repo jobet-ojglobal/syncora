@@ -94,49 +94,51 @@ export const columns: ColumnDef<TrashItem>[] = [
           </Button>
 
           {/* Purge / Delete Confirmation Dialog */}
-          <AlertDialog>
-            <AlertDialogTrigger asChild>
-              <Button 
-                variant="destructive" 
-                size="sm"
-                className="h-8 w-8 p-0"
-              >
-                <Trash2 className="h-4 w-4" />
-              </Button>
-            </AlertDialogTrigger>
-            
-            <AlertDialogContent className="max-w-md rounded-xl">
-              <AlertDialogHeader>
-                <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-full bg-destructive/10 text-destructive sm:mx-0 mb-2">
-                  <AlertTriangle className="h-5 w-5" />
-                </div>
-                <AlertDialogTitle className="text-left">
-                  Are you absolutely sure?
-                </AlertDialogTitle>
-                <AlertDialogDescription className="text-left text-sm text-muted-foreground mt-1">
-                  This will permanently delete <span className="font-semibold text-foreground">&quot;{item.title}&quot;</span>. This action cannot be undone.
-                </AlertDialogDescription>
-              </AlertDialogHeader>
+          { item.modelType !== "Location" && (
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button 
+                  variant="destructive" 
+                  size="sm"
+                  className="h-8 w-8 p-0"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </AlertDialogTrigger>
               
-              <AlertDialogFooter className="mt-4 gap-2 sm:gap-0">
-                <AlertDialogCancel asChild>
-                  <Button variant="outline" size="sm" className="h-9 rounded-xl">
-                    Cancel
-                  </Button>
-                </AlertDialogCancel>
-                <AlertDialogAction asChild>
-                  <Button
-                    variant="destructive"
-                    size="sm"
-                    className="h-9 min-w-[100px] rounded-xl"
-                    onClick={() => meta.purgeRow(item.id, item.modelType)}
-                  >
-                    Confirm Delete
-                  </Button>
-                </AlertDialogAction>
-              </AlertDialogFooter>
-            </AlertDialogContent>
-          </AlertDialog>
+              <AlertDialogContent className="max-w-md rounded-xl">
+                <AlertDialogHeader>
+                  <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-full bg-destructive/10 text-destructive sm:mx-0 mb-2">
+                    <AlertTriangle className="h-5 w-5" />
+                  </div>
+                  <AlertDialogTitle className="text-left">
+                    Are you absolutely sure?
+                  </AlertDialogTitle>
+                  <AlertDialogDescription className="text-left text-sm text-muted-foreground mt-1">
+                    This will permanently delete <span className="font-semibold text-foreground">&quot;{item.title}&quot;</span>. This action cannot be undone.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                
+                <AlertDialogFooter className="mt-4 gap-2 sm:gap-0">
+                  <AlertDialogCancel asChild>
+                    <Button variant="outline" size="sm" className="h-9 rounded-xl">
+                      Cancel
+                    </Button>
+                  </AlertDialogCancel>
+                  <AlertDialogAction asChild>
+                    <Button
+                      variant="destructive"
+                      size="sm"
+                      className="h-9 min-w-[100px] rounded-xl"
+                      onClick={() => meta.purgeRow(item.id, item.modelType)}
+                    >
+                      Confirm Delete
+                    </Button>
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          )}
         </div>
       )
     }

@@ -172,4 +172,48 @@ export class LocationService {
       }
     };
   }
+
+  static async permanentDelete(locationId: string, targetLocationId: string) {
+    await prisma.$transaction(async (tx) => {
+      // Step 1: Reassign open Sales & Purchase Orders to a new location
+      if (targetLocationId) {
+        await tx.salesOrder.updateMany({
+          where: { locationId },
+          data: { locationId: targetLocationId },
+        });
+
+        await tx.purchaseOrder.updateMany({
+          where: { locationId },
+          data: { locationId: targetLocationId },
+        });
+      }
+
+      // Step 2: Delete empty inventory balances
+      await tx.inventory.deleteMany({
+        where: { locationId, quantityOnHand: 0 },
+      });
+
+      // Step 3: Remove sublocations and sublocation mappings
+      await tx.sublocationLocationMap.deleteMany({
+        where: { locationId },
+      });
+      await tx.sublocation.deleteMany({
+        where: { locationId },
+      });
+
+      // Step 4: Remove location-specific mappings (Taxes, Pricing, Products)
+      await tx.taxingSchemeLocationMap.deleteMany({ where: { locationId } });
+      await tx.productLocationMap.deleteMany({ where: { locationId } });
+
+      // Step 5: Remove associated LocationAddress
+      await tx.locationAddress.deleteMany({
+        where: { locationId },
+      });
+
+      // Step 6: Permanently delete the Location
+      await tx.location.delete({
+        where: { id: locationId },
+      });
+    });
+  }
 }

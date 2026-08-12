@@ -597,7 +597,7 @@ export async function POST(request: NextRequest) {
     // ==========================================
     // 🏢 STEP 1: DISPATCH CLOUD SYNC JOB
     // ==========================================
-    const validCloudWebhook = await WebhookService.getCloudWebhookURL("product");
+    const validCloudWebhook = await WebhookService.getCloudWebhookURL("product.updated");
     if (validCloudWebhook) {
       await getMidSyncQueue().add(
         "product_cloudsync_job",
@@ -761,7 +761,7 @@ export async function PATCH(request: NextRequest) {
   try {
     const body = await request.json();
     const {
-      inflowId, name, description, itemType, brandId, categoryId,
+      inflowId, name, sku, description, itemType, brandId, categoryId,
       autoAssemble, isActive, isManufacturable, includeQuantityBuildable,
       trackExpiry, trackLots, trackSerials, shelfLifeDays, sellBeforeExpiryDays,
       expiryNotificationDays, weight, width, height, length, originCountry,
@@ -776,6 +776,8 @@ export async function PATCH(request: NextRequest) {
       tags = [], 
       features = [],
     } = body;
+
+    const lastModifiedById = "56bfcf3b-3e98-4098-ae8f-2adcb657cb57";
 
     // 1. Core Validation Constraints Guard Layer
     if (!inflowId) {
@@ -837,6 +839,7 @@ export async function PATCH(request: NextRequest) {
         where: { inflowId },
         data: {
           name: name.trim(),
+          sku,
           slug: slug.trim(),
           description: description?.trim() || null,
           itemType,
@@ -1167,7 +1170,8 @@ export async function PATCH(request: NextRequest) {
           cost: true,
           prices: true,
           barcodes: true,
-          images: true
+          images: true,
+          category: true
         } 
       });
 
@@ -1191,9 +1195,9 @@ export async function PATCH(request: NextRequest) {
         trackExpiry: updatedProduct.trackExpiry,
         trackLots: updatedProduct.trackLots,
         trackSerials: updatedProduct.trackSerials,
-        shelfLifeDays: updatedProduct.shelfLifeDays,
-        sellBeforeExpiryDays: updatedProduct.sellBeforeExpiryDays,
-        expiryNotificationDays: updatedProduct.expiryNotificationDays,
+        shelfLifeDays: null, // updatedProduct.shelfLifeDays,
+        sellBeforeExpiryDays: null, // updatedProduct.sellBeforeExpiryDays,
+        expiryNotificationDays: null, // updatedProduct.expiryNotificationDays,
         weight: updatedProduct.weight?.toString() || null,
         width: updatedProduct.width?.toString() || null,
         height: updatedProduct.height?.toString() || null,
@@ -1201,11 +1205,17 @@ export async function PATCH(request: NextRequest) {
         originCountry: updatedProduct.originCountry,
         hsTariffNumber: updatedProduct.hsTariffNumber,
         remarks: updatedProduct.remarks,
+        category: {
+          categoryId: updatedProduct.category?.inflowId,
+          name: updatedProduct.category?.name,
+          isDefault: false,
+          parentCategoryId: null
+        },
 
         defaultImageId: null,
         
-        lastModifiedById: null,
-        lastModifiedDateTime: null,
+        lastModifiedById,
+        lastModifiedDateTime: new Date().toISOString(),
         lastVendorId: null,
 
         totalQuantityOnHand: 20,
@@ -1268,7 +1278,7 @@ export async function PATCH(request: NextRequest) {
     // ==========================================
     // 🏢 STEP 1: DISPATCH CLOUD SYNC JOB
     // ==========================================
-    const validCloudWebhook = await WebhookService.getCloudWebhookURL("product");
+    const validCloudWebhook = await WebhookService.getCloudWebhookURL("product.updated");
     if (validCloudWebhook) {
       await getMidSyncQueue().add(
         "product_cloudsync_job",

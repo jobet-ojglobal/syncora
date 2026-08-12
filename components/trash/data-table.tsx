@@ -194,6 +194,7 @@ export function TrashDataTable<TData extends TrashItem, TValue>({
               <SelectItem value="Brand">Brands</SelectItem>
               <SelectItem value="Taxing Scheme">Taxing Schemes</SelectItem>
               <SelectItem value="Tax Code">Tax Codes</SelectItem>
+              <SelectItem value="Location">Locations</SelectItem>
             </SelectContent>
           </Select>
 

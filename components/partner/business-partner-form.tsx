@@ -1,23 +1,16 @@
 "use client";
 
-import React, { startTransition } from "react";
+import { startTransition } from "react";
 import { useRouter } from "next/navigation";
-import { useForm, useFieldArray, Controller } from "react-hook-form";
+import { useForm, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
 import { 
-  Building2, User, Mail, Phone, Globe, Printer, FileText, CheckCircle2, 
+  Building2, User, Globe, 
   MapPin, Plus, Trash2, ShoppingBag, Truck, CreditCard, ShieldAlert, ClipboardList
 } from "lucide-react";
-
-import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Switch } from "@/components/ui/switch";
-import { Textarea } from "@/components/ui/textarea";
-import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { businessPartnerFormSchema, type BusinessPartnerFormData } from "@/schemas/business-partner.scheme";
 import { FormSelect } from "../shared/form-select";

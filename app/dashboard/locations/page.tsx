@@ -1,244 +1,712 @@
-// app/admin/locations/page.tsx
 "use client";
 
-import { useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 import Link from "next/link";
-import { Plus, Search, MapPin, Warehouse, Layers, Boxes, CheckCircle2, XCircle, ChevronDown, ChevronUp, ExternalLink, ArrowRight, ShoppingBag, Package } from "lucide-react";
+import { 
+  Plus, 
+  ChevronDown, 
+  ChevronRight, 
+  Edit3, 
+  Eye, 
+  RefreshCw, 
+  Building2, 
+  MapPin, 
+  Phone, 
+  Mail, 
+  User, 
+  MoreHorizontal, 
+  Package, 
+  CheckCircle2, 
+  XCircle, 
+  Wrench,
+  Trash2,
+  Building,
+  Layers,
+  Users,
+  Box
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import PageHeader from "@/components/layout/dashboard/PageHeader";
+import { toast } from "sonner";
+import useSWR from "swr";
 
-interface SublocationMin {
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import PageHeader from "@/components/layout/dashboard/PageHeader";
+import SearchInput from "@/components/shared/search-input";
+import { DataTablePagination } from "@/components/shared/data-table-pagination";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { LocationDeleteButton } from "@/components/location/location-delete-button";
+
+// --- Types & Interfaces ---
+
+export type LocationType = "WAREHOUSE" | "STORE" | "FULFILLMENT_CENTER" | "TRANSIT";
+export type LocationStatus = "ACTIVE" | "INACTIVE" | "MAINTENANCE";
+
+export interface SublocationSummary {
   id: string;
   name: string;
+  binCount: number;
 }
 
-interface LocationListItem {
+export interface LocationRow {
   id: string;
   inflowId: string;
   name: string;
-  isActive: boolean;
-  isDefault: boolean;
-  formattedAddress: string | null;
-  sublocationsCount: number;
-  inventoryItemsCount: number;
-  totalSalesOrdersCount: number,
-  activeSalesOrdersCount: number,
-  teamMembersCount: number;
-  sublocationsList: SublocationMin[];
+  type: LocationType;
+  status: LocationStatus;
+  addressLine1: string;
+  addressLine2?: string | null;
+  city: string;
+  state?: string | null;
+  postalCode?: string | null;
+  country: string;
+  phone?: string | null;
+  email?: string | null;
+  managerName?: string | null;
+  totalStockUnits: number;
+  sublocationCount: number;
+  teams: number;
+  activeOrdersCount: number;
+  sublocations: SublocationSummary[];
+  createdAt: string;
+  updatedAt: string;
 }
 
-export default function LocationsListPage() {
-  const [locations, setLocations] = useState<LocationListItem[]>([]);
+interface ActionPayload {
+  location: LocationRow;
+  targetStatus: LocationStatus;
+  title: string;
+  description: string;
+  toastSuccess: string;
+}
+
+// Fetcher utility
+const fetcher = (url: string) =>
+  fetch(url).then((res) => {
+    if (!res.ok) throw new Error("Failed to load inventory locations.");
+    return res.json();
+  });
+
+// Helper badges formatting
+const getStatusBadgeVariant = (status: LocationStatus) => {
+  switch (status) {
+    case "ACTIVE":
+      return "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-400 dark:border-emerald-800/60";
+    case "INACTIVE":
+      return "bg-zinc-100 text-zinc-600 border-zinc-200 dark:bg-zinc-800 dark:text-zinc-400 dark:border-zinc-700";
+    case "MAINTENANCE":
+      return "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/40 dark:text-amber-400 dark:border-amber-800/60";
+    default:
+      return "bg-zinc-100 text-zinc-600 border-zinc-200";
+  }
+};
+
+const getTypeBadgeVariant = (type?: LocationType | null) => {
+  if (!type) return "bg-slate-100 text-slate-700 border-slate-200";
+
+  switch (type) {
+    case "WAREHOUSE":
+      return "bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/40 dark:text-blue-400 dark:border-blue-800/60";
+    case "STORE":
+      return "bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-950/40 dark:text-purple-400 dark:border-purple-800/60";
+    case "FULFILLMENT_CENTER":
+      return "bg-indigo-50 text-indigo-700 border-indigo-200 dark:bg-indigo-950/40 dark:text-indigo-400 dark:border-indigo-800/60";
+    case "TRANSIT":
+      return "bg-slate-100 text-slate-700 border-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700";
+    default:
+      return "bg-slate-100 text-slate-700 border-slate-200";
+  }
+};
+
+export default function LocationListPage() {
   const [searchQuery, setSearchQuery] = useState("");
-  const [isLoading, setIsLoading] = useState(true);
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [pageIndex, setPageIndex] = useState(0);
+  const PAGE_SIZE = 10;
+
+  const [status, setStatus] = useState<string>("ALL");
+  const [type, setType] = useState<string>("ALL");
+
   const [expandedRows, setExpandedRows] = useState<Record<string, boolean>>({});
-  
-  const fetchLocations = async () => {
+  const [viewingLocation, setViewingLocation] = useState<LocationRow | null>(null);
+  const [activeAction, setActiveAction] = useState<ActionPayload | null>(null);
+  const [isDeleting, setIsDeleting] = useState<LocationRow | null>(null);
+
+  // Debounce search query
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(searchQuery);
+      setPageIndex(0);
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+
+  const handleStatusChange = (val: string) => {
+    setStatus(val);
+    setPageIndex(0);
+  };
+
+  const handleTypeChange = (val: string) => {
+    setType(val);
+    setPageIndex(0);
+  };
+
+  const handleResetFilters = () => {
+    setSearchQuery("");
+    setDebouncedSearch("");
+    setStatus("ALL");
+    setType("ALL");
+    setPageIndex(0);
+  };
+
+  const queryString = new URLSearchParams({
+    search: encodeURIComponent(debouncedSearch),
+    status,
+    type,
+    page: String(pageIndex),
+    limit: String(PAGE_SIZE),
+  }).toString();
+
+  const {
+    data: payload,
+    error,
+    isLoading,
+    isValidating,
+    mutate,
+  } = useSWR(`/api/admin/locations/filtered?${queryString}`, fetcher, {
+    keepPreviousData: true,
+    revalidateOnFocus: false,
+  });
+
+  const locations: LocationRow[] = payload?.data || [];
+  const totalRecords = payload?.totalRecords || 0;
+  const pageCount = payload?.pageCount || 0;
+
+  const toggleRowExpand = (id: string) => {
+    setExpandedRows((prev) => ({ ...prev, [id]: !prev[id] }));
+  };
+
+  // Status Action Handler Modal
+  const openStatusActionModal = (
+    location: LocationRow,
+    targetStatus: LocationStatus,
+    title: string,
+    description: string,
+    toastSuccess: string
+  ) => {
+    setActiveAction({ location, targetStatus, title, description, toastSuccess });
+  };
+
+  const handleStatusUpdate = async () => {
+    if (!activeAction) return;
+
     try {
-      const res = await fetch("/api/admin/locations");
+      const res = await fetch(`/api/admin/locations/status`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ inflowId: activeAction.location.inflowId, status: activeAction.targetStatus }),
+      });
+
       if (res.ok) {
-        const data = await res.json();
-        setLocations(data);
+        toast.success(activeAction.toastSuccess);
+        await mutate();
+        setActiveAction(null);
+      } else {
+        const err = await res.json();
+        toast.error(err.error || "Failed to update location status.");
       }
-    } catch (err) {
-      console.error("Error updating facilities index state:", err);
-    } finally {
-      setIsLoading(false);
+    } catch {
+      toast.error("Network communication failure.");
     }
   };
 
-  useEffect(() => {
-    fetchLocations();
-  }, []);
+  // Delete Handler
+  const handleDeleteLocation = async () => {
+    if (!isDeleting) return;
 
-  const toggleRowExpand = (inflowId: string) => {
-    setExpandedRows((prev) => ({ ...prev, [inflowId]: !prev[inflowId] }));
+    try {
+      const res = await fetch(`/api/admin/locations/${isDeleting.id}`, {
+        method: "DELETE",
+      });
+
+      if (res.ok) {
+        toast.success(`Location ${isDeleting.name} has been deleted.`);
+        await mutate();
+        setIsDeleting(null);
+      } else {
+        const err = await res.json();
+        toast.error(err.error || "Failed to delete location.");
+      }
+    } catch {
+      toast.error("Network communication failure.");
+    }
   };
 
-  const filteredLocations = locations.filter((loc) => {
-    const normalizedQuery = searchQuery.toLowerCase();
+  if (error) {
     return (
-      loc.name.toLowerCase().includes(normalizedQuery) ||
-      (loc.formattedAddress?.toLowerCase().includes(normalizedQuery) ?? false)
+      <div className="p-6 text-center text-xs text-red-500 bg-destructive/10 border border-destructive/20 rounded-xl font-medium">
+        Hydration Failure: Failed resolving enterprise location directory records.
+      </div>
     );
-  });
+  }
 
   return (
-    <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 py-8 space-y-6">
-      
+    <div className="w-full max-w-7xl mx-auto p-4 sm:p-6 space-y-6 text-xs">
       {/* Page Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b pb-5">
-        <div className="space-y-1">
-          <h1 className="text-2xl font-bold tracking-tight text-foreground">Logistics & Storage Locations</h1>
-          <p className="text-sm text-muted-foreground">
-            Monitor inventory depots, verify fulfillment sites, and configure nested sublocation staging areas.
-          </p>
+      <PageHeader
+        title="Locations & Warehouses"
+        description="Manage enterprise facilities, retail outlets, fulfillment nodes, and transit destinations."
+        icon={Building2}
+        className="border-b border-border pb-4"
+      >
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => mutate()}
+            disabled={isLoading || isValidating}
+          >
+            <RefreshCw
+              className={`h-3.5 w-3.5 mr-1.5 ${
+                isLoading || isValidating ? "animate-spin" : ""
+              }`}
+            />
+            Sync
+          </Button>
+          <Button asChild size="sm">
+            <Link href="/dashboard/locations/new">
+              <Plus className="h-3.5 w-3.5 mr-1.5" />
+              New Location
+            </Link>
+          </Button>
         </div>
-        <Button asChild size="sm" className="gap-1.5 shrink-0 self-start sm:self-center">
-          <Link href="/dashboard/locations/create">
-            <Plus className="w-4 h-4" /> Add Logistics Site
-          </Link>
-        </Button>
-      </div>
+      </PageHeader>
 
-      {/* Toolbar Controls */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div className="relative w-full sm:max-w-sm">
-          <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground/70" />
-          <Input
-            placeholder="Search depot names, cities, states..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-9 text-xs w-full"
+      {/* Toolbar / Search Filter */}
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4">
+        <div className="w-full flex flex-col sm:flex-row gap-2 sm:max-w-2xl">
+          <SearchInput
+            placeholder="Search location name, code, city, manager..."
+            searchQuery={searchQuery}
+            setSearchQuery={setSearchQuery}
+            isLoading={isValidating && !isLoading}
           />
+
+          <div className="flex gap-2">
+            <div className="w-full ">
+              <Select value={type} onValueChange={handleTypeChange}>
+                <SelectTrigger className="h-9 text-xs">
+                  <SelectValue placeholder="Facility Type" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="ALL">All Types</SelectItem>
+                  <SelectItem value="WAREHOUSE">Warehouse</SelectItem>
+                  <SelectItem value="STORE">Retail Store</SelectItem>
+                  <SelectItem value="FULFILLMENT_CENTER">Fulfillment Center</SelectItem>
+                  <SelectItem value="TRANSIT">Transit Hub</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div>
+              <Select value={status} onValueChange={handleStatusChange}>
+                <SelectTrigger className="h-9 text-xs">
+                  <SelectValue placeholder="Status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="ALL">All Statuses</SelectItem>
+                  <SelectItem value="ACTIVE">Active</SelectItem>
+                  <SelectItem value="INACTIVE">Inactive</SelectItem>
+                  <SelectItem value="MAINTENANCE">Maintenance</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
         </div>
 
-        <div className="text-xs text-muted-foreground font-medium bg-muted/50 border px-3 py-1.5 rounded-lg flex items-center gap-1.5 self-start sm:self-auto">
-          <Warehouse className="w-3.5 h-3.5 text-muted-foreground" />
-          Active Facilities: <span className="font-bold text-foreground">{locations.length}</span>
+        <div className="text-xs text-muted-foreground font-medium bg-muted/50 border px-3 py-1.5 rounded-lg flex items-center gap-1.5 self-start sm:self-auto shrink-0">
+          <Building className="w-3.5 h-3.5 text-muted-foreground" />
+          Configured Locations:{" "}
+          <span className="font-bold text-foreground">{totalRecords}</span>
         </div>
       </div>
 
-      {/* Core Locations Registry Table Layout */}
-      {isLoading ? (
-        <div className="p-16 text-center text-xs text-muted-foreground italic bg-card border rounded-xl shadow-sm">
-          Loading fulfillment infrastructure indices...
-        </div>
-      ) : filteredLocations.length === 0 ? (
-        <div className="p-16 text-center text-xs text-muted-foreground border-dashed border-2 rounded-xl bg-card">
-          No facility records matching your search queries found.
-        </div>
-      ) : (
-        <div className="border rounded-xl bg-card shadow-sm overflow-hidden divide-y divide-border">
-          {filteredLocations.map((loc) => {
-            const isRowExpanded = !!expandedRows[loc.inflowId];
-            return (
-              <div key={loc.inflowId} className="flex flex-col transition-all group">
-                
-                {/* Primary Hub Summary Container */}
-                <div className="p-4 grid grid-cols-1 md:grid-cols-12 gap-4 items-start md:items-center bg-card hover:bg-muted/5 transition-colors">
-                  
-                  {/* Identity Column */}
-                  <div className="flex items-start gap-3 min-w-0 md:col-span-5">
-                    {/* Expand Sub-zones Toggler Button */}
-                    <button
-                      type="button"
-                      onClick={() => toggleRowExpand(loc.inflowId)}
-                      className="mt-0.5 text-muted-foreground hover:bg-muted p-1 rounded transition-colors shrink-0"
-                      title="Inspect Sublocations Structure"
-                    >
-                      {isRowExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-                    </button>
+      {/* Locations Table */}
+      <div className="space-y-4">
+        <div className="border rounded-xl bg-card shadow-2xs overflow-hidden">
+          <Table>
+            <TableHeader className="bg-muted/40">
+              <TableRow className="border-b border-border hover:bg-transparent">
+                <TableHead className="w-[40px] p-3 text-center" />
+                <TableHead className="w-[180px] text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                  Facility Name
+                </TableHead>
+                <TableHead className="w-[130px] text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                  Type
+                </TableHead>
+                <TableHead className="w-[150px] text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                  City / Country
+                </TableHead>
+                <TableHead className="w-[100px] text-center text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                  Status
+                </TableHead>
+                <TableHead className="w-[100px] text-center text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                  Sublocations
+                </TableHead>
+                <TableHead className="w-[110px] text-center text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                  Stock Units
+                </TableHead>
+                <TableHead className="w-[80px] text-right pr-5 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                  Actions
+                </TableHead>
+              </TableRow>
+            </TableHeader>
 
-                    <div className="w-9 h-9 rounded-xl border bg-muted/40 flex items-center justify-center text-muted-foreground shrink-0">
-                      <Warehouse className="w-4 h-4 text-slate-600 dark:text-slate-400" />
-                    </div>
-
-                    <div className="min-w-0 space-y-1">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <h3 className="text-sm font-bold text-foreground tracking-tight truncate">
-                          {loc.name}
-                        </h3>
-                        {/* Status Badges Group */}
-                        {loc.isDefault && (
-                          <Badge className="text-[10px] tracking-tight bg-blue-500 hover:bg-blue-500 text-white font-semibold h-4 px-1.5 shrink-0">
-                            System Default Site
-                          </Badge>
-                        )}
-                        {!loc.isActive && (
-                          <Badge variant="destructive" className="text-[10px] tracking-tight font-semibold h-4 px-1.5 shrink-0">
-                            Offline / Suspended
-                          </Badge>
-                        )}
-                      </div>
-
-                      {/* Map Location String Indicator */}
-                      <p className="text-xs text-muted-foreground flex items-center gap-1 truncate">
-                        <MapPin className="w-3 h-3 shrink-0 text-muted-foreground/60" />
-                        {loc.formattedAddress || <span className="italic opacity-60">Physical address configuration missing</span>}
+            <TableBody className="text-xs font-medium divide-y divide-border/60">
+              {isLoading ? (
+                <TableRow>
+                  <TableCell colSpan={9} className="p-20 text-center text-xs text-muted-foreground bg-card italic">
+                    <RefreshCw className="h-5 w-5 animate-spin mx-auto mb-2 text-primary" />
+                    Synchronizing enterprise facilities data...
+                  </TableCell>
+                </TableRow>
+              ) : locations.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={9}>
+                    <div className="border border-dashed rounded-xl p-8 text-center bg-muted/20">
+                      <Building2 className="w-8 h-8 text-muted-foreground/50 mx-auto mb-2" />
+                      <p className="text-xs font-medium text-muted-foreground">
+                        No location facilities match the specified search and filter criteria.
                       </p>
-                    </div>
-                  </div>
-
-                  {/* Operational Relational Asset Metrics (Grid aligned on desktop) */}
-                  <div className="grid grid-cols-2 sm:grid-cols-4 md:flex md:items-center gap-4 text-[11px] font-medium text-muted-foreground pl-8 md:pl-0 md:col-span-5">
-                    
-                    {/* Storage Zones */}
-                    <div className="flex items-center gap-1.5">
-                      <Layers className="w-3.5 h-3.5 text-blue-500/80 shrink-0" />
-                      <span>
-                        <strong className="text-foreground">{loc.sublocationsCount}</strong> {loc.sublocationsCount === 1 ? "Zone" : "Zones"}
-                      </span>
-                    </div>
-
-                    {/* Active Lines */}
-                    <div className="flex items-center gap-1.5">
-                      <Boxes className="w-3.5 h-3.5 text-emerald-500/80 shrink-0" />
-                      <span className="truncate">
-                        <strong className="text-foreground">{loc.inventoryItemsCount}</strong> Active lines
-                      </span>
-                    </div>
-
-                    {/* Sales Orders Metric */}
-                    <div className="flex items-center gap-1.5" title={`${loc.totalSalesOrdersCount} total lifetime orders`}>
-                      <ShoppingBag className="w-3.5 h-3.5 text-amber-500/80 shrink-0" />
-                      <span className="truncate">
-                        <strong className="text-foreground">{loc.activeSalesOrdersCount}</strong> Orders
-                      </span>
-                    </div>
-
-                    {/* Status Operational Metric */}
-                    <div className="flex items-center gap-1">
-                      {loc.isActive ? (
-                        <span className="inline-flex items-center gap-1 text-emerald-600"><CheckCircle2 className="w-3 h-3 shrink-0" /> Ready</span>
-                      ) : (
-                        <span className="inline-flex items-center gap-1 text-destructive"><XCircle className="w-3 h-3 shrink-0" /> Locked</span>
+                      {(status !== "ALL" || type !== "ALL" || searchQuery !== "") && (
+                        <Button variant="link" size="sm" onClick={handleResetFilters} className="mt-1 text-xs">
+                          Clear Filters
+                        </Button>
                       )}
                     </div>
-                  </div>
+                  </TableCell>
+                </TableRow>
+              ) : (
+                locations.map((location) => {
+                  const isExpanded = !!expandedRows[location.id];
+                  const isInactive = location.status === "INACTIVE";
 
-                  {/* Operational Action Column */}
-                  <div className="flex items-center justify-end pl-8 md:pl-0 md:col-span-2 w-full">
-                    <Link
-                      href={`/dashboard/locations/${loc.id}`}
-                      className="w-full md:w-auto inline-flex items-center justify-center gap-1 rounded-xl bg-slate-50 dark:bg-slate-900 px-4 py-2 text-xs font-bold border border-slate-200 dark:border-slate-800 hover:bg-slate-900 dark:hover:bg-slate-50 hover:text-white dark:hover:text-slate-900 transition-all shadow-2xs"
-                    >
-                      Overview
-                      <ArrowRight className="h-3.5 w-3.5 transform transition-transform group-hover:translate-x-0.5" />
-                    </Link>
-                  </div>
-                </div>
+                  const locationOptions = locations.filter(loc => loc.id !== location.id);
 
-                {/* Dropdown Section: Render Sublocations Rows Inside This Hub Node */}
-                {isRowExpanded && (
-                  <div className="bg-muted/10 px-6 md:px-16 py-4 border-t border-b border-border flex flex-col gap-2">
-                    <h4 className="text-[10px] uppercase font-bold tracking-wider text-muted-foreground/80">
-                      Mapped Internal Sublocation Zones Matrix
-                    </h4>
-                    {loc.sublocationsList.length === 0 ? (
-                      <p className="text-xs text-muted-foreground/60 italic py-1">
-                        No internal staging zones or storage aisles configured. Items are mapped directly to the facility floor.
-                      </p>
-                    ) : (
-                      <div className="flex flex-wrap gap-1.5 pt-1">
-                        {loc.sublocationsList.map((sub) => (
-                          <div key={sub.id} className="text-xs bg-background border rounded-lg px-2.5 py-1 font-medium text-foreground flex items-center gap-1.5 shadow-2xs">
-                            <span className="w-1.5 h-1.5 bg-slate-400 dark:bg-slate-600 rounded-full shrink-0" />
-                            {sub.name}
+                  return (
+                    <React.Fragment key={location.id}>
+                      <TableRow className={`hover:bg-muted/40 transition-colors group align-middle ${isInactive ? "bg-muted/5 opacity-75" : ""}`}>
+                        {/* Expand Toggle Button */}
+                        <TableCell className="p-3 text-center align-middle">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="size-7"
+                            onClick={() => toggleRowExpand(location.id)}
+                          >
+                            {isExpanded ? (
+                              <ChevronDown className="h-4 w-4" />
+                            ) : (
+                              <ChevronRight className="h-4 w-4" />
+                            )}
+                          </Button>
+                        </TableCell>
+
+                        {/* Facility Name */}
+                        <TableCell className="p-3.5 align-middle">
+                          <div className="font-semibold text-foreground text-xs leading-tight">
+                            {location.name}
                           </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                )}
+                          {location.managerName && (
+                            <div className="text-[10px] text-muted-foreground flex items-center gap-1 mt-0.5">
+                              <User className="w-2.5 h-2.5 shrink-0" />
+                              <span className="truncate">{location.managerName}</span>
+                            </div>
+                          )}
+                        </TableCell>
 
-              </div>
-            );
-          })}
+                        {/* Facility Type */}
+                        <TableCell className="p-3.5 align-middle">
+                          <Badge
+                            variant="outline"
+                            className={`text-[10px] px-1.5 py-0 h-5 font-semibold border ${getTypeBadgeVariant(location.type)}`}
+                          >
+                            {location.type ? location.type.replace(/_/g, " ") : "UNSPECIFIED"}
+                          </Badge>
+                        </TableCell>
+
+                        {/* City / Country */}
+                        <TableCell className="p-3.5 align-middle">
+                          <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                            <MapPin className="w-3.5 h-3.5 text-muted-foreground/70 shrink-0" />
+                            <span className="truncate">{location.city}, {location.country}</span>
+                          </div>
+                        </TableCell>
+
+                        {/* Status Badge */}
+                        <TableCell className="p-3.5 align-middle text-center">
+                          <Badge
+                            variant="outline"
+                            className={`text-[10px] px-1.5 py-0 h-5 font-semibold border ${getStatusBadgeVariant(location.status)}`}
+                          >
+                            {location.status}
+                          </Badge>
+                        </TableCell>
+
+                        {/* Sublocation Count Badge */}
+                        <TableCell className="p-3.5 align-middle text-center">
+                          <Badge variant="secondary" className="text-[10px] font-mono px-2 py-0.5">
+                            <Layers className="w-3 h-3 mr-1 inline-block" />
+                            {location.sublocationCount}
+                          </Badge>
+                        </TableCell>
+
+                        {/* Stock Units */}
+                        <TableCell className="p-3.5 align-middle text-center font-mono text-muted-foreground">
+                          {location.totalStockUnits.toLocaleString()} units
+                        </TableCell>
+
+                        {/* Actions Menu */}
+                        <TableCell className="p-3.5 pr-5 align-middle text-right">
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="icon" className="size-8">
+                                <MoreHorizontal className="w-4 h-4" />
+                                <span className="sr-only">Open location menu</span>
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem asChild>
+                                <Link
+                                  href={`/dashboard/locations/${location.id}`}
+                                >
+                                  <Eye className="w-3.5 h-3.5 mr-2" /> Overview
+                                </Link>
+                              </DropdownMenuItem>
+                              <DropdownMenuItem asChild>
+                                <Link href={`/dashboard/locations/${location.id}/edit`}>
+                                  <Edit3 className="w-3.5 h-3.5 mr-2" /> Edit Details
+                                </Link>
+                              </DropdownMenuItem>
+
+                              <DropdownMenuSeparator />
+
+                              {location.status !== "ACTIVE" && (
+                                <DropdownMenuItem
+                                  className="text-emerald-600 focus:text-emerald-700"
+                                  onClick={() =>
+                                    openStatusActionModal(
+                                      location,
+                                      "ACTIVE",
+                                      "Set Facility Active",
+                                      "Are you sure you want to enable operations for this location?",
+                                      "Location is now set to active."
+                                    )
+                                  }
+                                >
+                                  <CheckCircle2 className="w-3.5 h-3.5 mr-2" /> Set Active
+                                </DropdownMenuItem>
+                              )}
+
+                              {location.status !== "MAINTENANCE" && (
+                                <DropdownMenuItem
+                                  className="text-amber-600 focus:text-amber-700"
+                                  onClick={() =>
+                                    openStatusActionModal(
+                                      location,
+                                      "MAINTENANCE",
+                                      "Set Under Maintenance",
+                                      "Flag location as under maintenance? Dispatches may be suspended.",
+                                      "Location is now flagged under maintenance."
+                                    )
+                                  }
+                                >
+                                  <Wrench className="w-3.5 h-3.5 mr-2" /> Set Maintenance
+                                </DropdownMenuItem>
+                              )}
+
+                              {location.status !== "INACTIVE" && (
+                                <DropdownMenuItem
+                                  onClick={() =>
+                                    openStatusActionModal(
+                                      location,
+                                      "INACTIVE",
+                                      "Deactivate Location",
+                                      "Deactivating will restrict new transfers and order dispatches to this site.",
+                                      "Location deactivated."
+                                    )
+                                  }
+                                >
+                                  <XCircle className="w-3.5 h-3.5 mr-2" /> Deactivate
+                                </DropdownMenuItem>
+                              )}
+
+                              <DropdownMenuSeparator />
+
+                              <DropdownMenuItem variant="destructive" asChild>
+                                <LocationDeleteButton
+                                  locationId={location.inflowId} 
+                                  locationName={location.name}
+                                  availableLocations={locationOptions.map(item => ({
+                                    id: item.inflowId,
+                                    name: item.name
+                                  }))} 
+                                  endpointUrl={`/api/admin/locations`}
+                                  onSuccess={() => mutate()} 
+                                  variant="full"
+                                />
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </TableCell>
+                      </TableRow>
+
+                      {/* Expanded Accordion Breakdown */}
+                      {isExpanded && (
+                        <TableRow className="bg-muted/15 border-b hover:bg-muted/15">
+                          <TableCell colSpan={9} className="p-4">
+                            <div className="space-y-4 pl-8">
+                              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 p-3 bg-card border rounded-lg shadow-2xs">
+                                {/* Address Breakdown */}
+                                <div className="space-y-1">
+                                  <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1">
+                                    <MapPin className="w-3 h-3" /> Full Address
+                                  </span>
+                                  <p className="text-xs font-medium text-foreground">
+                                    {location.addressLine1}
+                                    {location.addressLine2 && `, ${location.addressLine2}`}
+                                  </p>
+                                  <p className="text-[11px] text-muted-foreground">
+                                    {location.city}{location.state ? `, ${location.state}` : ""} {location.postalCode || ""}
+                                  </p>
+                                  <p className="text-[11px] font-semibold text-foreground">{location.country}</p>
+                                </div>
+
+                                {/* Contact Person */}
+                                <div className="space-y-1">
+                                  <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1">
+                                    <User className="w-3 h-3" /> Contact & Teams
+                                  </span>
+                                  <p className="text-xs font-medium text-foreground">
+                                    {location.managerName || "No Manager Assigned"}
+                                  </p>
+                                  {location.email && (
+                                    <div className="text-[11px] text-muted-foreground flex items-center gap-1">
+                                      <Mail className="w-3 h-3" /> {location.email}
+                                    </div>
+                                  )}
+                                  {location.phone && (
+                                    <div className="text-[11px] text-muted-foreground flex items-center gap-1">
+                                      <Phone className="w-3 h-3" /> {location.phone}
+                                    </div>
+                                  )}
+                                  <div className="text-[11px] text-muted-foreground flex items-center gap-1 pt-1">
+                                    <Users className="w-3 h-3" /> Assigned Teams: <strong className="text-foreground">{location.teams}</strong>
+                                  </div>
+                                </div>
+
+                                {/* Logistics Metrics */}
+                                <div className="space-y-1">
+                                  <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1">
+                                    <Package className="w-3 h-3" /> Operations Overview
+                                  </span>
+                                  <div className="text-xs text-muted-foreground font-mono">
+                                    Total On-Hand Stock: <strong className="text-foreground">{location.totalStockUnits.toLocaleString()} units</strong>
+                                  </div>
+                                  <div className="text-xs text-muted-foreground font-mono">
+                                    Active Dispatches: <strong className="text-foreground">{location.activeOrdersCount} orders</strong>
+                                  </div>
+                                  <div className="text-[10px] text-muted-foreground font-mono pt-1">
+                                    Created: {new Date(location.createdAt).toLocaleDateString()}
+                                  </div>
+                                </div>
+                              </div>
+
+                              {/* Sublocations List */}
+                              {location.sublocations && location.sublocations.length > 0 && (
+                                <div className="p-3 bg-card border rounded-lg shadow-2xs space-y-2">
+                                  <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1">
+                                    <Layers className="w-3 h-3" /> Sublocations & Bins
+                                  </span>
+                                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
+                                    {location.sublocations.map((sub) => (
+                                      <div key={sub.id} className="p-2 border rounded bg-muted/20 flex flex-col justify-between">
+                                        <span className="font-semibold text-xs truncate">{sub.name}</span>
+                                        <span className="text-[10px] text-muted-foreground flex items-center gap-1 mt-1 font-mono">
+                                          <Box className="w-2.5 h-2.5" /> {sub.binCount} bins
+                                        </span>
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      )}
+                    </React.Fragment>
+                  );
+                })
+              )}
+            </TableBody>
+          </Table>
         </div>
-      )}
+
+        {/* Pagination */}
+        <DataTablePagination
+          pageIndex={pageIndex}
+          pageSize={PAGE_SIZE}
+          pageCount={pageCount}
+          totalRecords={totalRecords}
+          loading={isLoading}
+          onPageChange={(nextIndex: number) => setPageIndex(nextIndex)}
+        />
+      </div>
+
+      {/* View Location Details Dialog */}
+
+      {/* Status Update Confirmation Dialog */}
+      <Dialog open={!!activeAction} onOpenChange={() => setActiveAction(null)}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="text-sm">{activeAction?.title}</DialogTitle>
+            <DialogDescription className="text-xs">
+              {activeAction?.description}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button variant="outline" size="sm" onClick={() => setActiveAction(null)}>
+              Cancel
+            </Button>
+            <Button size="sm" onClick={handleStatusUpdate}>
+              Confirm
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

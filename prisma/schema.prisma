@@ -1122,6 +1122,12 @@ model ProductTag {
   @@map("product_tag")
 }
 
+enum LocationStatus {
+  ACTIVE
+  INACTIVE
+  MAINTENANCE
+}
+
 
 // Locations
 
@@ -1132,6 +1138,7 @@ model Location {
   isActive        Boolean  @default(true)
   isDefault       Boolean  @default(false)
   url             String?
+  status          LocationStatus @default(ACTIVE)
   
   address             LocationAddress?
   inventories         Inventory[]
@@ -1144,6 +1151,9 @@ model Location {
   customers           Customer[]
   salesOrders         SalesOrder[]
   purchaseOrders      PurchaseOrder[]
+
+  ledgerFromLocations InventoryLedger[] @relation("LedgerFromLocation")
+  ledgerToLocations InventoryLedger[] @relation("LedgerToLocation")
   
   outgoingTransfers TransferOrder[] @relation("TransferSourceLocation")
   incomingTransfers TransferOrder[]  @relation("TransferTargetLocation")
@@ -1526,6 +1536,8 @@ model InventoryLedger {
   sublocation      Sublocation?             @relation(fields: [sublocationId], references: [id], onDelete: SetNull)
   performedBy      TeamMember?              @relation(fields: [performedById], references: [inflowId], onDelete: SetNull)
   inventoryBinItem    InventoryBinItem?           @relation(fields: [inventoryBinItemId], references: [id], onDelete: SetNull)
+  fromLocation        Location? @relation("LedgerFromLocation", fields: [fromLocationId], references: [inflowId], onDelete: SetNull)
+  toLocation        Location? @relation("LedgerToLocation", fields: [toLocationId], references: [inflowId], onDelete: SetNull)
 
   createdAt        DateTime                 @default(now())
 
@@ -2805,6 +2817,21 @@ model SalesOrder {
   @@map("sales_order")
 }
 
+enum SalesOrderPaymentStatus {
+  OWING
+  UNINVOICED
+  INVOICED
+  QUOTE
+  PAID
+}
+
+enum SalesOrderInventoryStatus {
+  STARTED
+  UNFULFILLED
+  FULFILLED  
+  QUOTE
+}
+
 model SalesOrderLocationMap {
   id             String       @id @default(cuid())
   salesOrderId  String       // References SalesOrder.inflowId
@@ -3005,20 +3032,7 @@ model SalesOrderAttachment {
   @@map("sales_order_attachment")
 }
 
-enum SalesOrderPaymentStatus {
-  OWING
-  UNINVOICED
-  INVOICED
-  QUOTE
-  PAID
-}
 
-enum SalesOrderInventoryStatus {
-  STARTED
-  UNFULFILLED
-  FULFILLED  
-  QUOTE
-}
 
 model InventoryReservation {
   id          String @id @default(cuid())
