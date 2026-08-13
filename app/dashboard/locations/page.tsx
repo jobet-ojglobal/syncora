@@ -144,7 +144,7 @@ export default function LocationListPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [pageIndex, setPageIndex] = useState(0);
-  const PAGE_SIZE = 10;
+  const PAGE_SIZE = 50;
 
   const [status, setStatus] = useState<string>("ALL");
   const [type, setType] = useState<string>("ALL");

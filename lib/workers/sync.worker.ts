@@ -21,6 +21,7 @@ import { ProductSyncService } from "@/lib/inflow/services/product-sync.service";
 import { ProductGroupSyncService } from "../inflow/services/product-group-sync.service";
 import { SalesOrderSyncService } from "../inflow/services/sales-order-sync.service";
 import { PurchaseOrderSyncService } from "../inflow/services/purchase-order-sync.service";
+import { SublocationInventoryAdjustOutSyncService } from "../inflow/services/out-sync-sublocation-inventory-adjust-stock";
 
 // Local Imports
 import { CategorySyncMapService as LocalCategorySyncMapService } from "../locations/services/batch-category-sync-map";
@@ -51,6 +52,9 @@ const productCostAdjustmentService = new ProductCostAdjustmentSyncService();
 const paymentTermService = new PaymentTermSyncService();
 const salesOrderService = new SalesOrderSyncService();
 const purchaseOrderService = new PurchaseOrderSyncService();
+
+// cloud outsync
+const subInventoryOutSyncService = new SublocationInventoryAdjustOutSyncService();
 
 // Local Service 
 const categoryServiceLocal = new LocalCategorySyncMapService();
@@ -113,7 +117,8 @@ interface SyncWebhookJobData {
   jobId: string;
   source: string;
   includes: any;
-  selectedRecords: string[];
+  selectedRecords?: string[];
+  selectedLocations?: string[];
   syncedAll: boolean;
   brandCustomName: string;
   after: string;
@@ -162,7 +167,7 @@ const safeUpdateJob = async (jobId: string, progress: number) => {
 const worker = new Worker<SyncWebhookJobData>(
   "sync",
   async (job: Job<SyncWebhookJobData>) => {
-    const { jobId, source, includes, location, selectedRecords, syncedAll, brandCustomName, after } = job.data;
+    const { jobId, source, includes, location, selectedRecords = [] , selectedLocations = [], syncedAll, brandCustomName, after } = job.data;
 
     const locationUrl = (location?.url && location.url.trim() !== "") ? location.url : null;
 
@@ -332,6 +337,12 @@ const worker = new Worker<SyncWebhookJobData>(
         case "purchase_orders":
           result = await purchaseOrderService.sync(syncOptions);
           break;
+
+        // cloud outsync
+        case "outsync_inventory_levels":
+          result = await subInventoryOutSyncService.sync(syncOptions, selectedLocations, selectedRecords, syncedAll, brandCustomName, ["UpsertProduct","StockAdjustLocal"]);
+          break;
+          
         case "test":
           result = await testService.sync(source, syncOptions);
           break;
@@ -405,6 +416,10 @@ process.on("SIGTERM", async () => {
 });
 
 
+
+function sync(options: any, SyncOptions: any, arg2: any, arg3: any, arg4: any, arg5: any) {
+  throw new Error("Function not implemented.");
+}
  // } catch (error) {
     //   await prisma.syncJob.update({
     //     where: { id: jobId },

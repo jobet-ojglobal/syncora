@@ -8,6 +8,7 @@ import { WebhookService } from "@/services/webhook.service";
 import { UI_TO_API_ITEM_TYPE } from "@/types/local-location.type";
 import { BrandService } from "@/services/brand.service";
 import { toJsonInput } from "@/lib/inflow/services/helpers";
+import { InflowCustomFields } from "@/lib/inflow/types";
 
 // export async function GET() {
 //   try {
@@ -415,7 +416,8 @@ export async function POST(request: NextRequest) {
           cost: true,
           prices: true,
           barcodes: true,
-          images: true
+          images: true,
+          brand: true
         }
       });
 
@@ -507,6 +509,27 @@ export async function POST(request: NextRequest) {
         });
       }
 
+      let setCategoryId: string | null = newProduct.categoryId;
+
+      if(!newProduct.categoryId) {
+        const defaultCategory = await tx.category.findFirst({
+          where: { isDefault: true }
+        });
+        setCategoryId = defaultCategory?.inflowId || null;
+      } 
+
+      const customFields: InflowCustomFields = {};
+      const brandCustomName = "custom1";
+
+      const brandName = newProduct.brand?.name;
+      if (brandName) {
+        if (brandCustomName) {
+          customFields[brandCustomName as keyof InflowCustomFields] = brandName;
+        } else {
+          customFields.custom1 = brandName;
+        }
+      }
+
       const inflowPayload = {
         cloudId: newProduct.inflowId,
         sku: newProduct.sku,
@@ -515,7 +538,7 @@ export async function POST(request: NextRequest) {
         description: newProduct.description,
         itemType: newProduct.itemType,
         brandId: newProduct.brandId,
-        categoryId: newProduct.categoryId,
+        categoryId: setCategoryId,
         autoAssemble: newProduct.autoAssemble,
         isActive: newProduct.isActive,
         isManufacturable: newProduct.isManufacturable,
@@ -534,6 +557,7 @@ export async function POST(request: NextRequest) {
         originCountry: newProduct.originCountry,
         hsTariffNumber: newProduct.hsTariffNumber,
         remarks: newProduct.remarks,
+        customFields,
 
         defaultImageId: null,
         
@@ -1171,11 +1195,32 @@ export async function PATCH(request: NextRequest) {
           prices: true,
           barcodes: true,
           images: true,
-          category: true
+          brand: true
         } 
       });
 
       if(!updatedProduct) return { databaseRecord: null, inflowPayload: null }
+
+      let setCategoryId: string | null = updatedProduct.categoryId;
+
+      if(!updatedProduct.categoryId) {
+        const defaultCategory = await tx.category.findFirst({
+          where: { isDefault: true }
+        });
+        setCategoryId = defaultCategory?.inflowId || null;
+      } 
+
+      const customFields: InflowCustomFields = {};
+      const brandCustomName = "custom1";
+
+      const brandName = updatedProduct.brand?.name;
+      if (brandName) {
+        if (brandCustomName) {
+          customFields[brandCustomName as keyof InflowCustomFields] = brandName;
+        } else {
+          customFields.custom1 = brandName;
+        }
+      }
 
       // C. Extract structural object tree configuration to safely handle outbound pipeline tasks
       const inflowPayload = {
@@ -1186,7 +1231,7 @@ export async function PATCH(request: NextRequest) {
         description: updatedProduct.description,
         itemType: updatedProduct.itemType,
         brandId: updatedProduct.brandId,
-        categoryId: updatedProduct.categoryId,
+        categoryId: setCategoryId,
         autoAssemble: updatedProduct.autoAssemble,
         isActive: updatedProduct.isActive,
         isManufacturable: updatedProduct.isManufacturable,
@@ -1205,12 +1250,7 @@ export async function PATCH(request: NextRequest) {
         originCountry: updatedProduct.originCountry,
         hsTariffNumber: updatedProduct.hsTariffNumber,
         remarks: updatedProduct.remarks,
-        category: {
-          categoryId: updatedProduct.category?.inflowId,
-          name: updatedProduct.category?.name,
-          isDefault: false,
-          parentCategoryId: null
-        },
+        customFields,
 
         defaultImageId: null,
         

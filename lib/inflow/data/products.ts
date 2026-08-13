@@ -113,6 +113,13 @@ export async function getProduct(productId: string) {
   );
 }
 
+export async function checkCloudProduct(productId: string) {
+  return inflow.get<InflowProduct>(
+    `/products/${productId}`
+  );
+}
+
+// lib\inflow\data\products.ts
 export async function upsertProduct(payload: Partial<InflowProduct>) {
   return inflow.put<InflowProduct>("/products", payload);
 }

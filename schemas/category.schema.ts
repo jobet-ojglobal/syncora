@@ -7,6 +7,7 @@ export const categorySchema = z.object({
   description: z.string().optional().nullable(),
   imageUrl: z.string().url("Must be a valid image URL").or(z.literal("")).optional().nullable(),
   parentId: z.string().optional().nullable(),
+  isDefault: z.boolean(),
 });
 
 export type CategoryInput = z.infer<typeof categorySchema>;

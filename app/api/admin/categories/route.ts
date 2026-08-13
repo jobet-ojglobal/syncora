@@ -43,7 +43,7 @@ export async function POST(
 ) {
   try {
     const body = await request.json();
-    const { name, description, imageUrl, parentId } = body;
+    const { name, description, imageUrl, parentId, isDefault } = body;
 
     if (!name?.trim()) {
       return NextResponse.json({ error: "Name is a required payload token" }, { status: 400 });
@@ -59,7 +59,7 @@ export async function POST(
 
     const newCategory =
       await CategoryService.createCategory({
-        name, description, imageUrl, parentId: parentCategory ,
+        name, isDefault , description, imageUrl, parentId: parentCategory ,
       });
 
     // Re-map structural fields targeting Cloud Global Identifiers
@@ -134,7 +134,7 @@ export async function PATCH(
 ) {
   try {
     const body = await request.json();
-    const { id, name, description, imageUrl, parentId } = body;
+    const { id,  name, isDefault ,  description, imageUrl, parentId } = body;
 
     if (!id) {
       return NextResponse.json({ error: "Missing required id target pointer token" }, { status: 400 });
@@ -158,7 +158,7 @@ export async function PATCH(
     const parentCategory = parentId == 'root-level' ? null : parentId;
 
     const updatedCategory = await CategoryService.updateCategory({
-      id, name, description, imageUrl, parentId: parentCategory,
+      id, name, isDefault , description, imageUrl, parentId: parentCategory,
     });
 
     // Re-map structural fields targeting Cloud Global Identifiers

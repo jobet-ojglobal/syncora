@@ -94,7 +94,14 @@ const midWorker = new Worker<MidWebhookJobData>(
             result = { success: true}
             break;
           case "PRODUCT_UPSERT_CLOUD": 
-            await upsertCloudProduct(payload);
+            const upsertRes = await upsertCloudProduct(payload);
+            if(upsertRes.productId) {
+              await prisma.product.update({
+                where: { inflowId: upsertRes.productId },
+                data: { isCloudSynced: true }
+              });
+            }
+           
             result = { success: true}
             break;
           
