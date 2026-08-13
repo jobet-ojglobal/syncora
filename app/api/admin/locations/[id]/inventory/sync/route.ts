@@ -48,6 +48,10 @@ export async function POST(
             images: { orderBy: { position: "asc" } },
             salesUom: { include: { uom: true } },
             purchasingUom: { include: { uom: true } },
+<<<<<<< HEAD
+=======
+            category: true
+>>>>>>> f774fa4d46540598445552ff7ba82d06bcdf5aad
           },
         },
         bins: {
@@ -162,6 +166,11 @@ export async function POST(
         hsTariffNumber: product.hsTariffNumber,
         remarks: product.remarks,
 
+<<<<<<< HEAD
+=======
+        // category: 
+
+>>>>>>> f774fa4d46540598445552ff7ba82d06bcdf5aad
         defaultImageId: null,
         lastModifiedById: null,
         lastModifiedDateTime: null,
@@ -232,7 +241,11 @@ export async function POST(
           timestamp: new Date().toISOString(),
         },
         {
+<<<<<<< HEAD
           attempts: 3,
+=======
+          attempts: 0,
+>>>>>>> f774fa4d46540598445552ff7ba82d06bcdf5aad
           backoff: { type: "exponential", delay: 2000 },
           removeOnComplete: true,
         }

@@ -6,6 +6,7 @@ import { useParams } from "next/navigation";
 import useSWR from "swr";
 import { Warehouse, RefreshCw, CloudSync, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+<<<<<<< HEAD
 import {
   AlertDialog,
   AlertDialogAction,
@@ -17,6 +18,9 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
+=======
+import { CloudSyncButton } from "@/components/integration/cloud-sync-button";
+>>>>>>> f774fa4d46540598445552ff7ba82d06bcdf5aad
 
 // Custom Sub-components
 import { StorageInspectionModalEnhance, InspectionItem } from "@/components/inventory/storage-inspection-modal";
@@ -25,6 +29,7 @@ import { InventoryTable } from "./InventoryTable";
 import { ReplenishmentSettingsModal } from "@/components/inventory/replenishment-settings-modal";
 import { InventorySummaryCards } from "./SummaryCards";
 import { Location } from "@/types/location.type";
+import { CloudSyncSublocationButton } from "@/components/integration/cloud-sync-sublocation-button";
 
 const fetcher = (url: string) => fetch(url).then((res) => res.json());
 
@@ -34,7 +39,7 @@ export default function LocationInventoryPage() {
   // Local Modal States
   const [activeInspectionItem, setActiveInspectionItem] = useState<InspectionItem | null>(null);
   const [selectedReplenishItem, setSelectedReplenishItem] = useState<any | null>(null);
-  const [isReplenishModalOpen, setIsReplenishModalOpen] = useState(false);
+  const [isReplenishModalOpen, setIsReplenishModalOpen] = useState<boolean>(false);
 
   // Sync Modal & State
   const [isSyncConfirmOpen, setIsSyncConfirmOpen] = useState(false);
@@ -87,7 +92,7 @@ export default function LocationInventoryPage() {
 
   return (
     <div className="w-full max-w-7xl mx-auto p-6 space-y-6">
-      {/* Top Header Bar */}
+      {/* Header Bar */}
       <div className="flex flex-col gap-2">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b pb-5">
           <div className="flex items-start gap-3">
@@ -103,7 +108,16 @@ export default function LocationInventoryPage() {
               </p>
             </div>
           </div>
-          <div className="flex gap-2">
+
+          <div className="flex items-center gap-2">
+            {/* Extracted Cloud Sync Component */}
+            <CloudSyncSublocationButton
+              source="outsync_inventory_levels"
+              locationId={location?.inflowId}
+              locationName={location?.name}
+              onSyncComplete={refreshAllData}
+            />
+
             <Button
               variant="outline"
               size="sm"
@@ -127,6 +141,7 @@ export default function LocationInventoryPage() {
               <RefreshCw className="w-3.5 h-3.5" />
               Refresh Data
             </Button>
+
             <Button asChild size="sm" className="h-8 gap-1.5 text-xs">
               <Link href="/dashboard/inventory/stocks/new">Post Adjustment</Link>
             </Button>
@@ -134,13 +149,17 @@ export default function LocationInventoryPage() {
         </div>
       </div>
 
-      {/* Summary Card */}
+      {/* Summary Cards */}
       <InventorySummaryCards locationId={locationId} />
 
       {/* Inbound Freight Pipeline */}
       <InboundTransitMonitor locationId={locationId} />
 
+<<<<<<< HEAD
       {/* Paginated Inventory Table Component */}
+=======
+      {/* Inventory Table Component */}
+>>>>>>> f774fa4d46540598445552ff7ba82d06bcdf5aad
       <InventoryTable
         locationId={locationId}
         locationInflowId={location?.inflowId}
@@ -204,6 +223,409 @@ export default function LocationInventoryPage() {
     </div>
   );
 }
+
+// 8/13/26
+// "use client";
+
+// import { useEffect, useRef, useState } from "react";
+// import Link from "next/link";
+// import { useParams } from "next/navigation";
+// import useSWR from "swr";
+// import {
+//   Warehouse,
+//   RefreshCw,
+//   CloudSync,
+//   Loader2,
+//   XCircle,
+//   CheckCircle2,
+//   AlertTriangle,
+//   Trash2,
+// } from "lucide-react";
+// import { Button } from "@/components/ui/button";
+// import { Progress } from "@/components/ui/progress";
+// import {
+//   AlertDialog,
+//   AlertDialogAction,
+//   AlertDialogCancel,
+//   AlertDialogContent,
+//   AlertDialogDescription,
+//   AlertDialogFooter,
+//   AlertDialogHeader,
+//   AlertDialogTitle,
+// } from "@/components/ui/alert-dialog";
+// import { toast } from "sonner";
+
+// // Custom Sub-components
+// import {
+//   StorageInspectionModalEnhance,
+//   InspectionItem,
+// } from "@/components/inventory/storage-inspection-modal";
+// import { InboundTransitMonitor } from "@/components/transfer/inbound-pipeline-card";
+// import { InventoryTable } from "./InventoryTable";
+// import { ReplenishmentSettingsModal } from "@/components/inventory/replenishment-settings-modal";
+// import { InventorySummaryCards } from "./SummaryCards";
+// import { Location } from "@/types/location.type";
+
+// const fetcher = (url: string) => fetch(url).then((res) => res.json());
+
+// export default function LocationInventoryPage() {
+//   const { id: locationId } = useParams() as { id: string };
+//   const source = "PRODUCT_UPSERT_CLOUD";
+
+//   const [jobId, setJobId] = useState<string | null>(null);
+//   const [progress, setProgress] = useState<number>(0);
+//   const [status, setStatus] = useState<string>("");
+//   const [error, setError] = useState<string>("");
+//   const [showProgress, setShowProgress] = useState<boolean>(false);
+
+//   // Local Modal States
+//   const [activeInspectionItem, setActiveInspectionItem] = useState<InspectionItem | null>(null);
+//   const [selectedReplenishItem, setSelectedReplenishItem] = useState<any | null>(null);
+//   const [isReplenishModalOpen, setIsReplenishModalOpen] = useState<boolean>(false);
+
+//   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+//   // Sync Modal & State
+//   const [isSyncConfirmOpen, setIsSyncConfirmOpen] = useState<boolean>(false);
+//   const [isSyncing, setIsSyncing] = useState<boolean>(false);
+
+//   // 1. Fetch Location Metadata
+//   const { data: location, mutate: mutateLocation } = useSWR<Location>(
+//     locationId ? `/api/admin/locations/${locationId}/lookup` : null,
+//     fetcher
+//   );
+
+//   // 2. Fetch Locations Lookup for Replenishment Modal
+//   const { data: locations = [], isLoading: isLoadingLocations } = useSWR(
+//     "/api/locations/lookup",
+//     fetcher
+//   );
+
+//   // 3. Fetch Inbound Freight Pipeline
+//   const { data: inboundCargo = [], mutate: mutateInbound } = useSWR(
+//     locationId ? `/api/admin/locations/${locationId}/inbound-transit` : null,
+//     fetcher
+//   );
+
+//   const refreshAllData = async () => {
+//     await Promise.all([mutateLocation(), mutateInbound()]);
+//   };
+
+//   const handleCloudSync = async () => {
+//     try {
+//       setIsSyncing(true);
+
+//       const payload = {
+//         source,
+//         selectedLocations: [locationId],
+//         selectedRecords: [],
+//         syncedAll: true,
+//       };
+
+//       const res = await fetch(`/api/sync/cloud/out`, {
+//         method: "POST",
+//         headers: { "Content-Type": "application/json" },
+//         body: JSON.stringify(payload),
+//       });
+
+//       const data = await res.json();
+
+//       if (!res.ok) {
+//         throw new Error(data.error || "Failed to trigger cloud sync");
+//       }
+
+//       toast.success(data.message || "Cloud sync job queued successfully!");
+//       if (data.jobId) {
+//         setJobId(data.jobId);
+//         setStatus("pending");
+//         setProgress(0);
+//         setShowProgress(true);
+//       }
+//       await refreshAllData();
+//     } catch (err: any) {
+//       toast.error(err.message || "Cloud sync failed");
+//       setIsSyncing(false);
+//     } finally {
+//       setIsSyncConfirmOpen(false);
+//     }
+//   };
+
+//   useEffect(() => {
+//     let isMounted = true;
+//     async function checkForActiveJob() {
+//       try {
+//         const res = await fetch(`/api/sync?source=${source}`);
+//         if (!res.ok) return;
+
+//         const data = await res.json();
+//         if (isMounted && data.activeJob) {
+//           const job = data.activeJob;
+//           const activeStatuses = ["pending", "processing", "retrying"];
+//           if (activeStatuses.includes(job.status)) {
+//             setJobId(job.id);
+//             setProgress(job.progress || 0);
+//             setStatus(job.status);
+//             setError(job.error || "");
+//             setIsSyncing(true);
+//             setShowProgress(true);
+//           }
+//         }
+//       } catch (err) {
+//         console.error(`Error checking active sync job for ${source}:`, err);
+//       }
+//     }
+
+//     checkForActiveJob();
+//     return () => {
+//       isMounted = false;
+//     };
+//   }, [source]);
+
+//   useEffect(() => {
+//     if (!jobId) return;
+
+//     const interval = setInterval(async () => {
+//       try {
+//         const res = await fetch(`/api/sync?jobId=${jobId}`);
+//         const data = await res.json();
+
+//         setProgress(Number(data.progress) || 0);
+//         setStatus(data.status);
+//         setError(data.error || "");
+
+//         const terminalStates = ["completed", "failed", "cancelled"];
+//         if (terminalStates.includes(data.status)) {
+//           clearInterval(interval);
+//           setIsSyncing(false);
+
+//           if (timeoutRef.current) clearTimeout(timeoutRef.current);
+//           timeoutRef.current = setTimeout(() => {
+//             setShowProgress(false);
+//             setJobId(null);
+//           }, 4000);
+//         }
+//       } catch (err) {
+//         console.error("Polling error:", err);
+//       }
+//     }, 1000);
+
+//     return () => {
+//       clearInterval(interval);
+//       if (timeoutRef.current) clearTimeout(timeoutRef.current);
+//     };
+//   }, [jobId]);
+
+//   const cancelSync = async () => {
+//     if (!jobId) return;
+//     try {
+//       await fetch("/api/sync/cancel", {
+//         method: "POST",
+//         headers: { "Content-Type": "application/json" },
+//         body: JSON.stringify({ jobId }),
+//       });
+//       setStatus("cancelled");
+//       setIsSyncing(false);
+//       toast.info("Sync job cancelled");
+//     } catch (err) {
+//       console.error("Failed to cancel sync:", err);
+//       toast.error("Failed to cancel sync process");
+//     }
+//   };
+
+//   const clearJobs = async () => {
+//     try {
+//       await fetch("/api/sync/clear", {
+//         method: "POST",
+//         headers: { "Content-Type": "application/json" },
+//         body: JSON.stringify({ queue: "midworker" }),
+//       });
+//       setShowProgress(false);
+//       setJobId(null);
+//       setIsSyncing(false);
+//       toast.success("Sync queue cleared");
+//     } catch (err) {
+//       console.error("Failed to clear jobs:", err);
+//       toast.error("Failed to clear queue");
+//     }
+//   };
+
+//   return (
+//     <div className="w-full max-w-7xl mx-auto p-6 space-y-6">
+//       {/* Header Bar */}
+//       <div className="flex flex-col gap-2">
+//         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b pb-5">
+//           <div className="flex items-start gap-3">
+//             <div className="w-10 h-10 bg-muted border rounded-xl flex items-center justify-center shrink-0 mt-1">
+//               <Warehouse className="w-5 h-5 text-muted-foreground" />
+//             </div>
+//             <div>
+//               <h1 className="text-xl font-bold tracking-tight">
+//                 {location?.name ? `${location.name} — Inventory` : "Inventory"}
+//               </h1>
+//               <p className="text-xs text-muted-foreground mt-0.5">
+//                 Targeted internal warehouse balances, allocated bin vectors, and tracking references.
+//               </p>
+//             </div>
+//           </div>
+
+//           <div className="flex items-center gap-2">
+//             <Button
+//               variant="outline"
+//               size="sm"
+//               onClick={() => setIsSyncConfirmOpen(true)}
+//               disabled={isSyncing}
+//               className="h-8 gap-1.5 text-xs"
+//             >
+//               {isSyncing ? (
+//                 <Loader2 className="w-3.5 h-3.5 animate-spin" />
+//               ) : (
+//                 <CloudSync className="w-3.5 h-3.5" />
+//               )}
+//               Sync to Cloud
+//             </Button>
+
+//             <Button
+//               variant="outline"
+//               size="sm"
+//               onClick={refreshAllData}
+//               className="h-8 gap-1.5 text-xs"
+//             >
+//               <RefreshCw className="w-3.5 h-3.5" />
+//               Refresh Data
+//             </Button>
+
+//             <Button asChild size="sm" className="h-8 gap-1.5 text-xs">
+//               <Link href="/dashboard/inventory/stocks/new">Post Adjustment</Link>
+//             </Button>
+//           </div>
+//         </div>
+//       </div>
+
+//       {/* Cloud Sync Active Status & Progress Banner */}
+//       {showProgress && (
+//         <div className="p-4 border rounded-xl bg-card space-y-3 shadow-sm">
+//           <div className="flex items-center justify-between">
+//             <div className="flex items-center gap-2">
+//               {status === "completed" && <CheckCircle2 className="w-4 h-4 text-emerald-500" />}
+//               {status === "failed" && <XCircle className="w-4 h-4 text-destructive" />}
+//               {status === "cancelled" && <AlertTriangle className="w-4 h-4 text-amber-500" />}
+//               {["pending", "processing", "retrying"].includes(status) && (
+//                 <Loader2 className="w-4 h-4 text-primary animate-spin" />
+//               )}
+//               <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+//                 Sync Status: <span className="text-foreground">{status || "Initializing"}</span>
+//               </span>
+//             </div>
+
+//             <div className="flex items-center gap-1.5">
+//               {isSyncing && status !== "cancelled" && (
+//                 <Button
+//                   variant="ghost"
+//                   size="sm"
+//                   onClick={cancelSync}
+//                   className="h-7 px-2 text-xs text-amber-600 hover:text-amber-700 hover:bg-amber-50"
+//                 >
+//                   <XCircle className="w-3.5 h-3.5 mr-1" />
+//                   Cancel Sync
+//                 </Button>
+//               )}
+//               <Button
+//                 variant="ghost"
+//                 size="sm"
+//                 onClick={clearJobs}
+//                 className="h-7 px-2 text-xs text-destructive hover:text-destructive hover:bg-destructive/10"
+//               >
+//                 <Trash2 className="w-3.5 h-3.5 mr-1" />
+//                 Clear Queue
+//               </Button>
+//             </div>
+//           </div>
+
+//           <div className="space-y-1">
+//             <div className="flex justify-between text-xs text-muted-foreground">
+//               <span>Cloud Sync Progress</span>
+//               <span>{Math.round(progress)}%</span>
+//             </div>
+//             <Progress value={progress} className="h-2" />
+//           </div>
+
+//           {error && (
+//             <p className="text-xs text-destructive font-medium bg-destructive/10 p-2 rounded">
+//               {error}
+//             </p>
+//           )}
+//         </div>
+//       )}
+
+//       {/* Summary Cards */}
+//       <InventorySummaryCards locationId={locationId} />
+
+//       {/* Inbound Freight Pipeline */}
+//       <InboundTransitMonitor locationId={locationId} />
+
+//       {/* Inventory Table Component */}
+//       <InventoryTable
+//         locationId={locationId}
+//         locationInflowId={location?.inflowId}
+//         onInspectBins={(item) => setActiveInspectionItem(item)}
+//         onSelectItemForReplenishment={(item) => {
+//           setSelectedReplenishItem(item);
+//           setIsReplenishModalOpen(true);
+//         }}
+//         onDataChanged={refreshAllData}
+//       />
+
+//       {/* Storage Layout Inspection Modal */}
+//       <StorageInspectionModalEnhance
+//         item={activeInspectionItem}
+//         locationName={location?.name}
+//         onClose={() => setActiveInspectionItem(null)}
+//       />
+
+//       {/* Auto-Replenishment Settings Modal */}
+//       {selectedReplenishItem && (
+//         <ReplenishmentSettingsModal
+//           isOpen={isReplenishModalOpen}
+//           onClose={() => {
+//             setIsReplenishModalOpen(false);
+//             setSelectedReplenishItem(null);
+//           }}
+//           locations={locations}
+//           isLoadingLocations={isLoadingLocations}
+//           inventoryItem={{
+//             id: selectedReplenishItem.id,
+//             productName: selectedReplenishItem.productName,
+//             productSlug: selectedReplenishItem.productSlug,
+//             reorderThreshold: selectedReplenishItem.reorderThreshold || 0,
+//             reorderQuantity: selectedReplenishItem.reorderQuantity || 0,
+//             isAutoReorderEnabled: selectedReplenishItem.isAutoReorderEnabled || false,
+//             preferredSourceLocationId: selectedReplenishItem.preferredSourceLocationId || null,
+//           }}
+//           onSaveSuccess={refreshAllData}
+//         />
+//       )}
+
+//       {/* Confirmation Modal */}
+//       <AlertDialog open={isSyncConfirmOpen} onOpenChange={setIsSyncConfirmOpen}>
+//         <AlertDialogContent>
+//           <AlertDialogHeader>
+//             <AlertDialogTitle>Confirm Cloud Sync</AlertDialogTitle>
+//             <AlertDialogDescription>
+//               Are you sure you want to push all inventory records for{" "}
+//               <strong>{location?.name || "this location"}</strong> to the cloud worker queue?
+//             </AlertDialogDescription>
+//           </AlertDialogHeader>
+//           <AlertDialogFooter>
+//             <AlertDialogCancel disabled={isSyncing}>Cancel</AlertDialogCancel>
+//             <AlertDialogAction onClick={handleCloudSync} disabled={isSyncing}>
+//               {isSyncing ? "Enqueuing..." : "Confirm & Sync"}
+//             </AlertDialogAction>
+//           </AlertDialogFooter>
+//         </AlertDialogContent>
+//       </AlertDialog>
+//     </div>
+//   );
+// }
 
 // "use client";
 

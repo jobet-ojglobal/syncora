@@ -42,6 +42,7 @@ export default async function LocationOverviewPage({
     prisma.location.findMany({
       where: { NOT: { inflowId: targetId } },
       select: { 
+        id: true,
         name: true,
         inflowId: true,
         linkedSublocation: {
@@ -57,7 +58,7 @@ export default async function LocationOverviewPage({
   if (!location) return notFound();
 
   // Normalize locations list for disabled logic in modal
-  const locationsList = rawLocationsList.map((loc) => ({
+  const locationsList = rawLocationsList.filter(item => item.id !== targetId).map((loc) => ({
     inflowId: loc.inflowId,
     name: loc.name,
     alreadyLinkedSublocationId: loc.linkedSublocation[0]?.id || null,

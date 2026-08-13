@@ -178,6 +178,7 @@ model Category {
   inflowId    String   @unique
   name        String
   slug        String   @unique // e.g., "digital-cameras"
+  isDefault   Boolean  @default(false)    
   description String?
   imageUrl    String?
   parentId          String?
@@ -310,6 +311,7 @@ model Product {
   autoAssemble            Boolean @default(false)
   isActive                Boolean @default(true)
   isManufacturable        Boolean @default(false)
+  isCloudSynced           Boolean @default(false)
   includeQuantityBuildable Boolean @default(false)
   standardUomName         String?
   trackExpiry             Boolean @default(false)

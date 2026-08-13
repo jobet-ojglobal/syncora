@@ -140,7 +140,7 @@ export interface InflowProduct {
   images: InflowProductImage[];
   defaultPrice?: InflowProductPrice;
   inventoryLines: InflowInventoryLine[];
-  productVariant: InflowProductVariant
+  productVariant?: InflowProductVariant;
 
   category?: InflowCategory | null;
   productBarcodes?: InflowProductBarcode[];
@@ -277,9 +277,9 @@ export interface InflowInventoryLine {
   productId: string;
   quantityOnHand: string;
   serial: string;
-  sublocation: string; // ex. "Rack A"
+  sublocation: string; // ex. "Rack A" or ""
   timestamp?: string;
-  location: InflowLocation
+  location?: InflowLocation
 }
 
 // =====================================

@@ -6,7 +6,10 @@ import {
   InventoryAdjustmentLineReason,
   InventorySerialAdjustmentAction,
 } from "@/generated/prisma/client";
+<<<<<<< HEAD
 import { StockAdjustmentLineInput } from "@/schemas/stock-adjustment.schema";
+=======
+>>>>>>> f774fa4d46540598445552ff7ba82d06bcdf5aad
 
 export interface StockAdjustmentBinInput {
   sublocationId: string;
@@ -18,6 +21,7 @@ export type SyncAdjustmentLine = StockAdjustmentLineInput & {
   description?: string;
 };
 
+<<<<<<< HEAD
 // export interface StockAdjustmentLineInput {
 //   productId: string;
 //   quantityOnHand: number;
@@ -28,6 +32,25 @@ export type SyncAdjustmentLine = StockAdjustmentLineInput & {
 //   serials?: string[];
 //   bins?: StockAdjustmentBinInput[];
 // }
+=======
+export type StockAdjustmentLineInput = {
+  productId: string;
+  trackSerials: boolean;
+  quantityAdjusted: number;
+  quantityOnHand: number;
+  quantityReserved: number;
+  quantityAvailable: number;
+  bins: {
+    sublocationId: string;
+    quantity: number;
+    serials: string[];
+    id?: string | undefined;
+  }[];
+  serials: string[];
+  id?: string | undefined;
+  reason?: string | null | undefined;
+}
+>>>>>>> f774fa4d46540598445552ff7ba82d06bcdf5aad
 
 export interface PostAdjustmentPayload {
   existingAdjustmentId?: string;

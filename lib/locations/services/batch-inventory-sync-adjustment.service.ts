@@ -20,7 +20,12 @@ export class InventorySyncService {
       },
     };
 
+<<<<<<< HEAD
     this.adjustmentService = new AdjustmentService(prisma, queueProvider);
+=======
+    // this.adjustmentService = new AdjustmentService(prisma, queueProvider); // with sync stock adjust
+    this.adjustmentService = new AdjustmentService(prisma);
+>>>>>>> f774fa4d46540598445552ff7ba82d06bcdf5aad
   }
 
   private sleep(ms: number) {

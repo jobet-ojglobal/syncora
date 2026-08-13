@@ -24,6 +24,7 @@ import {
 } from "@/components/ui/field";
 import { CategoryInput, categorySchema } from "@/schemas/category.schema";
 import { useRouter } from "next/navigation";
+import { FormSwitch } from "../shared/form-switch";
 
 interface CategoryFlatOption {
   id: string;
@@ -31,10 +32,11 @@ interface CategoryFlatOption {
   name: string;
 }
 
-interface BrandFormProps {
+interface CategoryFormProps {
   initialData?: {
     id: string;
     inflowId: string;
+    isDefault: boolean;
     name: string;
     description: string | null;
     imageUrl: string | null;
@@ -43,7 +45,7 @@ interface BrandFormProps {
   onSuccess?: () => void;
 }
 
-export function CategoryForm({ initialData, onSuccess }: BrandFormProps) {
+export function CategoryForm({ initialData, onSuccess }: CategoryFormProps) {
   const [flatCategories, setFlatCategories] = useState<CategoryFlatOption[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const router = useRouter();
@@ -56,6 +58,7 @@ export function CategoryForm({ initialData, onSuccess }: BrandFormProps) {
       name: initialData?.name || "",
       description: initialData?.description || "",
       imageUrl: initialData?.imageUrl || "",
+      isDefault: !!initialData?.isDefault,
       parentId: initialData?.parentId || "root-level", // Select UI placeholder default
     },
   });
@@ -149,6 +152,15 @@ export function CategoryForm({ initialData, onSuccess }: BrandFormProps) {
                 )}
               />
             </Field>
+
+            <FormSwitch
+              name="isDefault"
+              control={control}
+              variant="card"
+              label="Default Scheme"
+              description="Set this scheme as the default for new transactions."
+              className=" p-2.5"
+            />
 
             {/* Thumbnail URL */}
             <Field>

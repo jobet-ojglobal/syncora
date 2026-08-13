@@ -32,6 +32,7 @@ export class CategoryService {
       select: { 
         id: true,
         inflowId: true, 
+        isDefault: true,
         parentId: true, 
         name: true, 
         description: true, 
@@ -119,6 +120,7 @@ export class CategoryService {
    */
   static async createCategory(data: {
     name: string;
+    isDefault: boolean;
     parentId?: string | null;
     description?: string | null;
     imageUrl?: string;
@@ -126,18 +128,27 @@ export class CategoryService {
     const slug = await genUniqueSlug(data.name, prisma.category);
     const computedInflowId = crypto.randomUUID().toString();
 
-    console.log(computedInflowId, slug)
+    return await prisma.$transaction(async (tx) => {
+      if (data.isDefault) {
+        await tx.category.updateMany({
+          where: { isDefault: true },
+          data: { isDefault: false }
+        });
+      }
 
-    return await prisma.category.create({
-      data: {
-        inflowId: computedInflowId,
-        name: data.name.trim(),
-        slug,
-        description: data.description?.trim() || null,
-        imageUrl: data.imageUrl?.trim() || null,
-        parentId: data.parentId || null, // Resolves structural reference key paths safely
-      },
+      return await tx.category.create({
+        data: {
+          inflowId: computedInflowId,
+          isDefault: data.isDefault,
+          name: data.name.trim(),
+          slug,
+          description: data.description?.trim() || null,
+          imageUrl: data.imageUrl?.trim() || null,
+          parentId: data.parentId || null, // Resolves structural reference key paths safely
+        },
+      });
     });
+
   }
 
   /**
@@ -146,21 +157,32 @@ export class CategoryService {
   static async updateCategory(data: {
     id: string;
     name: string;
+    isDefault: boolean;
     parentId?: string | null;
     description?: string | null;
     imageUrl?: string;
   }) {
     const slug = await genUniqueSlug(data.name, prisma.category, data.id);
 
-    return await prisma.category.update({
-      where: { id: data.id },
-      data: {
-        name: data.name.trim(),
-        slug,
-        description: data.description?.trim() || null,
-        imageUrl: data.imageUrl?.trim() || null,
-        parentId: data.parentId || null, // Resolves structural reference key paths safely
-      },
+    return await prisma.$transaction(async (tx) => {
+      if (data.isDefault) {
+        await tx.category.updateMany({
+          where: { isDefault: true },
+          data: { isDefault: false }
+        });
+      }
+
+      return await tx.category.update({
+        where: { id: data.id },
+        data: {
+          name: data.name.trim(),
+          isDefault: data.isDefault,
+          slug,
+          description: data.description?.trim() || null,
+          imageUrl: data.imageUrl?.trim() || null,
+          parentId: data.parentId || null, // Resolves structural reference key paths safely
+        },
+      });
     });
   }
  

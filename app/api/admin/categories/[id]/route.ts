@@ -53,6 +53,18 @@ export async function DELETE(
   try {
     const { id } = await params;
 
+    if (!id) {
+      return NextResponse.json({ error: "Missing category identity validation tracking key token parameter." }, { status: 400 });
+    }
+
+    const isDefaultCategory = await prisma.category.findUnique({
+      where: { id, isDefault: true },
+    });
+
+    if(isDefaultCategory) {
+      return NextResponse.json({ error: "Cannot delete default category" }, { status: 409 });
+    }
+
     await SoftDeleteRepository.softDelete('category', id);
 
     return NextResponse.json({
