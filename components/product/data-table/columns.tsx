@@ -1,20 +1,23 @@
 "use client"
 
 import { ColumnDef } from "@tanstack/react-table"
-import { ArrowUpDown, Barcode, CalendarClock, ShieldCheck } from "lucide-react"
+import { ArrowUpDown, Barcode, CalendarClock, CheckCircle2, Cloud, CloudOff, HardDrive, HardDriveDownload, ShieldCheck, XCircle } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { CellAction } from "./status-cell-action"
 import { RowActions } from "./row-actions"
 import { Checkbox } from "@/components/ui/checkbox"
 import { ThumbnailCell } from "./thumbnail-cell"
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 
 // Shape matching your API Map payload precisely
 export type ParsedProduct = {
-  id: string
-  inflowId: string
-  sku: string
-  name: string
+  id: string;
+  inflowId: string;
+  sku: string;
+  name: string;
+  isCloudSynced: boolean;
+  isLocalSynced: boolean;
   groupName?: string
   slug: string
   itemType: string
@@ -208,6 +211,44 @@ export const columns: ColumnDef<ParsedProduct>[] = [
     }
   },
   {
+    accessorKey: "isCloudSynced",
+    header: "Cloud Sync",
+    cell: ({ row }) => {
+      const isSynced: boolean = row.getValue("isCloudSynced");
+
+      return isSynced ? (
+        <Badge variant="outline" className="bg-emerald-50 text-emerald-700 border-emerald-200 gap-1 font-normal">
+          <Cloud className="w-3 h-3" />
+          Synced
+        </Badge>
+      ) : (
+        <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-200 gap-1 font-normal">
+          <CloudOff className="w-3 h-3" />
+          Pending
+        </Badge>
+      );
+    },
+  },
+  {
+    accessorKey: "isLocalSynced",
+    header: "Local Sync",
+    cell: ({ row }) => {
+      const isSynced: boolean = row.getValue("isLocalSynced");
+
+      return isSynced ? (
+        <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 gap-1 font-normal">
+          <HardDrive className="w-3 h-3" />
+          Synced
+        </Badge>
+      ) : (
+        <Badge variant="outline" className="bg-slate-100 text-slate-600 border-slate-200 gap-1 font-normal">
+          <HardDriveDownload className="w-3 h-3" />
+          Pending
+        </Badge>
+      );
+    },
+  },
+  {
     accessorKey: "createdAt",
     header: ({ column }) => (
       <Button
@@ -248,3 +289,69 @@ export const columns: ColumnDef<ParsedProduct>[] = [
     cell: ({ row, table }) => <RowActions row={row} table={table} />,
   },
 ]
+
+
+
+//  {
+//     accessorKey: "isCloudSynced",
+//     header: () => <div className="text-center">Cloud</div>,
+//     cell: ({ row }) => {
+//       const isSynced = Boolean(row.original.isCloudSynced);
+
+//       return (
+//         <div className="flex items-center justify-center">
+//           <Tooltip>
+//             <TooltipTrigger asChild>
+//               <button
+//                 type="button"
+//                 className="inline-flex items-center justify-center rounded-md p-1 hover:bg-accent focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+//                 aria-label={isSynced ? "Cloud synced" : "Not synced to cloud"}
+//               >
+//                 {isSynced ? (
+//                   <CheckCircle2 className="h-4 w-4 text-emerald-500" />
+//                 ) : (
+//                   <XCircle className="h-4 w-4 text-muted-foreground/40" />
+//                 )}
+//               </button>
+//             </TooltipTrigger>
+//             <TooltipContent side="top">
+//               <p className="text-xs font-medium">
+//                 {isSynced ? "Cloud Synced" : "Not synced to cloud"}
+//               </p>
+//             </TooltipContent>
+//           </Tooltip>
+//         </div>
+//       );
+//     },
+//   },{
+//     accessorKey: "isLocalSynced",
+//     header: () => <div className="text-center">Cloud</div>,
+//     cell: ({ row }) => {
+//       const isSynced = Boolean(row.original.isLocalSynced);
+
+//       return (
+//         <div className="flex items-center justify-center">
+//           <Tooltip>
+//             <TooltipTrigger asChild>
+//               <button
+//                 type="button"
+//                 className="inline-flex items-center justify-center rounded-md p-1 hover:bg-accent focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+//                 aria-label={isSynced ? "Cloud synced" : "Not synced to cloud"}
+//               >
+//                 {isSynced ? (
+//                   <CheckCircle2 className="h-4 w-4 text-emerald-500" />
+//                 ) : (
+//                   <XCircle className="h-4 w-4 text-muted-foreground/40" />
+//                 )}
+//               </button>
+//             </TooltipTrigger>
+//             <TooltipContent side="top">
+//               <p className="text-xs font-medium">
+//                 {isSynced ? "Cloud Synced" : "Not synced to cloud"}
+//               </p>
+//             </TooltipContent>
+//           </Tooltip>
+//         </div>
+//       );
+//     },
+//   },

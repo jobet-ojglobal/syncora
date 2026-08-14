@@ -21,7 +21,7 @@ export class ProductSyncService {
     selectedRecords?: any[],
     syncedAll?: boolean,
     after: string | undefined = undefined) {
-    const BATCH_SIZE = options?.batchSize ?? 100;
+    const BATCH_SIZE = options?.batchSize ?? 30;
     const INTER_BATCH_DELAY = options?.delayBetweenBatchesMs ?? 300;
     const CLIENT_RETRIES = 1;
     
@@ -135,8 +135,10 @@ export class ProductSyncService {
     after: string | undefined = undefined
   ) {
     const BATCH_SIZE = options?.batchSize ?? 100;
-    const INTER_BATCH_DELAY = options?.delayBetweenBatchesMs ?? 300;
-    const CLIENT_RETRIES = 1;
+    const INTER_BATCH_DELAY = options?.delayBetweenBatchesMs ?? 1000;
+    const INTER_SINGLE_DELAY = 2000;
+    const INTER_ITEM_DELAY = 300;
+    const CLIENT_RETRIES = 5;
 
     const syncedGroupIds = new Set<string>();
     const EXCLUDED_INCLUDES = new Set(["coreData", "brand"]);
@@ -206,8 +208,8 @@ export class ProductSyncService {
         await options.onProgress(totalProcessed);
       }
 
-      if (INTER_BATCH_DELAY > 0) {
-        await this.sleep(INTER_BATCH_DELAY);
+      if (INTER_ITEM_DELAY > 0) {
+        await this.sleep(INTER_ITEM_DELAY);
       }
     };
 
@@ -252,7 +254,12 @@ export class ProductSyncService {
         if (validBatch.length > 0) {
           await processBatch(validBatch, batchNo);
         }
+
+        if (INTER_SINGLE_DELAY > 0) {
+          await this.sleep(INTER_SINGLE_DELAY);
+        }
       }
+
     } 
     // BRANCH 2: Sync all records paginated using getProducts
     else {
@@ -269,6 +276,10 @@ export class ProductSyncService {
         await processBatch(batch, batchNo);
 
         after = batch[batch.length - 1].productId;
+
+        if (INTER_BATCH_DELAY > 0) {
+          await this.sleep(INTER_BATCH_DELAY);
+        }
       }
     }
 

@@ -1,3 +1,4 @@
+// app\api\sync\cancel\route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getSyncQueue } from "@/lib/queues/sync.queue";

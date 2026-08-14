@@ -14,7 +14,7 @@ export const locationNav = (id: string) => [
   { label: "Transfers", url: `/dashboard/locations/${id}/transfers` },
   { label: "Performance", url: `/dashboard/locations/${id}/performance` },
   { label: "Staff", url: `/dashboard/locations/${id}/staff` },
-  { label: "Webhook", url: `/dashboard/locations/${id}/integrations/webhooks` },
+  { label: "Webhook", url: `/dashboard/locations/${id}/webhooks` },
 ];
 
 export default async function LocationLayout({

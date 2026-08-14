@@ -31,7 +31,7 @@ interface CloudSyncButtonProps {
 }
 
 export function CloudSyncButton({
-  source = "outsync_inventory_levels",
+  source = "cloudsync_inventory_levels",
   locationId,
   locationName,
   onSyncComplete,
@@ -176,58 +176,21 @@ export function CloudSyncButton({
     }
   };
 
-  // const clearJobs = async () => {
-  //   try {
-  //     await fetch("/api/sync/clear", {
-  //       method: "POST",
-  //       headers: { "Content-Type": "application/json" },
-  //       body: JSON.stringify({ queue: "midworker" }),
-  //     });
-  //     setShowProgress(false);
-  //     setJobId(null);
-  //     setIsSyncing(false);
-  //     toast.success("Sync queue cleared");
-  //   } catch (err) {
-  //     console.error("Failed to clear jobs:", err);
-  //     toast.error("Failed to clear queue");
-  //   }
-  // };
-
-  // Dynamic dialog message based on sync target context
-  const getConfirmationDescription = () => {
-    if (locationName) {
-      return (
-        <>
-          Are you sure you want to push all inventory records for{" "}
-          <strong>{locationName}</strong> to the cloud worker queue?
-        </>
-      );
+  const clearJobs = async () => {
+    try {
+      await fetch("/api/sync/clear", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ queue: "midworker" }),
+      });
+      setShowProgress(false);
+      setJobId(null);
+      setIsSyncing(false);
+      toast.success("Sync queue cleared");
+    } catch (err) {
+      console.error("Failed to clear jobs:", err);
+      toast.error("Failed to clear queue");
     }
-
-    if (locationId) {
-      return (
-        <>
-          Are you sure you want to push all inventory records for location{" "}
-          <strong>{locationId}</strong> to the cloud worker queue?
-        </>
-      );
-    }
-
-    if (source === "cloudsync_products") {
-      return (
-        <>
-          Are you sure you want to push <strong>all catalog products</strong> to
-          the cloud worker queue?
-        </>
-      );
-    }
-
-    return (
-      <>
-        Are you sure you want to push all <strong>{source.replace(/_/g, " ")}</strong> records
-        to the cloud worker queue?
-      </>
-    );
   };
 
   return (
@@ -276,7 +239,7 @@ export function CloudSyncButton({
                   Cancel
                 </Button>
               )}
-              {/* <Button
+              <Button
                 variant="ghost"
                 size="sm"
                 onClick={clearJobs}
@@ -284,7 +247,7 @@ export function CloudSyncButton({
               >
                 <Trash2 className="w-3.5 h-3.5 mr-1" />
                 Clear
-              </Button> */}
+              </Button>
             </div>
           </div>
 
@@ -310,7 +273,8 @@ export function CloudSyncButton({
           <AlertDialogHeader>
             <AlertDialogTitle>Confirm Cloud Sync</AlertDialogTitle>
             <AlertDialogDescription>
-              {getConfirmationDescription()}
+              Are you sure you want to push all inventory records for{" "}
+              <strong>{locationName || "this location"}</strong> to the cloud worker queue?
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

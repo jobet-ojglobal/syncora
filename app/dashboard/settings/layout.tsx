@@ -57,8 +57,9 @@ const settingsNav: NavItem[] = [
   { title: "Inflow Cloud", href: "/dashboard/settings/inflow", icon: Database },
   { title: "Location", href: "/dashboard/settings/locations", icon: MapPin },
   
+  { title: "Sync Jobs", href: "/dashboard/settings/sync-jobs", icon: RefreshCw },
   { title: "Payment", href: "/dashboard/settings/payment", icon: CreditCard },
-  // { title: "Tax Configuration", href: "/dashboard/settings/tax-config", icon: Receipt },
+  { title: "Tax Configuration", href: "/dashboard/settings/tax-config", icon: Receipt },
   { title: "Trash", href: "/dashboard/settings/trash", icon: Trash2 },
 ];
 

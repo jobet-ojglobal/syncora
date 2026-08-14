@@ -12,51 +12,82 @@ export async function DELETE(
   { params }: Props
 ) {
   try {
-    const { id } = await params;
+    const resolvedParams = await params;
+    const { id } = resolvedParams;
+    const body = await request.json();
+    const { isSoftDelete } = body;
 
     if (!id) {
-      return NextResponse.json({ error: "Missing mandatory corporate structure mapping primary index identification tracking string token parameter." }, { status: 400 });
+      return NextResponse.json(
+        { error: "Pricing scheme ID is required." },
+        { status: 400 }
+      );
     }
 
     const pricingScheme = await prisma.pricingScheme.findUnique({
-      where: { id }
+      where: { id },
     });
 
-    if(!pricingScheme) {
-      return NextResponse.json({ error: "Pricing scheme not found" }, { status: 404 });
+    if (!pricingScheme) {
+      return NextResponse.json(
+        { error: "Pricing scheme not found." },
+        { status: 404 }
+      );
     }
 
-    // 🛡️ Preflight database constraints checklist loop check: verify no customer records use this scheme
-    const liveBoundCustomersCount = await prisma.customer.count({ where: { pricingSchemeId: pricingScheme.inflowId } });
+    // Verify no customer records are actively using this pricing scheme
+    const liveBoundCustomersCount = await prisma.customer.count({
+      where: { pricingSchemeId: pricingScheme.inflowId },
+    });
 
     if (liveBoundCustomersCount > 0) {
       return NextResponse.json(
-        { error: "Relational lockout error rule trigger. Target pricing matrix card is actively driving live accounting billing profiles portfolios lines." },
+        {
+          error:
+            "Cannot delete pricing scheme because active customers are currently using it.",
+        },
         { status: 422 }
       );
     }
 
-    // Wrap execution fields mutations parameters variations inside clean atomic sequence database transactional block
+    // Execute deletion inside an atomic transaction
     await prisma.$transaction(async (tx) => {
-      // 1. Flush any specific matrix individual product price lists points records matching this parent tracker
+      // 1. Delete associated product prices for both soft and hard delete
       await tx.productPrice.deleteMany({
-        where: { pricingSchemeId: pricingScheme.inflowId }
+        where: { pricingSchemeId: pricingScheme.inflowId },
       });
 
-      // 2. Clear out the main pricing strategy row item by assigning a soft-delete timestamp
-      await tx.pricingScheme.update({
-        where: { inflowId: pricingScheme.inflowId },
-        data: {
-          deletedAt: new Date(),
-          isActive: false,
-          isDefault: false // Clear default status to prevent baseline systemic collision gaps faults
-        }
-      });
+      if (isSoftDelete === "true") {
+        // 2a. Soft Delete: Mark record as inactive and update deletedAt timestamp
+        await tx.pricingScheme.update({
+          where: { inflowId: pricingScheme.inflowId },
+          data: {
+            deletedAt: new Date(),
+            isActive: false,
+            isDefault: false,
+          },
+        });
+      } else {
+        // 2b. Hard Delete: Completely purge the record from the database
+        await tx.pricingScheme.delete({
+          where: { inflowId: pricingScheme.inflowId },
+        });
+      }
     });
 
-    return NextResponse.json({ success: true, archivedPricingSchemeInflowId: pricingScheme.inflowId }, { status: 200 });
+    return NextResponse.json(
+      {
+        success: true,
+        isSoftDelete,
+        deletedPricingSchemeInflowId: pricingScheme.inflowId,
+      },
+      { status: 200 }
+    );
   } catch (error) {
-    console.error("Pricing scheme soft-delete database transformation crashed:", error);
-    return NextResponse.json({ error: "Internal Database transaction execution engine aborted task operation pipeline." }, { status: 500 });
+    console.error("Pricing scheme delete operation failed:", error);
+    return NextResponse.json(
+      { error: "Internal server error during pricing scheme deletion." },
+      { status: 500 }
+    );
   }
 }

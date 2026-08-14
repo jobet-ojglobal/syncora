@@ -99,6 +99,9 @@ export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
 
+    const isCloudSyncedParam = searchParams.get("isCloudSynced");
+    const isLocalSyncedParam = searchParams.get("isLocalSynced");
+
     // Pagination Parameters
     const page = Math.max(1, parseInt(searchParams.get("page") || "1"))
     const limit = Math.max(1, parseInt(searchParams.get("limit") || "25"))
@@ -130,6 +133,20 @@ export async function GET(request: NextRequest) {
       whereClause.isActive = true
     } else if (statusParam === "inactive") {
       whereClause.isActive = false
+    }
+
+    // Cloud Sync Filter
+    if (isCloudSyncedParam === "true") {
+      whereClause.isCloudSynced = true;
+    } else if (isCloudSyncedParam === "false") {
+      whereClause.isCloudSynced = false;
+    }
+
+    // Local Sync Filter
+    if (isLocalSyncedParam === "true") {
+      whereClause.isLocalSynced = true;
+    } else if (isLocalSyncedParam === "false") {
+      whereClause.isLocalSynced = false;
     }
 
     // 🟢 Server-side relational database filters array processing
@@ -183,6 +200,8 @@ export async function GET(request: NextRequest) {
         name: prod.name,
         groupName: prod.variant?.group.name,
         slug: prod.slug,
+        isCloudSynced: prod.isCloudSynced,
+        isLocalSynced: prod.isLocalSynced,
         itemType: prod.itemType || "Stock",
         isActive: prod.isActive,
         trackExpiry: prod.trackExpiry,
@@ -325,6 +344,8 @@ export async function POST(request: NextRequest) {
             lineNum: index + 1, // Keep sequential indexing clean
           }));
       }
+
+      
 
       // A. Create root product document item node
       const newProduct = await tx.product.create({
@@ -518,15 +539,15 @@ export async function POST(request: NextRequest) {
         setCategoryId = defaultCategory?.inflowId || null;
       } 
 
-      const customFields: InflowCustomFields = {};
+      const newCustomFields: InflowCustomFields = {};
       const brandCustomName = "custom1";
 
       const brandName = newProduct.brand?.name;
       if (brandName) {
         if (brandCustomName) {
-          customFields[brandCustomName as keyof InflowCustomFields] = brandName;
+          newCustomFields[brandCustomName as keyof InflowCustomFields] = brandName;
         } else {
-          customFields.custom1 = brandName;
+          newCustomFields.custom1 = brandName;
         }
       }
 
@@ -557,7 +578,7 @@ export async function POST(request: NextRequest) {
         originCountry: newProduct.originCountry,
         hsTariffNumber: newProduct.hsTariffNumber,
         remarks: newProduct.remarks,
-        customFields,
+        customFields: newCustomFields,
 
         defaultImageId: null,
         
@@ -1210,15 +1231,15 @@ export async function PATCH(request: NextRequest) {
         setCategoryId = defaultCategory?.inflowId || null;
       } 
 
-      const customFields: InflowCustomFields = {};
+      const newCustomFields: InflowCustomFields = {};
       const brandCustomName = "custom1";
 
       const brandName = updatedProduct.brand?.name;
       if (brandName) {
         if (brandCustomName) {
-          customFields[brandCustomName as keyof InflowCustomFields] = brandName;
+          newCustomFields[brandCustomName as keyof InflowCustomFields] = brandName;
         } else {
-          customFields.custom1 = brandName;
+          newCustomFields.custom1 = brandName;
         }
       }
 
@@ -1250,7 +1271,7 @@ export async function PATCH(request: NextRequest) {
         originCountry: updatedProduct.originCountry,
         hsTariffNumber: updatedProduct.hsTariffNumber,
         remarks: updatedProduct.remarks,
-        customFields,
+        customFields: newCustomFields,
 
         defaultImageId: null,
         

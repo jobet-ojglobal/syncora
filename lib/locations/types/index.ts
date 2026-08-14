@@ -135,7 +135,7 @@ export interface LocalLocation {
 }
 
 export type SyncOptions = {
-  onProgress?: (processedCount: number) => Promise<void>;
+  onProgress?: (processedCount: number, lastCursorId?: string) => Promise<void>;
   /** 
    * Function to check for abort/cancellation signals.
    * Should throw an error (e.g. SyncCancelledError) if the job was cancelled.
@@ -152,4 +152,5 @@ export type SyncOptions = {
    * Default: 300ms
    */
   delayBetweenBatchesMs?: number;
+  initialCursorId?: string;
 };

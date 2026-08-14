@@ -2,9 +2,11 @@ import { prisma } from "@/lib/prisma";
 import { getLocalBatchProducts } from "../data/product-local";
 import crypto from "crypto";
 import { LocalProduct } from "../types";
-import { InflowProduct } from "@/lib/inflow/types";
+import { InflowCustomFields, InflowInventoryLine, InflowProduct } from "@/lib/inflow/types";
 import { localProductItemType } from "@/helpers/product.helper";
 import { syncProduct } from "./product-sync";
+import { Prisma } from "@/generated/prisma/client";
+import { generateSku2Variant2 } from "@/helpers/genSKU";
 
 /**
  * Helper to safely convert string/numeric flags or booleans
@@ -37,6 +39,122 @@ type SyncOptions = {
   delayBetweenBatchesMs?: number;
 };
 
+type LocalProductWithRelations = Prisma.ProductGetPayload<{
+  include: {
+    brand: true;
+    category: true;
+    prices: true;
+    salesUom: { 
+      include: { uom: true }
+    };
+    purchasingUom:  { 
+      include: { uom: true }
+    };
+  };
+}>;
+
+/**
+ * Core Payload Transformer
+ * Converts a raw local product record (with Prisma relations) to the structured InflowProduct payload.
+ * Map bin sublocation linkedLocationId to inventoryLines.locationId.
+ */
+export async function mapLocalToInflowPayload(
+  product: LocalProductWithRelations,
+  brandCustomName?: string,
+  currentTimestamp: string = new Date().toISOString(),
+  lastModifiedById: string = "56bfcf3b-3e98-4098-ae8f-2adcb657cb57",
+): Promise<InflowProduct & { isCloudSynced: boolean }> {
+  const trimmedName = product.name?.trim() || "";
+
+  // 1. Build Custom Fields (Brand dynamics)
+  const existingCustomFields = (product.customFields as Record<string, string>) || {};
+  const customFields: InflowCustomFields = { ...existingCustomFields };
+
+  const brandName = product.brand?.name;
+  if (brandName) {
+    if (brandCustomName) {
+      customFields[brandCustomName as keyof InflowCustomFields] = brandName;
+    } else {
+      customFields.custom7 = brandName;
+    }
+  }
+
+  let setCategoryId: string | null = product.categoryId;
+
+  if (!product.categoryId) {
+    const defaultCategory = await prisma.category.findFirst({
+      where: { isDefault: true },
+    });
+    setCategoryId = defaultCategory?.inflowId || null;
+  }
+
+  // 3. Map final payload
+  return {
+    productId: product.inflowId,
+    isCloudSynced: product.isCloudSynced,
+    sku: product.sku,
+    name: trimmedName,
+    description: product.description,
+    itemType: product.itemType || "stockedProduct",
+    autoAssemble: product.autoAssemble,
+    isActive: product.isActive,
+    isManufacturable: product.isManufacturable,
+    includeQuantityBuildable: product.includeQuantityBuildable,
+    standardUomName: product.standardUomName,
+
+    trackExpiry: product.trackExpiry,
+    trackLots: product.trackLots,
+    trackSerials: product.trackSerials,
+
+    shelfLifeDays: product.shelfLifeDays,
+    sellBeforeExpiryDays: product.sellBeforeExpiryDays,
+    expiryNotificationDays: product.expiryNotificationDays,
+
+    weight: product.weight?.toString() || null,
+    width: product.width?.toString() || null,
+    height: product.height?.toString() || null,
+    length: product.length?.toString() || null,
+
+    originCountry: product.originCountry,
+    hsTariffNumber: product.hsTariffNumber,
+    remarks: product.remarks,
+    categoryId: setCategoryId,
+    lastVendorId: product.lastVendorId,
+    lastModifiedById,
+    createdDttm: product.createdAt.toISOString(),
+    lastModifiedDateTime: product.updatedAt.toISOString(),
+    purchasingUom: product.purchasingUom?.uom.name
+      ? {
+          name: product.purchasingUom.uom.name || "",
+          conversionRatio: {
+            standardQuantity: String(product.purchasingUom.standardQuantity) || "1.0000",
+            uomQuantity: String(product.purchasingUom.uomQuantity) || "1.0000",
+          },
+        }
+      : null,
+    salesUom: product.salesUom?.uom.name
+      ? {
+          name: product.salesUom.uom.name || "",
+          conversionRatio: {
+            standardQuantity: String(product.salesUom.standardQuantity) || "1.0000",
+            uomQuantity: String(product.salesUom.uomQuantity) || "1.0000",
+          },
+        }
+      : null,
+    customFields,
+    images: [],
+    inventoryLines: [],
+    prices: product.prices.map((p) => ({
+      productPriceId: p.inflowId,
+      pricingSchemeId: p.pricingSchemeId,
+      productId: p.productId,
+      priceType: p.priceType,
+      unitPrice: p.unitPrice?.toString() || "0",
+      fixedMarkup: p.fixedMarkup?.toString() || "0",
+    })),
+  };
+}
+
 export class ProductSyncMapService {
   private sleep(ms: number) {
     return new Promise((resolve) => setTimeout(resolve, ms));
@@ -56,7 +174,7 @@ export class ProductSyncMapService {
   ) {
     const { onProgress, checkSignal } = options;
     // higher batch size
-    const BATCH_SIZE = options?.batchSize ?? 100; 
+    const BATCH_SIZE = options?.batchSize ?? 500; 
     const INTER_BATCH_DELAY = options?.delayBetweenBatchesMs ?? 300;
     const CLIENT_RETRIES = 1;
 
@@ -134,27 +252,19 @@ export class ProductSyncMapService {
             // 1. Check existing match by name
             let match = await tx.product.findFirst({
               where: { name: trimmedName },
-              select: { inflowId: true },
+              select: { inflowId: true, isLocalSynced: true },
             });
 
             // 2. If no match exists, prepare payload & invoke syncProduct
             if (!match) {
               const generatedInflowId = crypto.randomUUID().toLowerCase();
               const currentTimestamp = new Date().toISOString();
+              const modifiedById = "56bfcf3b-3e98-4098-ae8f-2adcb657cb57";
 
-              const taxingSchemeLocalId = Number(product.taxingSchemeId);
+              // const taxingSchemeLocalId = Number(product.taxingSchemeId);
               const categoryLocalId = Number(product.categoryId);
 
-              const [taxingScheme, category] = await Promise.all([
-                !isNaN(taxingSchemeLocalId) && product.taxingSchemeId != null
-                  ? tx.taxingSchemeLocationMap.findFirst({
-                      where: {
-                        locationId: location.inflowId,
-                        localId: taxingSchemeLocalId,
-                      },
-                      select: { taxingSchemeId: true },
-                    })
-                  : null,
+              const [category] = await Promise.all([
                 !isNaN(categoryLocalId) && product.categoryId != null
                   ? tx.categoryLocationMap.findFirst({
                       where: {
@@ -166,14 +276,23 @@ export class ProductSyncMapService {
                   : null,
               ]);
 
-              const productSku =
-                product.barcode?.trim() || `SKU-${product.productId}`;
-              const productSlug = `${generateSlug(trimmedName, String(product.productId))}-${generatedInflowId.slice(0, 8)}`;
+              // 1. Build Custom Fields (Brand dynamics)
+              
+              let setCategoryId: string | null = category?.categoryId || null;
+
+              if (!product.categoryId) {
+                const defaultCategory = await prisma.category.findFirst({
+                  where: { isDefault: true },
+                });
+                setCategoryId = defaultCategory?.inflowId || null;
+              }
+
+              const brandName = product.customFields?.custom7 || "";
+              const skuGenerated = generateSku2Variant2(brandName, trimmedName, []);
 
               const payload: InflowProduct & { slug?: string } = {
                 productId: generatedInflowId,
-                sku: "",
-                // slug: productSlug,
+                sku: skuGenerated,
                 name: trimmedName,
                 description: product.description ?? null,
                 itemType: localProductItemType(product.itemType),
@@ -199,9 +318,9 @@ export class ProductSyncMapService {
                 originCountry: product.originCountry || null,
                 hsTariffNumber: product.hsTariffNumber || null,
                 remarks: product.remarks || null,
-                categoryId: category?.categoryId ?? null,
+                categoryId: setCategoryId,
                 lastVendorId: null,
-                lastModifiedById: null,
+                lastModifiedById: modifiedById,
                 createdDttm: currentTimestamp,
                 lastModifiedDateTime: product.lastModifiedDateTime || currentTimestamp,
                 timestamp: currentTimestamp,
@@ -322,12 +441,20 @@ export class ProductSyncMapService {
               });
             }
 
+            if(!match.isLocalSynced) {
+              await prisma.product.update({
+                where: { inflowId: match.inflowId },
+                data: { isLocalSynced: true }
+              });
+            }
+
             syncResults.push({
               productLocalId: String(product.productId),
               productInflowId: match.inflowId,
               status: "synced",
             });
-
+            
+            console.log(`Product mapped: #${match.inflowId} completed.`);
             batchProcessed++;
           }
 

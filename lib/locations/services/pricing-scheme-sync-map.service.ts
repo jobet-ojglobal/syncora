@@ -61,15 +61,23 @@ export class PricingSchemeSyncMapService {
               select: { currencyId: true } // Adjust this field name to your schema configuration if necessary
             });
 
-            const newPricing = null;
+            let currencyId: string | null = null;
             
             // Only proceed with global insertion if the relational currency dependency exists
             if (depCurrency) {
-              const generatedInflowId = crypto.randomUUID().toLowerCase();
+              currencyId = depCurrency.currencyId;
+            } else {
+              const currency = await tx.currency.findFirst({
+                where: { isoCode: "PHP" }
+              });
+              currencyId = currency?.inflowId || null;
+            }
 
+            if(currencyId) {
+              const generatedInflowId = crypto.randomUUID().toLowerCase();
               const payload = {
                 pricingSchemeId: generatedInflowId,
-                currencyId: depCurrency.currencyId, // Pass the global String UUID, not the local Int
+                currencyId, // Pass the global String UUID, not the local Int
                 name: scheme.name,
                 isActive: Number(scheme.isActive) === 1,
                 isDefault: false,

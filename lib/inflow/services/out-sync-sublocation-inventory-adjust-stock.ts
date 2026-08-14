@@ -2,10 +2,10 @@
 import { prisma } from "@/lib/prisma";
 import { InflowProduct, InflowInventoryLine, InflowCustomFields } from "@/lib/inflow/types";
 import { Prisma } from "@/generated/prisma/client";
-import { checkCloudProduct, upsertProduct } from "../data/products";
-import { SyncOptions } from "@/lib/locations/types";
+import { upsertProduct } from "../data/products";
 import { getMidSyncQueue } from "@/lib/queues/sync.queue";
 import { AdjustmentService } from "@/services/stock-adjustment.service";
+import { SyncOptions } from "@/lib/workers/sync.worker";
 
 type DbClient = Prisma.TransactionClient;
 
@@ -75,6 +75,15 @@ type LocalProductWithRelations = Prisma.ProductGetPayload<{
     brand: true;
     category: true;
     prices: true;
+  };
+}>;
+
+
+type LocalInventoryWithRelations = Prisma.ProductGetPayload<{
+  include: {
+    brand: true;
+    category: true;
+    prices: true;
     inventories: {
       include: {
         bins: {
@@ -94,9 +103,10 @@ type LocalProductWithRelations = Prisma.ProductGetPayload<{
  * Map bin sublocation linkedLocationId to inventoryLines.locationId.
  */
 export async function mapLocalToInflowPayload(
-  product: LocalProductWithRelations,
+  product: LocalInventoryWithRelations,
   brandCustomName?: string,
-  currentTimestamp: string = new Date().toISOString()
+  modifiedById?: string,
+  currentTimestamp: string = new Date().toISOString(),
 ): Promise<InflowProduct & { isCloudSynced: boolean }> {
   const trimmedName = product.name?.trim() || "";
 
@@ -188,7 +198,90 @@ export async function mapLocalToInflowPayload(
     remarks: product.remarks,
     categoryId: setCategoryId,
     lastVendorId: product.lastVendorId,
-    lastModifiedById: "56bfcf3b-3e98-4098-ae8f-2adcb657cb57",
+    lastModifiedById: modifiedById || null,
+    createdDttm: product.createdAt.toISOString(),
+    lastModifiedDateTime: product.updatedAt.toISOString(),
+
+    purchasingUom: null,
+    salesUom: null,
+    customFields,
+    images: [],
+    inventoryLines: [],
+    prices: product.prices.map((p) => ({
+      productPriceId: p.inflowId,
+      pricingSchemeId: p.pricingSchemeId,
+      productId: p.productId,
+      priceType: p.priceType,
+      unitPrice: p.unitPrice?.toString() || "0",
+      fixedMarkup: p.fixedMarkup?.toString() || "0",
+    })),
+  };
+}
+
+export async function mapLocalProductToInflowPayload(
+  product: LocalProductWithRelations,
+  brandCustomName?: string,
+  modifiedById?: string,
+  currentTimestamp: string = new Date().toISOString(),
+): Promise<InflowProduct & { isCloudSynced: boolean }> {
+  const trimmedName = product.name?.trim() || "";
+
+  // 1. Build Custom Fields (Brand dynamics)
+  const existingCustomFields = (product.customFields as Record<string, string>) || {};
+  const customFields: InflowCustomFields = { ...existingCustomFields };
+
+  const brandName = product.brand?.name;
+  if (brandName) {
+    if (brandCustomName) {
+      customFields[brandCustomName as keyof InflowCustomFields] = brandName;
+    } else {
+      customFields.custom7 = brandName;
+    }
+  }
+
+  // 2. Build Inventory Lines from filtered bins and items
+  let setCategoryId: string | null = product.categoryId;
+
+  if (!product.categoryId) {
+    const defaultCategory = await prisma.category.findFirst({
+      where: { isDefault: true },
+    });
+    setCategoryId = defaultCategory?.inflowId || null;
+  }
+
+  // 3. Map final payload
+  return {
+    productId: product.inflowId,
+    isCloudSynced: product.isCloudSynced,
+    sku: product.sku,
+    name: trimmedName,
+    description: product.description,
+    itemType: product.itemType || "stockedProduct",
+    autoAssemble: product.autoAssemble,
+    isActive: product.isActive,
+    isManufacturable: product.isManufacturable,
+    includeQuantityBuildable: product.includeQuantityBuildable,
+    standardUomName: product.standardUomName,
+
+    trackExpiry: product.trackExpiry,
+    trackLots: product.trackLots,
+    trackSerials: product.trackSerials,
+
+    shelfLifeDays: product.shelfLifeDays,
+    sellBeforeExpiryDays: product.sellBeforeExpiryDays,
+    expiryNotificationDays: product.expiryNotificationDays,
+
+    weight: product.weight?.toString() || null,
+    width: product.width?.toString() || null,
+    height: product.height?.toString() || null,
+    length: product.length?.toString() || null,
+
+    originCountry: product.originCountry,
+    hsTariffNumber: product.hsTariffNumber,
+    remarks: product.remarks,
+    categoryId: setCategoryId,
+    lastVendorId: product.lastVendorId,
+    lastModifiedById: modifiedById || null,
     createdDttm: product.createdAt.toISOString(),
     lastModifiedDateTime: product.updatedAt.toISOString(),
 
@@ -229,51 +322,131 @@ export class SublocationInventoryAdjustOutSyncService {
     return new Promise((resolve) => setTimeout(resolve, ms));
   }
 
+  async syncProductJobs(
+    products: LocalProductWithRelations[],
+    brandCustomName?: string,
+    checkSignal?: () => Promise<void>,
+    itemDelayMs: number = 300,
+  ) {
+    let processedCount = 0;
+    const currentTimestamp = new Date().toISOString();
+    const modifiedById = "56bfcf3b-3e98-4098-ae8f-2adcb657cb57";
+
+    for (const product of products) {
+      if (checkSignal) await checkSignal();
+      // let payload: InflowProduct | null = null;
+      let syncedProduct: InflowProduct | null = null;
+      
+      const payload = await mapLocalProductToInflowPayload(
+        product,
+        brandCustomName,
+        modifiedById,
+        currentTimestamp,
+      );
+      syncedProduct = await upsertProduct(payload);
+      if(syncedProduct) {
+        console.log(`Success upsert product: ${syncedProduct.name}`);
+        await prisma.product.update({
+          where: { inflowId: syncedProduct.productId },
+          data: { isCloudSynced: true }
+        });
+      }
+      console.log(`Processed Product: ${payload.name} completed.`);
+      processedCount++;
+
+      if (itemDelayMs > 0) {
+        console.log('sleep upsert...')
+        await this.sleep(itemDelayMs);
+      }
+    }
+
+    return { processedCount };
+  }
+
+  async getLocationProduct(
+    db: DbClient | typeof prisma,
+    selectedLocations?: string[],
+    selectedSublocationIds?: Set<string> | null,
+    take: number = 30,
+    cursorId?: string,
+    skipSynced?: boolean
+  ): Promise<LocalProductWithRelations[]> {
+    const sublocationsFilter =
+      selectedSublocationIds && selectedSublocationIds.size > 0
+        ? { sublocationId: { in: Array.from(selectedSublocationIds) } }
+        : undefined;
+
+    const whereClause: Prisma.ProductWhereInput = {
+      deletedAt: null,
+      ...(skipSynced ? { isCloudSynced: false } : {}), // Apply to product root
+    };
+
+    return await db.product.findMany({
+      where: whereClause,
+      take,
+      ...(cursorId ? { skip: 1, cursor: { id: cursorId } } : {}),
+      orderBy: { name: "asc" },
+      include: {
+        brand: true,
+        category: true,
+        prices: true,
+      },
+    });
+  }
+
+
   /**
    * Universal Reusable Sub-Batch Transaction Processor.
    * Processes a concrete set of local products within a transaction context.
    */
   async syncBatch(
-    products: LocalProductWithRelations[],
+    products: LocalInventoryWithRelations[],
     caches: InventorySyncCache,
     brandCustomName?: string,
     checkSignal?: () => Promise<void>,
     batchNo: number = 0,
-    itemDelayMs: number = 250,
-    hasUpsertProduct: boolean,
-    hasStockAdjustLocal: boolean,
-    hasStockAdjustCloud: boolean,
+    itemDelayMs: number = 300,
+    hasUpsertProduct?: boolean,
+    hasStockAdjustLocal?: boolean,
+    hasStockAdjustCloud?: boolean,
   ) {
     let processedCount = 0;
     const currentTimestamp = new Date().toISOString();
-    const modifiedBy = "56bfcf3b-3e98-4098-ae8f-2adcb657cb57";
+    const modifiedById = "56bfcf3b-3e98-4098-ae8f-2adcb657cb57";
 
     // Group adjustments by target Location ID
     const locationAdjustmentMap = new Map<string, SyncAdjustmentLine[]>();
 
     for (const product of products) {
       if (checkSignal) await checkSignal();
-
       // let payload: InflowProduct | null = null;
       let syncedProduct: InflowProduct | null = null;
 
-      if(product.isCloudSynced) {
-        const payloadMapped = await mapLocalToInflowPayload(
+      if(product.isCloudSynced && !hasUpsertProduct) {
+        const payloadMapped = await mapLocalProductToInflowPayload(
             product,
             brandCustomName,
-            currentTimestamp
+            modifiedById,
+            currentTimestamp,
           );
-        syncedProduct = payloadMapped
-      } else {
-        if(hasUpsertProduct) {
-          const payload = await mapLocalToInflowPayload(
-            product,
-            brandCustomName,
-            currentTimestamp
-          );
-          syncedProduct = await upsertProduct(payload);
-          console.log(`Processed Product: ${payload.name} completed.`);
+        syncedProduct = payloadMapped;
+      } else if(!product.isCloudSynced && hasUpsertProduct) {
+        const payload = await mapLocalProductToInflowPayload(
+          product,
+          brandCustomName,
+          modifiedById,
+          currentTimestamp,
+        );
+        syncedProduct = await upsertProduct(payload);
+        if(syncedProduct) {
+          console.log(`Success upsert product: ${syncedProduct.name}`);
+          await prisma.product.update({
+            where: { inflowId: syncedProduct.productId },
+            data: { isCloudSynced: true }
+          });
         }
+        console.log(`Processed Product: ${payload.name} completed.`);
+        processedCount++;
       }
       
       if (syncedProduct) {
@@ -314,10 +487,14 @@ export class SublocationInventoryAdjustOutSyncService {
             }
           }
         }
-        processedCount++;
+      } else {
+        console.log(`Skipping Product: ${product.name}`);
       }
 
+      
+
       if (itemDelayMs > 0) {
+        // console.log('sleep upsert...')
         await this.sleep(itemDelayMs);
       }
     }
@@ -335,7 +512,7 @@ export class SublocationInventoryAdjustOutSyncService {
           locationId: targetLocationId,
           reasonId: reason?.inflowId || undefined,
           remarks: `Batch Sync #${batchNo + 1} Inventory Adjustment`,
-          performedById: modifiedBy,
+          performedById: modifiedById,
           lines: adjustmentLines,
         });
       } else {
@@ -343,16 +520,20 @@ export class SublocationInventoryAdjustOutSyncService {
           locationId: targetLocationId,
           reasonId: reason?.inflowId || undefined,
           remarks: `Batch Sync #${batchNo + 1} Inventory Adjustment`,
-          performedById: modifiedBy,
+          performedById: modifiedById,
           lines: adjustmentLines,
         });
       }
-
       
 
       console.log(
         `[Service Sync] Processed ${adjustmentLines.length} lines for location: ${targetLocationId}`
       );
+
+      if (itemDelayMs > 0) {
+        // console.log('sleep adjust...')
+        await this.sleep(itemDelayMs);
+      }
     }
 
     return { processedCount };
@@ -362,23 +543,33 @@ export class SublocationInventoryAdjustOutSyncService {
   /**
    * Fetch products with location inventory levels filtered specifically by selected Sublocations.
    */
+
+
   async getLocationInventory(
     db: DbClient | typeof prisma,
     selectedLocations?: string[],
     selectedSublocationIds?: Set<string> | null,
     take: number = 30,
-    cursorId?: string
-  ): Promise<LocalProductWithRelations[]> {
+    cursorId?: string,
+    skipSynced?: boolean
+  ): Promise<LocalInventoryWithRelations[]> {
     const sublocationsFilter =
       selectedSublocationIds && selectedSublocationIds.size > 0
         ? { sublocationId: { in: Array.from(selectedSublocationIds) } }
         : undefined;
 
+    // Build a reusable inventory filter for both 'where' and 'include'
+    const inventoryWhereFilter: Prisma.InventoryWhereInput = {
+      ...(selectedLocations?.length ? { locationId: { in: selectedLocations } } : {}),
+      ...(skipSynced ? { product: { isCloudSynced: false } } : {}), // Apply to inventory if flag lives here
+    };
+
     const whereClause: Prisma.ProductWhereInput = {
       deletedAt: null,
+      ...(skipSynced ? { isCloudSynced: false } : {}), // Apply to product root
       inventories: {
         some: {
-          ...(selectedLocations?.length ? { locationId: { in: selectedLocations } } : {}),
+          ...inventoryWhereFilter,
           bins: {
             some: sublocationsFilter || {},
           },
@@ -390,18 +581,16 @@ export class SublocationInventoryAdjustOutSyncService {
       where: whereClause,
       take,
       ...(cursorId ? { skip: 1, cursor: { id: cursorId } } : {}),
-      orderBy: { id: "asc" },
+      orderBy: { name: "asc" },
       include: {
         brand: true,
         category: true,
         prices: true,
         inventories: {
-          where: selectedLocations?.length
-            ? { locationId: { in: selectedLocations } }
-            : undefined,
+          where: inventoryWhereFilter, // Ensures returned inventory objects also exclude synced records
           include: {
             bins: {
-              where: sublocationsFilter, // Filter bins specifically to selected sublocations
+              where: sublocationsFilter,
               include: {
                 sublocation: true,
                 inventoryBinItems: true,
@@ -434,12 +623,11 @@ export class SublocationInventoryAdjustOutSyncService {
     includes?: string[]
   ) {
     const { onProgress, checkSignal } = options;
-    const BATCH_SIZE = options?.batchSize ?? 15; // 15 Decreased batch size to prevent long-running tasks
-    const INTER_BATCH_DELAY = options?.delayBetweenBatchesMs ?? 1000;
+    const BATCH_SIZE = options?.batchSize ?? 10;
+    const INTER_BATCH_DELAY = options?.delayBetweenBatchesMs ?? 500; 
     const ITEM_DELAY = 300;
 
     let totalProcessed = 0;
-    let hasMore = true;
     let cursorId: string | undefined = undefined;
 
     const selectedSublocationIds =
@@ -447,63 +635,107 @@ export class SublocationInventoryAdjustOutSyncService {
         ? new Set(selectedRecords.map((item) => String(item)))
         : null;
 
-    const EXCLUDED_INCLUDES = new Set(["coreData", "brand"]);
-    const cleanIncludes = (includes ?? []).filter((item) => !EXCLUDED_INCLUDES.has(item));
-    const hasUpsertProduct= (includes ?? []).includes("UpsertProduct");
+    const hasUpsertProduct = (includes ?? []).includes("UpsertProduct");
     const hasStockAdjustLocal = (includes ?? []).includes("StockAdjustLocal");
     const hasStockAdjustCloud = (includes ?? []).includes("StockAdjustCloud");
-    const mergedIncludes = [...cleanIncludes];
-    // "UpsertProduct",
+    const hasSkipSynced = (includes ?? []).includes("SkipSynced");
+
     const caches = createInventorySyncCache();
 
     console.log(
-      `Starting inventory sync map (Batch Size: ${BATCH_SIZE}, Delay: ${INTER_BATCH_DELAY}ms)...`
+      `Starting inventory sync map (Starting Cursor: ${cursorId || "BEGINNING"}, Batch Size: ${BATCH_SIZE})...`
     );
     let batchNo = 0;
 
-    while (hasMore) {
+    // 🟢 Use infinite loop; exit strictly when rawBatch comes back empty
+    while (true) {
       if (checkSignal) await checkSignal();
 
       // Fetch paged inventory batch filtered by sublocation IDs
-      const rawBatch = await this.getLocationInventory(
-        prisma,
-        selectedLocations,
-        selectedSublocationIds,
-        BATCH_SIZE,
-        cursorId
-      );
+      let rawBatch: any = [];
+      
+      if(hasUpsertProduct) {
+        const data = await this.getLocationProduct(
+          prisma,
+          selectedLocations,
+          selectedSublocationIds,
+          BATCH_SIZE,
+          cursorId,
+          hasSkipSynced
+        );
 
-      if (!rawBatch || rawBatch.length === 0) break;
+        rawBatch = data
 
-      // Update cursor for next batch iteration
-      cursorId = rawBatch[rawBatch.length - 1].id;
-      if (rawBatch.length < BATCH_SIZE) hasMore = false;
+      } else {
+        const data = await this.getLocationInventory(
+          prisma,
+          selectedLocations,
+          selectedSublocationIds,
+          BATCH_SIZE,
+          cursorId,
+          hasSkipSynced
+        );
+        rawBatch = data;
+      }
+
+      // 🟢 Condition 1: If no results are returned, we are finished
+      if (!rawBatch || rawBatch.length === 0) {
+        console.log(`[Sync] No more records returned. Sync complete.`);
+        break;
+      }
+
+      // 🟢 Condition 2: Set the cursor to the last record ID in this batch
+      const lastProduct = rawBatch[rawBatch.length - 1];
+      cursorId = lastProduct.id;
 
       if (checkSignal) await checkSignal();
 
-      // Execute sync per current batch inside Prisma transaction context
-      const { processedCount } = await this.syncBatch(
-        rawBatch,
-        caches,
-        brandCustomName,
-        checkSignal,
-        batchNo,
-        ITEM_DELAY,
-        hasUpsertProduct,
-        hasStockAdjustLocal,
-        hasStockAdjustCloud
-      );
+      let batchProcessedCount = 0;
 
-      totalProcessed += processedCount;
+      // Execute sync per current batch inside Prisma transaction context
+      if(hasUpsertProduct) {
+        const { processedCount } = await this.syncProductJobs(
+          rawBatch,
+          brandCustomName,
+          checkSignal
+        )
+
+        batchProcessedCount = processedCount
+      } else {
+        const { processedCount } = await this.syncBatch(
+          rawBatch,
+          caches,
+          brandCustomName,
+          checkSignal,
+          batchNo,
+          ITEM_DELAY,
+          hasUpsertProduct,
+          hasStockAdjustLocal,
+          hasStockAdjustCloud
+        );
+
+        batchProcessedCount = processedCount
+      }
+
+     
+      totalProcessed += batchProcessedCount;
       batchNo++;
 
       console.log(
-        `Batch #${batchNo} completed. Processed ${totalProcessed} products.`
+        `Batch #${batchNo} completed (${rawBatch.length} items fetched, ${batchProcessedCount} processed). Total: ${totalProcessed}`
       );
 
-      if (onProgress) await onProgress(totalProcessed);
+      if (onProgress) {
+        await onProgress(totalProcessed);
+      }
 
       if (checkSignal) await checkSignal();
+
+      // 🟢 Condition 3: If we fetched fewer items than BATCH_SIZE, this is the last page
+      if (rawBatch.length < BATCH_SIZE) {
+        console.log(`[Sync] Final batch reached (${rawBatch.length} < ${BATCH_SIZE}). Ending sync loop.`);
+        break;
+      }
 
       if (INTER_BATCH_DELAY > 0) {
         await this.sleep(INTER_BATCH_DELAY);
@@ -516,3 +748,91 @@ export class SublocationInventoryAdjustOutSyncService {
     };
   }
 }
+
+
+
+ // const { processedCount } = await this.syncBatch(
+      //   rawBatch,
+      //   caches,
+      //   brandCustomName,
+      //   checkSignal,
+      //   batchNo,
+      //   ITEM_DELAY,
+      //   hasUpsertProduct,
+      //   hasStockAdjustLocal,
+      //   hasStockAdjustCloud
+      // );
+
+      // const { processedCount } = await this.syncBatch(
+      //     rawBatch,
+      //     caches,
+      //     brandCustomName,
+      //     checkSignal,
+      //     batchNo,
+      //     ITEM_DELAY,
+      //     hasUpsertProduct,
+      //     hasStockAdjustLocal,
+      //     hasStockAdjustCloud
+      //   );
+
+
+        // async getLocationInventory(
+  //   db: DbClient | typeof prisma,
+  //   selectedLocations?: string[],
+  //   selectedSublocationIds?: Set<string> | null,
+  //   take: number = 30,
+  //   cursorId?: string,
+  //   skipSynced?: boolean
+  // ): Promise<LocalProductWithRelations[]> {
+  //   const sublocationsFilter =
+  //     selectedSublocationIds && selectedSublocationIds.size > 0
+  //       ? { sublocationId: { in: Array.from(selectedSublocationIds) } }
+  //       : undefined;
+
+  //   const whereClause: Prisma.ProductWhereInput = {
+  //     deletedAt: null,
+  //     inventories: {
+  //       some: {
+  //         ...(selectedLocations?.length ? { locationId: { in: selectedLocations } } : {}),
+  //         bins: {
+  //           some: sublocationsFilter || {},
+  //         },
+  //       },
+  //     },
+  //     ...(skipSynced ? { isCloudSynced: false } : {}),
+  //   };
+
+  //   return await db.product.findMany({
+  //     where: whereClause,
+  //     take,
+  //     ...(cursorId ? { skip: 1, cursor: { id: cursorId } } : {}),
+  //     orderBy: { name: "asc" },
+  //     include: {
+  //       brand: true,
+  //       category: true,
+  //       prices: true,
+  //       inventories: {
+  //         where: selectedLocations?.length
+  //           ? { locationId: { in: selectedLocations } }
+  //           : undefined,
+  //         include: {
+  //           bins: {
+  //             where: sublocationsFilter, // Filter bins specifically to selected sublocations
+  //             include: {
+  //               sublocation: true,
+  //               inventoryBinItems: true,
+  //             },
+  //           },
+  //           location: {
+  //             select: {
+  //               inflowId: true,
+  //               name: true,
+  //               isActive: true,
+  //               isDefault: true,
+  //             },
+  //           },
+  //         },
+  //       },
+  //     },
+  //   });
+  // }

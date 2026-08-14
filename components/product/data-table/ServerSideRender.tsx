@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button"
 import Link from "next/link"
 import { Layers, Plus } from "lucide-react"
 import { toast } from "sonner"
+import { CloudSyncButton } from "@/components/integration/cloud-sync-button"
 
 interface HydrationPayload {
   brands: any[];
@@ -25,7 +26,7 @@ export default function AdminServerSideProductsPage() {
 
   const [sorting, setSorting] = React.useState<SortingState>([])
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([])
-  const [pagination, setPagination] = React.useState({ pageIndex: 0, pageSize: 10 })
+  const [pagination, setPagination] = React.useState({ pageIndex: 0, pageSize: 50 })
   const [hydrationData, setHydrationData] = React.useState<HydrationPayload | null>(null)
 
   // 🟢 1. Core Data Fetching Engine (Extracted out of useEffect)
@@ -36,6 +37,10 @@ export default function AdminServerSideProductsPage() {
       const status = columnFilters.find(f => f.id === "isActive")?.value || ""
       const selectedBrands = (columnFilters.find(f => f.id === "brandName")?.value as string[]) || []
       const selectedCategories = (columnFilters.find(f => f.id === "categoryName")?.value as string[]) || []
+
+      // Extract sync state values
+    const isCloudSynced = columnFilters.find((f) => f.id === "isCloudSynced")?.value || "";
+    const isLocalSynced = columnFilters.find((f) => f.id === "isLocalSynced")?.value || "";
       
       let sortBy = ""
       let sortOrder = ""
@@ -51,6 +56,8 @@ export default function AdminServerSideProductsPage() {
         brands: selectedBrands.join(","), 
         categories: selectedCategories.join(","),
         status: String(status),
+        isCloudSynced: String(isCloudSynced),
+        isLocalSynced: String(isLocalSynced),
         sortBy,
         sortOrder
       })
@@ -157,18 +164,22 @@ export default function AdminServerSideProductsPage() {
   }
 
   return (
-    <div className="w-full max-w-7xl mx-auto  p-6  space-y-6">
+    <div className="w-full max-w-[1600px] mx-auto  px-6 pt-12 pb-[10rem]  space-y-6">
       <PageHeader 
         className="border-b pb-5" 
         icon={Layers}
         title="Master Product Catalog" 
         description="Manage global trade line SKUs, nested barcode structures, multi-tier transactional UOM variables, and active tracking variables." 
         >
+        <CloudSyncButton
+          source="cloudsync_products" 
+        />
         <Button asChild size="sm" className="gap-1.5 shrink-0">
           <Link href="/dashboard/products/create">
             <Plus className="w-4 h-4" /> Register New Product
           </Link>
         </Button>
+
       </PageHeader>
       
       <ProductDataTable 
