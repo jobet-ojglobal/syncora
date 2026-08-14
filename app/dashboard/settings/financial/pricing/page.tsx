@@ -44,7 +44,7 @@ export default function PricingSchemesListPage() {
   const [debouncedSearch, setDebouncedSearch] = useState("");
   
   const [pageIndex, setPageIndex] = useState(0);
-  const PAGE_SIZE = 10;
+  const PAGE_SIZE = 50;
 
   // 2. Automatically sync typing input to debounced state with a 300ms window delay
   useEffect(() => {
@@ -249,7 +249,7 @@ export default function PricingSchemesListPage() {
                         <DeleteButton
                           itemId={scheme.id} 
                           itemName={scheme.name} 
-                          endpointUrl={`/api/admin/settings/financial/pricing/${scheme.id}`}
+                          endpointUrl={`/api/admin/pricing-scheme/${scheme.id}`}
                           onSuccess={() => mutate()} 
                           variant="icon"
                         />

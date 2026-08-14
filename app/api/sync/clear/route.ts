@@ -1,3 +1,4 @@
+// app\api\sync\clear\route.ts
 import { getMidSyncQueue } from "@/lib/queues/sync.queue";
 import { NextResponse } from "next/server";
 

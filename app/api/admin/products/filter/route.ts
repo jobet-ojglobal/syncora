@@ -100,6 +100,7 @@ export async function GET(request: NextRequest) {
         thumbnail: prod.images[0]?.thumbUrl || prod.images[0]?.originalUrl || null,
         barcodesCount: prod.barcodes.length,
         primaryBarcode: prod.barcodes[0]?.barcode || null,
+        isCloudSynced: prod.isCloudSynced,
         purchasingUomText: prod.purchasingUom && purchasingCode
           ? `${purchasingCode} (${Number(prod.purchasingUom.standardQuantity)}:${Number(prod.purchasingUom.uomQuantity)})`
           : "Not Set",

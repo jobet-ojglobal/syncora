@@ -22,6 +22,7 @@ import { ProductGroupSyncService } from "../inflow/services/product-group-sync.s
 import { SalesOrderSyncService } from "../inflow/services/sales-order-sync.service";
 import { PurchaseOrderSyncService } from "../inflow/services/purchase-order-sync.service";
 import { SublocationInventoryAdjustOutSyncService } from "../inflow/services/out-sync-sublocation-inventory-adjust-stock";
+import { ProductOutSyncService } from "../inflow/services/out-sync-product";
 
 // Local Imports
 import { CategorySyncMapService as LocalCategorySyncMapService } from "../locations/services/batch-category-sync-map";
@@ -55,6 +56,7 @@ const purchaseOrderService = new PurchaseOrderSyncService();
 
 // cloud outsync
 const subInventoryOutSyncService = new SublocationInventoryAdjustOutSyncService();
+const productOutSyncService = new ProductOutSyncService();
 
 // Local Service 
 const categoryServiceLocal = new LocalCategorySyncMapService();
@@ -125,9 +127,11 @@ interface SyncWebhookJobData {
   location: { inflowId: string; name: string; url: string };
 }
 
-type SyncOptions = {
+export type SyncOptions = {
   onProgress?: (progress: number) => Promise<void>;
   checkSignal?: () => Promise<void>;
+  batchSize?: number;
+  delayBetweenBatchesMs?: number;
 };
 
 /**
@@ -339,8 +343,19 @@ const worker = new Worker<SyncWebhookJobData>(
           break;
 
         // cloud outsync
-        case "outsync_inventory_levels":
-          result = await subInventoryOutSyncService.sync(syncOptions, selectedLocations, selectedRecords, syncedAll, brandCustomName, ["UpsertProduct","StockAdjustLocal"]);
+        case "cloudsync_inventory_levels":
+          result = await subInventoryOutSyncService.sync(syncOptions, selectedLocations, selectedRecords, syncedAll, brandCustomName, ["UpsertProduct","StockAdjustLocal","StockAdjustCloud"]);
+          break;
+        // case "cloudsync_products":
+        //   result = await subInventoryOutSyncService.sync(syncOptions, selectedLocations, selectedRecords, syncedAll, brandCustomName, ["UpsertProduct","SkipSynced"]);
+        //   break;
+
+        case "cloudsync_products":
+          result = await productOutSyncService.sync(
+            syncOptions,
+            brandCustomName,
+            true // skipSynced flag
+          );
           break;
           
         case "test":

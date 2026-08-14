@@ -35,6 +35,7 @@ import { SlidersHorizontal } from "lucide-react"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { DataTablePagination } from "@/components/shared/data-table-pagination"
 import { DataTableBulkDelete } from "@/components/shared/data-table-bulk-delete"
+import { DataTableExportButton } from "@/components/shared/data-table-export-button"
 
 // 🟢 Extend props to receive server control hooks from the parent container
 interface DataTableProps<TData extends ParsedProduct, TValue> {
@@ -170,6 +171,7 @@ export function ProductDataTable<TData extends ParsedProduct, TValue>({
   const currentStatusValue = (columnFilters.find((f) => f.id === "isActive")?.value as string) ?? "all"
 
   const selectedRows = table.getFilteredSelectedRowModel().rows
+  const selectedIds = selectedRows.map((row) => row.original.id)
 
   const handleBulkDeleteExecution = async () => {
     if (!onBulkDelete) return
@@ -179,6 +181,9 @@ export function ProductDataTable<TData extends ParsedProduct, TValue>({
     onBulkDelete(selectedIds)
     table.resetRowSelection() // Wipe column selection checkboxes clean on complete
   }
+
+  const currentCloudSyncValue = (columnFilters.find((f) => f.id === "isCloudSynced")?.value as string) ?? "all";
+  const currentLocalSyncValue = (columnFilters.find((f) => f.id === "isLocalSynced")?.value as string) ?? "all";
 
   return (
     <div className="space-y-4 w-full">
@@ -224,6 +229,50 @@ export function ProductDataTable<TData extends ParsedProduct, TValue>({
               <SelectItem value="inactive">Archived Only</SelectItem>
             </SelectContent>
           </Select>
+
+          {/* Cloud Sync Filter */}
+          <Select
+            value={currentCloudSyncValue}
+            onValueChange={(value) => {
+              onColumnFiltersChange((prev) => {
+                const filtered = prev.filter((f) => f.id !== "isCloudSynced");
+                if (value !== "all") return [...filtered, { id: "isCloudSynced", value }];
+                return filtered;
+              });
+              onPaginationChange((prev) => ({ ...prev, pageIndex: 0 }));
+            }}
+          >
+            <SelectTrigger className="w-[150px] h-9">
+              <SelectValue placeholder="Cloud Sync" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Cloud Sync: All</SelectItem>
+              <SelectItem value="true">Cloud Synced</SelectItem>
+              <SelectItem value="false">Cloud Unsynced</SelectItem>
+            </SelectContent>
+          </Select>
+
+          {/* Local Sync Filter */}
+          <Select
+            value={currentLocalSyncValue}
+            onValueChange={(value) => {
+              onColumnFiltersChange((prev) => {
+                const filtered = prev.filter((f) => f.id !== "isLocalSynced");
+                if (value !== "all") return [...filtered, { id: "isLocalSynced", value }];
+                return filtered;
+              });
+              onPaginationChange((prev) => ({ ...prev, pageIndex: 0 }));
+            }}
+          >
+            <SelectTrigger className="w-[150px] h-9">
+              <SelectValue placeholder="Local Sync" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Local Sync: All</SelectItem>
+              <SelectItem value="true">Local Synced</SelectItem>
+              <SelectItem value="false">Local Unsynced</SelectItem>
+            </SelectContent>
+          </Select>
           
           {table.getColumn("brandName") && (
             <DataTableMultiSelect
@@ -248,6 +297,10 @@ export function ProductDataTable<TData extends ParsedProduct, TValue>({
         </div>
 
         <div className="flex items-center gap-3">
+          <DataTableExportButton
+            selectedIds={selectedIds}
+            columnFilters={columnFilters}
+          />
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="outline" size="sm" className="h-9 ml-auto flex gap-2">
@@ -271,10 +324,6 @@ export function ProductDataTable<TData extends ParsedProduct, TValue>({
                 ))}
             </DropdownMenuContent>
           </DropdownMenu>
-
-          {/* <div className="text-sm text-muted-foreground whitespace-nowrap">
-            Total Records: {totalRecords}
-          </div> */}
         </div>
       </div>
 

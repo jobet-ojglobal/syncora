@@ -112,7 +112,7 @@ export default function LocationInventoryPage() {
           <div className="flex items-center gap-2">
             {/* Extracted Cloud Sync Component */}
             <CloudSyncSublocationButton
-              source="outsync_inventory_levels"
+              source="cloudsync_inventory_levels"
               locationId={location?.inflowId}
               locationName={location?.name}
               onSyncComplete={refreshAllData}

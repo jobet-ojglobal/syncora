@@ -57,6 +57,7 @@ export async function syncProduct(
   const verifiedPricingSchemeIds = caches?.verifiedPricingSchemeIds ?? new Set<string>();
   const verifiedProductIds = caches?.verifiedProductIds ?? new Set<string>();
 
+  console.log(`...Syncing product: ${product.name}`);
   
   const rawFeaturesString = firstProductInGroup?.customFields?.custom2 || product.customFields?.custom2;
   const rawTagsString = firstProductInGroup?.customFields?.custom3  || product.customFields?.custom3;
@@ -66,10 +67,11 @@ export async function syncProduct(
   });
 
   // for initial sync only : NOT UPSERT PRODUCT DATA
-  if(localProduct) {
-    verifiedProductIds?.add(localProduct.inflowId);
-    return localProduct;
-  }
+  // if(localProduct) {
+  //   verifiedProductIds?.add(localProduct.inflowId);
+  //      console.log(`Return and skip upsert for testing only`);
+  //   return localProduct;
+  // }
 
   let brandId: string | null = null;
 
@@ -239,6 +241,13 @@ export async function syncProduct(
   }
 
   if(!validProductData) return null;
+  
+  if(!validProductData.isCloudSynced) {
+    await tx.product.update({
+      where: { inflowId: validProductData.inflowId },
+      data: { isCloudSynced: true }
+    });
+  }
 
   // Base Helpers Execution
   if(product.purchasingUom?.name !== "") {

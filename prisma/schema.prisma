@@ -27,6 +27,7 @@ model SyncJob {
   @@index([createdAt])
   @@map("sync_job")
 }
+
 // INFLOW MODELS
 model InflowWebhook {
   id                      String   @id 
@@ -312,6 +313,7 @@ model Product {
   isActive                Boolean @default(true)
   isManufacturable        Boolean @default(false)
   isCloudSynced           Boolean @default(false)
+  isLocalSynced           Boolean @default(false)
   includeQuantityBuildable Boolean @default(false)
   standardUomName         String?
   trackExpiry             Boolean @default(false)
