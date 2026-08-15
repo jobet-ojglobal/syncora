@@ -63,10 +63,10 @@ export async function syncProduct(
   });
 
   // for initial sync only : NOT UPSERT PRODUCT DATA
-  if(localProduct) {
-    verifiedProductIds?.add(localProduct.inflowId);
-    return localProduct;
-  }
+  // if(localProduct) {
+  //   verifiedProductIds?.add(localProduct.inflowId);
+  //   return localProduct;
+  // }
 
   let brandId: string | null = null;
   
@@ -251,7 +251,7 @@ export async function syncProduct(
         inflowId: product.productId,
         slug: slugToUse,
       },
-      update: productPayload,
+      update: {}, // productPayload
     });
 
     validProductData = dbProduct

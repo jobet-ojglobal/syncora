@@ -21,6 +21,14 @@ pnpm install
 | `docker compose down`       | Stop and remove containers |
 
 
+# To start only Redis from that docker-compose.yml:
+docker compose up -d redis
+Check it:
+docker ps
+#
+docker inspect existing-redis
+--
+
 # ERROR ENCOUNTERED
 
 1. docker compose up --build error static
