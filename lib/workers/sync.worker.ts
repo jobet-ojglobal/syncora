@@ -21,7 +21,6 @@ import { ProductSyncService } from "@/lib/inflow/services/product-sync.service";
 import { ProductGroupSyncService } from "../inflow/services/product-group-sync.service";
 import { SalesOrderSyncService } from "../inflow/services/sales-order-sync.service";
 import { PurchaseOrderSyncService } from "../inflow/services/purchase-order-sync.service";
-import { SublocationInventoryAdjustOutSyncService } from "../inflow/services/out-sync-sublocation-inventory-adjust-stock";
 import { ProductOutSyncService } from "../inflow/services/out-sync-product";
 
 // Local Imports
@@ -34,6 +33,7 @@ import { CustomerSyncMapService as LocalCustomerSyncMapService } from "../locati
 import { ProductSyncMapService as LocalProductSyncMapService } from "../locations/services/batch-product-sync-map";
 import { InventorySyncService as LocalInventorySyncService } from "../locations/services/batch-inventory-sync-adjustment.service";
 import { SublocationSyncMapService as LocalSublocationSyncMapService } from "../locations/services/sublocation-sync-map.service";
+import { inventoryOutSyncService } from "../inflow/services/out-sync-inventory";
 
 
 const testService = new TestSyncService();
@@ -55,7 +55,6 @@ const salesOrderService = new SalesOrderSyncService();
 const purchaseOrderService = new PurchaseOrderSyncService();
 
 // cloud outsync
-const subInventoryOutSyncService = new SublocationInventoryAdjustOutSyncService();
 const productOutSyncService = new ProductOutSyncService();
 
 // Local Service 
@@ -107,6 +106,13 @@ const sublocationServiceLocal = new LocalSublocationSyncMapService();
 //   }
 // };
 
+
+export interface BaseSyncResult {
+  processedCount: number;
+  failedCount: number;
+  syncedAt: string;
+  details?: Record<string, any>;
+}
 
 export class SyncCancelledError extends Error {
   constructor(message = "Sync job was cancelled by user.") {
@@ -176,26 +182,6 @@ const worker = new Worker<SyncWebhookJobData>(
     const locationUrl = (location?.url && location.url.trim() !== "") ? location.url : null;
 
     console.log(`[Sync Worker] Processing job source: ${source} for location ${location?.name || "cloud"}`);
-    
-    // const syncOptions: SyncOptions = {
-    //   checkSignal: async () => {
-    //     await checkCancellation(jobId);
-    //   },
-    //   onProgress: async (processedCount) => {
-    //     // Confirm job isn't cancelled before writing progress updates
-    //     await checkCancellation(jobId);
-
-    //     await job.updateProgress(processedCount);
-
-    //     await prisma.syncJob.update({
-    //       where: { id: jobId },
-    //       data: { 
-    //         status: "processing",
-    //         progress: processedCount 
-    //       },
-    //     });
-    //   },
-    // };
 
     const syncOptions: SyncOptions = {
       checkSignal: async () => {
@@ -204,25 +190,11 @@ const worker = new Worker<SyncWebhookJobData>(
       onProgress: async (processedCount) => {
         await checkCancellation(jobId);
         await job.updateProgress(processedCount);
-        // Atomically update DB only if not cancelled
         await safeUpdateJob(jobId, processedCount);
       },
     };
 
     try {
-      // // Check cancellation state right before starting execution
-      // await checkCancellation(jobId);
-
-      // await prisma.syncJob.update({
-      //   where: { id: jobId },
-      //   data: {
-      //     status: "processing",
-      //     progress: 0,
-      //   },
-      // });
-
-      // let result;
-
       await checkCancellation(jobId);
       await safeUpdateJob(jobId, 0);
 
@@ -344,7 +316,7 @@ const worker = new Worker<SyncWebhookJobData>(
 
         // cloud outsync
         case "cloudsync_inventory_levels":
-          result = await subInventoryOutSyncService.sync(syncOptions, selectedLocations, selectedRecords, syncedAll, brandCustomName, ["UpsertProduct","StockAdjustLocal","StockAdjustCloud"]);
+          result = await inventoryOutSyncService.sync(syncOptions, selectedLocations, selectedRecords, syncedAll, brandCustomName, ["UpsertProduct","StockAdjustLocal","StockAdjustCloud"]);
           break;
         // case "cloudsync_products":
         //   result = await subInventoryOutSyncService.sync(syncOptions, selectedLocations, selectedRecords, syncedAll, brandCustomName, ["UpsertProduct","SkipSynced"]);
@@ -354,7 +326,6 @@ const worker = new Worker<SyncWebhookJobData>(
           result = await productOutSyncService.sync(
             syncOptions,
             brandCustomName,
-            true // skipSynced flag
           );
           break;
           
@@ -367,11 +338,33 @@ const worker = new Worker<SyncWebhookJobData>(
           );
       }
 
+      // await prisma.syncJob.update({
+      //   where: { id: jobId },
+      //   data: {
+      //     status: "completed",
+      //     progress: 100,
+      //     data: JSON.parse(JSON.stringify(result)),
+      //   },
+      // });
+
+      // Safely check if 'failedCount' exists on the returned result object
+      const failedCount = 
+        result && typeof result === "object" && "failedCount" in result
+          ? (result.failedCount as number)
+          : 0;
+
+      const hasBatchFailures = failedCount > 0;
+
       await prisma.syncJob.update({
         where: { id: jobId },
         data: {
           status: "completed",
           progress: 100,
+          hasError: hasBatchFailures,
+          errorType: hasBatchFailures ? "PARTIAL_BATCH_FAILURE" : null,
+          error: hasBatchFailures
+            ? `Completed with ${failedCount} un-synced record error(s).`
+            : null,
           data: JSON.parse(JSON.stringify(result)),
         },
       });
@@ -379,32 +372,77 @@ const worker = new Worker<SyncWebhookJobData>(
       return result;
     } catch (error) {
       // Handle user-initiated cancellation: exit cleanly without triggering worker retries
+      // if (error instanceof SyncCancelledError) {
+      //   console.log(`[Sync Worker] Job ${jobId} was safely aborted mid-process.`);
+      //   await job.discard();
+      //   return { cancelled: true };
+      // }
       if (error instanceof SyncCancelledError) {
-        console.log(`[Sync Worker] Job ${jobId} was safely aborted mid-process.`);
+        await prisma.syncJob.updateMany({
+          where: { id: jobId },
+          data: {
+            status: "cancelled",
+            hasError: false,
+            errorType: "CANCELLED",
+            error: "Sync job was manually cancelled by user.",
+          },
+        });
+
         await job.discard();
         return { cancelled: true };
       }
 
-      const maxAttempts = job.opts.attempts || 1;
-      const isFinalAttempt = job.attemptsMade >= maxAttempts;
       const errorMessage = error instanceof Error ? error.message : "Unknown error";
+  
+      // Categorize error type dynamically
+      let errorType = "SYSTEM_ERROR";
+      if (errorMessage.includes("product_name_conflict")) {
+        errorType = "NAME_CONFLICT";
+      } else if (errorMessage.includes("InFlow API Error")) {
+        errorType = "API_ERROR";
+      }
+
+      const maxAttempts = job.opts.attempts || 1;
+      const currentAttempt = job.attemptsMade + 1;
+      const isFinalAttempt = currentAttempt >= maxAttempts;
 
       await prisma.syncJob.update({
         where: { id: jobId },
         data: {
           status: isFinalAttempt ? "failed" : "retrying",
+          hasError: true,
+          errorType,
+          failedAttempts: currentAttempt,
           error: isFinalAttempt
             ? errorMessage
-            : `Attempt ${job.attemptsMade}/${maxAttempts} failed. Retrying... (${errorMessage})`,
+            : `Attempt ${currentAttempt}/${maxAttempts} failed: ${errorMessage}`,
         },
       });
 
-      throw error; // Re-throw standard runtime errors so BullMQ schedules retries
+      throw error;
+
+      // const maxAttempts = job.opts.attempts || 1;
+      // const isFinalAttempt = job.attemptsMade >= maxAttempts;
+      // const errorMessage = error instanceof Error ? error.message : "Unknown error";
+
+      // await prisma.syncJob.update({
+      //   where: { id: jobId },
+      //   data: {
+      //     status: isFinalAttempt ? "failed" : "retrying",
+      //     error: isFinalAttempt
+      //       ? errorMessage
+      //       : `Attempt ${job.attemptsMade}/${maxAttempts} failed. Retrying... (${errorMessage})`,
+      //   },
+      // });
+
+      // throw error; // Re-throw standard runtime errors so BullMQ schedules retries
     }
   },
   { 
     connection,
-    concurrency: 5 
+    concurrency: 2, // 5
+    lockDuration: 60000, // Extend lock duration to 60s (default is 30s)
+    stalledInterval: 30000,
   }
 );
 

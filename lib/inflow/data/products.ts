@@ -1,4 +1,5 @@
 import { inflow } from "@/lib/inflow/inflow.client";
+import { inflow as inflowLimit } from "@/lib/inflow/inflow.client.limit";
 import { InflowProduct } from "../types";
 
 export async function getEntireCatalogs(
@@ -121,7 +122,7 @@ export async function checkCloudProduct(productId: string) {
 
 // lib\inflow\data\products.ts
 export async function upsertProduct(payload: Partial<InflowProduct>) {
-  return inflow.put<InflowProduct>("/products", payload);
+  return inflowLimit.put<InflowProduct>("/products", payload);
 }
 
 export async function deleteProduct(productId: string) {

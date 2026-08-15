@@ -237,7 +237,7 @@ export async function syncProduct(
         inflowId: product.productId,
         slug: slugToUse,
       },
-      update: productPayload,
+      update: {}, // productPayload
     });
 
     validProductData = dbProduct

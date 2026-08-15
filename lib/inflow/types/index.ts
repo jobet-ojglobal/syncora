@@ -130,29 +130,42 @@ export interface InflowProduct {
   categoryId: string | null;
   lastVendorId: string | null;
   lastModifiedById: string | null;
-  createdDttm: string;
   lastModifiedDateTime: string;
-  timestamp?: string;
   
   purchasingUom: InflowPurchasingUom | null;
   salesUom: InflowSalesUom | null;
   customFields: InflowCustomFields;
-  images: InflowProductImage[];
-  defaultPrice?: InflowProductPrice;
-  inventoryLines: InflowInventoryLine[];
-  productVariant?: InflowProductVariant;
 
-  category?: InflowCategory | null;
+
+  images?: InflowProductImage[];
+  defaultImage?: InflowDefaultImage;
+  defaultPrice?: InflowProductPrice;
+  inventoryLines?: InflowInventoryLine[];
+  productVariant?: InflowProductVariant;
+  category?: InflowCategory;
   productBarcodes?: InflowProductBarcode[];
   taxCodes?: InflowProductTaxCode[];
   reorderSettings?: InflowReorderSetting[];
   productOperations?: InflowProductOperation[];
   prices?: InflowProductPrice[];
-  cost?: InflowProductCost | null;
+  cost?: InflowProductCost;
   itemBoms?: InflowItemBom[];
   attachments?: InflowProductAttachment[];
-  lastVendor?: InflowVendor | null;
+  lastVendor?: InflowVendor;
   lastModifiedBy?: InflowTeamMember;
+
+  createdDttm: string;
+  timestamp?: string;
+}
+
+export interface InflowDefaultImage {
+  imageId: string;
+  largeUrl: string,
+  mediumUncroppedUrl: string,
+  mediumUrl: string,
+  originalUrl: string,
+  smallUrl: string,
+  thumbUrl: string
 }
 
 /**
