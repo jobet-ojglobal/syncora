@@ -240,6 +240,7 @@ export class ProductSyncMapService {
           for (const product of batch) {
             if (checkSignal) await checkSignal();
 
+            // skip inactive products
             if (!parseBooleanFlag(product.isActive)) {
               continue;
             }

@@ -2,9 +2,8 @@ import { prisma } from "@/lib/prisma";
 import { InflowProduct, InflowCustomFields, InflowStockAdjustInput } from "@/lib/inflow/types";
 import { Prisma } from "@/generated/prisma/client";
 import { SyncOptions } from "@/lib/workers/sync.worker";
-import { getMidSyncQueue } from "@/lib/queues/sync.queue";
 import { AdjustmentService, PostAdjustmentPayload, ProcessedAdjustmentResult } from "@/services/stock-adjustment.service";
-import { upsertStockAdjustBulk } from "../data/inventory";
+import { areSerialsDifferent } from "./helpers";
 
 type DbClient = Prisma.TransactionClient;
 
@@ -216,17 +215,10 @@ export function mapToInflowStockAdjustInput(
   return inflowPayload;
 }
 
-export class InventoryOutSyncService {
+export class InventoryLocationSyncService {
   private adjustmentLocalCloudService: AdjustmentService;
 
   constructor() {
-    const queueProvider = {
-      addJob: async (jobName: string, payload: any) => {
-        const queue = getMidSyncQueue();
-        await queue.add(jobName, payload);
-      },
-    };
-
     this.adjustmentLocalCloudService = new AdjustmentService(prisma);
   }
 
@@ -315,148 +307,10 @@ export class InventoryOutSyncService {
     });
 
     return products;
-
-    // // 2. Group products by Location ID
-    // const groupedByLocation = new Map<
-    //   string,
-    //   {
-    //     locationId: string;
-    //     locationName: string;
-    //     products: typeof products;
-    //   }
-    // >();
-
-    // for (const product of products) {
-    //   for (const inv of product.inventories) {
-    //     const locId = inv.locationId;
-    //     const locName = inv.location?.name || "Unknown Location";
-
-    //     if (!groupedByLocation.has(locId)) {
-    //       groupedByLocation.set(locId, {
-    //         locationId: locId,
-    //         locationName: locName,
-    //         products: [],
-    //       });
-    //     }
-
-    //     const group = groupedByLocation.get(locId)!;
-    //     if (!group.products.some((p) => p.id === product.id)) {
-    //       group.products.push(product);
-    //     }
-    //   }
-    // }
-
-    // return Array.from(groupedByLocation.values());
-  }
-
-  async processBatch(
-    products: LocalProductWithRelations[],
-    defaultCategoryPayload: { inflowId: string; name: string; isDefault: boolean } | null,
-    brandCustomName?: string,
-    checkSignal?: () => Promise<void>,
-    batchNo: number = 0,
-    concurrency = 1 // Lowered to 1 or 2 to avoid 429 rate limit thrashing
-  ): Promise<{
-    successfulIds: string[];
-    failedIds: string[];
-  }> {
-    const batchStartTime = performance.now();
-    const modifiedById = "56bfcf3b-3e98-4098-ae8f-2adcb657cb57";
-    const itemDelayMs = 300;
-
-    const locationAdjustmentMap = new Map<string, SyncAdjustmentLine[]>();
-
-    const results = await Promise.allSettled(
-      products.map(async (product) =>
-        {
-          if (checkSignal) await checkSignal();
-
-          // --- Phase A: Build Adjustment Inputs for target locations ---
-          for (const inv of product.inventories) {
-            for (const bin of inv.bins) {
-              const targetLocId = bin.sublocation?.linkedLocationId || inv.locationId;
-              if (!targetLocId) continue;
-
-              //  skip serialize products for testing
-              if (product.trackSerials) continue;
-
-              const binQty = Number(bin.quantity) || 0;
-              const binSerials = bin.inventoryBinItems?.map((item) => item.serialNumber) || [];
-
-              const adjustmentInput: SyncAdjustmentLine = {
-                productId: product.inflowId,
-                trackSerials: Boolean(product.trackSerials),
-                quantityAdjusted: binQty,
-                quantityOnHand: binQty,
-                quantityReserved: Number(inv.quantityReserved) || 0,
-                quantityAvailable: Number(inv.quantityAvailable) || binQty,
-                serials: binSerials,
-                description: `Sublocation sync adjustment for ${product.name}`,
-                bins: [],
-              };
-
-              const existingGroup = locationAdjustmentMap.get(targetLocId) ?? [];
-              existingGroup.push(adjustmentInput);
-              locationAdjustmentMap.set(targetLocId, existingGroup);
-            }
-          }
-
-          return product.id;
-        }
-      )
-    );
-
-    // --- Phase B: Post location adjustments ---
-    const reason = await prisma.adjustmentReason.findFirst({
-      where: { name: { contains: "Integration", mode: "insensitive" } },
-    });
-
-    for (const [targetLocationId, adjustmentLines] of locationAdjustmentMap) {
-      if (adjustmentLines.length === 0) continue;
-
-      await this.adjustmentLocalCloudService.postAdjustment({
-        locationId: targetLocationId,
-        reasonId: reason?.inflowId || undefined,
-        remarks: `Batch Sync #${batchNo + 1} Inventory Adjustment`,
-        performedById: modifiedById,
-        lines: adjustmentLines,
-      });
-
-      console.log(
-        `[Inventory Sync] Processed ${adjustmentLines.length} lines for location: ${targetLocationId}`
-      );
-
-      if (itemDelayMs> 0) {
-        await this.sleep(itemDelayMs);
-      }
-    }
-
-    const successfulIds: string[] = [];
-    const failedIds: string[] = [];
-
-    results.forEach((res, index) => {
-      if (res.status === "fulfilled") {
-        successfulIds.push(res.value);
-      } else {
-        failedIds.push(products[index].id);
-        console.error(`[Product Sync] Failed (${products[index].name}):`, res.reason);
-      }
-    });
-
-    const batchDuration = performance.now() - batchStartTime;
-    console.log(
-      `[Product Sync] Batch API processing finished in ${this.formatDuration(batchDuration)} (Avg: ${this.formatDuration(batchDuration / products.length)}/item)`
-    );
-
-    return { 
-      successfulIds, 
-      failedIds };
   }
 
   async processBatchBulk(
     products: LocalProductWithRelations[],
-    defaultCategoryPayload: { inflowId: string; name: string; isDefault: boolean } | null,
-    brandCustomName?: string,
     checkSignal?: () => Promise<void>,
     batchNo: number = 0,
     reasonId?: string,
@@ -466,7 +320,6 @@ export class InventoryOutSyncService {
   }> {
     const batchStartTime = performance.now();
     const modifiedById = "56bfcf3b-3e98-4098-ae8f-2adcb657cb57";
-    const itemDelayMs = 300;
 
     const locationAdjustmentMap = new Map<string, SyncAdjustmentLine[]>();
 
@@ -481,9 +334,8 @@ export class InventoryOutSyncService {
             const targetLocId = bin.sublocation?.linkedLocationId || inv.locationId;
             const productId = product.inflowId;
             if (!targetLocId) continue;
-            if (product.trackSerials) continue;
             
-            // 1. Fetch existing inventory along with product tracking settings
+            // 1. Fetch existing inventory including current bin serial items
             const linkedInventory = await prisma.inventory.findUnique({
               where: {
                 productId_locationId: {
@@ -497,28 +349,47 @@ export class InventoryOutSyncService {
                     trackSerials: true,
                   },
                 },
+                bins: {
+                  include: {
+                    inventoryBinItems: true,
+                  },
+                },
               },
             });
 
             const binQty = Number(bin.quantity) || 0;
             const binSerials = bin.inventoryBinItems?.map((item) => item.serialNumber) || [];
 
-            // 2. Extract current target values safely (Convert Prisma.Decimal -> Decimal / Number)
+            // 2. Extract existing serial numbers from target location (if tracking serials)
+            const isTrackSerials = Boolean(product.trackSerials);
+            const existingTargetSerials = isTrackSerials && linkedInventory?.bins
+              ? linkedInventory.bins.flatMap((b) => b.inventoryBinItems?.map((item) => item.serialNumber) || [])
+              : [];
+
+            // 3. Determine quantity & serial diffs
+            const isNewInventory = !linkedInventory;
             const targetBinBefore = linkedInventory?.quantityOnHand ?? new Prisma.Decimal(0);
             const linkedBinQtyChange = totalQty.minus(targetBinBefore);
-    
-            // 3. Push adjustment payload if a delta exists
-            if (linkedBinQtyChange.equals(0)) continue;
+            const hasQtyChange = !linkedBinQtyChange.equals(0);
+
+            const serialsChanged = isTrackSerials
+              ? areSerialsDifferent(binSerials, existingTargetSerials)
+              : false;
+
+            // 4. Skip ONLY IF there is no quantity change AND serials haven't changed AND the inventory already exists
+            if (!hasQtyChange && !serialsChanged && !isNewInventory) continue;
 
             const adjustmentInput: SyncAdjustmentLine = {
               productId: product.inflowId,
-              trackSerials: Boolean(product.trackSerials),
-              quantityAdjusted: linkedBinQtyChange.toNumber(),
+              trackSerials: isTrackSerials,
+              quantityAdjusted: linkedBinQtyChange.toNumber(), // Will be 0 if serial-only update
               quantityOnHand: binQty,
-              quantityReserved:  Number(inv.quantityReserved) || 0,
+              quantityReserved: Number(inv.quantityReserved) || 0,
               quantityAvailable: Number(inv.quantityAvailable) || binQty,
               serials: binSerials,
-              description: `Sublocation sync adjustment for ${product.name}`,
+              description: serialsChanged && !hasQtyChange
+                ? `Serial update sync for ${product.name}`
+                : `Sublocation sync adjustment for ${product.name}`,
               bins: [],
             };
 
@@ -556,22 +427,6 @@ export class InventoryOutSyncService {
       console.log(
         `[Inventory Sync] Local adjustment created (${postResult.adjustment.inflowId}) for location: ${targetLocationId}`
       );
-
-      if (itemDelayMs > 0) {
-        await this.sleep(itemDelayMs);
-      }
-    }
-
-    // --- Phase C: Bulk Send to external InFlow API ---
-    if (inflowBulkPayloads.length > 0) {
-      try {
-        console.log(`[Inventory Sync] Dispatching ${inflowBulkPayloads.length} stock adjustments to inFlow...`);
-        await upsertStockAdjustBulk(inflowBulkPayloads);
-        console.log(`[Inventory Sync] Bulk inFlow sync successful.`);
-      } catch (error) {
-        console.error(`[Inventory Sync] Failed bulk dispatch to inFlow:`, error);
-        // Optional: mark items as failed or trigger retry queue
-      }
     }
 
     // --- Phase D: Formulate Results ---
@@ -600,15 +455,11 @@ export class InventoryOutSyncService {
     selectedLocations?: string[],
     selectedRecords?: string[],
     syncedAll?: boolean,
-    brandCustomName?: string,
-    includes?: string[]
   ) {
     const syncStartTime = performance.now();
     const { onProgress, checkSignal } = options;
-    // Reduced batch size to 20 to keep BullMQ execution time well within stall limits
-    const BATCH_SIZE = options?.batchSize ?? 50 ;//20; 
-    const API_CONCURRENCY = 5 // 3; // 1 request at a time avoids 429 bursts
-    const INTER_BATCH_DELAY = options?.delayBetweenBatchesMs ?? 1000; // 5000; // 1000
+    const BATCH_SIZE = options?.batchSize ?? 500; 
+    const INTER_BATCH_DELAY = options?.delayBetweenBatchesMs ?? 10;
 
     const defaultCategory = await prisma.category.findFirst({
       where: { isDefault: true },
@@ -616,7 +467,7 @@ export class InventoryOutSyncService {
     });
 
     if (!defaultCategory) {
-      console.error("[InventoryOutSyncService] Sync aborted: Default category not found.");
+      console.error("[InventoryLocationSyncService] Sync aborted: Default category not found.");
       return { productsProcessed: 0, syncedAt: new Date().toISOString() };
     }
 
@@ -624,11 +475,10 @@ export class InventoryOutSyncService {
       where: { name: { contains: "Integration", mode: "insensitive" } },
     });
 
-     if (!reason) {
-      console.error("[InventoryOutSyncService] Sync aborted: Reason not found.");
+    if (!reason) {
+      console.error("[InventoryLocationSyncService] Sync aborted: Reason not found.");
       return { productsProcessed: 0, syncedAt: new Date().toISOString() };
     }
-
 
     const selectedSublocationIds =
       !syncedAll && selectedRecords && selectedRecords.length > 0
@@ -637,44 +487,51 @@ export class InventoryOutSyncService {
 
     let totalProcessed = 0;
     let batchNo = 0;
+    
+    // Track ALL processed product IDs (both success and fail) to paginate correctly
+    const processedProductIds: string[] = [];
     const permanentlyFailedIds: string[] = [];
 
-    console.log(`[InventoryOutSyncService] Starting sync batching (Size: ${BATCH_SIZE})...`);
+    console.log(`[InventoryLocationSyncService] Starting sync batching (Size: ${BATCH_SIZE})...`);
 
     while (true) {
       const iterationStartTime = performance.now();
       if (checkSignal) await checkSignal();
 
       const fetchStartTime = performance.now();
+      
+      // Exclude all previously fetched/processed IDs so getProducts advances
       const rawBatch = await this.getProducts(
         prisma,
         selectedLocations,
         selectedSublocationIds,
         BATCH_SIZE,
         undefined,
-        permanentlyFailedIds
+        processedProductIds
       );
       const fetchDuration = performance.now() - fetchStartTime;
 
       if (!rawBatch || rawBatch.length === 0) {
-        console.log(`[InventoryOutSyncService] No more unsynced products found. Sync complete.`);
+        console.log(`[InventoryLocationSyncService] No more unsynced products found. Sync complete.`);
         break;
       }
 
       console.log(
-        `[InventoryOutSyncService] Fetched ${rawBatch.length} unsynced items in ${this.formatDuration(fetchDuration)}`
+        `[InventoryLocationSyncService] Fetched ${rawBatch.length} unsynced items in ${this.formatDuration(fetchDuration)}`
       );
 
       if (checkSignal) await checkSignal();
 
       const { successfulIds, failedIds } = await this.processBatchBulk(
         rawBatch,
-        defaultCategory,
-        brandCustomName,
         checkSignal,
         batchNo,
         reason?.inflowId
       );
+
+      // Track all processed IDs so the next getProducts call fetches the next set of 20/500 items
+      const currentBatchIds = rawBatch.map((p) => p.id);
+      processedProductIds.push(...currentBatchIds);
 
       if (failedIds.length > 0) {
         permanentlyFailedIds.push(...failedIds);
@@ -686,29 +543,28 @@ export class InventoryOutSyncService {
       const iterationDuration = performance.now() - iterationStartTime;
 
       console.log(
-        `[InventoryOutSyncService] Batch #${batchNo} done in ${this.formatDuration(iterationDuration)}. ` +
+        `[InventoryLocationSyncService] Batch #${batchNo} done in ${this.formatDuration(iterationDuration)}. ` +
         `Processed: ${successfulIds.length}, Failed: ${failedIds.length}. Cumulative: ${totalProcessed}`
       );
 
-      // Heartbeat report to prevent BullMQ stall timeouts
       if (onProgress) {
         await onProgress(totalProcessed);
       }
 
       if (successfulIds.length === 0 && failedIds.length === rawBatch.length) {
-        console.warn(`[InventoryOutSyncService] Entire batch failed. Stopping execution loop.`);
+        console.warn(`[InventoryLocationSyncService] Entire batch failed. Stopping execution loop.`);
         break;
       }
 
       if (INTER_BATCH_DELAY > 0) {
         await this.sleep(INTER_BATCH_DELAY);
       }
-
-      const totalSyncDuration = performance.now() - syncStartTime;
-      console.log(
-        `[InventoryOutSyncService] Total job execution completed in ${this.formatDuration(totalSyncDuration)}. Total Processed: ${totalProcessed}, Total Failed: ${permanentlyFailedIds.length}`
-      );
     }
+
+    const totalSyncDuration = performance.now() - syncStartTime;
+    console.log(
+      `[InventoryLocationSyncService] Total job execution completed in ${this.formatDuration(totalSyncDuration)}. Total Processed: ${totalProcessed}, Total Failed: ${permanentlyFailedIds.length}`
+    );
 
     return {
       inventoryLevelsProcessed: totalProcessed,
@@ -718,4 +574,4 @@ export class InventoryOutSyncService {
   }
 }
 
-export const inventoryOutSyncService = new InventoryOutSyncService();
+export const inventoryStockLocationSyncService = new InventoryLocationSyncService();

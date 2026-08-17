@@ -66,7 +66,7 @@ export function FormInput<
             <Input
               {...fieldProps}
               id={inputId}
-              type={type}
+              type={computedType}
               placeholder={placeholder}
               aria-invalid={fieldState.invalid}
               className={`${Icon ? "pl-9" : ""} h-8 text-xs ${classNameInput}`}

@@ -10,6 +10,7 @@ import {
   AlertTriangle,
   Trash2,
   Layers,
+  ArrowRight,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
@@ -35,6 +36,9 @@ interface SublocationOption {
     name: string;
   } | null;
   stockQty: number;
+  sourceStockQty?: number;
+  targetStockQty?: number;
+  pendingAdjustmentQty?: number;
 }
 
 interface CloudSyncButtonProps {
@@ -67,7 +71,7 @@ export function CloudSyncSublocationButton({
 
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Fetch sublocations that have linkedLocationId
+  // Fetch sublocations with source/target/pending adjustment metrics
   const { data: sublocations = [], isLoading: isLoadingSublocations } = useSWR<SublocationOption[]>(
     isSyncConfirmOpen && locationId
       ? `/api/locations/${locationId}/sublocations/linked`
@@ -75,17 +79,15 @@ export function CloudSyncSublocationButton({
     fetcher
   );
 
-  // Build a stable identifier string to avoid array-reference re-triggers
   const sublocationIdsKey = sublocations.map((s) => s.id).join(",");
 
-  // ✅ FIX 1: Safely synchronize selected IDs when sublocations data actually changes
   useEffect(() => {
     if (sublocations.length > 0) {
       setSelectedSublocationIds(sublocations.map((sub) => sub.id));
     } else {
       setSelectedSublocationIds([]);
     }
-  }, [sublocationIdsKey]); // Depend on primitive ID string instead of array reference
+  }, [sublocationIdsKey]);
 
   // Sublocation toggle handlers
   const handleToggleSublocation = (id: string) => {
@@ -174,7 +176,6 @@ export function CloudSyncSublocationButton({
     };
   }, [source]);
 
-  // ✅ FIX 2: Store callback in a Ref to avoid adding unstable functions to useEffect dependencies
   const onSyncCompleteRef = useRef(onSyncComplete);
 
   useEffect(() => {
@@ -289,7 +290,9 @@ export function CloudSyncSublocationButton({
               <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                 Sync Status: <span className="text-foreground">{status || "Initializing"}</span>
               </span>
+              <span>source: {source}</span>
             </div>
+            
 
             <div className="flex items-center gap-1.5">
               {isSyncing && status !== "cancelled" && (
@@ -303,7 +306,6 @@ export function CloudSyncSublocationButton({
                   Cancel
                 </Button>
               )}
-             
             </div>
           </div>
 
@@ -323,19 +325,9 @@ export function CloudSyncSublocationButton({
         </div>
       )}
 
-      <Button
-        variant="ghost"
-        size="sm"
-        onClick={clearJobs}
-        className="h-7 px-2 text-xs text-destructive hover:text-destructive hover:bg-destructive/10"
-      >
-        <Trash2 className="w-3.5 h-3.5 mr-1" />
-        Clear
-      </Button>
-
-      {/* Confirmation Modal with Sublocation Selection */}
+      {/* Confirmation Modal with Sublocation Pre-Sync Quantities */}
       <AlertDialog open={isSyncConfirmOpen} onOpenChange={setIsSyncConfirmOpen}>
-        <AlertDialogContent className="max-w-md">
+        <AlertDialogContent className="max-w-lg">
           <AlertDialogHeader>
             <AlertDialogTitle>Confirm Cloud Sync</AlertDialogTitle>
             <AlertDialogDescription>
@@ -379,32 +371,65 @@ export function CloudSyncSublocationButton({
                 No linked sublocations found for this location. Standard location sync will apply.
               </p>
             ) : (
-              <div className="max-h-48 overflow-y-auto space-y-2 pr-1">
+              <div className="max-h-60 overflow-y-auto space-y-2 pr-1">
                 {sublocations.map((sub) => {
                   const isChecked = selectedSublocationIds.includes(sub.id);
+
+                  const sourceQty = sub.sourceStockQty ?? sub.stockQty ?? 0;
+                  const targetQty = sub.targetStockQty ?? 0;
+                  const deltaQty = sub.pendingAdjustmentQty ?? (sourceQty - targetQty);
+
                   return (
                     <div
                       key={sub.id}
-                      className="flex items-center justify-between p-2 rounded-lg border bg-muted/30 hover:bg-muted/60 transition-colors"
+                      className="flex flex-col gap-1.5 p-2.5 rounded-lg border bg-muted/30 hover:bg-muted/60 transition-colors"
                     >
-                      <div className="flex items-center space-x-2.5">
-                        <Checkbox
-                          id={`sublocation-${sub.id}`}
-                          checked={isChecked}
-                          onCheckedChange={() => handleToggleSublocation(sub.id)}
-                        />
-                        <Label
-                          htmlFor={`sublocation-${sub.id}`}
-                          className="text-xs font-medium cursor-pointer select-none"
-                        >
-                          {sub.name} <span className="text-muted-foreground">[InvQty: {sub.stockQty}]</span>
-                        </Label>
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center space-x-2.5">
+                          <Checkbox
+                            id={`sublocation-${sub.id}`}
+                            checked={isChecked}
+                            onCheckedChange={() => handleToggleSublocation(sub.id)}
+                          />
+                          <Label
+                            htmlFor={`sublocation-${sub.id}`}
+                            className="text-xs font-semibold cursor-pointer select-none"
+                          >
+                            {sub.name}
+                          </Label>
+                        </div>
+
+                        {sub.linkedLocation?.name && (
+                          <span className="flex items-center gap-1 text-[11px] font-medium text-muted-foreground bg-background border px-2 py-0.5 rounded-md">
+                            <ArrowRight className="w-3 h-3 text-primary" />
+                            {sub.linkedLocation.name}
+                          </span>
+                        )}
                       </div>
-                      {sub.linkedLocation?.name && (
-                        <span className="text-[10px] bg-background border px-1.5 py-0.5 rounded text-muted-foreground">
-                          → {sub.linkedLocation.name}
+
+                      {/* Stock Level Breakdowns & Sync Delta */}
+                      <div className="flex items-center justify-between text-[11px] pl-6 pt-0.5 text-muted-foreground border-t border-border/50">
+                        <span>
+                          Source Sublocation: <strong className="text-foreground">{sourceQty}</strong>
                         </span>
-                      )}
+                        <span>
+                          Target Location: <strong className="text-foreground">{targetQty}</strong>
+                        </span>
+                        <span>
+                          Adjustment:{" "}
+                          <span
+                            className={`font-semibold px-1.5 py-0.2 rounded ${
+                              deltaQty > 0
+                                ? "bg-emerald-500/10 text-emerald-600"
+                                : deltaQty < 0
+                                ? "bg-destructive/10 text-destructive"
+                                : "bg-muted text-muted-foreground"
+                            }`}
+                          >
+                            {deltaQty > 0 ? `+${deltaQty}` : deltaQty}
+                          </span>
+                        </span>
+                      </div>
                     </div>
                   );
                 })}
@@ -412,17 +437,29 @@ export function CloudSyncSublocationButton({
             )}
           </div>
 
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={isSyncing}>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleCloudSync}
-              disabled={
-                isSyncing ||
-                (sublocations.length > 0 && selectedSublocationIds.length === 0)
-              }
+          <AlertDialogFooter className="flex items-center justify-between">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={clearJobs}
+              className="h-8 px-2 text-xs text-destructive hover:text-destructive hover:bg-destructive/10"
             >
-              {isSyncing ? "Enqueuing..." : "Confirm & Sync"}
-            </AlertDialogAction>
+              <Trash2 className="w-3.5 h-3.5 mr-1" />
+              Clear Queue
+            </Button>
+
+            <div className="flex items-center gap-2">
+              <AlertDialogCancel disabled={isSyncing}>Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={handleCloudSync}
+                disabled={
+                  isSyncing ||
+                  (sublocations.length > 0 && selectedSublocationIds.length === 0)
+                }
+              >
+                {isSyncing ? "Enqueuing..." : "Confirm & Sync"}
+              </AlertDialogAction>
+            </div>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
