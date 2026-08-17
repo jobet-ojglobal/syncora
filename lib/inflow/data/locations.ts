@@ -23,7 +23,6 @@ export async function getLocations(
     params.append("after", after);
   }
 
-
   return inflow.get<InflowLocation[]>(
     `/locations?${params.toString()}`,
     retries,

@@ -1,7 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { InflowProduct, InflowCustomFields } from "@/lib/inflow/types";
 import { Prisma } from "@/generated/prisma/client";
-import { upsertProduct } from "../data/products";
+import { upsertProduct, upsertProductBulk } from "../data/products";
 import { SyncOptions } from "@/lib/workers/sync.worker";
 import pLimit from "p-limit";
 
@@ -104,13 +104,13 @@ export function mapLocalProductToInflowPayload(
     includeQuantityBuildable: product.includeQuantityBuildable,
     standardUomName: product.standardUomName,
 
-    trackExpiry: product.trackExpiry,
-    trackLots: product.trackLots,
-    trackSerials: product.trackSerials,
+    trackExpiry: false, // product.trackExpiry,
+    trackLots: false, //product.trackLots,
+    trackSerials: false, //product.trackSerials,
 
-    shelfLifeDays: product.shelfLifeDays,
-    sellBeforeExpiryDays: product.sellBeforeExpiryDays,
-    expiryNotificationDays: product.expiryNotificationDays,
+    shelfLifeDays: null, // product.shelfLifeDays,
+    sellBeforeExpiryDays: null, // product.sellBeforeExpiryDays,
+    expiryNotificationDays: null, // product.expiryNotificationDays,
 
     weight: product.weight?.toString() || null,
     width: product.width?.toString() || null,
@@ -198,7 +198,7 @@ export class ProductOutSyncService {
     const whereClause: Prisma.ProductWhereInput = {
       deletedAt: null,
       isActive: true,
-      // isCloudSynced: false,
+      isCloudSynced: true,
       ...(excludeIds.length > 0 ? { id: { notIn: excludeIds } } : {}),
     };
 
@@ -223,7 +223,7 @@ export class ProductOutSyncService {
     });
   }
 
-  async processBatch(
+  async processBatchOldSlowRunning(
     products: LocalProductWithRelations[],
     defaultCategoryPayload: { inflowId: string; name: string; isDefault: boolean } | null,
     brandCustomName?: string,
@@ -303,11 +303,183 @@ export class ProductOutSyncService {
       failedIds };
   }
 
+  async processBatch(
+    products: LocalProductWithRelations[],
+    defaultCategoryPayload: { inflowId: string; name: string; isDefault: boolean } | null,
+    brandCustomName?: string,
+    checkSignal?: () => Promise<void>,
+    concurrency = 1 // Lowered to 1 or 2 to avoid 429 rate limit thrashing
+  ): Promise<{
+    successfulIds: string[];
+    failedIds: string[];
+  }> {
+    const batchStartTime = performance.now();
+    const limit = pLimit(concurrency);
+    const modifiedById = "56bfcf3b-3e98-4098-ae8f-2adcb657cb57";
+
+    const results = await Promise.allSettled(
+      products.map( async (product) =>
+          {
+          if (checkSignal) await checkSignal();
+
+          const payload = mapLocalProductToInflowPayload(
+            product,
+            defaultCategoryPayload,
+            brandCustomName,
+            modifiedById
+          );
+
+          try {
+            const syncedProduct = await upsertProduct(payload);
+
+            if (!syncedProduct?.productId) {
+              throw new Error(`Invalid sync response for product ${product.name}`);
+            }
+
+            return product.id;
+          } catch (error: any) {
+            // Check for duplicate product name conflict
+            if (
+              error?.body?.includes("product_name_conflict") ||
+              error?.message?.includes("product_name_conflict")
+            ) {
+              console.warn(
+                `[Product Sync] Name conflict detected for "${product.name}". Skipping to unblock batch.`
+              );
+              // Option: Mark with a specific error flag in DB if needed
+            }
+            throw error;
+          }
+        }
+      )
+    );
+
+    const successfulIds: string[] = [];
+    const failedIds: string[] = [];
+
+    results.forEach((res, index) => {
+      if (res.status === "fulfilled") {
+        successfulIds.push(res.value);
+      } else {
+        failedIds.push(products[index].id);
+        console.error(`[Product Sync] Failed (${products[index].name}):`, res.reason);
+      }
+    });
+
+    if (successfulIds.length > 0) {
+      await prisma.product.updateMany({
+        where: { id: { in: successfulIds } },
+        data: { isCloudSynced: true },
+      });
+    }
+
+    const batchDuration = performance.now() - batchStartTime;
+    console.log(
+      `[Product Sync] Batch API processing finished in ${this.formatDuration(batchDuration)} (Avg: ${this.formatDuration(batchDuration / products.length)}/item)`
+    );
+
+    return { 
+      successfulIds, 
+      failedIds };
+  }
+
+  async processBatchBulk(
+    products: LocalProductWithRelations[],
+    defaultCategoryPayload: { inflowId: string; name: string; isDefault: boolean } | null,
+    brandCustomName?: string,
+    checkSignal?: () => Promise<void>
+  ): Promise<{
+    successfulIds: string[];
+    failedIds: string[];
+  }> {
+    const batchStartTime = performance.now();
+    const modifiedById = "56bfcf3b-3e98-4098-ae8f-2adcb657cb57";
+
+    if (checkSignal) await checkSignal();
+
+    // 1. Map all local products into an array payload
+    const payloads = products.map((product) =>
+      mapLocalProductToInflowPayload(
+        product,
+        defaultCategoryPayload,
+        brandCustomName,
+        modifiedById
+      )
+    );
+
+    const successfulIds: string[] = [];
+    const failedIds: string[] = [];
+
+    try {
+      // 2. Single Bulk API request sending array payload
+      const syncedProducts = await upsertProductBulk(payloads); // Bulk API call
+
+      if (Array.isArray(syncedProducts) && syncedProducts.length > 0) {
+        // Map returned synced items back to local product IDs
+        const syncedProductIds = new Set(
+          syncedProducts.map((p) => p.productId).filter(Boolean)
+        );
+
+        products.forEach((product) => {
+          if (syncedProductIds.has(product.inflowId)) {
+            successfulIds.push(product.id);
+          } else {
+            failedIds.push(product.id);
+          }
+        });
+      } else {
+        // If the bulk endpoint returns success without item array, mark all as successful
+        successfulIds.push(...products.map((p) => p.id));
+      }
+    } catch (bulkError: any) {
+      console.warn(
+        `[Product Sync] Bulk array payload failed (${bulkError?.message || "Error"}). Falling back to item-by-item processing for this batch...`
+      );
+
+      // Fallback: If bulk fails, process items individually to prevent 1 bad item from bricking the batch
+      for (let i = 0; i < products.length; i++) {
+        const product = products[i];
+        const payload = payloads[i];
+
+        try {
+          const syncedProduct = await upsertProduct(payload);
+          if (syncedProduct?.productId) {
+            successfulIds.push(product.id);
+          } else {
+            failedIds.push(product.id);
+          }
+        } catch (itemError: any) {
+          console.error(`[Product Sync] Item failed (${product.name}):`, itemError?.message || itemError);
+          failedIds.push(product.id);
+        }
+      }
+    }
+
+    // 3. Update database for all successful items in the batch
+    if (successfulIds.length > 0) {
+      const dbUpdateStart = performance.now();
+      await prisma.product.updateMany({
+        where: { id: { in: successfulIds } },
+        data: { isCloudSynced: true },
+      });
+      console.log(
+        `[Product Sync] Marked ${successfulIds.length} items as synced in DB (${this.formatDuration(performance.now() - dbUpdateStart)})`
+      );
+    }
+
+    const batchDuration = performance.now() - batchStartTime;
+    console.log(
+      `[Product Sync] Bulk Batch API processing finished in ${this.formatDuration(batchDuration)} (Avg: ${this.formatDuration(batchDuration / products.length)}/item)`
+    );
+
+    return { successfulIds, failedIds };
+  }
+
   async sync(options: SyncOptions, brandCustomName?: string) {
     const syncStartTime = performance.now();
     const { onProgress, checkSignal } = options;
     // Reduced batch size to 20 to keep BullMQ execution time well within stall limits
-    const BATCH_SIZE = options?.batchSize ?? 5 ;//20; 
+    const BATCH_SIZE = options?.batchSize ?? 50 ;//20; 
     const API_CONCURRENCY = 5 // 3; // 1 request at a time avoids 429 bursts
     const INTER_BATCH_DELAY = options?.delayBetweenBatchesMs ?? 1000; // 5000; // 1000
 
@@ -351,12 +523,12 @@ export class ProductOutSyncService {
 
       if (checkSignal) await checkSignal();
 
-      const { successfulIds, failedIds } = await this.processBatch(
+      const { successfulIds, failedIds } = await this.processBatchBulk(
         rawBatch,
         defaultCategory,
         brandCustomName,
         checkSignal,
-        API_CONCURRENCY
+        // API_CONCURRENCY
       );
 
       if (failedIds.length > 0) {

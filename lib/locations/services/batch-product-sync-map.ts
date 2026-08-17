@@ -240,6 +240,10 @@ export class ProductSyncMapService {
           for (const product of batch) {
             if (checkSignal) await checkSignal();
 
+            if (!parseBooleanFlag(product.isActive)) {
+              continue;
+            }
+
             const trimmedName = product.name?.trim();
             if (!trimmedName) {
               syncResults.push({
@@ -417,6 +421,8 @@ export class ProductSyncMapService {
               });
               continue;
             }
+
+            
 
             // 3. Bridge mapping record
             const localIdNum = Number(product.productId);

@@ -631,7 +631,7 @@ export interface InflowQuantity {
 
 export interface InflowStockAdjustmentLine {
   productId: string;
-  stockAdjustmentLineId: string;
+  stockAdjustmentLineId: string | null;
   quantity: InflowQuantity;
   sublocation: string | null;
   description?: string;

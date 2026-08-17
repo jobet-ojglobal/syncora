@@ -46,8 +46,6 @@ export async function getProducts(
 
   return inflow.get<InflowProduct[]>(
     `/products?${params.toString()}`,
-    retries,
-    delayMs
   );
 }
 
@@ -68,8 +66,6 @@ export async function getSingleProduct(
   
   return inflow.get<InflowProduct>(
     `/products/${productId}?${params.toString()}`,
-    retries,
-    delayMs
   );
 }
 
@@ -122,6 +118,10 @@ export async function checkCloudProduct(productId: string) {
 
 // lib\inflow\data\products.ts
 export async function upsertProduct(payload: Partial<InflowProduct>) {
+  return inflowLimit.put<InflowProduct>("/products", payload);
+}
+
+export async function upsertProductBulk(payload: Partial<InflowProduct>[]) {
   return inflowLimit.put<InflowProduct>("/products", payload);
 }
 
