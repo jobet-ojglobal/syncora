@@ -35,3 +35,7 @@ export async function getInventoryByProduct(
 export async function upsertStockAdjust(payload: InflowStockAdjustInput) {
   return inflow.put<InflowStockAdjustInput>("/stock-adjustments", payload);
 }
+
+export async function upsertStockAdjustBulk(payload: InflowStockAdjustInput[]) {
+  return inflow.put<InflowStockAdjustInput>("/stock-adjustments", payload);
+}

@@ -67,6 +67,7 @@ export default function LocationInventoryPage() {
     await Promise.all([mutateLocation(), mutateInbound()]);
   };
 
+<<<<<<< HEAD
   const handleCloudSync = async () => {
     try {
       setIsSyncing(true);
@@ -89,6 +90,9 @@ export default function LocationInventoryPage() {
       setIsSyncConfirmOpen(false);
     }
   };
+=======
+  const sourceName = location?.name === "HQ GLOBAL SYNC" ? "sync_locations_inventory" : "cloudsync_inventory_levels";
+>>>>>>> 185395c75cf3224c055c0937011b2dae2943eb01
 
   return (
     <div className="w-full max-w-7xl mx-auto p-6 space-y-6">
@@ -112,7 +116,7 @@ export default function LocationInventoryPage() {
           <div className="flex items-center gap-2">
             {/* Extracted Cloud Sync Component */}
             <CloudSyncSublocationButton
-              source="cloudsync_inventory_levels"
+              source={sourceName}
               locationId={location?.inflowId}
               locationName={location?.name}
               onSyncComplete={refreshAllData}

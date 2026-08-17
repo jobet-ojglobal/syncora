@@ -6,7 +6,7 @@ export const inflowQueue = new PQueue({
   concurrency: 1,
 
   // Start conservatively
-  interval: 1000,
+  interval: 1000, // 1000
   intervalCap: 1,
 });
 

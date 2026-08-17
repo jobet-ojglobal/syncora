@@ -1,8 +1,9 @@
 import { inflow } from "@/lib/inflow/inflow.client";
 import { InflowTeamMember } from "../types";
 
-export async function getTeamMembers( count = 100,
-  after?: string
+export async function getTeamMembers(
+  count = 30,
+  after?: string,
 ) {
   const params = new URLSearchParams({
     count: String(count),

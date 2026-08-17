@@ -33,7 +33,8 @@ import { CustomerSyncMapService as LocalCustomerSyncMapService } from "../locati
 import { ProductSyncMapService as LocalProductSyncMapService } from "../locations/services/batch-product-sync-map";
 import { InventorySyncService as LocalInventorySyncService } from "../locations/services/batch-inventory-sync-adjustment.service";
 import { SublocationSyncMapService as LocalSublocationSyncMapService } from "../locations/services/sublocation-sync-map.service";
-import { inventoryOutSyncService } from "../inflow/services/out-sync-inventory";
+import { inventoryCloudSyncService } from "../inflow/services/out-sync-location-inventory";
+import { inventoryStockLocationSyncService } from "../inflow/services/adjust-location-stocks-sync";
 
 
 const testService = new TestSyncService();
@@ -313,10 +314,9 @@ const worker = new Worker<SyncWebhookJobData>(
         case "purchase_orders":
           result = await purchaseOrderService.sync(syncOptions);
           break;
-
         // cloud outsync
         case "cloudsync_inventory_levels":
-          result = await inventoryOutSyncService.sync(syncOptions, selectedLocations, selectedRecords, syncedAll, brandCustomName, ["UpsertProduct","StockAdjustLocal","StockAdjustCloud"]);
+          result = await inventoryCloudSyncService.sync(syncOptions, selectedLocations[0], selectedRecords);
           break;
         // case "cloudsync_products":
         //   result = await subInventoryOutSyncService.sync(syncOptions, selectedLocations, selectedRecords, syncedAll, brandCustomName, ["UpsertProduct","SkipSynced"]);
@@ -328,6 +328,12 @@ const worker = new Worker<SyncWebhookJobData>(
             brandCustomName,
           );
           break;
+
+        // Mid Sync
+        case "sync_locations_inventory":
+          result = await inventoryStockLocationSyncService.sync(syncOptions, selectedLocations, selectedRecords, syncedAll);
+          break;
+
           
         case "test":
           result = await testService.sync(source, syncOptions);

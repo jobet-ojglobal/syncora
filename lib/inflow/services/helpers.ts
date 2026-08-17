@@ -7,6 +7,12 @@ import { prisma } from "@/lib/prisma";
 
 type Tx = Prisma.TransactionClient;
 
+export function areSerialsDifferent(serialsA: string[], serialsB: string[]): boolean {
+  if (serialsA.length !== serialsB.length) return true;
+  const setA = new Set(serialsA);
+  return serialsB.some((serial) => !setA.has(serial));
+}
+
 /**
  * Safely converts custom interfaces/objects to Prisma-compatible JSON input values,
  * returning Prisma.DbNull for null/undefined.

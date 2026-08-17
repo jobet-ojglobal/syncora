@@ -174,10 +174,15 @@ export class ProductSyncService {
               const groupData = variantRelation?.productGroup;
               const groupDefaultProduct = variantRelation?.productGroup?.defaultProduct;
 
+              // skip inactive
+              if(!fullProduct.isActive) continue;
+
               if (groupData && !syncedGroupIds.has(groupData.productGroupId)) {
                 await syncProductGroup(tx, groupData, fullProduct, true, caches);
                 syncedGroupIds.add(groupData.productGroupId);
               }
+
+
 
               await syncProduct(
                 tx,
