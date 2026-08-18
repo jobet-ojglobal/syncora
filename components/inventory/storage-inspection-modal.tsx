@@ -2,7 +2,9 @@
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Package } from "lucide-react";
 import Image from "next/image";
+import Link from "next/link";
 
 interface BinDetail {
   id: string;
@@ -70,13 +72,15 @@ export function StorageInspectionModalEnhance({
               />
             ) : (
               <div className="w-10 h-10 rounded-md border bg-muted flex items-center justify-center text-[10px] font-bold text-muted-foreground">
-                N/A
+                <Package className="w-4 h-4 " />
               </div>
             )}
             <div>
-              <h3 className="text-sm font-bold text-foreground">
-                {item.product.name}
-              </h3>
+              <Link href={`/products/${item.product.slug}`} className="text-foreground hover:text-blue-500 transition-colors">
+                <h3 className="text-sm font-bold">
+                  {item.product.name}
+                </h3>
+              </Link>
               <p className="text-[11px] text-muted-foreground font-mono mt-0.5">
                 SKU: {item.product.sku}
               </p>

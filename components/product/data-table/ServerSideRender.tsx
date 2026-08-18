@@ -174,11 +174,18 @@ export default function AdminServerSideProductsPage() {
         <CloudSyncButton
           source="cloudsync_products" 
         />
+
+        
         <Button asChild size="sm" className="gap-1.5 shrink-0">
           <Link href="/dashboard/products/create">
             <Plus className="w-4 h-4" /> Register New Product
           </Link>
         </Button>
+        
+        {/* test */}
+        <CloudSyncButton
+          source="cloudsync_product_inventory" 
+        />
 
       </PageHeader>
       

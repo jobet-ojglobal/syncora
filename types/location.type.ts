@@ -16,6 +16,8 @@ export interface Location {
   updatedAt: Date;
 }
 
+
+
 export interface LocationAddress {
   id: string;
   locationId: string;

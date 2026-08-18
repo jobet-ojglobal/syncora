@@ -286,13 +286,25 @@ export interface InflowProductAttachment {
 
 export interface InflowInventoryLine {
   inventoryLineId: string;
+  lotId: string | null;
   locationId: string;
   productId: string;
   quantityOnHand: string;
   serial: string;
-  sublocation: string; // ex. "Rack A" or ""
+  sublocation: string; // ex. "Rack A" or "" if floor stock
   timestamp?: string;
-  location?: InflowLocation
+  location?: InflowLocation;
+  lot?: inflowLot;
+}
+
+export interface inflowLot {
+  lotId: string;
+  lotNumber: string;
+  productId: string;
+  customFields: InflowCustomFields;
+  manufactureDate: string | null;
+  sellByDate: string | null;
+  createdDate: string;
 }
 
 // =====================================

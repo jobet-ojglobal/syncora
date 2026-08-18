@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import useSWR from "swr";
+<<<<<<< HEAD
 import { Warehouse, RefreshCw, CloudSync, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 <<<<<<< HEAD
@@ -21,21 +22,25 @@ import { toast } from "sonner";
 =======
 import { CloudSyncButton } from "@/components/integration/cloud-sync-button";
 >>>>>>> f774fa4d46540598445552ff7ba82d06bcdf5aad
+=======
+import { Warehouse, RefreshCw } from "lucide-react";
+>>>>>>> 496b01c6048d1dc95608ee6ccc0a0cb9d255882c
 
-// Custom Sub-components
+import { Button } from "@/components/ui/button";
 import { StorageInspectionModalEnhance, InspectionItem } from "@/components/inventory/storage-inspection-modal";
 import { InboundTransitMonitor } from "@/components/transfer/inbound-pipeline-card";
-import { InventoryTable } from "./InventoryTable";
-import { ReplenishmentSettingsModal } from "@/components/inventory/replenishment-settings-modal";
-import { InventorySummaryCards } from "./SummaryCards";
-import { Location } from "@/types/location.type";
 import { CloudSyncSublocationButton } from "@/components/integration/cloud-sync-sublocation-button";
+
+import { InventoryTable } from "./InventoryTable";
+import { InventorySummaryCards } from "./SummaryCards";
+import { Location, LocationWithRelations } from "@/types/location.type";
 
 const fetcher = (url: string) => fetch(url).then((res) => res.json());
 
 export default function LocationInventoryPage() {
   const { id: locationId } = useParams() as { id: string };
 
+<<<<<<< HEAD
   // Local Modal States
   const [activeInspectionItem, setActiveInspectionItem] = useState<InspectionItem | null>(null);
   const [selectedReplenishItem, setSelectedReplenishItem] = useState<any | null>(null);
@@ -45,28 +50,25 @@ export default function LocationInventoryPage() {
   const [isSyncConfirmOpen, setIsSyncConfirmOpen] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
 
+=======
+>>>>>>> 496b01c6048d1dc95608ee6ccc0a0cb9d255882c
   // 1. Fetch Location Metadata
-  const { data: location, mutate: mutateLocation } = useSWR<Location>(
+  const { data: location, mutate: mutateLocation } = useSWR<LocationWithRelations>(
     locationId ? `/api/admin/locations/${locationId}/lookup` : null,
     fetcher
   );
 
   // 2. Fetch Locations Lookup for Replenishment Modal
-  const { data: locations = [], isLoading: isLoadingLocations } = useSWR(
+  const { data: locations = [] } = useSWR<Location[]>(
     "/api/locations/lookup",
     fetcher
   );
 
-  // 3. Fetch Inbound Freight Pipeline
-  const { data: inboundCargo = [], mutate: mutateInbound } = useSWR(
-    locationId ? `/api/admin/locations/${locationId}/inbound-transit` : null,
-    fetcher
-  );
-
   const refreshAllData = async () => {
-    await Promise.all([mutateLocation(), mutateInbound()]);
+    await mutateLocation();
   };
 
+<<<<<<< HEAD
 <<<<<<< HEAD
   const handleCloudSync = async () => {
     try {
@@ -93,25 +95,21 @@ export default function LocationInventoryPage() {
 =======
   const sourceName = location?.name === "HQ GLOBAL SYNC" ? "sync_locations_inventory" : "cloudsync_inventory_levels";
 >>>>>>> 185395c75cf3224c055c0937011b2dae2943eb01
+=======
+  const sourceName = location?.name === "HQ GLOBAL SYNC" 
+    ? "sync_locations_inventory" 
+    : "cloudsync_inventory_levels";
+>>>>>>> 496b01c6048d1dc95608ee6ccc0a0cb9d255882c
 
   return (
     <div className="w-full max-w-7xl mx-auto p-6 space-y-6">
       {/* Header Bar */}
-      <div className="flex flex-col gap-2">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b pb-5">
-          <div className="flex items-start gap-3">
-            <div className="w-10 h-10 bg-muted border rounded-xl flex items-center justify-center shrink-0 mt-1">
-              <Warehouse className="w-5 h-5 text-muted-foreground" />
-            </div>
-            <div>
-              <h1 className="text-xl font-bold tracking-tight">
-                {location?.name ? `${location.name} — Inventory` : "Inventory"}
-              </h1>
-              <p className="text-xs text-muted-foreground mt-0.5">
-                Targeted internal warehouse balances, allocated bin vectors, and tracking references.
-              </p>
-            </div>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b pb-5">
+        <div className="flex items-start gap-3">
+          <div className="w-10 h-10 bg-muted border rounded-xl flex items-center justify-center shrink-0 mt-1">
+            <Warehouse className="w-5 h-5 text-muted-foreground" />
           </div>
+<<<<<<< HEAD
 
           <div className="flex items-center gap-2">
             {/* Extracted Cloud Sync Component */}
@@ -149,7 +147,39 @@ export default function LocationInventoryPage() {
             <Button asChild size="sm" className="h-8 gap-1.5 text-xs">
               <Link href="/dashboard/inventory/stocks/new">Post Adjustment</Link>
             </Button>
+=======
+          <div>
+            <h1 className="text-xl font-bold tracking-tight">
+              {location?.name ? `${location.name} — Inventory` : "Inventory"}
+            </h1>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              Targeted internal warehouse balances, allocated bin vectors, and tracking references.
+            </p>
+>>>>>>> 496b01c6048d1dc95608ee6ccc0a0cb9d255882c
           </div>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <CloudSyncSublocationButton
+            source={sourceName}
+            locationId={location?.inflowId}
+            locationName={location?.name}
+            onSyncComplete={refreshAllData}
+          />
+
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={refreshAllData}
+            className="h-8 gap-1.5 text-xs"
+          >
+            <RefreshCw className="w-3.5 h-3.5" />
+            Refresh Data
+          </Button>
+
+          <Button asChild size="sm" className="h-8 gap-1.5 text-xs">
+            <Link href="/dashboard/inventory/stocks/new">Post Adjustment</Link>
+          </Button>
         </div>
       </div>
 
@@ -167,13 +197,11 @@ export default function LocationInventoryPage() {
       <InventoryTable
         locationId={locationId}
         locationInflowId={location?.inflowId}
-        onInspectBins={(item) => setActiveInspectionItem(item)}
-        onSelectItemForReplenishment={(item) => {
-          setSelectedReplenishItem(item);
-          setIsReplenishModalOpen(true);
-        }}
+        locations={locations}
+        sublocations={location?.sublocations || []}
         onDataChanged={refreshAllData}
       />
+<<<<<<< HEAD
 
       {/* Storage Layout Inspection Modal */}
       <StorageInspectionModalEnhance
@@ -224,6 +252,8 @@ export default function LocationInventoryPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+=======
+>>>>>>> 496b01c6048d1dc95608ee6ccc0a0cb9d255882c
     </div>
   );
 }

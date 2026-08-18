@@ -36,7 +36,9 @@ export async function getSingleLocation(
   retries: number =  5,
   delayMs: number = 1000
 ) {
-  const params = new URLSearchParams({});
+  const params = new URLSearchParams({
+    // includes: "product"
+  });
 
   const data = inflow.get<InflowLocation>(
     `/locations/${locationId}?${params.toString()}`,

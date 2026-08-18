@@ -29,7 +29,7 @@ export async function GET(
     // 1. Resolve Location Inflow ID
     const location = await prisma.location.findUnique({
         where: { id: locationId },
-        select: { id: true, inflowId: true, name: true, isActive: true },
+        select: { id: true, inflowId: true, name: true, isActive: true, sublocations: { select: { id: true, name: true }} },
     });
 
     if (!location) {
