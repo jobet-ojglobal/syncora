@@ -21,7 +21,6 @@ import { ProductSyncService } from "@/lib/inflow/services/product-sync.service";
 import { ProductGroupSyncService } from "../inflow/services/product-group-sync.service";
 import { SalesOrderSyncService } from "../inflow/services/sales-order-sync.service";
 import { PurchaseOrderSyncService } from "../inflow/services/purchase-order-sync.service";
-import { ProductOutSyncService } from "../inflow/services/out-sync-product";
 
 // Local Imports
 import { CategorySyncMapService as LocalCategorySyncMapService } from "../locations/services/batch-category-sync-map";
@@ -33,8 +32,14 @@ import { CustomerSyncMapService as LocalCustomerSyncMapService } from "../locati
 import { ProductSyncMapService as LocalProductSyncMapService } from "../locations/services/batch-product-sync-map";
 import { InventorySyncService as LocalInventorySyncService } from "../locations/services/batch-inventory-sync-adjustment.service";
 import { SublocationSyncMapService as LocalSublocationSyncMapService } from "../locations/services/sublocation-sync-map.service";
+
+// OUT SYNC
 import { inventoryCloudSyncService } from "../inflow/services/out-sync-location-inventory";
 import { inventoryStockLocationSyncService } from "../inflow/services/adjust-location-stocks-sync";
+
+import { ProductOutSyncService } from "../inflow/services/out-sync-product";
+import { productInventoryOutSyncService } from "../inflow/services/out-sync-product-inventory";
+
 
 
 const testService = new TestSyncService();
@@ -281,7 +286,7 @@ const worker = new Worker<SyncWebhookJobData>(
           result = await inventoryService.sync(syncOptions, includes);
           break;
         case "single_inventory":
-          console.log(selectedRecords[0], includes)
+          console.log("worker ", selectedRecords[0], includes)
           result = await inventoryService.syncSingle(selectedRecords[0], includes);
           break;
         case "locations":
@@ -318,9 +323,9 @@ const worker = new Worker<SyncWebhookJobData>(
         case "cloudsync_inventory_levels":
           result = await inventoryCloudSyncService.sync(syncOptions, selectedLocations[0], selectedRecords);
           break;
-        // case "cloudsync_products":
-        //   result = await subInventoryOutSyncService.sync(syncOptions, selectedLocations, selectedRecords, syncedAll, brandCustomName, ["UpsertProduct","SkipSynced"]);
-        //   break;
+        case "cloudsync_product_inventory":
+          result = await productInventoryOutSyncService.syncNoCheckCloudSync(syncOptions, ["e4cc6c9a-9d2b-49eb-a331-361ef582fc7f"], brandCustomName);
+          break;
 
         case "cloudsync_products":
           result = await productOutSyncService.sync(

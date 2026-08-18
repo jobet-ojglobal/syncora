@@ -273,7 +273,7 @@ export function CloudSyncSublocationButton({
         ) : (
           <CloudSync className="w-3.5 h-3.5" />
         )}
-        Sync to Cloud
+        Sync to Cloud 
       </Button>
 
       {/* Cloud Sync Progress Banner */}
@@ -290,7 +290,6 @@ export function CloudSyncSublocationButton({
               <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                 Sync Status: <span className="text-foreground">{status || "Initializing"}</span>
               </span>
-              <span>source: {source}</span>
             </div>
             
 
@@ -331,7 +330,8 @@ export function CloudSyncSublocationButton({
           <AlertDialogHeader>
             <AlertDialogTitle>Confirm Cloud Sync</AlertDialogTitle>
             <AlertDialogDescription>
-              Select linked sublocations for <strong>{locationName || "this location"}</strong> to queue for cloud sync.
+              Select linked sublocations for <strong>{locationName || "this location"}</strong> to queue for cloud sync. 
+              {/* <br/><span>Source: {source}</span> */}
             </AlertDialogDescription>
           </AlertDialogHeader>
 

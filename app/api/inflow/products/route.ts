@@ -9,7 +9,8 @@ export async function GET(request: NextRequest) {
     const limitParam = searchParams.get('count');
     const limit = limitParam ? Math.min(Math.max(parseInt(limitParam, 10), 1), 100) : 50;
     const after = searchParams.get('after') || undefined;
-    const data = await getEntireCatalogs(limit, after);
+    
+    const data = await getEntireCatalogs(limit, after, "FUJIFILM X100VI BLACK");
 
     return NextResponse.json({
       success: true,

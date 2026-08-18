@@ -13,6 +13,8 @@
 //   Manual = "Manual",
 // }
 
+import { Currency } from "@/generated/prisma/client";
+
 export const PRICE_TYPES = {
   FixedPrice: "FixedPrice",
   PercentageDiscount: "PercentageDiscount",
@@ -30,3 +32,19 @@ export const PRICE_TYPES = {
 
 export type PriceType =
   (typeof PRICE_TYPES)[keyof typeof PRICE_TYPES];
+
+
+export interface PricingScheme {
+  id: string;
+  inflowId: string;
+  currencyId: string;
+  name: string;
+  isActive: boolean;
+  isDefault: boolean;
+  isTaxInclusive: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+  deletedAt?: Date | null;
+}
+
+

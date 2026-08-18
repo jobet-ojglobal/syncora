@@ -5,94 +5,80 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import useSWR from "swr";
 import { Warehouse, RefreshCw } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { CloudSyncButton } from "@/components/integration/cloud-sync-button";
 
-// Custom Sub-components
+import { Button } from "@/components/ui/button";
 import { StorageInspectionModalEnhance, InspectionItem } from "@/components/inventory/storage-inspection-modal";
 import { InboundTransitMonitor } from "@/components/transfer/inbound-pipeline-card";
-import { InventoryTable } from "./InventoryTable";
-import { ReplenishmentSettingsModal } from "@/components/inventory/replenishment-settings-modal";
-import { InventorySummaryCards } from "./SummaryCards";
-import { Location } from "@/types/location.type";
 import { CloudSyncSublocationButton } from "@/components/integration/cloud-sync-sublocation-button";
+
+import { InventoryTable } from "./InventoryTable";
+import { InventorySummaryCards } from "./SummaryCards";
+import { Location, LocationWithRelations } from "@/types/location.type";
 
 const fetcher = (url: string) => fetch(url).then((res) => res.json());
 
 export default function LocationInventoryPage() {
   const { id: locationId } = useParams() as { id: string };
 
-  // Local Modal States
-  const [activeInspectionItem, setActiveInspectionItem] = useState<InspectionItem | null>(null);
-  const [selectedReplenishItem, setSelectedReplenishItem] = useState<any | null>(null);
-  const [isReplenishModalOpen, setIsReplenishModalOpen] = useState<boolean>(false);
-
   // 1. Fetch Location Metadata
-  const { data: location, mutate: mutateLocation } = useSWR<Location>(
+  const { data: location, mutate: mutateLocation } = useSWR<LocationWithRelations>(
     locationId ? `/api/admin/locations/${locationId}/lookup` : null,
     fetcher
   );
 
   // 2. Fetch Locations Lookup for Replenishment Modal
-  const { data: locations = [], isLoading: isLoadingLocations } = useSWR(
+  const { data: locations = [] } = useSWR<Location[]>(
     "/api/locations/lookup",
     fetcher
   );
 
-  // 3. Fetch Inbound Freight Pipeline
-  const { data: inboundCargo = [], mutate: mutateInbound } = useSWR(
-    locationId ? `/api/admin/locations/${locationId}/inbound-transit` : null,
-    fetcher
-  );
-
   const refreshAllData = async () => {
-    await Promise.all([mutateLocation(), mutateInbound()]);
+    await mutateLocation();
   };
 
-  const sourceName = location?.name === "HQ GLOBAL SYNC" ? "sync_locations_inventory" : "cloudsync_inventory_levels";
+  const sourceName = location?.name === "HQ GLOBAL SYNC" 
+    ? "sync_locations_inventory" 
+    : "cloudsync_inventory_levels";
 
   return (
     <div className="w-full max-w-7xl mx-auto p-6 space-y-6">
       {/* Header Bar */}
-      <div className="flex flex-col gap-2">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b pb-5">
-          <div className="flex items-start gap-3">
-            <div className="w-10 h-10 bg-muted border rounded-xl flex items-center justify-center shrink-0 mt-1">
-              <Warehouse className="w-5 h-5 text-muted-foreground" />
-            </div>
-            <div>
-              <h1 className="text-xl font-bold tracking-tight">
-                {location?.name ? `${location.name} — Inventory` : "Inventory"}
-              </h1>
-              <p className="text-xs text-muted-foreground mt-0.5">
-                Targeted internal warehouse balances, allocated bin vectors, and tracking references.
-              </p>
-            </div>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b pb-5">
+        <div className="flex items-start gap-3">
+          <div className="w-10 h-10 bg-muted border rounded-xl flex items-center justify-center shrink-0 mt-1">
+            <Warehouse className="w-5 h-5 text-muted-foreground" />
           </div>
-
-          <div className="flex items-center gap-2">
-            {/* Extracted Cloud Sync Component */}
-            <CloudSyncSublocationButton
-              source={sourceName}
-              locationId={location?.inflowId}
-              locationName={location?.name}
-              onSyncComplete={refreshAllData}
-            />
-
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={refreshAllData}
-              className="h-8 gap-1.5 text-xs"
-            >
-              <RefreshCw className="w-3.5 h-3.5" />
-              Refresh Data
-            </Button>
-
-            <Button asChild size="sm" className="h-8 gap-1.5 text-xs">
-              <Link href="/dashboard/inventory/stocks/new">Post Adjustment</Link>
-            </Button>
+          <div>
+            <h1 className="text-xl font-bold tracking-tight">
+              {location?.name ? `${location.name} — Inventory` : "Inventory"}
+            </h1>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              Targeted internal warehouse balances, allocated bin vectors, and tracking references.
+            </p>
           </div>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <CloudSyncSublocationButton
+            source={sourceName}
+            locationId={location?.inflowId}
+            locationName={location?.name}
+            onSyncComplete={refreshAllData}
+          />
+
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={refreshAllData}
+            className="h-8 gap-1.5 text-xs"
+          >
+            <RefreshCw className="w-3.5 h-3.5" />
+            Refresh Data
+          </Button>
+
+          <Button asChild size="sm" className="h-8 gap-1.5 text-xs">
+            <Link href="/dashboard/inventory/stocks/new">Post Adjustment</Link>
+          </Button>
         </div>
       </div>
 
@@ -106,43 +92,10 @@ export default function LocationInventoryPage() {
       <InventoryTable
         locationId={locationId}
         locationInflowId={location?.inflowId}
-        onInspectBins={(item) => setActiveInspectionItem(item)}
-        onSelectItemForReplenishment={(item) => {
-          setSelectedReplenishItem(item);
-          setIsReplenishModalOpen(true);
-        }}
+        locations={locations}
+        sublocations={location?.sublocations || []}
         onDataChanged={refreshAllData}
       />
-
-      {/* Storage Layout Inspection Modal */}
-      <StorageInspectionModalEnhance
-        item={activeInspectionItem}
-        locationName={location?.name}
-        onClose={() => setActiveInspectionItem(null)}
-      />
-
-      {/* Auto-Replenishment Settings Modal */}
-      {selectedReplenishItem && (
-        <ReplenishmentSettingsModal
-          isOpen={isReplenishModalOpen}
-          onClose={() => {
-            setIsReplenishModalOpen(false);
-            setSelectedReplenishItem(null);
-          }}
-          locations={locations}
-          isLoadingLocations={isLoadingLocations}
-          inventoryItem={{
-            id: selectedReplenishItem.id,
-            productName: selectedReplenishItem.productName,
-            productSlug: selectedReplenishItem.productSlug,
-            reorderThreshold: selectedReplenishItem.reorderThreshold || 0,
-            reorderQuantity: selectedReplenishItem.reorderQuantity || 0,
-            isAutoReorderEnabled: selectedReplenishItem.isAutoReorderEnabled || false,
-            preferredSourceLocationId: selectedReplenishItem.preferredSourceLocationId || null,
-          }}
-          onSaveSuccess={refreshAllData}
-        />
-      )}
     </div>
   );
 }

@@ -7,48 +7,28 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
-
-interface LookupLocation {
-  id: string;
-  inflowId: string;
-  name: string;
-}
+import { Location } from "@/types/location.type";
+import { InventoryStockRow } from "@/app/dashboard/locations/[id]/(viewLayout)/inventory/InventoryTable";
 
 interface ModalProps {
-  isOpen: boolean;
+  item: InventoryStockRow;
   onClose: () => void;
-  locations: LookupLocation[];
-  isLoadingLocations: boolean
-  inventoryItem: {
-    id: string;
-    productName: string;
-    productSlug: string;
-    reorderThreshold: number;
-    reorderQuantity: number;
-    isAutoReorderEnabled: boolean;
-    preferredSourceLocationId: string | null;
-  };
+  locations: Location[];
   onSaveSuccess: () => void;
 }
 
-export function ReplenishmentSettingsModal({ isOpen, onClose, inventoryItem, onSaveSuccess, locations, isLoadingLocations }: ModalProps) {
-  const [threshold, setThreshold] = useState(inventoryItem.reorderThreshold.toString());
-  const [reorderQty, setReorderQty] = useState(inventoryItem.reorderQuantity.toString());
-  const [enabled, setEnabled] = useState(inventoryItem.isAutoReorderEnabled);
-  const [sourceLoc, setSourceLoc] = useState(inventoryItem.preferredSourceLocationId || "");
+export function ReplenishmentSettingsModal({ onClose, item, onSaveSuccess, locations }: ModalProps) {
+  const [threshold, setThreshold] = useState(item.reorderThreshold.toString());
+  const [reorderQty, setReorderQty] = useState(item.reorderQuantity.toString());
+  const [enabled, setEnabled] = useState(item.isAutoReorderEnabled);
+  const [sourceLoc, setSourceLoc] = useState(item.preferredSourceLocationId || "");
   
-  // 📍 New Lookup States
-
   const [isSaving, setIsSaving] = useState(false);
-
- 
-
-  if (!isOpen) return null;
 
   const handleSave = async () => {
     setIsSaving(true);
     try {
-      const res = await fetch(`/api/admin/inventory/${inventoryItem.id}/replenishment`, {
+      const res = await fetch(`/api/admin/inventory/${item.id}/replenishment`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -82,7 +62,7 @@ export function ReplenishmentSettingsModal({ isOpen, onClose, inventoryItem, onS
           <Sliders className="w-4 h-4 text-blue-500" />
           <div>
             <h3 className="text-sm font-bold text-foreground">Automation Rules Engine</h3>
-            <p className="text-[11px] text-muted-foreground font-mono">{inventoryItem.productSlug}</p>
+            <p className="text-[11px] text-muted-foreground font-mono">{item.product.slug}</p>
           </div>
         </div>
 
@@ -128,7 +108,6 @@ export function ReplenishmentSettingsModal({ isOpen, onClose, inventoryItem, onS
             <select
               value={sourceLoc}
               onChange={(e) => setSourceLoc(e.target.value)}
-              disabled={isLoadingLocations}
               className="flex h-8 w-full rounded-md border border-input bg-background px-3 py-1 text-xs shadow-xs transition-colors file:border-0 file:bg-transparent file:text-xs file:font-medium placeholder:text-muted-foreground focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 font-sans"
             >
               <option value="">-- Choose Upstream Target Node --</option>
@@ -138,11 +117,6 @@ export function ReplenishmentSettingsModal({ isOpen, onClose, inventoryItem, onS
                 </option>
               ))}
             </select>
-            {isLoadingLocations && (
-              <span className="text-[10px] text-muted-foreground block animate-pulse mt-1">
-                Syncing available network nodes...
-              </span>
-            )}
           </div>
 
           {enabled && !sourceLoc && (

@@ -5,7 +5,8 @@ import { InflowProduct } from "../types";
 export async function getEntireCatalogs(
   count = 30,
   after?: string,
-  includes: string[] = []
+  filterName?: string,
+  includes: string[] = [],
 ) {
   const params = new URLSearchParams({
     count: String(count),
@@ -14,6 +15,10 @@ export async function getEntireCatalogs(
 
   if (after) {
     params.append("after", after);
+  }
+
+  if(filterName) {
+    params.append("filter[name]", filterName);
   }
 
   return inflow.get<InflowProduct[]>(
@@ -122,7 +127,7 @@ export async function upsertProduct(payload: Partial<InflowProduct>) {
 }
 
 export async function upsertProductBulk(payload: Partial<InflowProduct>[]) {
-  return inflowLimit.put<InflowProduct>("/products", payload);
+  return inflowLimit.put<InflowProduct[]>("/products", payload);
 }
 
 export async function deleteProduct(productId: string) {

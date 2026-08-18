@@ -97,7 +97,7 @@ export class InventorySyncService {
             }
           },
           {
-            timeout: 40000,
+            timeout: 300, // 40000,
           }
         );
       } catch (transactionError) {
