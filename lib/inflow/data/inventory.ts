@@ -11,7 +11,6 @@ export async function getInventoryLevels(
   const params = new URLSearchParams({
     count: String(count),
     include: "inventoryLines.location",
-    "filter[isActive]": "true"
   });
 
   if (after) {

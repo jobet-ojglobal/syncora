@@ -15,11 +15,6 @@ export interface LocalCurrency {
   syncedAt: string;
 }
 
-export interface LocalProductSerial {
-  serialId: string;
-  productId: string;
-  serialNumber: string;
-}
 
 export interface LocalProductPrice {
   productPriceId: number;
@@ -108,21 +103,24 @@ export interface LocalProduct {
   inventoryLines?: LocalInventoryLine[];
 }
 
+export interface LocalProductSerial {
+  serialId: string;
+  productId: string;
+  locationId: string;
+  serialNumber: string;
+}
 
 export interface LocalProductInventory {
   productId: string;
   name: string;
-  serials?: LocalProductSerial[];
   inventoryLines?: LocalInventoryLine[];
 }
 
 export interface LocalInventoryLine {
   locationId: string | null;
-  lotId: string | null;
   productId: string;
   quantityOnHand: number;
-  serial: boolean;
-  sublocation: string | null;
+  serials: string[];
 }
 
 export interface LocalLocation {

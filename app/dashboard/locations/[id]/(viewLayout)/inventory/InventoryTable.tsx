@@ -16,7 +16,8 @@ import { RefreshCw, AlertCircle, Edit, Layers,
   MoreHorizontalIcon,
   Truck,
   Barcode,
-  Tag
+  Tag,
+  Trash2
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -46,6 +47,7 @@ import { TableMultiSelect } from "@/components/shared/table-multiselect";
 import { ReplenishmentSettingsModal } from "@/components/inventory/replenishment-settings-modal";
 import { ProductPriceType } from "@/generated/prisma/enums";
 import { PricingSchemeInspectionModal } from "@/components/inventory/pricing-scheme-inspection-modal";
+import { Checkbox } from "@/components/ui/checkbox";
 
 interface BinDetail {
   id: string;
@@ -134,6 +136,9 @@ export function InventoryTable({
   const [pageIndex, setPageIndex] = useState(0);
   const [pageSize, setPageSize] = useState(10);
 
+  const [selectedRowIds, setSelectedRowIds] = useState<string[]>([]);
+  const [isBulkDeleting, setIsBulkDeleting] = useState(false);
+
 
   // 2. Automatically sync typing input to debounced state with a 300ms window delay
   useEffect(() => {
@@ -196,6 +201,69 @@ export function InventoryTable({
     : payload?.data || [];
   const totalRecords = payload?.totalRecords || inventory.length;
   const pageCount = payload?.pageCount || Math.ceil(totalRecords / pageSize) || 1;
+
+  // Selection Logic
+  const currentPageIds = inventory.map((item) => item.id);
+  const isAllOnPageSelected =
+    currentPageIds.length > 0 &&
+    currentPageIds.every((id) => selectedRowIds.includes(id));
+  const isSomeOnPageSelected =
+    currentPageIds.some((id) => selectedRowIds.includes(id)) && !isAllOnPageSelected;
+
+  const handleSelectAllPageRows = () => {
+    if (isAllOnPageSelected) {
+      setSelectedRowIds((prev) => prev.filter((id) => !currentPageIds.includes(id)));
+    } else {
+      setSelectedRowIds((prev) => Array.from(new Set([...prev, ...currentPageIds])));
+    }
+  };
+
+  const handleSelectRow = (id: string) => {
+    setSelectedRowIds((prev) =>
+      prev.includes(id) ? prev.filter((rowId) => rowId !== id) : [...prev, id]
+    );
+  };
+
+  // Bulk Delete Action
+  const handleBulkDelete = async () => {
+    if (!selectedRowIds.length) return;
+
+    if (
+      !confirm(
+        `Are you sure you want to delete ${selectedRowIds.length} selected inventory record(s)?`
+      )
+    ) {
+      return;
+    }
+
+    setIsBulkDeleting(true);
+
+    toast.promise(
+      async () => {
+        const res = await fetch(`/api/admin/locations/${locationId}/inventory/bulk-delete`, {
+          method: "DELETE",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ ids: selectedRowIds }),
+        });
+
+        const resData = await res.json();
+        if (!res.ok) {
+          throw new Error(resData.error || "Failed to delete selected items");
+        }
+
+        setSelectedRowIds([]);
+        await mutate();
+        if (onDataChanged) await onDataChanged();
+        return resData;
+      },
+      {
+        loading: `Deleting ${selectedRowIds.length} inventory record(s)...`,
+        success: `Successfully deleted ${selectedRowIds.length} record(s)!`,
+        error: (err) => err.message || "Failed to delete records",
+        finally: () => setIsBulkDeleting(false),
+      }
+    );
+  };
 
   // Calculate total units held in Bulk Floor / Unassigned storage across active dataset
   const totalBulkStockOverall = inventory.reduce((acc, item) => {
@@ -440,11 +508,49 @@ export function InventoryTable({
         </div>
       </div>
 
+      {/* Bulk Action Bar (Visible when rows are selected) */}
+      {selectedRowIds.length > 0 && (
+        <div className="flex items-center justify-between p-2.5 px-4 bg-muted/80 border border-border rounded-lg text-xs animate-in fade-in slide-in-from-top-1">
+          <div className="flex items-center gap-2 font-medium">
+            <span className="bg-primary text-primary-foreground font-semibold px-2 py-0.5 rounded-full text-[11px]">
+              {selectedRowIds.length}
+            </span>
+            <span>record(s) selected</span>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setSelectedRowIds([])}
+              className="h-6 px-2 text-[11px] text-muted-foreground hover:text-foreground"
+            >
+              Deselect All
+            </Button>
+          </div>
+
+          <Button
+            variant="destructive"
+            size="sm"
+            disabled={isBulkDeleting}
+            onClick={handleBulkDelete}
+            className="h-8 gap-1.5 text-xs font-semibold"
+          >
+            <Trash2 className="w-3.5 h-3.5" />
+            Delete Selected ({selectedRowIds.length})
+          </Button>
+        </div>
+      )}
+
       <div className="space-y-4">
         <div className="border rounded-xl bg-card shadow-xs overflow-hidden">
           <Table>
             <TableHeader>
               <TableRow className="bg-muted/30 hover:bg-muted/30">
+                <TableHead className="w-[40px] pl-4">
+                  <Checkbox
+                    checked={isAllOnPageSelected || (isSomeOnPageSelected ? "indeterminate" : false)}
+                    onCheckedChange={handleSelectAllPageRows}
+                    aria-label="Select all rows on current page"
+                  />
+                </TableHead>
                 <TableHead className="pl-5 w-[240px] text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
                   SKU Product Assignment
                 </TableHead>
@@ -489,6 +595,7 @@ export function InventoryTable({
                 </TableRow>
               ) : (
                 inventory.map((item) => {
+                  const isSelected = selectedRowIds.includes(item.id);
                   const isOutOfStock = item.quantityAvailable <= 0;
                   const isStrained = item.quantityReserved > item.quantityOnHand * 0.5;
 
@@ -507,6 +614,13 @@ export function InventoryTable({
                     <TableRow key={item.id}  className={`hover:bg-muted/20 transition-colors ${
                         isLowStock ? "bg-amber-50/30 dark:bg-amber-950/15" : ""
                       }`}>
+                      <TableCell className="pl-4">
+                        <Checkbox
+                          checked={isSelected}
+                          onCheckedChange={() => handleSelectRow(item.id)}
+                          aria-label={`Select row for ${item.product.name}`}
+                        />
+                      </TableCell>
                       {/* Product */}
                       {/* <TableCell className="pl-5">
                         <div className="flex items-center gap-2.5 max-w-[220px]">

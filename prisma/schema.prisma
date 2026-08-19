@@ -1432,7 +1432,7 @@ model InventoryAdjustmentLine {
   description      String?
 
   adjustment       InventoryAdjustment       @relation(fields: [adjustmentId], references: [inflowId], onDelete: Cascade)
-  product          Product                   @relation(fields: [productId], references: [inflowId], onDelete: Restrict)
+  product          Product                   @relation(fields: [productId], references: [inflowId], onDelete: Cascade) // Restrict
   location         Location                  @relation(fields: [locationId], references: [inflowId], onDelete: Restrict)
   inventoryBin     InventoryBin?             @relation(fields: [inventoryBinId], references: [id], onDelete: SetNull)
 
@@ -1541,7 +1541,7 @@ model InventoryLedger {
 
   remarks          String?
 
-  product          Product                  @relation(fields: [productId], references: [inflowId], onDelete: Restrict)
+  product          Product                  @relation(fields: [productId], references: [inflowId], onDelete: Cascade) // Restrict
   location         Location                 @relation(fields: [locationId], references: [inflowId], onDelete: Restrict)
   sublocation      Sublocation?             @relation(fields: [sublocationId], references: [id], onDelete: SetNull)
   performedBy      TeamMember?              @relation(fields: [performedById], references: [inflowId], onDelete: SetNull)

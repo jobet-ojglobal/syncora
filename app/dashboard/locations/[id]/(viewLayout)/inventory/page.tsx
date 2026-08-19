@@ -34,6 +34,7 @@ import { CloudSyncSublocationButton } from "@/components/integration/cloud-sync-
 import { InventoryTable } from "./InventoryTable";
 import { InventorySummaryCards } from "./SummaryCards";
 import { Location, LocationWithRelations } from "@/types/location.type";
+import { EmptyLocationButton } from "@/components/location/empty-location-inventory-button";
 
 const fetcher = (url: string) => fetch(url).then((res) => res.json());
 
@@ -160,6 +161,12 @@ export default function LocationInventoryPage() {
         </div>
 
         <div className="flex items-center gap-2">
+
+          <EmptyLocationButton 
+             locationId={location?.inflowId || ""}
+             locationName={location?.name || ""}
+            />
+
           <CloudSyncSublocationButton
             source={sourceName}
             locationId={location?.inflowId}

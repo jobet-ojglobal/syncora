@@ -44,28 +44,6 @@ export function mapLocalProductToInflowPayload(
   }
 
   const cat = product.category;
-  // const mappedCategory = cat
-  //   ? {
-  //       categoryId: cat.inflowId,
-  //       isDefault: cat.isDefault,
-  //       name: cat.name,
-  //       parentCategoryId: cat.parentId || null,
-  //       parentCategory: cat.parent
-  //         ? {
-  //             categoryId: cat.parent.inflowId,
-  //             name: cat.parent.name,
-  //             isDefault: cat.parent.isDefault,
-  //           }
-  //         : undefined,
-  //     }
-  //   : defaultCategoryPayload
-  //   ? {
-  //       categoryId: defaultCategoryPayload.inflowId,
-  //       isDefault: defaultCategoryPayload.isDefault,
-  //       name: defaultCategoryPayload.name,
-  //       parentCategoryId: null,
-  //     }
-  //   : undefined;
 
   // 2. Resolve Cost Object Mapping
   const productCost = product.cost;
@@ -106,7 +84,7 @@ export function mapLocalProductToInflowPayload(
 
     trackExpiry: false, // product.trackExpiry,
     trackLots: false, //product.trackLots,
-    trackSerials: false, //product.trackSerials,
+    trackSerials: product.trackSerials,
 
     shelfLifeDays: null, // product.shelfLifeDays,
     sellBeforeExpiryDays: null, // product.sellBeforeExpiryDays,
@@ -479,7 +457,7 @@ export class ProductOutSyncService {
     const syncStartTime = performance.now();
     const { onProgress, checkSignal } = options;
     // Reduced batch size to 20 to keep BullMQ execution time well within stall limits
-    const BATCH_SIZE = options?.batchSize ?? 50 ;//20; 
+    const BATCH_SIZE = options?.batchSize ?? 100 ;//20; 
     const API_CONCURRENCY = 5 // 3; // 1 request at a time avoids 429 bursts
     const INTER_BATCH_DELAY = options?.delayBetweenBatchesMs ?? 1000; // 5000; // 1000
 
@@ -528,7 +506,6 @@ export class ProductOutSyncService {
         defaultCategory,
         brandCustomName,
         checkSignal,
-        // API_CONCURRENCY
       );
 
       if (failedIds.length > 0) {

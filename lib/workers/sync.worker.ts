@@ -30,8 +30,8 @@ import { PricingSchemeSyncMapService as LocalPricingSchemeSyncMapService } from 
 import { TaxingSchemeSyncMapService as LocalTaxingSchemeSyncMapService } from "../locations/services/taxing-scheme-sync-map.service";
 import { CustomerSyncMapService as LocalCustomerSyncMapService } from "../locations/services/customer-sync-map.service";
 import { ProductSyncMapService as LocalProductSyncMapService } from "../locations/services/batch-product-sync-map";
-import { InventorySyncService as LocalInventorySyncService } from "../locations/services/batch-inventory-sync-adjustment.service";
 import { SublocationSyncMapService as LocalSublocationSyncMapService } from "../locations/services/sublocation-sync-map.service";
+import { inventoryLocalSyncService } from "../locations/services/batch-inventory-sync-adjustment.service";
 
 // OUT SYNC
 import { inventoryCloudSyncService } from "../inflow/services/out-sync-location-inventory";
@@ -39,8 +39,6 @@ import { inventoryStockLocationSyncService } from "../inflow/services/adjust-loc
 
 import { ProductOutSyncService } from "../inflow/services/out-sync-product";
 import { productInventoryOutSyncService } from "../inflow/services/out-sync-product-inventory";
-
-
 
 const testService = new TestSyncService();
 const categoryService = new CategorySyncService();
@@ -71,7 +69,6 @@ const pricingServiceLocal = new LocalPricingSchemeSyncMapService();
 const taxingSchemeServiceLocal = new LocalTaxingSchemeSyncMapService();
 const customerServiceLocal = new LocalCustomerSyncMapService();
 const productServiceLocal = new LocalProductSyncMapService();
-const inventoryServiceLocal = new LocalInventorySyncService();
 const sublocationServiceLocal = new LocalSublocationSyncMapService();
 
 // export class SyncCancelledError extends Error {
@@ -260,7 +257,7 @@ const worker = new Worker<SyncWebhookJobData>(
           if (!locationUrl) {
             throw new Error(`Cannot sync inventory: No location URL found for location ${location?.name}`);
           }
-          result = await inventoryServiceLocal.sync(location, syncOptions, selectedRecords, syncedAll, after);
+          result = await inventoryLocalSyncService.sync(location, syncOptions, selectedRecords, syncedAll, after);
           break;
 
         // Cloud Sync
@@ -326,17 +323,13 @@ const worker = new Worker<SyncWebhookJobData>(
         case "cloudsync_product_inventory":
           result = await productInventoryOutSyncService.syncNoCheckCloudSync(syncOptions, ["e4cc6c9a-9d2b-49eb-a331-361ef582fc7f"], brandCustomName);
           break;
-
         case "cloudsync_products":
-          result = await productOutSyncService.sync(
-            syncOptions,
-            brandCustomName,
-          );
+          result = await productOutSyncService.sync(syncOptions, brandCustomName);
           break;
 
         // Mid Sync
-        case "sync_locations_inventory":
-          result = await inventoryStockLocationSyncService.sync(syncOptions, selectedLocations, selectedRecords, syncedAll);
+        case "sync_locations_inventory": // Mid Process - cloning inventory from global sync to main location connected to cloud
+          result = await inventoryStockLocationSyncService.syncToCloud(syncOptions, selectedLocations, selectedRecords, syncedAll);
           break;
 
           
