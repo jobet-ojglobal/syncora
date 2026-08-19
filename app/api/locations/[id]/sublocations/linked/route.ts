@@ -50,7 +50,6 @@ export async function GET(
                 deletedAt: null,
                 isActive: true,
                 isCloudSynced: true,
-                trackSerials: false, // Sync skips serial tracked items
               },
             },
           },

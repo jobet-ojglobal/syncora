@@ -175,14 +175,14 @@ export class ProductSyncService {
               const groupDefaultProduct = variantRelation?.productGroup?.defaultProduct;
 
               // skip inactive
-              if(!fullProduct.isActive) continue;
+              if(!fullProduct.isActive) {
+                console.log(`...Skipping inactive product: ${fullProduct.name}`);
+              }
 
               if (groupData && !syncedGroupIds.has(groupData.productGroupId)) {
                 await syncProductGroup(tx, groupData, fullProduct, true, caches);
                 syncedGroupIds.add(groupData.productGroupId);
               }
-
-
 
               await syncProduct(
                 tx,

@@ -164,7 +164,7 @@ export class InventoryCloudSyncService {
 
       if (!product.inflowId) continue;
 
-      // if(product.name === "FUJIFILM X100VI BLACK") continue;
+      if(product.name === "FUJIFILM X100VI BLACK") continue;
 
       let productIncluded = false;
 
@@ -255,7 +255,7 @@ export class InventoryCloudSyncService {
         isCancelled: false,
         lastModifiedById: modifiedById,
         locationId: targetLocationInflowId || locationId || "",
-        remarks: `Batch Sync #${batchNo + 1} Inventory Adjustment`,
+        remarks: `Mid Sync Batch #${batchNo + 1} Inventory Adjustment`,
         lines: batchLines,
       };
 

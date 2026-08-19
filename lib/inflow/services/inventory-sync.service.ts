@@ -52,6 +52,8 @@ export class InventorySyncService {
           async (tx) => {
             for (const product of batch) {
 
+              if(!product.isActive || product.inventoryLines?.length === 0) continue;
+
               let validProductId: string | null = null;
 
               if (product.productId) {
@@ -66,17 +68,8 @@ export class InventorySyncService {
                   if (localProduct) {
                     validProductId = localProduct.inflowId;
                     caches.verifiedProductIds.add(localProduct.inflowId);
-                  } else if (product) {
-                    console.warn(
-                      `[Sync Notification] Product with inflowId "${product.productId}" missing locally. Syncing JIT...`
-                    );
-                    // Pass downstream caches into syncProduct to prevent infinite sync loops
-                    const syncedProduct = await ensureProductShell(tx, product);
-                    if (syncedProduct?.inflowId) {
-                      validProductId = syncedProduct.inflowId;
-                      caches.verifiedProductIds.add(syncedProduct.inflowId);
-                    }
                   }
+                 
                 }
               }
 
@@ -97,7 +90,7 @@ export class InventorySyncService {
             }
           },
           {
-            timeout: 300, // 40000,
+            timeout: 40000, // 40000,
           }
         );
       } catch (transactionError) {
@@ -120,8 +113,34 @@ export class InventorySyncService {
       if (INTER_BATCH_DELAY > 0) {
         await this.sleep(INTER_BATCH_DELAY);
       }
+    }
 
-      // } catch (transactionError) {
+    return {
+      inventoryProcessed: totalProcessed,
+      syncedAt: new Date().toISOString(),
+    };
+  }
+
+  async syncSingle(productId: string, locationIds?: string[]) {
+    return await syncSingleProductInventory(productId, { locationIds });
+  }
+}
+
+
+ //  else if (product) {
+                  //   console.warn(
+                  //     `[Sync Notification] Product with inflowId "${product.productId}" missing locally. Syncing JIT...`
+                  //   );
+                  //   // Pass downstream caches into syncProduct to prevent infinite sync loops
+                  //   const syncedProduct = await ensureProductShell(tx, product);
+                  //   if (syncedProduct?.inflowId) {
+                  //     validProductId = syncedProduct.inflowId;
+                  //     caches.verifiedProductIds.add(syncedProduct.inflowId);
+                  //   }
+                  // }
+
+
+                   // } catch (transactionError) {
       //   console.error(
       //     `Transaction failed for inventory batch ending with ID ${after}:`,
       //     transactionError
@@ -135,15 +154,3 @@ export class InventorySyncService {
       // if (options?.onProgress) {
       //   await options.onProgress(totalProcessed);
       // }
-    }
-
-    return {
-      inventoryProcessed: totalProcessed,
-      syncedAt: new Date().toISOString(),
-    };
-  }
-
-  async syncSingle(productId: string, locationIds?: string[]) {
-    return await syncSingleProductInventory(productId, { locationIds });
-  }
-}

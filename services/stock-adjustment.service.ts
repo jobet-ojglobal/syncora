@@ -50,6 +50,7 @@ export interface ProcessedAdjustmentResult {
     inflowId: string | null;
     productId: string;
     quantityOnHand: number;
+    quantityAdjusted?: number;
     sublocation: string | null;
     serials: string[];
     description?: string;
@@ -535,6 +536,978 @@ export class AdjustmentService {
 
     return result;
   }
+
+  async postAdjustmentWithAdjustedReturn(payload: PostAdjustmentPayload): Promise<ProcessedAdjustmentResult> {
+    const {
+      existingAdjustmentId,
+      reasonId,
+      locationId,
+      remarks,
+      performedById,
+      lines,
+    } = payload;
+
+    const result = await this.prisma.$transaction(
+      async (tx) => {
+        let adjustment: any;
+        const createdAdjustmentLines: ProcessedAdjustmentResult["createdAdjustmentLines"] = [];
+
+        // ----------------------------------------------------------------
+        // 1. Header Validation & Upsert
+        // ----------------------------------------------------------------
+        if (existingAdjustmentId) {
+          const existing = await tx.inventoryAdjustment.findUnique({
+            where: { id: existingAdjustmentId },
+          });
+
+          if (!existing) {
+            throw new Error("Adjustment record not found.");
+          }
+          if (existing.status === AdjustmentStatus.POSTED) {
+            throw new Error("Cannot modify an adjustment that is already POSTED.");
+          }
+
+          const existingLines = await tx.inventoryAdjustmentLine.findMany({
+            where: { adjustmentId: existingAdjustmentId },
+            select: { id: true },
+          });
+          const existingLineIds = existingLines.map((l) => l.id);
+
+          if (existingLineIds.length > 0) {
+            await tx.inventoryAdjustmentSerial.deleteMany({
+              where: { adjustmentLineId: { in: existingLineIds } },
+            });
+            await tx.inventoryAdjustmentLineBin.deleteMany({
+              where: { adjustmentLineId: { in: existingLineIds } },
+            });
+            await tx.inventoryAdjustmentLine.deleteMany({
+              where: { adjustmentId: existingAdjustmentId },
+            });
+          }
+
+          adjustment = await tx.inventoryAdjustment.update({
+            where: { id: existingAdjustmentId },
+            data: {
+              adjustmentReasonId: reasonId || null,
+              remarks: remarks || null,
+              lastModifiedById: performedById,
+              status: AdjustmentStatus.POSTED,
+            },
+          });
+        } else {
+          const adjustmentNumber = await this.generateAdjustmentNumber(tx);
+          const computedInflowId = crypto.randomUUID().toLowerCase();
+
+          adjustment = await tx.inventoryAdjustment.create({
+            data: {
+              inflowId: computedInflowId,
+              adjustmentNumber,
+              adjustmentReasonId: reasonId || null,
+              performedById,
+              status: AdjustmentStatus.POSTED,
+              remarks: remarks || null,
+            },
+          });
+        }
+
+        // ----------------------------------------------------------------
+        // 2. Commit Inventory, Bins, & Ledger Balances
+        // ----------------------------------------------------------------
+        const ledgerEntriesToCreate: Prisma.InventoryLedgerCreateManyInput[] = [];
+        const serialAuditsToCreate: Prisma.InventoryAdjustmentSerialCreateManyInput[] = [];
+
+        for (const line of lines) {
+          const { productId, bins = [], trackSerials } = line;
+
+          let inventory = await tx.inventory.findUnique({
+            where: { productId_locationId: { productId, locationId } },
+          });
+
+          const targetOnHand = Number(line.quantityOnHand) || 0;
+          const currentOnHand = inventory ? Number(inventory.quantityOnHand) : 0;
+          const netOnHandChange = targetOnHand - currentOnHand;
+
+          // Sync Header Inventory
+          if (!inventory) {
+            inventory = await tx.inventory.create({
+              data: {
+                productId,
+                locationId,
+                quantityOnHand: targetOnHand,
+                quantityAvailable: Math.max(
+                  0,
+                  targetOnHand - (Number(line.quantityReserved) || 0)
+                ),
+                quantityReserved: Number(line.quantityReserved) || 0,
+              },
+            });
+          } else {
+            const currentReserved = Number(inventory.quantityReserved) || 0;
+            await tx.inventory.update({
+              where: { id: inventory.id },
+              data: {
+                quantityOnHand: targetOnHand,
+                quantityReserved: Number(line.quantityReserved) || 0,
+                quantityAvailable: Math.max(0, targetOnHand - currentReserved),
+                lastCountedAt: new Date(),
+                lastMovementAt: new Date(),
+              },
+            });
+          }
+
+          const sublocationToBinMap = new Map<string, string>();
+
+          // Pre-sync/upsert bins to obtain IDs for both serialized and non-serialized paths
+          for (const binData of bins) {
+            if (!binData.sublocationId) continue;
+
+            const targetBinQty = Number(binData.quantity) || 0;
+
+            const existingBin = await tx.inventoryBin.findUnique({
+              where: {
+                inventoryId_sublocationId: {
+                  inventoryId: inventory.id,
+                  sublocationId: binData.sublocationId,
+                },
+              },
+            });
+
+            if (existingBin) {
+              await tx.inventoryBin.update({
+                where: { id: existingBin.id },
+                data: { quantity: targetBinQty },
+              });
+              sublocationToBinMap.set(binData.sublocationId, existingBin.id);
+            } else {
+              const newBin = await tx.inventoryBin.create({
+                data: {
+                  inventoryId: inventory.id,
+                  sublocationId: binData.sublocationId,
+                  quantity: targetBinQty,
+                },
+              });
+              sublocationToBinMap.set(binData.sublocationId, newBin.id);
+            }
+          }
+
+          // NON-SERIALIZED PATH
+          if (!trackSerials) {
+            if (bins.length > 0) {
+              for (const binData of bins) {
+                if (!binData.sublocationId) continue;
+
+                const sublocation = await tx.sublocation.findUnique({
+                  where: { id: binData.sublocationId },
+                  select: { name: true },
+                });
+
+                if (!sublocation?.name) continue;
+
+                const targetBinQty = Number(binData.quantity) || 0;
+                const binId = sublocationToBinMap.get(binData.sublocationId)!;
+                
+                // Find original bin quantity for exact calculation
+                const prevBin = await tx.inventoryBin.findUnique({
+                  where: { id: binId },
+                });
+                const prevBinQty = prevBin ? Number(prevBin.quantity) : 0;
+                const binQuantityDiff = targetBinQty - prevBinQty;
+
+                if (binQuantityDiff !== 0) {
+                  ledgerEntriesToCreate.push({
+                    productId,
+                    locationId,
+                    sublocationId: binData.sublocationId,
+                    transactionType: "ADJUSTMENT",
+                    referenceType: "ADJUSTMENT",
+                    referenceId: adjustment.id,
+                    performedById,
+                    quantityChange: binQuantityDiff,
+                    quantityBefore: prevBinQty,
+                    quantityAfter: targetBinQty,
+                    remarks:
+                      remarks ||
+                      `Stock Adjustment posted (${adjustment.adjustmentNumber})`,
+                  });
+                }
+
+                const createdLine = await tx.inventoryAdjustmentLine.create({
+                  data: {
+                    inflowId: crypto.randomUUID().toLowerCase(),
+                    adjustmentId: adjustment.inflowId, // Using header inflowId mapping
+                    inventoryId: inventory.id,
+                    productId,
+                    locationId,
+                    inventoryBinId: binId,
+                    quantityBefore: prevBinQty,
+                    quantityAdjusted: binQuantityDiff,
+                    quantityAfter: targetBinQty,
+                    quantityReserved: line.quantityReserved,
+                    reason: (line.reason as InventoryAdjustmentLineReason) || null,
+                    description: line.description || null,
+                  },
+                });
+
+                createdAdjustmentLines.push({
+                  inflowId: createdLine.inflowId,
+                  productId: line.productId,
+                  quantityOnHand: targetBinQty,
+                  quantityAdjusted: binQuantityDiff, 
+                  sublocation: sublocation.name,
+                  serials: [],
+                  description: line.description, 
+                });
+              }
+            } else {
+              // Location-wide adjustment (No bins)
+              if (netOnHandChange !== 0) {
+                ledgerEntriesToCreate.push({
+                  productId,
+                  locationId,
+                  sublocationId: null,
+                  transactionType: "ADJUSTMENT",
+                  referenceType: "ADJUSTMENT",
+                  referenceId: adjustment.id,
+                  performedById,
+                  quantityChange: netOnHandChange,
+                  quantityBefore: currentOnHand,
+                  quantityAfter: targetOnHand,
+                  remarks:
+                    remarks ||
+                    `Stock Adjustment posted (${adjustment.adjustmentNumber})`,
+                });
+              }
+
+              const createdLine = await tx.inventoryAdjustmentLine.create({
+                data: {
+                  inflowId: crypto.randomUUID().toLowerCase(),
+                  adjustmentId: adjustment.inflowId,
+                  inventoryId: inventory.id,
+                  productId,
+                  locationId,
+                  inventoryBinId: null,
+                  quantityBefore: currentOnHand,
+                  quantityAdjusted: netOnHandChange,
+                  quantityAfter: targetOnHand,
+                  quantityReserved: line.quantityReserved,
+                  reason: (line.reason as InventoryAdjustmentLineReason) || null,
+                  description: line.description || null,
+                },
+              });
+
+              createdAdjustmentLines.push({
+                inflowId: createdLine.inflowId,
+                productId: line.productId,
+                quantityOnHand: targetOnHand,
+                quantityAdjusted: netOnHandChange,
+                sublocation: null,
+                serials: [],
+                description: line.description,
+              });
+            }
+          } else {
+            // SERIALIZED PATH
+            const createdLine = await tx.inventoryAdjustmentLine.create({
+              data: {
+                inflowId: crypto.randomUUID().toLowerCase(),
+                adjustmentId: adjustment.inflowId,
+                inventoryId: inventory.id,
+                productId,
+                locationId,
+                inventoryBinId: null,
+                quantityBefore: currentOnHand,
+                quantityAdjusted: netOnHandChange,
+                quantityAfter: targetOnHand,
+                quantityReserved: line.quantityReserved,
+                reason: (line.reason as InventoryAdjustmentLineReason) || null,
+                description: line.description || null,
+              },
+            });
+
+            const serialToBinIdMap = new Map<string, string | null>();
+            const allIncomingSerials: string[] = [];
+
+            (line.serials || []).forEach((s: string) => {
+              const cleaned = s.trim();
+              if (cleaned) {
+                allIncomingSerials.push(cleaned);
+                serialToBinIdMap.set(cleaned, null);
+              }
+            });
+
+            // Map serials to created/updated bins
+            for (const b of bins) {
+              const binId = sublocationToBinMap.get(b.sublocationId) || null;
+              if (Array.isArray(b.serials)) {
+                for (const binSerial of b.serials) {
+                  const cleaned = binSerial.trim();
+                  if (cleaned) {
+                    if (!allIncomingSerials.includes(cleaned)) {
+                      allIncomingSerials.push(cleaned);
+                    }
+                    serialToBinIdMap.set(cleaned, binId);
+                  }
+                }
+              }
+            }
+
+            if (bins.length > 0) {
+              const allocatedSerials = new Set<string>();
+
+              for (const b of bins) {
+                const sublocation = await tx.sublocation.findUnique({
+                  where: { id: b.sublocationId },
+                  select: { name: true },
+                });
+
+                const binSerials = (b.serials || []).map((s) => s.trim()).filter(Boolean);
+                binSerials.forEach((s) => allocatedSerials.add(s));
+
+                const targetQty = Number(b.quantity) || binSerials.length;
+
+                createdAdjustmentLines.push({
+                  inflowId: createdLine.inflowId,
+                  productId: line.productId,
+                  quantityOnHand: targetQty,
+                  quantityAdjusted: binSerials.length, 
+                  sublocation: sublocation?.name || null,
+                  serials: binSerials,
+                  description: line.description,
+                });
+              }
+
+              const unallocatedSerials = allIncomingSerials.filter(
+                (sn) => !allocatedSerials.has(sn)
+              );
+
+              if (unallocatedSerials.length > 0) {
+                createdAdjustmentLines.push({
+                  inflowId: createdLine.inflowId,
+                  productId: line.productId,
+                  quantityOnHand: unallocatedSerials.length,
+                  quantityAdjusted: unallocatedSerials.length,
+                  sublocation: null,
+                  serials: unallocatedSerials,
+                  description: line.description,
+                });
+              }
+            } else {
+              createdAdjustmentLines.push({
+                inflowId: createdLine.inflowId,
+                productId: line.productId,
+                quantityOnHand: targetOnHand,
+                quantityAdjusted: netOnHandChange,
+                sublocation: null,
+                serials: allIncomingSerials,
+                description: line.description,
+              });
+            }
+
+            // Sync physical bin serials state
+            const existingSerials = await tx.inventoryBinItem.findMany({
+              where: { productId, locationId },
+            });
+
+            const existingSerialMap = new Map(
+              existingSerials.map((s) => [s.serialNumber, s])
+            );
+            const existingSerialNumbers = Array.from(existingSerialMap.keys());
+
+            const serialsToCreate = allIncomingSerials.filter(
+              (sn) => !existingSerialNumbers.includes(sn)
+            );
+            const serialsToDelete = existingSerials.filter(
+              (s) =>
+                !allIncomingSerials.includes(s.serialNumber) &&
+                s.status === "IN_STOCK"
+            );
+
+            // 1. Additions
+            for (const sn of serialsToCreate) {
+              const targetBinId = serialToBinIdMap.get(sn) || null;
+              const newItem = await tx.inventoryBinItem.create({
+                data: {
+                  productId,
+                  locationId,
+                  inventoryBinId: targetBinId,
+                  serialNumber: sn,
+                  status: "IN_STOCK",
+                },
+              });
+
+              serialAuditsToCreate.push({
+                adjustmentLineId: createdLine.id,
+                inventoryBinItemId: newItem.id,
+                serialNumber: sn,
+                action: InventorySerialAdjustmentAction.ADD,
+                fromInventoryBinId: null,
+                toInventoryBinId: targetBinId,
+              });
+            }
+
+            // 2. Relocations & Audits
+            for (const sn of allIncomingSerials) {
+              if (existingSerialMap.has(sn)) {
+                const item = existingSerialMap.get(sn)!;
+                const targetBinId = serialToBinIdMap.get(sn) || null;
+
+                if (item.inventoryBinId !== targetBinId) {
+                  await tx.inventoryBinItem.update({
+                    where: { id: item.id },
+                    data: { inventoryBinId: targetBinId },
+                  });
+
+                  serialAuditsToCreate.push({
+                    adjustmentLineId: createdLine.id,
+                    inventoryBinItemId: item.id,
+                    serialNumber: sn,
+                    action: InventorySerialAdjustmentAction.MOVE,
+                    fromInventoryBinId: item.inventoryBinId,
+                    toInventoryBinId: targetBinId,
+                  });
+                } else {
+                  serialAuditsToCreate.push({
+                    adjustmentLineId: createdLine.id,
+                    inventoryBinItemId: item.id,
+                    serialNumber: sn,
+                    action: InventorySerialAdjustmentAction.VERIFY,
+                    fromInventoryBinId: targetBinId,
+                    toInventoryBinId: targetBinId,
+                  });
+                }
+              }
+            }
+
+            // 3. Deletions
+            if (serialsToDelete.length > 0) {
+              serialsToDelete.forEach((item) => {
+                serialAuditsToCreate.push({
+                  adjustmentLineId: createdLine.id,
+                  inventoryBinItemId: null,
+                  serialNumber: item.serialNumber,
+                  action: InventorySerialAdjustmentAction.REMOVE,
+                  fromInventoryBinId: item.inventoryBinId,
+                  toInventoryBinId: null,
+                });
+              });
+
+              await tx.inventoryBinItem.deleteMany({
+                where: { id: { in: serialsToDelete.map((s) => s.id) } },
+              });
+            }
+          }
+        }
+
+        if (ledgerEntriesToCreate.length > 0) {
+          await tx.inventoryLedger.createMany({ data: ledgerEntriesToCreate });
+        }
+        if (serialAuditsToCreate.length > 0) {
+          await tx.inventoryAdjustmentSerial.createMany({ data: serialAuditsToCreate });
+        }
+
+        // ✅ Updated return block strictly mapped to ProcessedAdjustmentResult
+        return {
+          adjustment: {
+            id: adjustment.id,
+            inflowId: adjustment.inflowId,
+            adjustmentNumber: adjustment.adjustmentNumber,
+          },
+          createdAdjustmentLines,
+        };
+      },
+      { timeout: 15000 }
+    );
+
+    if (this.queueProvider) {
+      await this.dispatchBackgroundSync(result, payload);
+    }
+
+    return result;
+  }
+
+  // async postAdjustmentWithAdjustedReturn(payload: PostAdjustmentPayload): Promise<ProcessedAdjustmentResult> {
+  //   const {
+  //     existingAdjustmentId,
+  //     reasonId,
+  //     locationId,
+  //     remarks,
+  //     performedById,
+  //     lines,
+  //   } = payload;
+
+  //   const result = await this.prisma.$transaction(
+  //     async (tx) => {
+  //       let adjustment: any;
+  //       const createdAdjustmentLines: ProcessedAdjustmentResult["createdAdjustmentLines"] = [];
+
+  //       // ----------------------------------------------------------------
+  //       // 1. Header Validation & Upsert
+  //       // ----------------------------------------------------------------
+  //       if (existingAdjustmentId) {
+  //         const existing = await tx.inventoryAdjustment.findUnique({
+  //           where: { id: existingAdjustmentId },
+  //         });
+
+  //         if (!existing) {
+  //           throw new Error("Adjustment record not found.");
+  //         }
+  //         if (existing.status === AdjustmentStatus.POSTED) {
+  //           throw new Error("Cannot modify an adjustment that is already POSTED.");
+  //         }
+
+  //         const existingLines = await tx.inventoryAdjustmentLine.findMany({
+  //           where: { adjustmentId: existingAdjustmentId },
+  //           select: { id: true },
+  //         });
+  //         const existingLineIds = existingLines.map((l) => l.id);
+
+  //         if (existingLineIds.length > 0) {
+  //           await tx.inventoryAdjustmentSerial.deleteMany({
+  //             where: { adjustmentLineId: { in: existingLineIds } },
+  //           });
+  //           await tx.inventoryAdjustmentLineBin.deleteMany({
+  //             where: { adjustmentLineId: { in: existingLineIds } },
+  //           });
+  //           await tx.inventoryAdjustmentLine.deleteMany({
+  //             where: { adjustmentId: existingAdjustmentId },
+  //           });
+  //         }
+
+  //         adjustment = await tx.inventoryAdjustment.update({
+  //           where: { id: existingAdjustmentId },
+  //           data: {
+  //             adjustmentReasonId: reasonId || null,
+  //             remarks: remarks || null,
+  //             lastModifiedById: performedById,
+  //             status: AdjustmentStatus.POSTED,
+  //           },
+  //         });
+  //       } else {
+  //         const adjustmentNumber = await this.generateAdjustmentNumber(tx);
+  //         const computedInflowId = crypto.randomUUID().toLowerCase();
+
+  //         adjustment = await tx.inventoryAdjustment.create({
+  //           data: {
+  //             inflowId: computedInflowId,
+  //             adjustmentNumber,
+  //             adjustmentReasonId: reasonId || null,
+  //             performedById,
+  //             status: AdjustmentStatus.POSTED,
+  //             remarks: remarks || null,
+  //           },
+  //         });
+  //       }
+
+  //       // ----------------------------------------------------------------
+  //       // 2. Commit Inventory, Bins, & Ledger Balances
+  //       // ----------------------------------------------------------------
+  //       const ledgerEntriesToCreate: Prisma.InventoryLedgerCreateManyInput[] = [];
+  //       const serialAuditsToCreate: Prisma.InventoryAdjustmentSerialCreateManyInput[] = [];
+
+  //       for (const line of lines) {
+  //         const { productId, bins = [], trackSerials } = line;
+
+  //         let inventory = await tx.inventory.findUnique({
+  //           where: { productId_locationId: { productId, locationId } },
+  //         });
+
+  //         const targetOnHand = Number(line.quantityOnHand) || 0;
+  //         const currentOnHand = inventory ? Number(inventory.quantityOnHand) : 0;
+  //         const netOnHandChange = targetOnHand - currentOnHand;
+
+  //         // Sync Header Inventory
+  //         if (!inventory) {
+  //           inventory = await tx.inventory.create({
+  //             data: {
+  //               productId,
+  //               locationId,
+  //               quantityOnHand: targetOnHand,
+  //               quantityAvailable: Math.max(
+  //                 0,
+  //                 targetOnHand - (Number(line.quantityReserved) || 0)
+  //               ),
+  //               quantityReserved: Number(line.quantityReserved) || 0,
+  //             },
+  //           });
+  //         } else {
+  //           const currentReserved = Number(inventory.quantityReserved) || 0;
+  //           await tx.inventory.update({
+  //             where: { id: inventory.id },
+  //             data: {
+  //               quantityOnHand: targetOnHand,
+  //               quantityReserved: Number(line.quantityReserved) || 0,
+  //               quantityAvailable: Math.max(0, targetOnHand - currentReserved),
+  //               lastCountedAt: new Date(),
+  //               lastMovementAt: new Date(),
+  //             },
+  //           });
+  //         }
+
+  //         const sublocationToBinMap = new Map<string, string>();
+
+  //         // Pre-sync/upsert bins to obtain IDs for both serialized and non-serialized paths
+  //         for (const binData of bins) {
+  //           if (!binData.sublocationId) continue;
+
+  //           const targetBinQty = Number(binData.quantity) || 0;
+
+  //           const existingBin = await tx.inventoryBin.findUnique({
+  //             where: {
+  //               inventoryId_sublocationId: {
+  //                 inventoryId: inventory.id,
+  //                 sublocationId: binData.sublocationId,
+  //               },
+  //             },
+  //           });
+
+  //           if (existingBin) {
+  //             await tx.inventoryBin.update({
+  //               where: { id: existingBin.id },
+  //               data: { quantity: targetBinQty },
+  //             });
+  //             sublocationToBinMap.set(binData.sublocationId, existingBin.id);
+  //           } else {
+  //             const newBin = await tx.inventoryBin.create({
+  //               data: {
+  //                 inventoryId: inventory.id,
+  //                 sublocationId: binData.sublocationId,
+  //                 quantity: targetBinQty,
+  //               },
+  //             });
+  //             sublocationToBinMap.set(binData.sublocationId, newBin.id);
+  //           }
+  //         }
+
+  //         // NON-SERIALIZED PATH
+  //         if (!trackSerials) {
+  //           if (bins.length > 0) {
+  //             for (const binData of bins) {
+  //               if (!binData.sublocationId) continue;
+
+  //               const sublocation = await tx.sublocation.findUnique({
+  //                 where: { id: binData.sublocationId },
+  //                 select: { name: true },
+  //               });
+
+  //               if (!sublocation?.name) continue;
+
+  //               const targetBinQty = Number(binData.quantity) || 0;
+  //               const binId = sublocationToBinMap.get(binData.sublocationId)!;
+                
+  //               // Find original bin quantity for exact calculation
+  //               const prevBin = await tx.inventoryBin.findUnique({
+  //                 where: { id: binId },
+  //               });
+  //               const prevBinQty = prevBin ? Number(prevBin.quantity) : 0;
+  //               const binQuantityDiff = targetBinQty - prevBinQty;
+
+  //               if (binQuantityDiff !== 0) {
+  //                 ledgerEntriesToCreate.push({
+  //                   productId,
+  //                   locationId,
+  //                   sublocationId: binData.sublocationId,
+  //                   transactionType: "ADJUSTMENT",
+  //                   referenceType: "ADJUSTMENT",
+  //                   referenceId: adjustment.id,
+  //                   performedById,
+  //                   quantityChange: binQuantityDiff,
+  //                   quantityBefore: prevBinQty,
+  //                   quantityAfter: targetBinQty,
+  //                   remarks:
+  //                     remarks ||
+  //                     `Stock Adjustment posted (${adjustment.adjustmentNumber})`,
+  //                 });
+  //               }
+
+  //               const createdLine = await tx.inventoryAdjustmentLine.create({
+  //                 data: {
+  //                   inflowId: crypto.randomUUID().toLowerCase(),
+  //                   adjustmentId: adjustment.inflowId,
+  //                   inventoryId: inventory.id,
+  //                   productId,
+  //                   locationId,
+  //                   inventoryBinId: binId,
+  //                   quantityBefore: prevBinQty,
+  //                   quantityAdjusted: binQuantityDiff,
+  //                   quantityAfter: targetBinQty,
+  //                   quantityReserved: line.quantityReserved,
+  //                   reason: (line.reason as InventoryAdjustmentLineReason) || null,
+  //                   description: line.description || null,
+  //                 },
+  //               });
+
+  //               createdAdjustmentLines.push({
+  //                 inflowId: createdLine.inflowId,
+  //                 productId: line.productId,
+  //                 quantityOnHand: targetBinQty,
+  //                 quantityAdjusted: binQuantityDiff, // ✅ Accurate Bin Delta
+  //                 sublocation: sublocation.name,
+  //                 serials: [],
+  //                 description: line.description, // ✅ Propagated description
+  //               });
+  //             }
+  //           } else {
+  //             // Location-wide adjustment (No bins)
+  //             if (netOnHandChange !== 0) {
+  //               ledgerEntriesToCreate.push({
+  //                 productId,
+  //                 locationId,
+  //                 sublocationId: null,
+  //                 transactionType: "ADJUSTMENT",
+  //                 referenceType: "ADJUSTMENT",
+  //                 referenceId: adjustment.id,
+  //                 performedById,
+  //                 quantityChange: netOnHandChange,
+  //                 quantityBefore: currentOnHand,
+  //                 quantityAfter: targetOnHand,
+  //                 remarks:
+  //                   remarks ||
+  //                   `Stock Adjustment posted (${adjustment.adjustmentNumber})`,
+  //               });
+  //             }
+
+  //             const createdLine = await tx.inventoryAdjustmentLine.create({
+  //               data: {
+  //                 inflowId: crypto.randomUUID().toLowerCase(),
+  //                 adjustmentId: adjustment.inflowId,
+  //                 inventoryId: inventory.id,
+  //                 productId,
+  //                 locationId,
+  //                 inventoryBinId: null,
+  //                 quantityBefore: currentOnHand,
+  //                 quantityAdjusted: netOnHandChange,
+  //                 quantityAfter: targetOnHand,
+  //                 quantityReserved: line.quantityReserved,
+  //                 reason: (line.reason as InventoryAdjustmentLineReason) || null,
+  //                 description: line.description || null,
+  //               },
+  //             });
+
+  //             createdAdjustmentLines.push({
+  //               inflowId: createdLine.inflowId,
+  //               productId: line.productId,
+  //               quantityOnHand: targetOnHand,
+  //               quantityAdjusted: netOnHandChange,
+  //               sublocation: null,
+  //               serials: [],
+  //               description: line.description,
+  //             });
+  //           }
+  //         } else {
+  //           // SERIALIZED PATH
+  //           const createdLine = await tx.inventoryAdjustmentLine.create({
+  //             data: {
+  //               inflowId: crypto.randomUUID().toLowerCase(),
+  //               adjustmentId: adjustment.inflowId,
+  //               inventoryId: inventory.id,
+  //               productId,
+  //               locationId,
+  //               inventoryBinId: null,
+  //               quantityBefore: currentOnHand,
+  //               quantityAdjusted: netOnHandChange,
+  //               quantityAfter: targetOnHand,
+  //               quantityReserved: line.quantityReserved,
+  //               reason: (line.reason as InventoryAdjustmentLineReason) || null,
+  //               description: line.description || null,
+  //             },
+  //           });
+
+  //           const serialToBinIdMap = new Map<string, string | null>();
+  //           const allIncomingSerials: string[] = [];
+
+  //           (line.serials || []).forEach((s: string) => {
+  //             const cleaned = s.trim();
+  //             if (cleaned) {
+  //               allIncomingSerials.push(cleaned);
+  //               serialToBinIdMap.set(cleaned, null);
+  //             }
+  //           });
+
+  //           // Map serials to created/updated bins
+  //           for (const b of bins) {
+  //             const binId = sublocationToBinMap.get(b.sublocationId) || null;
+  //             if (Array.isArray(b.serials)) {
+  //               for (const binSerial of b.serials) {
+  //                 const cleaned = binSerial.trim();
+  //                 if (cleaned) {
+  //                   if (!allIncomingSerials.includes(cleaned)) {
+  //                     allIncomingSerials.push(cleaned);
+  //                   }
+  //                   serialToBinIdMap.set(cleaned, binId);
+  //                 }
+  //               }
+  //             }
+  //           }
+
+  //           if (bins.length > 0) {
+  //             const allocatedSerials = new Set<string>();
+
+  //             for (const b of bins) {
+  //               const sublocation = await tx.sublocation.findUnique({
+  //                 where: { id: b.sublocationId },
+  //                 select: { name: true },
+  //               });
+
+  //               const binSerials = (b.serials || []).map((s) => s.trim()).filter(Boolean);
+  //               binSerials.forEach((s) => allocatedSerials.add(s));
+
+  //               // Compute actual delta for serialized bin
+  //               const targetQty = Number(b.quantity) || binSerials.length;
+
+  //               createdAdjustmentLines.push({
+  //                 inflowId: createdLine.inflowId,
+  //                 productId: line.productId,
+  //                 quantityOnHand: targetQty,
+  //                 quantityAdjusted: binSerials.length, // ✅ Bin specific count/delta
+  //                 sublocation: sublocation?.name || null,
+  //                 serials: binSerials,
+  //                 description: line.description,
+  //               });
+  //             }
+
+  //             const unallocatedSerials = allIncomingSerials.filter(
+  //               (sn) => !allocatedSerials.has(sn)
+  //             );
+
+  //             if (unallocatedSerials.length > 0) {
+  //               createdAdjustmentLines.push({
+  //                 inflowId: createdLine.inflowId,
+  //                 productId: line.productId,
+  //                 quantityOnHand: unallocatedSerials.length,
+  //                 quantityAdjusted: unallocatedSerials.length,
+  //                 sublocation: null,
+  //                 serials: unallocatedSerials,
+  //                 description: line.description,
+  //               });
+  //             }
+  //           } else {
+  //             createdAdjustmentLines.push({
+  //               inflowId: createdLine.inflowId,
+  //               productId: line.productId,
+  //               quantityOnHand: targetOnHand,
+  //               quantityAdjusted: netOnHandChange,
+  //               sublocation: null,
+  //               serials: allIncomingSerials,
+  //               description: line.description,
+  //             });
+  //           }
+
+  //           // Sync physical bin serials state
+  //           const existingSerials = await tx.inventoryBinItem.findMany({
+  //             where: { productId, locationId },
+  //           });
+
+  //           const existingSerialMap = new Map(
+  //             existingSerials.map((s) => [s.serialNumber, s])
+  //           );
+  //           const existingSerialNumbers = Array.from(existingSerialMap.keys());
+
+  //           const serialsToCreate = allIncomingSerials.filter(
+  //             (sn) => !existingSerialNumbers.includes(sn)
+  //           );
+  //           const serialsToDelete = existingSerials.filter(
+  //             (s) =>
+  //               !allIncomingSerials.includes(s.serialNumber) &&
+  //               s.status === "IN_STOCK"
+  //           );
+
+  //           // 1. Additions
+  //           for (const sn of serialsToCreate) {
+  //             const targetBinId = serialToBinIdMap.get(sn) || null;
+  //             const newItem = await tx.inventoryBinItem.create({
+  //               data: {
+  //                 productId,
+  //                 locationId,
+  //                 inventoryBinId: targetBinId,
+  //                 serialNumber: sn,
+  //                 status: "IN_STOCK",
+  //               },
+  //             });
+
+  //             serialAuditsToCreate.push({
+  //               adjustmentLineId: createdLine.id,
+  //               inventoryBinItemId: newItem.id,
+  //               serialNumber: sn,
+  //               action: InventorySerialAdjustmentAction.ADD,
+  //               fromInventoryBinId: null,
+  //               toInventoryBinId: targetBinId,
+  //             });
+  //           }
+
+  //           // 2. Relocations & Audits
+  //           for (const sn of allIncomingSerials) {
+  //             if (existingSerialMap.has(sn)) {
+  //               const item = existingSerialMap.get(sn)!;
+  //               const targetBinId = serialToBinIdMap.get(sn) || null;
+
+  //               if (item.inventoryBinId !== targetBinId) {
+  //                 await tx.inventoryBinItem.update({
+  //                   where: { id: item.id },
+  //                   data: { inventoryBinId: targetBinId },
+  //                 });
+
+  //                 serialAuditsToCreate.push({
+  //                   adjustmentLineId: createdLine.id,
+  //                   inventoryBinItemId: item.id,
+  //                   serialNumber: sn,
+  //                   action: InventorySerialAdjustmentAction.MOVE,
+  //                   fromInventoryBinId: item.inventoryBinId,
+  //                   toInventoryBinId: targetBinId,
+  //                 });
+  //               } else {
+  //                 serialAuditsToCreate.push({
+  //                   adjustmentLineId: createdLine.id,
+  //                   inventoryBinItemId: item.id,
+  //                   serialNumber: sn,
+  //                   action: InventorySerialAdjustmentAction.VERIFY,
+  //                   fromInventoryBinId: targetBinId,
+  //                   toInventoryBinId: targetBinId,
+  //                 });
+  //               }
+  //             }
+  //           }
+
+  //           // 3. Deletions
+  //           if (serialsToDelete.length > 0) {
+  //             serialsToDelete.forEach((item) => {
+  //               serialAuditsToCreate.push({
+  //                 adjustmentLineId: createdLine.id,
+  //                 inventoryBinItemId: null,
+  //                 serialNumber: item.serialNumber,
+  //                 action: InventorySerialAdjustmentAction.REMOVE,
+  //                 fromInventoryBinId: item.inventoryBinId,
+  //                 toInventoryBinId: null,
+  //               });
+  //             });
+
+  //             await tx.inventoryBinItem.deleteMany({
+  //               where: { id: { in: serialsToDelete.map((s) => s.id) } },
+  //             });
+  //           }
+  //         }
+  //       }
+
+  //       if (ledgerEntriesToCreate.length > 0) {
+  //         await tx.inventoryLedger.createMany({ data: ledgerEntriesToCreate });
+  //       }
+  //       if (serialAuditsToCreate.length > 0) {
+  //         await tx.inventoryAdjustmentSerial.createMany({ data: serialAuditsToCreate });
+  //       }
+
+  //       return {
+  //         adjustment,
+  //         createdAdjustmentLines,
+  //       };
+  //     },
+  //     { timeout: 15000 }
+  //   );
+
+  //   if (this.queueProvider) {
+  //     await this.dispatchBackgroundSync(result, payload);
+  //   }
+
+  //   return result;
+  // }
 
   private async dispatchBackgroundSync(
     result: ProcessedAdjustmentResult,

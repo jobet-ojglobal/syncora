@@ -84,6 +84,10 @@ export class ProductGroupSyncService {
 
               // 3. Process children matrix nodes
               for (const variant of group.productVariants ?? []) {
+                if(!variant.product.isActive) {
+                  console.log(`...Skipping inactive product: ${variant.product.name}`);
+                } 
+                
                 if (variant.product) {
                   await syncProduct(
                     tx,

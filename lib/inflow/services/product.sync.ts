@@ -56,11 +56,15 @@ export async function syncProduct(
   const verifiedOperationTypes = caches?.verifiedOperationTypes ?? new Set<string>();
   const verifiedPricingSchemeIds = caches?.verifiedPricingSchemeIds ?? new Set<string>();
   const verifiedProductIds = caches?.verifiedProductIds ?? new Set<string>();
-
-  console.log(`...Syncing product: ${product.name}`);
-  
+    
   const rawFeaturesString = firstProductInGroup?.customFields?.custom2 || product.customFields?.custom2;
   const rawTagsString = firstProductInGroup?.customFields?.custom3  || product.customFields?.custom3;
+  
+  if(!product.isActive) {
+    console.log(`...Skipping inactive product: ${product.name}`);
+  }
+
+  console.log(`...Syncing product: ${product.name}`);
 
   const localProduct = await tx.product.findUnique({
     where: { inflowId: product.productId }

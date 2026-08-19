@@ -10,3 +10,10 @@ export const toDecimal = (value: string | number | null | undefined): Prisma.Dec
   if (value === null || value === undefined || value === "") return null;
   return new Prisma.Decimal(value);
 };
+
+export function parseBooleanFlag(value: unknown): boolean {
+  if (typeof value === "boolean") return value;
+  if (typeof value === "number") return value === 1;
+  if (typeof value === "string") return value === "1" || value.toLowerCase() === "true";
+  return false;
+}
