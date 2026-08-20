@@ -12,16 +12,28 @@ export async function GET(
   { params }: Props
 ) {
   try {
-    const { id } =
-      await params;
+    const { id: locationId } = await params;
 
-    if (!id) {
-      return NextResponse.json({ sublocations: [] });
+    if (!locationId) {
+      return NextResponse.json({ error: "Location ID is required" }, { status: 400 });
     }
+
+    // 1. Resolve location to get inflowId
+    const location = await prisma.location.findFirst({
+      where: {
+        OR: [{ id: locationId }, { inflowId: locationId }],
+      },
+      select: { inflowId: true },
+    });
+
+    if (!location) {
+      return NextResponse.json({ error: "Location not found" }, { status: 404 });
+    }
+
 
     const sublocations = await prisma.sublocation.findMany({
       where: {
-        locationId: id,
+        locationId: location.inflowId,
         location: {
           isActive: true,
           deletedAt: null
@@ -31,6 +43,7 @@ export async function GET(
         id: true,
         name: true,
         locationId: true,
+        linkedLocationId: true,
       },
       orderBy: { name: "asc" },
     });

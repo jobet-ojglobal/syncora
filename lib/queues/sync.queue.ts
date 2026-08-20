@@ -2,6 +2,15 @@
 import { Queue } from "bullmq";
 import { connection } from "@/lib/redis";
 
+let syncLocalQueue: Queue | null = null;
+
+export const getLocalSyncQueue = () => {
+  if (!syncLocalQueue) {
+    syncLocalQueue = new Queue("local_sync", { connection });
+  }
+  return syncLocalQueue;
+};
+
 let syncQueue: Queue | null = null;
 
 export const getSyncQueue = () => {

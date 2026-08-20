@@ -482,7 +482,7 @@ export class ProductSyncMapService {
               );
             }
 
-            if (!match?.inflowId) {
+            if (!match?.inflowId || !location.inflowId) {
               syncResults.push({
                 productLocalId: String(product.productId),
                 status: "skipped_not_found",

@@ -1,8 +1,9 @@
 "use client";
 
-import { useState } from "react";
+
 import Link from "next/link";
 import { useParams } from "next/navigation";
+<<<<<<< HEAD
 import useSWR from "swr";
 <<<<<<< HEAD
 import { Warehouse, RefreshCw, CloudSync, Loader2 } from "lucide-react";
@@ -23,6 +24,9 @@ import { toast } from "sonner";
 import { CloudSyncButton } from "@/components/integration/cloud-sync-button";
 >>>>>>> f774fa4d46540598445552ff7ba82d06bcdf5aad
 =======
+=======
+import useSWR, { useSWRConfig } from "swr";
+>>>>>>> c66250bba3194c91f5b84633a80c8f9687f3d979
 import { Warehouse, RefreshCw } from "lucide-react";
 >>>>>>> 496b01c6048d1dc95608ee6ccc0a0cb9d255882c
 
@@ -39,6 +43,7 @@ import { EmptyLocationButton } from "@/components/location/empty-location-invent
 const fetcher = (url: string) => fetch(url).then((res) => res.json());
 
 export default function LocationInventoryPage() {
+  const { mutate: globalMutate } = useSWRConfig();
   const { id: locationId } = useParams() as { id: string };
 
 <<<<<<< HEAD
@@ -67,6 +72,13 @@ export default function LocationInventoryPage() {
 
   const refreshAllData = async () => {
     await mutateLocation();
+
+    // Revalidate all inventory queries matching this locationId
+    await globalMutate(
+      (key) => typeof key === "string" && key.startsWith(`/api/admin/locations/${locationId}/inventory`),
+      undefined,
+      { revalidate: true }
+    );
   };
 
 <<<<<<< HEAD
@@ -163,9 +175,10 @@ export default function LocationInventoryPage() {
         <div className="flex items-center gap-2">
 
           <EmptyLocationButton 
-             locationId={location?.inflowId || ""}
-             locationName={location?.name || ""}
-            />
+            locationId={location?.inflowId || ""}
+            locationName={location?.name || ""}
+            onSuccess={refreshAllData}
+          />
 
           <CloudSyncSublocationButton
             source={sourceName}

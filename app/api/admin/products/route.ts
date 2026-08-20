@@ -729,6 +729,7 @@ export async function POST(request: NextRequest) {
               model: "Product",
               payload: {
                 ...cleanInflowPayload,
+                lastModifiedById: 100,
                 productId: cloudId,
                 localId: null, 
 
@@ -1605,6 +1606,7 @@ export async function PATCH(request: NextRequest) {
               model: "Product",
               payload: {
                 ...cleanInflowPayload,
+                lastModifiedById: 100,
                 productId: cloudId,
                 localId: match?.localId || null, 
 

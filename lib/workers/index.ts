@@ -12,6 +12,7 @@ if (isServer && !isBuilding && !globalForWorkers.workersStarted) {
 
   console.log(`🚀 Starting workers in ${process.env.NODE_ENV || 'development'} mode...`);
 
+  import("./local-sync.worker").catch((err) => console.error("Local Sync worker failed:", err));
   import("./sync.worker").catch((err) => console.error("Sync worker failed:", err));
   import("./location.worker").catch((err) => console.error("Location worker failed:", err));
   import("./mid.worker").catch((err) => console.error("Mid worker failed:", err));

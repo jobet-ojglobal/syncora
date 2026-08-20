@@ -18,30 +18,63 @@ export function EmptyLocationButton({
   const [isOpen, setIsOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [progressMessage, setProgressMessage] = useState("");
 
   const handleEmptyInventory = async () => {
     setIsLoading(true);
     setError(null);
+    setProgressMessage("Starting cleanup...");
 
     try {
-      const response = await fetch(`/api/admin/locations/${locationId}/inventory/empty`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-      });
+      const response = await fetch(
+        `/api/admin/locations/${locationId}/inventory/empty`,
+        { method: "POST" }
+      );
 
-      if (!response.ok) {
-        const data = await response.json();
-        throw new Error(data.error || "Failed to empty inventory.");
+      if (!response.ok || !response.body) {
+        throw new Error("Failed to initiate batch cleanup process.");
       }
 
-      setIsOpen(false);
-      if (onSuccess) {
-        onSuccess();
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n\n");
+        buffer = lines.pop() || ""; // Keep tail incomplete fragment
+
+        for (const line of lines) {
+          if (!line.startsWith("data: ")) continue;
+          const payload = JSON.parse(line.replace("data: ", ""));
+
+          if (payload.type === "progress") {
+            setProgressMessage(
+              `Deleted batch of ${payload.batchCount} ${payload.phase} (Total: ${payload.totalDeleted})`
+            );
+            
+            // Trigger frontend page revalidation on every batch completion
+            if (onSuccess) onSuccess();
+          }
+
+          if (payload.type === "complete") {
+            if (onSuccess) onSuccess();
+            setIsOpen(false);
+          }
+
+          if (payload.type === "error") {
+            throw new Error(payload.error);
+          }
+        }
       }
     } catch (err: any) {
       setError(err.message || "Something went wrong.");
     } finally {
       setIsLoading(false);
+      setProgressMessage("");
     }
   };
 
@@ -76,6 +109,10 @@ export function EmptyLocationButton({
                 Are you sure you want to delete all stock records, bins, and serial items for{" "}
                 <span className="font-semibold text-gray-900">{locationName}</span>?
                 This action is destructive and cannot be undone.
+              </p>
+
+              <p className="text-sm text-gray-600 leading-relaxed my-4">
+                {progressMessage}
               </p>
 
               {error && (

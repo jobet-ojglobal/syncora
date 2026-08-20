@@ -16,6 +16,7 @@ import { SyncButtonPreviewOptions } from "./sync-button-preview-paginated";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../ui/select";
 import { FilterX, RefreshCw } from "lucide-react";
 import { DataTablePagination } from "../shared/data-table-pagination";
+import { SyncButtonOptionsPreview } from "./sync-preview-button";
 
 interface LocationWebhookWorkspaceProps {
   selectedLocationInflowId: string;
@@ -321,10 +322,20 @@ export const LocationWebhookWorkspace = ({ selectedLocationInflowId }: LocationW
                 <SyncButtonPreviewOptions source="taxing_schemes_local" title="Taxing Schemes" locationId={selectedLocationInflowId} isDisabled={!webhook} />
                 <SyncButtonPreviewOptions source="pricing_schemes_local" title="Pricing Schemes" locationId={selectedLocationInflowId} isDisabled={!webhook} />
                 <SyncButtonPreviewOptions source="products_local" title="Products" locationId={selectedLocationInflowId} isDisabled={!webhook} />
-                <SyncButtonPreviewOptions source="inventory_lines_local" title="Inventory Lines" locationId={selectedLocationInflowId} isDisabled={!webhook} />
+                {/* <SyncButtonPreviewOptions source="inventory_lines_local" title="Inventory Lines" locationId={selectedLocationInflowId} isDisabled={!webhook} /> */}
                 <SyncButtonPreviewOptions source="payment_terms_local" title="Payment Terms" locationId={selectedLocationInflowId} isDisabled={!webhook} />
                 <SyncButtonPreviewOptions source="customers_local" title="Customers" locationId={selectedLocationInflowId} isDisabled={!webhook} />
                 <SyncButtonPreviewOptions source="locations_local" title="Locations" locationId={selectedLocationInflowId} isDisabled={!webhook} />
+              </CardContent>
+            </Card>
+
+            <Card className="md:col-span-1">
+              <CardHeader>
+                <CardTitle>Batch Diagnostics</CardTitle>
+                <CardDescription>Force historical inventory execution sweeps manually.</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4 pt-0 max-h-[300px] overflow-y-auto">
+                <SyncButtonOptionsPreview locationId={selectedLocationInflowId} source="inventory_lines_local" title="Local Inventory Lines" />
               </CardContent>
             </Card>
           </div>

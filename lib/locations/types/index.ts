@@ -113,7 +113,7 @@ export interface LocalProductSerial {
 export interface LocalProductInventory {
   productId: string;
   name: string;
-  inventoryLines?: LocalInventoryLine[];
+  inventoryLines: LocalInventoryLine[];
 }
 
 export interface LocalInventoryLine {
