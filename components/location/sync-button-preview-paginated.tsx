@@ -225,7 +225,7 @@ export function SyncButtonPreviewOptions({
 
       const recordsToSync = previewItems.filter((item) => selectedItemIds.includes(item.id));
 
-      const res = await fetch("/api/sync", {
+      const res = await fetch("/api/sync/local", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

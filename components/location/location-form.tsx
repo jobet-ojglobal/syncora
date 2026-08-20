@@ -111,13 +111,15 @@ export function LocationForm({ initialData, onSuccess }: LocationFormProps) {
         throw new Error(data.error || "Failed to commit inventory location.");
       }
 
+      const data = await response.json();
+
       toast.success(isEditMode ? "Location Profile Updated" : "Location Successfully Created", {
         description: `Committed logistics mapping for "${values.name}".`,
       });
 
       onSuccess?.();
 
-      router.push("/dashboard/locations");
+      router.push(`/dashboard/locations/${data.id}`);
       router.refresh();
     } catch (err: any) {
       toast.error("Execution Error", { description: err.message });

@@ -110,7 +110,7 @@ export async function adjustStockAction(input: AdjustmentInput) {
               quantityBefore: currentOnHand,
               quantityAdjusted: deltaQuantity,
               quantityAfter: newOnHand,
-              remarks,
+              description: remarks,
             },
           },
         },

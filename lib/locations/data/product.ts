@@ -1,3 +1,4 @@
+import { LocationClient } from "../location-client.limit";
 import { BranchClient } from "../location.client";
 
 export interface InflowProduct {
@@ -320,7 +321,7 @@ export async function upsertProduct(
   payload: InflowProduct,
   url: string
 ) {
-  const apiClient = new BranchClient(url)
+  const apiClient = new LocationClient(url)
   return await apiClient.post<UpsertResult>(
     `/inbound/receive`, {
         "eventType": "productLocal",
@@ -337,7 +338,7 @@ export async function upsertProductImage(
   payload: InflowProduct,
   url: string
 ) {
-  const apiClient = new BranchClient(url)
+  const apiClient = new LocationClient(url)
   return await apiClient.post<UpsertResult>(
     `/inbound/receive`, {
         "eventType": "imageLocal",

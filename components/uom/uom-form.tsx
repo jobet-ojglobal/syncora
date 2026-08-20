@@ -89,7 +89,7 @@ export function UomForm({ uomListLookup, initialData }: UomFormProps) {
 
           <Field className="md:col-span-3">
             <FieldLabel>Unique Symbol Token Code *</FieldLabel>
-            <Input placeholder="e.g., LBS, LTR, PLT" {...register("code")} disabled={isEditMode} className="uppercase font-mono text-xs" />
+            <Input placeholder="e.g., LBS, LTR, PLT" {...register("code")} disabled={isEditMode} className=" font-mono text-xs" />
             {errors.code && <span className="text-xs text-destructive">{errors.code.message}</span>}
           </Field>
 

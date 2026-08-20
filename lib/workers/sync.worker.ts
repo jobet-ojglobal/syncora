@@ -31,7 +31,6 @@ import { TaxingSchemeSyncMapService as LocalTaxingSchemeSyncMapService } from ".
 import { CustomerSyncMapService as LocalCustomerSyncMapService } from "../locations/services/customer-sync-map.service";
 import { ProductSyncMapService as LocalProductSyncMapService } from "../locations/services/batch-product-sync-map";
 import { SublocationSyncMapService as LocalSublocationSyncMapService } from "../locations/services/sublocation-sync-map.service";
-import { inventoryLocalSyncService } from "../locations/services/batch-inventory-sync-adjustment.service";
 
 // OUT SYNC
 import { inventoryCloudSyncService } from "../inflow/services/out-sync-location-inventory";
@@ -253,12 +252,12 @@ const worker = new Worker<SyncWebhookJobData>(
           }
           result = await productServiceLocal.sync(location, syncOptions, selectedRecords, syncedAll, "custom7");
           break;
-        case "inventory_lines_local":
-          if (!locationUrl) {
-            throw new Error(`Cannot sync inventory: No location URL found for location ${location?.name}`);
-          }
-          result = await inventoryLocalSyncService.sync(location, syncOptions, selectedRecords, syncedAll, after);
-          break;
+        // case "inventory_lines_local":
+        //   if (!locationUrl) {
+        //     throw new Error(`Cannot sync inventory: No location URL found for location ${location?.name}`);
+        //   }
+        //   result = await inventoryLocalSyncService.sync(location, syncOptions, selectedRecords, syncedAll, after);
+        //   break;
 
         // Cloud Sync
         case "categories":

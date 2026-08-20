@@ -94,7 +94,7 @@ export const columns: ColumnDef<TrashItem>[] = [
           </Button>
 
           {/* Purge / Delete Confirmation Dialog */}
-          { item.modelType !== "Location" && (
+          {/* { item.modelType !== "LOC" && ( */}
             <AlertDialog>
               <AlertDialogTrigger asChild>
                 <Button 
@@ -138,7 +138,7 @@ export const columns: ColumnDef<TrashItem>[] = [
                 </AlertDialogFooter>
               </AlertDialogContent>
             </AlertDialog>
-          )}
+          {/* )} */}
         </div>
       )
     }
