@@ -38,6 +38,7 @@ import { inventoryStockLocationSyncService } from "../inflow/services/adjust-loc
 
 import { ProductOutSyncService } from "../inflow/services/out-sync-product";
 import { productInventoryOutSyncService } from "../inflow/services/out-sync-product-inventory";
+import { cloudInventorySyncService } from "../inflow/services/batch-inventory-sync.service";
 
 const testService = new TestSyncService();
 const categoryService = new CategorySyncService();
@@ -279,7 +280,7 @@ const worker = new Worker<SyncWebhookJobData>(
           result = await vendorService.sync(syncOptions, includes);
           break;          
         case "inventory":
-          result = await inventoryService.sync(syncOptions, includes);
+          result = await cloudInventorySyncService.batchSync(syncOptions, after, [], includes, syncedAll);
           break;
         case "single_inventory":
           console.log("worker ", selectedRecords[0], includes)

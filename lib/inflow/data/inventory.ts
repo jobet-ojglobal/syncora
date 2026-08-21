@@ -5,8 +5,6 @@ import { inflow as inflowLimit } from "@/lib/inflow/inflow.client.limit";
 export async function getInventoryLevels(
   count = 100,
   after?: string,
-  retries: number =  5,
-  delayMs: number = 1000
 ) {
   const params = new URLSearchParams({
     count: String(count),
@@ -17,17 +15,15 @@ export async function getInventoryLevels(
     params.append("after", after);
   }
 
- return await inflow.get<InflowProduct[]>(
-    `/products?${params.toString()}`,
-    retries,
-    delayMs
+ return await inflowLimit.get<InflowProduct[]>(
+    `/products?${params.toString()}`
   );
 }
 
 export async function getInventoryByProduct(
   productId: string
 ) {
-  const data = await inflow.get<InflowProduct>(
+  const data = await inflowLimit.get<InflowProduct>(
     `/products/${productId}?include=inventoryLines.location`
   );
   return data;

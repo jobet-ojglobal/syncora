@@ -213,7 +213,7 @@ export async function syncInventoryLines(
             quantityBefore: binQtyBefore,
             quantityChange: binQtyChange,
             quantityAfter: totalQty,
-            remarks: "System Inbound Inventory Sync",
+            remarks: "System Inbound Cloud Inventory Sync",
           });
         }
       })

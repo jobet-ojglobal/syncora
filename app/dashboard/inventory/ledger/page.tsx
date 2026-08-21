@@ -84,7 +84,7 @@ export default function MasterLedgerPage() {
   const [referenceType, setReferenceType] = useState<string>("ALL");
 
   const [pageIndex, setPageIndex] = useState(0);
-  const PAGE_SIZE = 10;
+  const PAGE_SIZE = 500;
 
   // 2. Sync typing input to debounced state with a 300ms delay
   useEffect(() => {

@@ -2,7 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { getLocalBatchProducts } from "../data/product-local";
 import crypto from "crypto";
 import { LocalProduct } from "../types";
-import { InflowCustomFields, InflowInventoryLine, InflowProduct } from "@/lib/inflow/types";
+import { InflowCustomFields, InflowProduct } from "@/lib/inflow/types";
 import { localProductItemType } from "@/helpers/product.helper";
 import { syncProduct } from "./product-sync";
 import { Prisma } from "@/generated/prisma/client";
@@ -16,20 +16,6 @@ function parseBooleanFlag(value: unknown): boolean {
   if (typeof value === "number") return value === 1;
   if (typeof value === "string") return value === "1" || value.toLowerCase() === "true";
   return false;
-}
-
-/**
- * Helper to generate URL-safe product slugs
- */
-function generateSlug(name: string, fallbackId: string): string {
-  const baseSlug = name
-    .toLowerCase()
-    .trim()
-    .replace(/[^\w\s-]/g, "")
-    .replace(/[\s_-]+/g, "-")
-    .replace(/^-+|-+$/g, "");
-
-  return baseSlug || `product-${fallbackId}`;
 }
 
 type SyncOptions = {
@@ -186,6 +172,11 @@ export class ProductSyncMapService {
         ? new Set(selectedRecords.map((item) => String(item.id ?? item.productId)))
         : null;
 
+    const defaultCategory = await prisma.category.findFirst({
+          where: { isDefault: true },
+          select: { inflowId: true, name: true, isDefault: true },
+        });
+
     const syncResults: Array<{
       productLocalId: string;
       productInflowId?: string;
@@ -254,166 +245,10 @@ export class ProductSyncMapService {
               continue;
             }
 
-            // 1. Check existing match by name
-            let match = await tx.product.findFirst({
+            const match = await tx.product.findFirst({
               where: { name: trimmedName },
               select: { inflowId: true, isLocalSynced: true },
             });
-
-            // 2. If no match exists, prepare payload & invoke syncProduct
-            if (!match) {
-              const generatedInflowId = crypto.randomUUID().toLowerCase();
-              const currentTimestamp = new Date().toISOString();
-              const modifiedById = "56bfcf3b-3e98-4098-ae8f-2adcb657cb57";
-
-              // const taxingSchemeLocalId = Number(product.taxingSchemeId);
-              const categoryLocalId = Number(product.categoryId);
-
-              const [category] = await Promise.all([
-                !isNaN(categoryLocalId) && product.categoryId != null
-                  ? tx.categoryLocationMap.findFirst({
-                      where: {
-                        locationId: location.inflowId,
-                        localId: categoryLocalId,
-                      },
-                      select: { categoryId: true },
-                    })
-                  : null,
-              ]);
-
-              // 1. Build Custom Fields (Brand dynamics)
-              
-              let setCategoryId: string | null = category?.categoryId || null;
-
-              if (!product.categoryId) {
-                const defaultCategory = await prisma.category.findFirst({
-                  where: { isDefault: true },
-                });
-                setCategoryId = defaultCategory?.inflowId || null;
-              }
-
-              const brandName = product.customFields?.custom7 || "";
-              const skuGenerated = generateSku2Variant2(brandName, trimmedName, []);
-
-              const payload: InflowProduct & { slug?: string } = {
-                productId: generatedInflowId,
-                sku: skuGenerated,
-                name: trimmedName,
-                description: product.description ?? null,
-                itemType: localProductItemType(product.itemType),
-                autoAssemble: parseBooleanFlag(product.autoAssemble),
-                isActive: parseBooleanFlag(product.isActive),
-                isManufacturable: parseBooleanFlag(product.isManufacturable),
-                includeQuantityBuildable: parseBooleanFlag(product.includeQuantityBuildable),
-                standardUomName: product.standardUomName || null,
-
-                trackExpiry: parseBooleanFlag(product.trackExpiry),
-                trackLots: parseBooleanFlag(product.trackLots),
-                trackSerials: parseBooleanFlag(product.trackSerials),
-
-                shelfLifeDays: product.shelfLifeDays ?? null,
-                sellBeforeExpiryDays: product.sellBeforeExpiryDays ?? null,
-                expiryNotificationDays: product.expiryNotificationDays ?? null,
-
-                weight: product.weight != null ? String(product.weight) : null,
-                width: product.width != null ? String(product.width) : null,
-                height: product.height != null ? String(product.height) : null,
-                length: product.length != null ? String(product.length) : null,
-
-                originCountry: product.originCountry || null,
-                hsTariffNumber: product.hsTariffNumber || null,
-                remarks: product.remarks || null,
-                categoryId: setCategoryId,
-                lastVendorId: null,
-                lastModifiedById: modifiedById,
-                createdDttm: currentTimestamp,
-                lastModifiedDateTime: product.lastModifiedDateTime || currentTimestamp,
-                timestamp: currentTimestamp,
-
-                purchasingUom: product.purchasingUom
-                  ? {
-                      name: product.purchasingUom.poUomName || "",
-                      conversionRatio: {
-                        standardQuantity: product.purchasingUom.poUomRatioStd || "1.0000",
-                        uomQuantity: product.purchasingUom.poUomRatio || "1.0000",
-                      },
-                    }
-                  : null,
-
-                salesUom: product.salesUom
-                  ? {
-                      name: product.salesUom.soUomName || "",
-                      conversionRatio: {
-                        standardQuantity: product.salesUom.soUomRatioStd || "1.0000",
-                        uomQuantity: product.salesUom.soUomRatio || "1.0000",
-                      },
-                    }
-                  : null,
-
-                customFields: {
-                  custom1: product.customFields?.custom1 || undefined,
-                  custom2: product.customFields?.custom2 || undefined,
-                  custom3: product.customFields?.custom3 || undefined,
-                  custom4: product.customFields?.custom4 || undefined,
-                  custom5: product.customFields?.custom5 || undefined,
-                  custom6: product.customFields?.custom6 || undefined,
-                  custom7: product.customFields?.custom7 || undefined,
-                  custom8: product.customFields?.custom8 || undefined,
-                  custom9: product.customFields?.custom9 || undefined,
-                  custom10: product.customFields?.custom10 || undefined,
-                },
-
-                productBarcodes: product.barcode?.trim()
-                  ? [
-                      {
-                        productBarcodeId: crypto.randomUUID().toLowerCase(),
-                        barcode: product.barcode.trim(),
-                        lineNum: 1,
-                        productId: generatedInflowId,
-                        timestamp: currentTimestamp,
-                      },
-                    ]
-                  : [],
-
-                prices: product.prices
-                  ? product.prices.map((p) => ({
-                      productPriceId: crypto.randomUUID().toLowerCase(),
-                      productId: generatedInflowId,
-                      pricingSchemeId: String(p.pricingSchemeId),
-                      priceType: p.priceType || "FixedPrice",
-                      fixedMarkup: p.fixedMarkup != null ? String(p.fixedMarkup) : null,
-                      unitPrice: String(p.unitPrice ?? 0),
-                      timestamp: currentTimestamp,
-                    }))
-                  : [],
-
-                images: [],
-                inventoryLines: [],
-                productVariant: undefined as any,
-                itemBoms: product.itemBoms || [],
-                attachments: product.attachments || [],
-                taxCodes: [],
-                reorderSettings: [],
-                productOperations: [],
-                cost: product.cost
-                  ? {
-                      productCostId: crypto.randomUUID().toLowerCase(),
-                      productId: generatedInflowId,
-                      cost: String(product.cost),
-                    }
-                  : undefined,
-              };
-
-              match = await syncProduct(
-                tx,
-                payload,
-                undefined,
-                undefined,
-                true,
-                brandCustomName,
-                caches
-              );
-            }
 
             if (!match?.inflowId || !location.inflowId) {
               syncResults.push({
@@ -422,8 +257,6 @@ export class ProductSyncMapService {
               });
               continue;
             }
-
-            
 
             // 3. Bridge mapping record
             const localIdNum = Number(product.productId);
@@ -445,13 +278,6 @@ export class ProductSyncMapService {
                   localId: !isNaN(localIdNum) ? localIdNum : 0,
                 },
                 select: { localId: true },
-              });
-            }
-
-            if(!match.isLocalSynced) {
-              await prisma.product.update({
-                where: { inflowId: match.inflowId },
-                data: { isLocalSynced: true }
               });
             }
 

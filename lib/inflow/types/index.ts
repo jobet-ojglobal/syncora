@@ -290,7 +290,7 @@ export interface InflowInventoryLine {
   locationId: string;
   productId: string;
   quantityOnHand: string;
-  serial: string;
+  serial: string; // 1 serial === 1 inventory line
   sublocation: string; // ex. "Rack A" or "" if floor stock
   timestamp?: string;
   location?: InflowLocation;

@@ -57,7 +57,7 @@ export function EmptyLocationButton({
             );
             
             // Trigger frontend page revalidation on every batch completion
-            if (onSuccess) onSuccess();
+            // if (onSuccess) onSuccess();
           }
 
           if (payload.type === "complete") {

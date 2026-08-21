@@ -111,7 +111,7 @@ export async function getProductVariantGroup(productId: string) {
 
 export async function getProduct(productId: string) {
   return inflow.get<InflowProduct>(
-    `/products/${productId}?include=images,productBarcodes,taxCodes,reorderSettings,productOperations,prices,cost,itemBoms,attachments,productVariant.productGroup.category,productVariant.productGroup.options.optionValues,productVariant.productGroup.images.image,lastVendor`
+    `/products/${productId}?include=images,productBarcodes,taxCodes,reorderSettings,productOperations,prices,cost,itemBoms,attachments,productVariant.productGroup.category,productVariant.productGroup.options.optionValues,productVariant.productGroup.images.image,lastVendor,inventoryLines.location`
   );
 }
 

@@ -39,6 +39,7 @@ export async function POST(request: NextRequest) {
 
     // 2. Delegate data operations based on event type classifications
     switch (eventType) {
+      case "product.updated":
       case "ProductCreatedV1":
       case "ProductUpdatedV2": {
         const inflowId = payload.id || payload.productId;
@@ -64,6 +65,7 @@ export async function POST(request: NextRequest) {
         break;
       }
 
+      case "customer.updated":
       case "CustomerCreatedV1":
       case "CustomerUpdatedV1": {
         const inflowId = payload.id || payload.customerId;
@@ -89,6 +91,7 @@ export async function POST(request: NextRequest) {
         break;
       }
 
+      case "vendor.updated":
       case "VendorCreatedV1":
       case "VendorUpdatedV2": {
         const inflowId = payload.id || payload.vendorId;
@@ -114,6 +117,7 @@ export async function POST(request: NextRequest) {
         break;
       }
 
+      case "salesOrder.updated":
       case "SalesOrderCreatedV1":
       case "SalesOrderUpdatedV1":
       case "SalesOrderUpdatedV2": {
@@ -127,6 +131,35 @@ export async function POST(request: NextRequest) {
             {
               source: "inflow_sales_order",
               action: eventType === "SalesOrderCreatedV1" ? "create" : "update",
+              dataId: orderId,
+              loggedEventId: loggedEvent.id,
+            },
+            {
+              attempts: 3,
+              backoff: {
+                type: "exponential",
+                delay: 2000, // Wait 2s, then 4s, then 8s on failure
+              },
+            }
+          );
+        }
+        break;
+      }
+
+      case "purchaseOrder.updated":
+      case "purchaseOrderCreatedV1":
+      case "purchaseOrderUpdatedV1":
+      case "purchaseOrderUpdatedV2": {
+        const orderId =  payload.id || payload.salesOrderId;
+
+        if (orderId) {
+          // Offload the sync processing to the dedicated background worker queue
+          console.log(`api partner_sync_job ${eventType}`)
+          await getCloudSyncQueue().add(
+            "partner_sync_job",
+            {
+              source: "inflow_purchase_order",
+              action: eventType === "PurchaseOrderCreatedV1" ? "create" : "update",
               dataId: orderId,
               loggedEventId: loggedEvent.id,
             },

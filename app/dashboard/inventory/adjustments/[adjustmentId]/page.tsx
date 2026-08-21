@@ -22,7 +22,6 @@ import {
   Building2,
   AlertCircle,
   Hash,
-  CheckCircle2,
   PlusCircle,
   MinusCircle,
   ArrowRight,
@@ -40,6 +39,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { CancelAdjustmentButton } from "@/components/inventory/cancel-stock-adjustment-button";
+import { renderStatusBadge } from "@/helpers/badge";
 
 const fetcher = (url: string) =>
   fetch(url).then((res) => {
@@ -73,7 +74,7 @@ export default function InventoryAdjustmentDetailsPage({
 
   const [selectedSerialsLine, setSelectedSerialsLine] = useState<any | null>(null);
 
-  const { data: payload, error, isLoading } = useSWR(
+  const { data: payload, mutate, error, isLoading } = useSWR(
     `/api/admin/inventory/adjustments/${adjustmentId}`,
     fetcher
   );
@@ -127,34 +128,6 @@ export default function InventoryAdjustmentDetailsPage({
     return acc + (line.serials?.length || 0);
   }, 0);
 
-  const renderStatusBadge = (status: string) => {
-    switch (status) {
-      case "POSTED":
-        return (
-          <Badge variant="outline" className="text-[10px] font-bold uppercase tracking-wider bg-emerald-500/10 text-emerald-600 border-emerald-500/30 px-2.5 py-1">
-            <CheckCircle2 className="w-3 h-3 mr-1 text-emerald-500" />
-            Approved / Posted
-          </Badge>
-        );
-      case "DRAFT":
-        return (
-          <Badge variant="outline" className="text-[10px] font-bold uppercase tracking-wider bg-amber-500/10 text-amber-600 border-amber-500/30 px-2.5 py-1">
-            <Clock className="w-3 h-3 mr-1 text-amber-500" />
-            Draft Mode
-          </Badge>
-        );
-      case "VOIDED":
-        return (
-          <Badge variant="outline" className="text-[10px] font-bold uppercase tracking-wider bg-rose-500/10 text-rose-600 border-rose-500/30 px-2.5 py-1">
-            <AlertCircle className="w-3 h-3 mr-1 text-rose-500" />
-            Cancelled
-          </Badge>
-        );
-      default:
-        return <Badge variant="outline">{status}</Badge>;
-    }
-  };
-
   const getActionBadge = (action?: string) => {
     switch (action) {
       case "ADD":
@@ -199,6 +172,18 @@ export default function InventoryAdjustmentDetailsPage({
         </div>
 
         <div className="flex items-center gap-2 pl-11 sm:pl-0 print:hidden">
+          {
+            adjustment.adjustmentNumber &&
+            !adjustment.adjustmentNumber.toUpperCase().includes("REV") && (
+              <CancelAdjustmentButton 
+                adjustmentId={adjustmentId}
+                adjustmentNumber={adjustment.adjustmentNumber}
+                status={adjustment.status}
+                currentUserId={"56bfcf3b-3e98-4098-ae8f-2adcb657cb57"}
+                onSuccess={()=> mutate() }
+              />
+            )
+          }
           <Button
             variant="outline"
             size="sm"

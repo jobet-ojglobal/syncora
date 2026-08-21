@@ -42,13 +42,14 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import { renderStatusBadge } from "@/helpers/badge";
 
 export interface InventoryAdjustmentRow {
   id: string;
   referenceNo: string;
   reason: string;
-  status: "Draft" | "Approved" | "Cancelled";
-  rawStatus: "DRAFT" | "POSTED" | "VOIDED";
+  status: "Draft" | "Approved" | "Cancelled" | "Reverted";
+  rawStatus: "DRAFT" | "POSTED" | "VOIDED" | "REVERTED";
   adjustedBy: {
     name: string;
     email: string;
@@ -116,37 +117,37 @@ export default function InventoryAdjustmentsListPage() {
     setPageIndex(0);
   };
 
-  const renderStatusBadge = (status: InventoryAdjustmentRow["status"]) => {
-    switch (status) {
-      case "Approved":
-        return (
-          <Badge
-            variant="outline"
-            className="text-[9px] font-bold uppercase tracking-tight bg-emerald-500/10 text-emerald-600 border-emerald-500/20 dark:bg-emerald-950/40 dark:text-emerald-400"
-          >
-            Approved
-          </Badge>
-        );
-      case "Draft":
-        return (
-          <Badge
-            variant="outline"
-            className="text-[9px] font-bold uppercase tracking-tight bg-amber-500/10 text-amber-600 border-amber-500/20 dark:bg-amber-950/40 dark:text-amber-400"
-          >
-            Draft
-          </Badge>
-        );
-      case "Cancelled":
-        return (
-          <Badge
-            variant="outline"
-            className="text-[9px] font-bold uppercase tracking-tight bg-rose-500/10 text-rose-600 border-rose-500/20 dark:bg-rose-950/40 dark:text-rose-400"
-          >
-            Cancelled
-          </Badge>
-        );
-    }
-  };
+  // const renderStatusBadge = (status: InventoryAdjustmentRow["status"]) => {
+  //   switch (status) {
+  //     case "Approved":
+  //       return (
+  //         <Badge
+  //           variant="outline"
+  //           className="text-[9px] font-bold uppercase tracking-tight bg-emerald-500/10 text-emerald-600 border-emerald-500/20 dark:bg-emerald-950/40 dark:text-emerald-400"
+  //         >
+  //           Approved
+  //         </Badge>
+  //       );
+  //     case "Draft":
+  //       return (
+  //         <Badge
+  //           variant="outline"
+  //           className="text-[9px] font-bold uppercase tracking-tight bg-amber-500/10 text-amber-600 border-amber-500/20 dark:bg-amber-950/40 dark:text-amber-400"
+  //         >
+  //           Draft
+  //         </Badge>
+  //       );
+  //     case "Cancelled":
+  //       return (
+  //         <Badge
+  //           variant="outline"
+  //           className="text-[9px] font-bold uppercase tracking-tight bg-rose-500/10 text-rose-600 border-rose-500/20 dark:bg-rose-950/40 dark:text-rose-400"
+  //         >
+  //           Cancelled
+  //         </Badge>
+  //       );
+  //   }
+  // };
 
   if (error) {
     return (
@@ -280,7 +281,7 @@ export default function InventoryAdjustmentsListPage() {
 
                     {/* Status */}
                     <TableCell className="text-center">
-                      {renderStatusBadge(row.status)}
+                      {renderStatusBadge(row.rawStatus)}
                     </TableCell>
 
                     {/* Items Changed */}
