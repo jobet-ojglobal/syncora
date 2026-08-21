@@ -57,7 +57,6 @@ export class LocationClient {
           headers: {
             Authorization: `Bearer ${env.PARTNER_API_KEY}`,
             "Content-Type": "application/json",
-            Accept: "application/json;version=2026-07-10",
             ...options?.headers,
           },
           cache: "no-store",

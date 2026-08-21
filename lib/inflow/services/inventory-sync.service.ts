@@ -1,7 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { getInventoryLevels } from "../data/inventory";
 import { syncInventoryLines } from "./inventory-lines.sync";
-import { ensureProductShell } from "./ensure.service";
 import { syncSingleProductInventory } from "./inventory-single.sync";
 
 type SyncOptions = {
@@ -18,8 +17,7 @@ export class InventorySyncService {
   
   async sync(options?: SyncOptions, locationIds?: string[]) {
     const BATCH_SIZE = options?.batchSize ?? 100;
-    const INTER_BATCH_DELAY = options?.delayBetweenBatchesMs ?? 300;
-    const CLIENT_RETRIES = 1;
+    const INTER_BATCH_DELAY = options?.delayBetweenBatchesMs ?? 200;
 
     const caches = {
       verifiedLocationIds: new Set<string>(),
@@ -40,7 +38,7 @@ export class InventorySyncService {
       // 1. Check signal before starting remote fetch
       if (options?.checkSignal) await options.checkSignal();
 
-      const batch = await getInventoryLevels(BATCH_SIZE, after, CLIENT_RETRIES);
+      const batch = await getInventoryLevels(BATCH_SIZE, after);
       if (!batch || batch.length === 0) break;
 
       // 2. Check signal before starting long DB transaction

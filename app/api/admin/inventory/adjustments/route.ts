@@ -18,11 +18,12 @@ function formatReasonLabel(reason?: string | null): string {
   return map[reason] || reason;
 }
 
-function formatStatusLabel(status: string): "Draft" | "Approved" | "Cancelled" {
-  const map: Record<string, "Draft" | "Approved" | "Cancelled"> = {
+function formatStatusLabel(status: string): "Draft" | "Approved" | "Cancelled" | "Reverted" {
+  const map: Record<string, "Draft" | "Approved" | "Cancelled" | "Reverted"> = {
     DRAFT: "Draft",
     POSTED: "Approved",
     VOIDED: "Cancelled",
+    REVERTED: "Reverted",
   };
   return map[status] || "Draft";
 }

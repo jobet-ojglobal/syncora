@@ -164,6 +164,7 @@ export class InventorySyncService {
   }> {
     const batchStartTime = performance.now();
     const locationAdjustmentMap = new Map<string, SyncAdjustmentLine[]>();
+    const validationFailedProductIds = new Set<string>();
 
     // Phase A: Build Adjustment Inputs
     const results = await Promise.allSettled(
@@ -210,7 +211,6 @@ export class InventorySyncService {
           return null;
         }
 
-        const invLinesCount = product.inventoryLines?.length ?? 0;
         if (!product.inventoryLines || product.inventoryLines.length === 0) {
           console.warn(
             `[Sync Debug] Skipping product "${product.name}" (${product.productId}): No inventory lines available.`
@@ -260,12 +260,25 @@ export class InventorySyncService {
           }
 
           // 3. Resolve targetLocationId: Use linkedLocationId if available, else defaultLocationId
-          const targetLocationId =
-            sublocationMeta?.linkedLocationId ||
-            sublocationMeta?.locationId ||
-            defaultLocationId;
+          const targetLocationId = sublocationMeta?.linkedLocationId;
 
-          const activeSublocationId = sublocationMeta?.sublocationId ?? "";
+          if(!targetLocationId) continue;
+
+          const newOnHand = Number(inv.quantityOnHand);
+          const incomingSerials = inv.serials || [];
+          const isTrackSerials = productMeta.trackSerials;
+
+          // ----------------------------------------------------------------
+          // Validation: Verify Serial Count === StockOnHand Qty for Tracked Items
+          // ----------------------------------------------------------------
+          if (isTrackSerials && incomingSerials.length !== newOnHand) {
+            console.error(
+              `[Sync Validation Error] Mismatch for product "${product.name}" (${product.productId}) at sublocation ${rawLocalId}: ` +
+              `Serial count (${incomingSerials.length}) does not match stock on hand (${newOnHand}). Skipping adjustment.`
+            );
+            validationFailedProductIds.add(product.productId);
+            throw new Error(`Serial count mismatch (${incomingSerials.length} serials vs ${newOnHand} Qty) for product ${product.productId}`);
+          }
 
           // Fetch current database inventory for comparison
           const existingInv = await prisma.inventory.findFirst({
@@ -285,12 +298,8 @@ export class InventorySyncService {
           const currentOnHand = existingInv ? Number(existingInv.quantityOnHand) : 0;
           const currentReserved = existingInv ? Number(existingInv.quantityReserved) : 0;
 
-          const newOnHand = Number(inv.quantityOnHand);
           const quantityDelta = newOnHand - currentOnHand;
           const hasQtyChange = quantityDelta !== 0;
-
-          const incomingSerials = inv.serials || [];
-          const isTrackSerials = productMeta.trackSerials;
 
           // Extract existing serial numbers from local DB
           const existingTargetSerials = isTrackSerials && existingInv?.bins
@@ -321,16 +330,7 @@ export class InventorySyncService {
           }
           const adjustmentLines = locationAdjustmentMap.get(targetLocationId)!;
 
-          // Construct target sublocation bin entry
-          const targetBins = activeSublocationId
-            ? [
-                {
-                  sublocationId: activeSublocationId,
-                  quantity: newOnHand,
-                  serials: incomingSerials,
-                },
-              ]
-            : [];
+      
 
           if (isTrackSerials && (serialsChanged || isOpeningBalance)) {
             const serialsToPost = isOpeningBalance ? incomingSerials : addedSerials;
@@ -346,7 +346,7 @@ export class InventorySyncService {
                 quantityAvailable: availableQty,
                 serials: removedSerials,
                 description: `Removed ${removedSerials.length} serial(s) for ${product.name}`,
-                bins: targetBins,
+                bins: [],
               });
             }
 
@@ -363,7 +363,7 @@ export class InventorySyncService {
                 description: isOpeningBalance
                   ? `Opening balance for ${product.name}`
                   : `Added ${serialsToPost.length} serial(s) for ${product.name}`,
-                bins: targetBins,
+                bins: [],
               });
             }
           } else {
@@ -379,7 +379,7 @@ export class InventorySyncService {
               description: isOpeningBalance
                 ? `Opening balance for ${product.name}`
                 : `Inbound sync inventory adjustment for ${product.name}`,
-              bins: targetBins,
+              bins: [],
             });
           }
         }
@@ -404,32 +404,76 @@ export class InventorySyncService {
     // Phase B: Post Local Adjustments & Collect InFlow Payloads
     const inflowBulkPayloads: InflowStockAdjustInput[] = [];
 
+    // DO NOT DELETE
+    // for (const [targetLocationId, adjustmentLines] of locationAdjustmentMap) {
+    //   if (adjustmentLines.length === 0) continue;
+
+    //   console.log(
+    //     `[Sync Debug] Location ${targetLocationId} has ${adjustmentLines.length} line(s) to adjust:`,
+    //     JSON.stringify(adjustmentLines, null, 2)
+    //   );
+
+    //   const postPayload: PostAdjustmentPayload = {
+    //     locationId: targetLocationId,
+    //     reasonId: reasonId || undefined,
+    //     remarks: `Global Sync Batch #${batchNo + 1} Mid Inventory Adjustment`,
+    //     performedById: modifiedBy,
+    //     lines: adjustmentLines,
+    //   };
+
+    //   console.log(`[Sync Debug] Executing postAdjustment for target location: ${targetLocationId}...`);
+    //   const postResult = await this.adjustmentService.postAdjustment(postPayload, "SYNC-ADJ");
+
+    //   const inflowPayload = mapToInflowStockAdjustInput(postResult, postPayload);
+    //   inflowBulkPayloads.push(inflowPayload);
+
+    //   console.log(
+    //     `[Inventory Sync] Local adjustment created (${postResult.adjustment.inflowId}) for target location: ${targetLocationId}`
+    //   );
+    // }
+
+    const CHUNK_SIZE = 100;
+
     for (const [targetLocationId, adjustmentLines] of locationAdjustmentMap) {
       if (adjustmentLines.length === 0) continue;
 
-      console.log(
-        `[Sync Debug] Location ${targetLocationId} has ${adjustmentLines.length} line(s) to adjust:`,
-        JSON.stringify(adjustmentLines, null, 2)
-      );
+      // Split lines into chunks of max 100 items
+      for (let i = 0; i < adjustmentLines.length; i += CHUNK_SIZE) {
+        const chunkIndex = Math.floor(i / CHUNK_SIZE);
+        const lineChunk = adjustmentLines.slice(i, i + CHUNK_SIZE);
+        const isExcessChunk = chunkIndex > 0;
 
-      const postPayload: PostAdjustmentPayload = {
-        locationId: targetLocationId,
-        reasonId: reasonId || undefined,
-        remarks: `Global Sync Batch #${batchNo + 1} Mid Inventory Adjustment`,
-        performedById: modifiedBy,
-        lines: adjustmentLines,
-      };
+        console.log(
+          `[Sync Debug] Location ${targetLocationId} (Chunk ${chunkIndex + 1}) has ${lineChunk.length} line(s) to adjust:`,
+          JSON.stringify(lineChunk, null, 2)
+        );
 
-      console.log(`[Sync Debug] Executing postAdjustment for target location: ${targetLocationId}...`);
-      const postResult = await this.adjustmentService.postAdjustment(postPayload);
+        const postPayload: PostAdjustmentPayload = {
+          locationId: targetLocationId,
+          reasonId: reasonId || undefined,
+          remarks: `Global Sync Batch #${batchNo + 1} Mid Inventory Adjustment${isExcessChunk ? ` (Part ${chunkIndex + 1})` : ''}`,
+          performedById: modifiedBy,
+          lines: lineChunk,
+        };
 
-      const inflowPayload = mapToInflowStockAdjustInput(postResult, postPayload);
-      inflowBulkPayloads.push(inflowPayload);
+        console.log(`[Sync Debug] Executing postAdjustment for target location: ${targetLocationId} (Chunk ${chunkIndex + 1})...`);
+        const postResult = await this.adjustmentService.postAdjustment(postPayload, "SYNC-ADJ");
 
-      console.log(
-        `[Inventory Sync] Local adjustment created (${postResult.adjustment.inflowId}) for target location: ${targetLocationId}`
-      );
+        // If chunking exceeds 100 lines, transform adjustment number to ADJ-[chunkIndex+1]-[number] (e.g., ADJ-2-002382)
+        if (isExcessChunk && postResult.adjustment?.adjustmentNumber) {
+          const baseNum = postResult.adjustment.adjustmentNumber.replace(/^SYNC-ADJ-/, '');
+          postResult.adjustment.adjustmentNumber = `SYNC-ADJ-${chunkIndex + 1}-${baseNum}`;
+        }
+
+        const inflowPayload = mapToInflowStockAdjustInput(postResult, postPayload);
+        inflowBulkPayloads.push(inflowPayload);
+
+        console.log(
+          `[Inventory Sync] Local adjustment created (${postResult.adjustment.adjustmentNumber} | inflowId: ${postResult.adjustment.inflowId}) for target location: ${targetLocationId}`
+        );
+      }
     }
+
 
     const successfulIds: string[] = [];
 
@@ -594,6 +638,16 @@ export class InventorySyncService {
 export const inventoryLocalSyncService = new InventorySyncService();
 
 
+    // Construct target sublocation bin entry
+          // const targetBins = activeSublocationId
+          //   ? [
+          //       {
+          //         sublocationId: activeSublocationId,
+          //         quantity: newOnHand,
+          //         serials: incomingSerials,
+          //       },
+          //     ]
+          //   : [];
 
   // async sync(
   //   location: {

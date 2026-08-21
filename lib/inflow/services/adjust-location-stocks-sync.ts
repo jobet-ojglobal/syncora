@@ -329,6 +329,7 @@ export class InventoryLocationSyncService {
     return products;
   }
 
+  // Global Server sublocations clone inventory
   async processBatchBulk(
     products: LocalProductWithRelations[],
     checkSignal?: () => Promise<void>,

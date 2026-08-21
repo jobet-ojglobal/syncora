@@ -61,6 +61,7 @@ export interface PostAdjustmentPayload {
   remarks?: string;
   performedById: string;
   lines: SyncAdjustmentLine[];
+  
 }
 
 export interface ProcessedAdjustmentResult {
@@ -82,7 +83,7 @@ export class AdjustmentService {
     private queueProvider?: { addJob: (jobName: string, payload: any) => Promise<void> }
   ) {}
 
-  async postAdjustment(payload: PostAdjustmentPayload): Promise<ProcessedAdjustmentResult> {
+  async postAdjustment(payload: PostAdjustmentPayload, prefix?: string): Promise<ProcessedAdjustmentResult> {
     const {
       existingAdjustmentId,
       reasonId,
@@ -141,7 +142,7 @@ export class AdjustmentService {
             },
           });
         } else {
-          const adjustmentNumber = await this.generateAdjustmentNumber(tx);
+          const adjustmentNumber = await this.generateAdjustmentNumber(tx, prefix);
           const computedInflowId = crypto.randomUUID().toLowerCase();
 
           adjustment = await tx.inventoryAdjustment.create({
@@ -836,9 +837,9 @@ export class AdjustmentService {
     });
   }
 
-  private async generateAdjustmentNumber(tx: Prisma.TransactionClient): Promise<string> {
+  private async generateAdjustmentNumber(tx: Prisma.TransactionClient, prefix: string = 'ADJ'): Promise<string> {
     const count = await tx.inventoryAdjustment.count();
-    return `ADJ-${String(count + 1).padStart(6, "0")}`;
+    return `${prefix}-${String(count + 1).padStart(6, "0")}`;
   }
 }
 

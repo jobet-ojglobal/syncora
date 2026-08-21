@@ -140,6 +140,43 @@ generateSku2Variant2(
 
 // KEYCHRON-Q1P-BB-SLVRGRY
 
+// Clean (preventing leading, trailing, or double dashes)
+export function generateSku2Variant2V2(
+  brand: string,
+  productName: string,
+  variants: string[]
+): string {
+  // 1. Convert brand code (or empty string if non-existent)
+  const brandCode = brand?.trim().toUpperCase() || "";
+
+  // 2. Generate product code
+  const productCode = productName
+    ? productName
+        .trim()
+        .split(/\s+/)
+        .map(w => {
+          const upper = w.toUpperCase();
+          return /^[A-Z]+\d+$/.test(upper) ? upper : upper[0];
+        })
+        .join("")
+    : "";
+
+  // 3. Process variants, filtering out empty results
+  const variantCodes = variants
+    .map(variantCode2)
+    .filter(v => Boolean(v && v.trim()));
+
+  // 4. Combine parts and filter out any empty string items before joining
+  return [brandCode, productCode, ...variantCodes]
+    .filter(part => Boolean(part && part.trim()))
+    .join("-");
+}
+
+generateSku2Variant2V2(
+  "",
+  "Q1 Pro",
+  []
+);
 
 // =========== SKU 2 USING Variant 2 =============
 
