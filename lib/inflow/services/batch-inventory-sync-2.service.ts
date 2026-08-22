@@ -332,7 +332,7 @@ export class InventorySyncService {
     const BATCH_SIZE = options?.batchSize ?? 100; 
     const INTER_BATCH_DELAY = options?.delayBetweenBatchesMs ?? 200;
 
-    const modifiedBy = "56bfcf3b-3e98-4098-ae8f-2adcb657cb57";
+    const modifiedBy = "8ff3e71d-eb02-425d-8e0f-00a69fc8e482";
 
     const selectedProductIds =
       !syncedAll && selectedRecords && selectedRecords.length > 0

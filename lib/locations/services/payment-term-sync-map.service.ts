@@ -9,7 +9,7 @@ type SyncOptions = {
 };
 
 export class PaymentTermSyncMapService {
-  async sync(
+  async syncMap(
     location: {
       inflowId: string;
       name: string;
@@ -127,7 +127,120 @@ export class PaymentTermSyncMapService {
       results: syncResults,
     };
   }
+
+  async map(
+    location: {
+      inflowId: string;
+      name: string;
+      url: string;
+    },
+    options: SyncOptions,
+    selectedRecords?: any[],
+    syncedAll?: boolean
+  ) {
+    const { onProgress } = options;
+
+    // Fetch payment terms from the location endpoint
+    let paymentTerms = await getPaymentTerms(location.url);
+
+    if (!syncedAll && selectedRecords && selectedRecords.length > 0) {
+      const allowedIds = new Set(selectedRecords.map((item) => String(item.id)));
+      paymentTerms = paymentTerms.filter((data: any) =>
+        allowedIds.has(String(data.paymentTermId))
+      );
+    }
+
+    let processed = 0;
+
+    const syncResults: Array<{
+      paymentTermInflowId: string;
+      status: "synced" | "skipped_not_found";
+    }> = [];
+
+    await prisma.$transaction(
+      async (tx) => {
+        /**
+         * Step 1: Query global availability by exact name match.
+         * If missing, push to results as skipped immediately and return null.
+         */
+        const resolvedPaymentTerms = await Promise.all(
+          paymentTerms.map(async (term) => {
+            const match = await tx.paymentTerm.findFirst({
+              where: { name: term.name },
+              select: { inflowId: true },
+            });
+
+            if (!match) {
+              syncResults.push({
+                paymentTermInflowId: String(term.paymentTermsId),
+                status: "skipped_not_found",
+              });
+              return null;
+            }
+
+            return { incoming: term, existing: match };
+          })
+        );
+
+        // Filter out skipped entries with safe type predicate narrowing
+        const validPaymentTerms = resolvedPaymentTerms.filter(
+          (pt): pt is NonNullable<typeof pt> => pt !== null
+        );
+
+        /**
+         * Step 2: Bridge connection inside PaymentTermLocationMap
+         */
+        await Promise.all(
+          validPaymentTerms.map(async ({ incoming, existing }) => {
+            // Check if a mapping record already exists for this location
+            let locationMap = await tx.paymentTermLocationMap.findUnique({
+              where: {
+                paymentTermId_locationId: {
+                  paymentTermId: existing.inflowId,
+                  locationId: location.inflowId,
+                },
+              },
+              select: { localId: true },
+            });
+
+            // Create location map if missing
+            if (!locationMap) {
+              locationMap = await tx.paymentTermLocationMap.create({
+                data: {
+                  paymentTermId: existing.inflowId,
+                  locationId: location.inflowId,
+                  localId: Number(incoming.paymentTermsId),
+                },
+                select: { localId: true },
+              });
+            }
+
+            syncResults.push({
+              paymentTermInflowId: String(incoming.paymentTermsId),
+              status: "synced",
+            });
+          })
+        );
+
+        processed = validPaymentTerms.length;
+      },
+      {
+        timeout: 30000,
+      }
+    );
+
+    if (onProgress) {
+      await onProgress(processed);
+    }
+
+    return {
+      paymentTermsProcessed: processed,
+      syncedAt: new Date().toISOString(),
+      results: syncResults,
+    };
+  }
 }
+
 
 // // lib/locations/services/payment-term-sync-map.service.ts
 // import { prisma } from "@/lib/prisma";

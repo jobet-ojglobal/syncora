@@ -1,6 +1,6 @@
 import { prisma } from "@/lib/prisma";
-import { LocalProductInventory, SyncOptions } from "../types";
-import { getLocalInventoryLines } from "../data/product-local";
+import { LocalProductInventory } from "../types";
+import { getLocalBatchInventory } from "../data/product-local";
 import { 
   AdjustmentService,
   PostAdjustmentPayload,
@@ -8,6 +8,7 @@ import {
 } from "@/services/stock-adjustment.service";
 import { InflowStockAdjustInput } from "@/lib/inflow/types";
 import { upsertStockAdjustBulk } from "@/lib/inflow/data/inventory";
+import { SyncOptions } from "@/lib/workers/types";
 
 export type SyncAdjustmentLine = StockAdjustmentLineInput & {
   description?: string;
@@ -487,7 +488,7 @@ export class InventorySyncService {
     return { successfulIds, failedIds };
   }
 
-  async batchSync(
+  async sync(
     location: {
       inflowId: string;
       name: string;
@@ -504,7 +505,7 @@ export class InventorySyncService {
     const BATCH_SIZE = options?.batchSize ?? 500; 
     const INTER_BATCH_DELAY = options?.delayBetweenBatchesMs ?? 300;
 
-    const modifiedBy = "56bfcf3b-3e98-4098-ae8f-2adcb657cb57";
+    const modifiedBy = "8ff3e71d-eb02-425d-8e0f-00a69fc8e482";
     
     const reason = await prisma.adjustmentReason.findFirst({
       where: { name: { contains: "Integration", mode: "insensitive" } },
@@ -515,9 +516,9 @@ export class InventorySyncService {
       return { productsProcessed: 0, syncedAt: new Date().toISOString() };
     }
 
-    const selectedProductIds =
+    const allowedIds =
       !syncedAll && selectedRecords && selectedRecords.length > 0
-        ? new Set(selectedRecords.map((item) => String(item)))
+        ? new Set(selectedRecords.map((id) => String(id)))
         : null;
 
     const selectedSubLocationIds = selectedSubLocations && selectedSubLocations.length > 0
@@ -546,7 +547,7 @@ export class InventorySyncService {
 
       const fetchStartTime = performance.now();
       
-      const rawBatch: LocalProductInventory[] = await getLocalInventoryLines(
+      const rawBatch: LocalProductInventory[] = await getLocalBatchInventory(
         location.url,
         BATCH_SIZE,
         cursor,
@@ -570,7 +571,7 @@ export class InventorySyncService {
         batchNo,
         modifiedBy,
         reason.inflowId,
-        selectedProductIds,
+        allowedIds,
         selectedSubLocationIds,
         caches,
         checkSignal,
@@ -619,7 +620,8 @@ export class InventorySyncService {
   }
 }
 
-export const inventoryLocalSyncService = new InventorySyncService();
+const inventoryService = new InventorySyncService();
+export const localInventoryServiceMap = inventoryService.sync.bind(inventoryService);
 
 
     // Construct target sublocation bin entry
@@ -653,7 +655,7 @@ export const inventoryLocalSyncService = new InventorySyncService();
   //   const REQUEST_TIMEOUT_MS = 15000;
 
   //   const reason = await this.getAdjustmentReason("Integration import");
-  //   const modifiedBy = "56bfcf3b-3e98-4098-ae8f-2adcb657cb57";
+  //   const modifiedBy = "8ff3e71d-eb02-425d-8e0f-00a69fc8e482";
 
   //   const caches = {
   //     verifiedLocationIds: new Set<string>(),
@@ -685,7 +687,7 @@ export const inventoryLocalSyncService = new InventorySyncService();
   //     if (checkSignal) await checkSignal();
 
   //     const fetchStartTime = performance.now();
-  //     const rawBatch: LocalProductInventory[] = await getLocalInventoryLines(
+  //     const rawBatch: LocalProductInventory[] = await getLocalBatchInventory(
   //       location.url,
   //       BATCH_SIZE,
   //       after,
@@ -887,7 +889,7 @@ export const inventoryLocalSyncService = new InventorySyncService();
 // import { prisma } from "@/lib/prisma";
 // import { syncInventoryLines } from "./inventory-line-sync";
 // import { LocalProductInventory, SyncOptions } from "../types";
-// import { getLocalInventoryLines } from "../data/product-local";
+// import { getLocalBatchInventory } from "../data/product-local";
 // import { 
 //   AdjustmentService,
 //   PostAdjustmentPayload,
@@ -988,7 +990,7 @@ export const inventoryLocalSyncService = new InventorySyncService();
 //     const CLIENT_RETRIES = 1;
 
 //     const reason = await this.getAdjustmentReason("Integration import");
-//     const modifiedBy = "56bfcf3b-3e98-4098-ae8f-2adcb657cb57";
+//     const modifiedBy = "8ff3e71d-eb02-425d-8e0f-00a69fc8e482";
 
 //     const caches = {
 //       verifiedLocationIds: new Set<string>(),
@@ -1016,7 +1018,7 @@ export const inventoryLocalSyncService = new InventorySyncService();
 //       // 1. Check signal before starting remote fetch
 //       if (checkSignal) await checkSignal();
 
-//       const rawBatch: LocalProductInventory[] = await getLocalInventoryLines(
+//       const rawBatch: LocalProductInventory[] = await getLocalBatchInventory(
 //         location.url,
 //         BATCH_SIZE,
 //         after,

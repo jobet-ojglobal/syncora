@@ -1,33 +1,5 @@
 import { BranchClient } from "../location.client";
-
-export interface InflowTaxCode {
-  taxCodeId: string;
-  taxingSchemeId: string;
-  name: string;
-  isActive: boolean;
-  tax1Rate: string;
-  tax2Rate: string;
-  syncedAt: string;
-}
-
-export interface InflowTaxingScheme {
-    taxingSchemeId: string;
-    name: string;
-    tax1Name: string;
-    tax2Name: string;
-    calculateTax2OnTax1: number;
-    lastModUserId: number;
-    lastModDttm: string;
-    timestamp: string;
-    isActive: number;
-    tax1OnShipping: number;
-    defaultTaxCodeId: number;
-    tax2OnShipping: number;
-    syncedAt: string;
-    taxCodes?: InflowTaxCode[]
-  }
-
-  
+import { LocalTaxingScheme } from "../types";
   
 export interface UpsertResult {
   success: boolean;
@@ -36,7 +8,7 @@ export interface UpsertResult {
 }
 
 export async function upsertTaxingScheme(
-  payload: InflowTaxingScheme,
+  payload: LocalTaxingScheme,
   url: string
 ) {
   const apiClient = new BranchClient(url)
@@ -52,10 +24,9 @@ export async function upsertTaxingScheme(
   );
 }
 
-
 export async function getTaxingSchemes(url: string) {
  const apiClient = new BranchClient(url)
-  return await apiClient.get<InflowTaxingScheme[]>(
+  return await apiClient.get<LocalTaxingScheme[]>(
     `/inflow-local/taxing-schemes`,
   );
 }
@@ -65,8 +36,41 @@ export async function getTaxingScheme(
   url: string
 ) {
  const apiClient = new BranchClient(url)
-  return await apiClient.get<InflowTaxingScheme>(
+  return await apiClient.get<LocalTaxingScheme>(
     `/inflow-local/payload/${batchId}`,
+  );
+}
+
+
+export async function getLocalBatchTaxingSchemes(
+  url: string,
+  count = 50,
+  after?: string,
+  includes: string[] = []
+) {
+  // 1. Specify base relation includes here if needed
+  const baseIncludes: string[] = [];
+
+  // 2. Filter empty strings to prevent trailing/leading commas in the query string
+  const mergedIncludes = Array.from(new Set([...baseIncludes, ...includes]))
+    .filter(Boolean)
+    .join(",");
+
+  const params = new URLSearchParams({
+    count: String(count),
+  });
+
+  if (mergedIncludes) {
+    params.append("include", mergedIncludes);
+  }
+
+  if (after) {
+    params.append("after", after);
+  }
+
+  const apiClient = new BranchClient(url);
+  return apiClient.get<LocalTaxingScheme[]>(
+    `/inflow-local/taxing-schemes?${params.toString()}`
   );
 }
 

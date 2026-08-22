@@ -9,7 +9,7 @@ type SyncOptions = {
 };
 
 export class TaxingSchemeSyncMapService {
-  async sync(
+  async syncMap(
     location: {
       inflowId: string;
       name: string;
@@ -211,7 +211,192 @@ export class TaxingSchemeSyncMapService {
       results: syncResults,
     };
   }
+
+  async map(
+    location: {
+      inflowId: string;
+      name: string;
+      url: string;
+    },
+    options: SyncOptions,
+    selectedRecords?: any[],
+    syncedAll?: boolean
+  ) {
+    const { onProgress } = options;
+
+    // Fetch taxing schemes from your source location endpoint
+    let taxingSchemes = await getTaxingSchemes(location.url);
+
+    if (!syncedAll && selectedRecords && selectedRecords.length > 0) {
+      const allowedIds = new Set(selectedRecords.map((item) => String(item.id)));
+      taxingSchemes = taxingSchemes.filter((data: any) =>
+        allowedIds.has(String(data.taxingSchemeId))
+      );
+    }
+
+    const syncResults: Array<{
+      taxingSchemeInflowId: string;
+      localTaxingSchemeId?: number;
+      status: "synced" | "skipped_not_found";
+    }> = [];
+
+    let processed = 0;
+
+    await prisma.$transaction(
+      async (tx) => {
+        /**
+         * Step 1: Query global availability by name and resolve dependencies
+         */
+        const resolvedSchemesPromises = taxingSchemes.map(async (scheme) => {
+          // Find global taxing scheme where name matches exactly
+          const match = await tx.taxingScheme.findFirst({
+            where: { name: scheme.name },
+            select: { inflowId: true },
+          });
+
+          // Skip immediately if match is not found
+          if (!match) {
+            syncResults.push({
+              taxingSchemeInflowId: String(scheme.taxingSchemeId),
+              status: "skipped_not_found",
+            });
+            return null;
+          }
+
+          let globalDefaultTaxCodeId: string | null = null;
+
+          // Resolve the default tax code dependency if it exists
+          if (scheme.defaultTaxCodeId) {
+            const depTaxCode = await tx.taxCodeLocationMap.findFirst({
+              where: {
+                locationId: location.inflowId,
+                localId: Number(scheme.defaultTaxCodeId),
+              },
+              select: { taxCodeId: true },
+            });
+            globalDefaultTaxCodeId = depTaxCode?.taxCodeId || null;
+          }
+
+          // Prepare nested child tax codes with resolved global inflow IDs
+          const mappedTaxCodes = scheme.taxCodes
+            ? await Promise.all(
+                scheme.taxCodes.map(async (code: any) => {
+                  const codeMatch = await tx.taxCode.findFirst({
+                    where: { name: code.name, taxingSchemeId: match.inflowId },
+                    select: { inflowId: true },
+                  });
+
+                  return {
+                    taxCodeId: codeMatch?.inflowId || crypto.randomUUID().toLowerCase(),
+                    name: code.name,
+                    isActive: Number(code.isActive) === 1,
+                    tax1Rate: code.tax1Rate,
+                    tax2Rate: code.tax2Rate,
+                    _localId: Number(code.taxCodeId),
+                  };
+                })
+              )
+            : [];
+
+          // Apply default tax code update if necessary
+          if (globalDefaultTaxCodeId) {
+            await tx.taxingScheme.update({
+              where: { inflowId: match.inflowId },
+              data: { defaultTaxCodeId: globalDefaultTaxCodeId },
+            });
+          }
+
+          return {
+            incoming: scheme,
+            existing: match,
+            processedTaxCodes: mappedTaxCodes,
+          };
+        });
+
+        // Filter out null entries directly
+        const validSchemes = (await Promise.all(resolvedSchemesPromises)).filter(
+          (item): item is NonNullable<typeof item> => item !== null
+        );
+
+        /**
+         * Step 2: Bridge connection inside TaxingSchemeLocationMap & TaxCodeLocationMap
+         */
+        for (const { incoming, existing, processedTaxCodes } of validSchemes) {
+          // A. Parent Location Mappings
+          let schemeMap = await tx.taxingSchemeLocationMap.findUnique({
+            where: {
+              taxingSchemeId_locationId: {
+                taxingSchemeId: existing.inflowId,
+                locationId: location.inflowId,
+              },
+            },
+            select: { localId: true },
+          });
+
+          if (!schemeMap) {
+            schemeMap = await tx.taxingSchemeLocationMap.create({
+              data: {
+                taxingSchemeId: existing.inflowId,
+                locationId: location.inflowId,
+                localId: Number(incoming.taxingSchemeId),
+              },
+              select: { localId: true },
+            });
+          }
+
+          // B. Nested Children Location Mappings
+          if (processedTaxCodes.length > 0) {
+            await Promise.all(
+              processedTaxCodes.map(async (childCode) => {
+                const codeMap = await tx.taxCodeLocationMap.findUnique({
+                  where: {
+                    taxCodeId_locationId: {
+                      taxCodeId: childCode.taxCodeId,
+                      locationId: location.inflowId,
+                    },
+                  },
+                  select: { localId: true },
+                });
+
+                if (!codeMap) {
+                  await tx.taxCodeLocationMap.create({
+                    data: {
+                      taxCodeId: childCode.taxCodeId,
+                      locationId: location.inflowId,
+                      localId: childCode._localId,
+                    },
+                  });
+                }
+              })
+            );
+          }
+
+          syncResults.push({
+            taxingSchemeInflowId: String(incoming.taxingSchemeId),
+            localTaxingSchemeId: schemeMap.localId,
+            status: "synced",
+          });
+        }
+
+        processed = validSchemes.length;
+      },
+      {
+        timeout: 45000,
+      }
+    );
+
+    if (onProgress) {
+      await onProgress(processed);
+    }
+
+    return {
+      taxingSchemesProcessed: processed,
+      syncedAt: new Date().toISOString(),
+      results: syncResults,
+    };
+  }
 }
+
 
 // // lib/locations/services/taxing-scheme-sync-map.service.ts
 // import { getTaxingSchemes } from "@/lib/locations/data/taxing-scheme";

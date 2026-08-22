@@ -2,6 +2,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { LocationService } from "@/services/location.service";
+import { LocationType } from "@/generated/prisma/enums";
 
 export async function GET() {
   try {
@@ -20,7 +21,7 @@ export async function GET() {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { name, isActive, isDefault, address, sublocations, url } = body;
+    const { name, isActive, isDefault, address, locationType, sublocations, url } = body;
 
     // Validate required fields
     if (!name?.trim()) {
@@ -51,8 +52,7 @@ export async function POST(request: NextRequest) {
               state: address.state?.trim() || null,
               country: address.country?.trim() || null,
               postalCode: address.postalCode?.trim() || null,
-              remarks: address.remarks?.trim() || null,
-              addressType: address.addressType?.trim() || "Warehouse",
+              remarks: address.remarks?.trim() || null
             },
           }
         : undefined;
@@ -79,6 +79,7 @@ export async function POST(request: NextRequest) {
           url: url?.trim() || "",
           address: addressData,
           sublocations: sublocationsData,
+          locationType: locationType as LocationType,
         },
         include: {
           address: true,
@@ -157,7 +158,7 @@ export async function POST(request: NextRequest) {
 export async function PATCH(request: NextRequest) {
   try {
     const body = await request.json();
-    const { inflowId, name, isActive, isDefault, address, sublocations, url } = body;
+    const { inflowId, name, isActive, locationType, isDefault, address, sublocations, url } = body;
 
     if (!inflowId) {
       return NextResponse.json(
@@ -187,7 +188,6 @@ export async function PATCH(request: NextRequest) {
             country: address.country?.trim() || null,
             postalCode: address.postalCode?.trim() || null,
             remarks: address.remarks?.trim() || null,
-            addressType: address.addressType?.trim() || "Warehouse",
           },
           create: {
             locationId: inflowId,
@@ -198,7 +198,6 @@ export async function PATCH(request: NextRequest) {
             country: address.country?.trim() || null,
             postalCode: address.postalCode?.trim() || null,
             remarks: address.remarks?.trim() || null,
-            addressType: address.addressType?.trim() || "Warehouse",
           },
         });
       } else {
@@ -246,6 +245,7 @@ export async function PATCH(request: NextRequest) {
           isActive: isActive ?? true,
           isDefault: isDefault ?? false,
           url: url?.trim() || "",
+          locationType: locationType as LocationType,
         },
         include: { address: true, sublocations: true },
       });

@@ -30,8 +30,6 @@ export class LocationSyncService {
     let processed = 0;
     let batchNo = 0;
 
-    console.log(selectedRecords)
-
     console.log(`[Location Sync] Starting service (Batch Size: ${BATCH_SIZE}, Inter-batch Delay: ${INTER_BATCH_DELAY}ms)...`);
 
     // Helper closure to handle sublocations and DB transactions for a given batch of locations
@@ -104,6 +102,13 @@ export class LocationSyncService {
             .filter((id): id is string => Boolean(id) && id !== "undefined")
         )
       );
+
+    // if (!syncedAll && selectedRecords && selectedRecords.length > 0) {
+    //   const allowedIds = selectedRecords.map(item => String(item.id));
+    //   taxingSchemes = taxingSchemes.filter((data: any) => 
+    //     allowedIds.includes(String(data.taxingSchemeId))
+    //   );
+    // }
 
       const totalSelected = selectedIds.length;
       console.log(`[Location Sync] Processing ${totalSelected} selected locations in chunks...`);

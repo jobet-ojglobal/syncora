@@ -27,16 +27,19 @@ const nextConfig: NextConfig = {
         hostname: 'inflowclouduser.blob.core.windows.net',
         port: '',
         pathname: '/**', // This allows any path under the hostname
-        
       },
       {
         protocol: 'https',
         hostname: 'www.facebook.com',
         port: '',
         pathname: '/**', // This allows any path under the hostname
+      },
+      {
+        protocol: 'https',
+        hostname: 'drench-nugget-blip.ngrok-free.dev',
+        port: '',
+        pathname: '/**', // This allows any path under the hostname
       }
-
-      
     ],
   }
 };

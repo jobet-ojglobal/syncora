@@ -438,7 +438,8 @@ export async function POST(request: NextRequest) {
           prices: true,
           barcodes: true,
           images: true,
-          brand: true
+          brand: true,
+          category: true
         }
       });
 
@@ -580,9 +581,16 @@ export async function POST(request: NextRequest) {
         remarks: newProduct.remarks,
         customFields: newCustomFields,
 
+        category: newProduct.category ? {
+          categoryId: newProduct.category.inflowId,
+          name: newProduct.category.name,
+          isDefault: newProduct.category.isDefault,
+          parentCategoryId: newProduct.category.parentId,
+        } : undefined,
+
         defaultImageId: null,
         
-        lastModifiedById: null,
+        lastModifiedById: "8ff3e71d-eb02-425d-8e0f-00a69fc8e482",
         lastModifiedDateTime: null,
         lastVendorId: null,
 
@@ -638,6 +646,9 @@ export async function POST(request: NextRequest) {
     });
 
     const { cloudId, ...cleanInflowPayload } = outputTransaction.inflowPayload;
+
+
+    console.log(JSON.stringify(cleanInflowPayload, null, 2))
 
     // ==========================================
     // 🏢 STEP 1: DISPATCH CLOUD SYNC JOB
@@ -823,7 +834,7 @@ export async function PATCH(request: NextRequest) {
       features = [],
     } = body;
 
-    const lastModifiedById = "56bfcf3b-3e98-4098-ae8f-2adcb657cb57";
+    const lastModifiedById = "8ff3e71d-eb02-425d-8e0f-00a69fc8e482";
 
     // 1. Core Validation Constraints Guard Layer
     if (!inflowId) {

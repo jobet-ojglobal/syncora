@@ -1138,6 +1138,12 @@ enum LocationStatus {
   MAINTENANCE
 }
 
+enum LocationType {
+  WAREHOUSE
+  STORE
+  FULFILLMENT_CENTER
+  TRANSIT
+}
 
 // Locations
 
@@ -1147,8 +1153,10 @@ model Location {
   name            String
   isActive        Boolean  @default(true)
   isDefault       Boolean  @default(false)
-  url             String?
+  locationType    LocationType  @default(STORE)
   status          LocationStatus @default(ACTIVE)
+  url             String?
+  imageUrl        String?
   
   address             LocationAddress?
   inventories         Inventory[]
@@ -1163,13 +1171,13 @@ model Location {
   purchaseOrders      PurchaseOrder[]
 
   ledgerFromLocations InventoryLedger[] @relation("LedgerFromLocation")
-  ledgerToLocations InventoryLedger[] @relation("LedgerToLocation")
+  ledgerToLocations   InventoryLedger[] @relation("LedgerToLocation")
   
   outgoingTransfers TransferOrder[] @relation("TransferSourceLocation")
   incomingTransfers TransferOrder[]  @relation("TransferTargetLocation")
-  reorderTargets ReorderSetting[] @relation("TargetLocation")
-  reorderSources ReorderSetting[] @relation("SourceLocation")
-  webhooks      LocationWebhook[]
+  reorderTargets    ReorderSetting[] @relation("TargetLocation")
+  reorderSources    ReorderSetting[] @relation("SourceLocation")
+  webhooks          LocationWebhook[]
 
   inventoryPreferredSource   Inventory[]  @relation("PreferredReplenishmentLocation")    
 
@@ -1193,7 +1201,6 @@ model Location {
   localProductImageMappings  ProductImageLocationMap[]
   localProductGroupOptionMappings ProductGroupOptionLocationMap[]
   localProductGroupOptionValueMappings ProductGroupOptionValueLocationMap[]
-  // localAdjustmentReasonMappings AdjustmentReasonLocationMap[]
   localCurrencyMappings      CurrencyLocationMap[]
   localPricingSchemeMappings PricingSchemeLocationMap[]
   localPaymentTermMappings   PaymentTermLocationMap[]
@@ -1229,7 +1236,6 @@ model LocationAddress {
   country       String?
   postalCode    String?
   remarks       String?
-  addressType   String?
 
   location      Location @relation(fields: [locationId],references: [inflowId], onDelete: Cascade)
 

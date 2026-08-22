@@ -15,6 +15,54 @@ export interface LocalCurrency {
   syncedAt: string;
 }
 
+export interface LocalPaymentTerm {
+  paymentTermsId: string;
+  name: string;
+  daysDue: number;
+  isActive: number;
+  timestamp: string;
+}
+
+
+export interface LocalPricingScheme {
+  pricingSchemeId: string;
+  name: string;
+  lastModUserId: number;
+  lastModDttm: string;
+  isActive: number;
+  isTaxInclusive: number;
+  currencyId: string;
+  timestamp: string;
+  syncedAt: string;
+}
+
+export interface LocalTaxCode {
+  taxCodeId: string;
+  taxingSchemeId: string;
+  name: string;
+  isActive: boolean;
+  tax1Rate: string;
+  tax2Rate: string;
+  syncedAt: string;
+}
+
+
+export interface LocalTaxingScheme {
+  taxingSchemeId: string;
+  name: string;
+  tax1Name: string;
+  tax2Name: string;
+  calculateTax2OnTax1: number;
+  lastModUserId: number;
+  lastModDttm: string;
+  timestamp: string;
+  isActive: number;
+  tax1OnShipping: number;
+  defaultTaxCodeId: number;
+  tax2OnShipping: number;
+  syncedAt: string;
+  taxCodes?: LocalTaxCode[]
+}
 
 export interface LocalProductPrice {
   productPriceId: number;
@@ -132,23 +180,281 @@ export interface LocalLocation {
   timestamp: string;
 }
 
-export type SyncOptions = {
-  onProgress?: (processedCount: number, lastCursorId?: string) => Promise<void>;
-  /** 
-   * Function to check for abort/cancellation signals.
-   * Should throw an error (e.g. SyncCancelledError) if the job was cancelled.
-   */
-  checkSignal?: () => Promise<void>;
-  /** 
-   * Number of items per API call. 
-   * Recommended max: 20-30 when using heavy `includes` to avoid HTTP 429 Rate Limits.
-   * Default: 30
-   */
-  batchSize?: number;
-  /**
-   * Pause time in milliseconds between API batch fetches to prevent rate limit spikes.
-   * Default: 300ms
-   */
-  delayBetweenBatchesMs?: number;
-  initialCursorId?: string;
-};
+
+export interface LocalCustomer {
+  customerId: string;
+  contactName: string;
+  customFields: LocalCustomFields;
+  defaultBillingAddressId: string | null;
+  defaultCarrier: string | null;
+  defaultLocationId: string | null;
+  defaultPaymentMethod: string | null;
+  defaultPaymentTermsId: string | null;
+  defaultSalesRep: string | null;
+  defaultSalesRepTeamMemberId: string | null;
+  defaultShippingAddressId: string | null;
+  discount: string;
+  email: string | null;
+  fax: string | null;
+  isActive: boolean;
+  lastModifiedById: string | null;
+  lastModifiedDttm: string;
+  name: string;
+  phone: string | null;
+  pricingSchemeId: string | null;
+  remarks: string | null;
+  taxExemptNumber: string | null;
+  taxingSchemeId: string | null;
+  timestamp: string | null;
+  website: string | null;
+  addresses: LocalCustomerAddress[];
+  attachments: InflowAttachment[];
+  balances: LocalCustomerBalance[];
+  credits: LocalCustomerCredit[];
+  defaultBillingAddress: LocalCustomerAddress | null;
+  defaultLocation: InflowLocation | null;
+  defaultPaymentTerms: InflowPaymentTerms | null;
+  defaultSalesRepTeamMember: InflowTeamMember | null;
+  defaultShippingAddress: LocalCustomerAddress | null;
+  dues: LocalCustomerDue[];
+  lastModifiedBy: InflowTeamMember | null;
+  orderHistory: LocalCustomerOrderHistory | null;
+  pricingScheme: InflowPricingScheme | null;
+  taxingScheme: InflowTaxingScheme | null;
+}
+
+export interface LocalCustomerAddress {
+  customerAddressId: string;
+  customerId: string;
+  name: string;
+  timestamp: string | null;
+  address: InflowAddress;
+}
+
+export interface InflowAddress {
+  address1: string;
+  address2: string;
+  city: string;
+  state: string;
+  country: string;
+  postalCode: string;
+  remarks: string;
+  addressType: string;
+}
+
+export interface InflowLocation {
+  locationId: string;
+  name: string;
+  isActive: boolean;
+  isDefault: boolean;
+  timestamp: string | null;
+  address: InflowAddress;
+}
+
+export interface InflowPaymentTerms {
+  paymentTermsId: string;
+  daysDue: number;
+  isActive: boolean;
+  name: string;
+  timestamp: string | null;
+}
+
+export interface InflowTeamMember {
+  teamMemberId: string;
+  accessAllLocations: boolean;
+  canBeSalesRep: boolean;
+  email: string;
+  isInternal: boolean;
+  name: string;
+}
+
+export interface InflowPricingScheme {
+  pricingSchemeId: string;
+  currencyId: string | null;
+  isActive: boolean;
+  isDefault: boolean;
+  isTaxInclusive: boolean;
+  name: string;
+  timestamp: string | null;
+}
+
+export interface InflowTaxingScheme {
+  taxingSchemeId: string;
+  calculateTax2OnTax1: boolean;
+  defaultTaxCodeId: string | null;
+  isActive: boolean;
+  isDefault: boolean;
+  name: string;
+  tax1Name: string;
+  tax1OnShipping: boolean;
+  tax2Name: string;
+  tax2OnShipping: boolean;
+  timestamp: string | null;
+  taxCodes: InflowTaxCode[];
+}
+
+export interface InflowTaxCode {
+  taxCodeId: string;
+  name: string;
+  rate?: number;
+}
+
+export interface LocalCustomerOrderHistory {
+  id: string;
+  lastOrderDate: string | null;
+}
+
+export interface InflowAttachment {
+  attachmentId?: string;
+  fileName?: string;
+  url?: string;
+}
+
+export interface LocalCustomerDue {
+  customerDueId: string;
+  currencyId?: string;
+  amountCurrent: string;
+  amount1To30: string;
+  amount31To60: string;
+  amount61Plus: string;
+}
+
+export interface LocalCustomerBalance {
+  customerBalanceId: string;
+  customerId?: string;
+  currencyId: string;
+  balance: string;
+}
+
+export interface LocalCustomerCredit {
+  customerCreditId: string;
+  customerId?: string;
+  currencyId: string;
+  credit: string;
+}
+
+
+export interface CustomerPayload {
+  customerId: number;
+  version: number;
+  name: string;
+  vendorPermitNumber: string;
+  remarks: string;
+  defaultPricingSchemeId: number | null;
+  discount: string;
+  defaultPaymentTermsId: number | null;
+  taxingSchemeId: number | null;
+  defaultCarrier: string;
+  defaultPaymentMethod: string;
+  contactName: string;
+  phone: string;
+  fax: string;
+  email: string;
+  
+  // Primary Address
+  address1: string;
+  address2: string;
+  city: string;
+  state: string;
+  country: string;
+  postalCode: string;
+  addressRemarks: string;
+  addressType: number | string | null;
+  
+  // Billing Address
+  usingBillingAddress: number; // 0 | 1 boolean flag
+  billingAddress1: string;
+  billingAddress2: string;
+  billingCity: string;
+  billingState: string;
+  billingCountry: string;
+  billingPostalCode: string;
+  billingAddressRemarks: string;
+  billingAddressType: number | string | null;
+  
+  // Shipping Address
+  usingShippingAddress: number; // 0 | 1 boolean flag
+  shippingAddress1: string;
+  shippingAddress2: string;
+  shippingCity: string;
+  shippingState: string;
+  shippingCountry: string;
+  shippingPostalCode: string;
+  shippingAddressRemarks: string;
+  shippingAddressType: number | string | null;
+  
+  // Custom Fields
+  custom1: string;
+  custom2: string;
+  custom3: string;
+  custom4: string;
+  custom5: string;
+  custom6: string;
+  custom7: string;
+  custom8: string;
+  custom9: string;
+  custom10: string;
+  
+  // Metadata & System Info
+  lastModUserId: number;
+  lastModDttm: string;
+  timestamp: string;
+  isActive: number; // 0 | 1 boolean flag
+  website: string;
+  defaultSalesRep: string;
+  defaultLocationId: number | null;
+  syncedAt: string;
+}
+
+
+export interface VendorPayload {
+  vendorId: number;
+  version: number;
+  name: string;
+  remarks: string;
+  defaultPaymentTermsId: number | null;
+  taxingSchemeId: number | null;
+  defaultCarrier: string;
+  
+  // Primary Address
+  address1: string;
+  address2: string;
+  city: string;
+  state: string;
+  country: string;
+  postalCode: string;
+  addressRemarks: string;
+  addressType: number | string | null;
+  
+  // Contact Info
+  contactName: string;
+  phone: string;
+  fax: string;
+  email: string;
+  
+  // Financial & Commerce
+  currencyId: number | null;
+  discount: string;
+  isTaxInclusivePricing: number; // 0 | 1 boolean flag
+  defaultPaymentMethod: string;
+  
+  // Custom Fields
+  custom1: string;
+  custom2: string;
+  custom3: string;
+  custom4: string;
+  custom5: string;
+  custom6: string;
+  custom7: string;
+  custom8: string;
+  custom9: string;
+  custom10: string;
+  
+  // Metadata & System Info
+  lastModUserId: number;
+  lastModDttm: string;
+  timestamp: string;
+  isActive: number; // 0 | 1 boolean flag
+  website: string;
+  syncedAt: string;
+}

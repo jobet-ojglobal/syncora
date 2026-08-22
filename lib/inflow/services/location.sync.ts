@@ -14,7 +14,7 @@ export async function syncLocation(
   location: InflowLocation
 ) {
   // 1. Map embedded address payload if provided
-  const addressData = location.address
+  const addressData = location.address && location.address.address1 !== ""
     ? {
         address1: location.address.address1 ?? null,
         address2: location.address.address2 ?? null,
@@ -23,7 +23,6 @@ export async function syncLocation(
         country: location.address.country ?? null,
         postalCode: location.address.postalCode ?? null,
         remarks: location.address.remarks ?? null,
-        addressType: location.address.addressType ?? null,
       }
     : null;
 
