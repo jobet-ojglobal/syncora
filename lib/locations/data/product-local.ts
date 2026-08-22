@@ -9,7 +9,7 @@ export async function getLocalProducts(url: string) {
   );
 }
 
-export async function getLocalInventoryLines(
+export async function getLocalBatchInventory(
   url: string,
   count = 30,
   after?: string,

@@ -205,54 +205,54 @@ const worker = new Worker<SyncWebhookJobData>(
 
       switch (source) {
         // Local Sync
-        case "categories_local": // OK
-          if (!locationUrl) {
-            throw new Error(`Cannot sync category: No location URL found for location ${location?.name}`);
-          }
-          result = await categoryServiceLocal.sync(location, syncOptions, selectedRecords, syncedAll);
-          break;
-        case "currencies_local": 
-          if (!locationUrl) {
-            throw new Error(`Cannot sync currency: No location URL found for location ${location?.name}`);
-          }
-          result = await currencyServiceLocal.sync(location, syncOptions, selectedRecords, syncedAll);
-          break;
-        case "payment_terms_local":
-          if (!locationUrl) {
-            throw new Error(`Cannot sync payment term: No location URL found for location ${location?.name}`);
-          }
-          result = await paymentServiceLocal.sync(location, syncOptions, selectedRecords, syncedAll);
-          break;
-        case "pricing_schemes_local":
-          if (!locationUrl) {
-            throw new Error(`Cannot sync pricing scheme: No location URL found for location ${location?.name}`);
-          }
-          result = await pricingServiceLocal.sync(location, syncOptions, selectedRecords, syncedAll);
-          break;
-        case "taxing_schemes_local":
-          if (!locationUrl) {
-            throw new Error(`Cannot sync taxing scheme: No location URL found for location ${location?.name}`);
-          }
-          result = await taxingSchemeServiceLocal.sync(location, syncOptions, selectedRecords, syncedAll);
-          break;
-        case "customers_local":
-          if (!locationUrl) {
-            throw new Error(`Cannot sync customer: No location URL found for location ${location?.name}`);
-          }
-          result = await customerServiceLocal.sync(location, syncOptions, selectedRecords, syncedAll);
-          break;
-        case "locations_local":
-          if (!locationUrl) {
-            throw new Error(`Cannot sync product: No location URL found for location ${location?.name}`);
-          }
-          result = await sublocationServiceLocal.sync(location, syncOptions, selectedRecords, syncedAll);
-          break;
-        case "products_local":
-          if (!locationUrl) {
-            throw new Error(`Cannot sync product: No location URL found for location ${location?.name}`);
-          }
-          result = await productServiceLocal.sync(location, syncOptions, selectedRecords, syncedAll, "custom7");
-          break;
+        // case "categories_local": // OK
+        //   if (!locationUrl) {
+        //     throw new Error(`Cannot sync category: No location URL found for location ${location?.name}`);
+        //   }
+        //   result = await categoryServiceLocal.sync(location, syncOptions, selectedRecords, syncedAll);
+        //   break;
+        // case "currencies_local": 
+        //   if (!locationUrl) {
+        //     throw new Error(`Cannot sync currency: No location URL found for location ${location?.name}`);
+        //   }
+        //   result = await currencyServiceLocal.sync(location, syncOptions, selectedRecords, syncedAll);
+        //   break;
+        // case "payment_terms_local":
+        //   if (!locationUrl) {
+        //     throw new Error(`Cannot sync payment term: No location URL found for location ${location?.name}`);
+        //   }
+        //   result = await paymentServiceLocal.sync(location, syncOptions, selectedRecords, syncedAll);
+        //   break;
+        // case "pricing_schemes_local":
+        //   if (!locationUrl) {
+        //     throw new Error(`Cannot sync pricing scheme: No location URL found for location ${location?.name}`);
+        //   }
+        //   result = await pricingServiceLocal.sync(location, syncOptions, selectedRecords, syncedAll);
+        //   break;
+        // case "taxing_schemes_local":
+        //   if (!locationUrl) {
+        //     throw new Error(`Cannot sync taxing scheme: No location URL found for location ${location?.name}`);
+        //   }
+        //   result = await taxingSchemeServiceLocal.map(location, syncOptions, selectedRecords, syncedAll);
+        //   break;
+        // case "customers_local":
+        //   if (!locationUrl) {
+        //     throw new Error(`Cannot sync customer: No location URL found for location ${location?.name}`);
+        //   }
+        //   result = await customerServiceLocal.sync(location, syncOptions, selectedRecords, syncedAll);
+        //   break;
+        // case "locations_local":
+        //   if (!locationUrl) {
+        //     throw new Error(`Cannot sync product: No location URL found for location ${location?.name}`);
+        //   }
+        //   result = await sublocationServiceLocal.sync(location, syncOptions, selectedRecords, syncedAll);
+        //   break;
+        // case "products_local":
+        //   if (!locationUrl) {
+        //     throw new Error(`Cannot sync product: No location URL found for location ${location?.name}`);
+        //   }
+        //   result = await productServiceLocal.sync(location, syncOptions, selectedRecords, syncedAll, "custom7");
+        //   break;
         // case "inventory_lines_local":
         //   if (!locationUrl) {
         //     throw new Error(`Cannot sync inventory: No location URL found for location ${location?.name}`);

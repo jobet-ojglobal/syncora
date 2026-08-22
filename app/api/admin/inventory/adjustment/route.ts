@@ -51,7 +51,7 @@ export async function POST(req: Request) {
     } = body as StockAdjustmentInput;
     
     // TODO: Replace with dynamic user context from session / auth header
-    const performedById = "56bfcf3b-3e98-4098-ae8f-2adcb657cb57";
+    const performedById = "8ff3e71d-eb02-425d-8e0f-00a69fc8e482";
 
     // Execute atomic transaction with custom timeout
     const result = await prisma.$transaction(

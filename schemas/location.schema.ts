@@ -8,7 +8,6 @@ export const addressSchema = z
     state: z.string().min(1, "State/Province is required"),
     country: z.string().min(1, "Country designation is required"),
     postalCode: z.string().min(1, "Postal code is required"),
-    addressType: z.string().optional().or(z.literal("")),
     remarks: z.string().optional().or(z.literal("")),
   })
   .optional()
@@ -19,6 +18,7 @@ export const locationSchema = z.object({
   name: z.string().min(1, "Location name is required (e.g., East Warehouse)"),
   isActive: z.boolean(),
   isDefault: z.boolean(),
+  locationType: z.string().min(1, "Location type is required"),
   url: z.string().url({ message: "Please enter a valid URL." }).optional().or(z.literal("")),
   address: addressSchema,
   sublocations: z.array(

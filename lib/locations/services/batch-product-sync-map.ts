@@ -1,29 +1,10 @@
 import { prisma } from "@/lib/prisma";
 import { getLocalBatchProducts } from "../data/product-local";
-import crypto from "crypto";
 import { LocalProduct } from "../types";
 import { InflowCustomFields, InflowProduct } from "@/lib/inflow/types";
-import { localProductItemType } from "@/helpers/product.helper";
-import { syncProduct } from "./product-sync";
 import { Prisma } from "@/generated/prisma/client";
-import { generateSku2Variant2 } from "@/helpers/genSKU";
-
-/**
- * Helper to safely convert string/numeric flags or booleans
- */
-function parseBooleanFlag(value: unknown): boolean {
-  if (typeof value === "boolean") return value;
-  if (typeof value === "number") return value === 1;
-  if (typeof value === "string") return value === "1" || value.toLowerCase() === "true";
-  return false;
-}
-
-type SyncOptions = {
-  onProgress?: (processedCount: number) => Promise<void>;
-  checkSignal?: () => Promise<void>;
-  batchSize?: number;
-  delayBetweenBatchesMs?: number;
-};
+import { SyncOptions } from "@/lib/workers/types";
+import { parseBooleanFlag } from "@/helpers";
 
 type LocalProductWithRelations = Prisma.ProductGetPayload<{
   include: {
@@ -48,7 +29,7 @@ export async function mapLocalToInflowPayload(
   product: LocalProductWithRelations,
   brandCustomName?: string,
   currentTimestamp: string = new Date().toISOString(),
-  lastModifiedById: string = "56bfcf3b-3e98-4098-ae8f-2adcb657cb57",
+  lastModifiedById: string = "8ff3e71d-eb02-425d-8e0f-00a69fc8e482",
 ): Promise<InflowProduct & { isCloudSynced: boolean }> {
   const trimmedName = product.name?.trim() || "";
 
@@ -160,12 +141,15 @@ export class ProductSyncMapService {
     selectedRecords?: any[],
     syncedAll?: boolean,
 <<<<<<< HEAD
+<<<<<<< HEAD
     brandCustomName?: string, 
     after: string | undefined = undefined
   ) {
     const { onProgress } = options;
 =======
     brandCustomName?: string,
+=======
+>>>>>>> 26da4154f735a2a903d33db29396bf1d14802e10
     after: string | undefined = undefined
   ) {
     const { onProgress, checkSignal } = options;
@@ -188,13 +172,8 @@ export class ProductSyncMapService {
 
     const allowedIds =
       !syncedAll && selectedRecords && selectedRecords.length > 0
-        ? new Set(selectedRecords.map((item) => String(item.id ?? item.productId)))
+        ? new Set(selectedRecords.map((id) => String(id)))
         : null;
-
-    const defaultCategory = await prisma.category.findFirst({
-          where: { isDefault: true },
-          select: { inflowId: true, name: true, isDefault: true },
-        });
 
     const syncResults: Array<{
       productLocalId: string;
@@ -202,6 +181,7 @@ export class ProductSyncMapService {
       status: "synced" | "skipped_not_found";
     }> = [];
 
+<<<<<<< HEAD
     const caches = {
       verifiedTeamMemberIds: new Set<string>(),
       verifiedCategoryIds: new Set<string>(),
@@ -226,6 +206,8 @@ export class ProductSyncMapService {
 
       // 1. Fetch current batch from local endpoint
 =======
+=======
+>>>>>>> 26da4154f735a2a903d33db29396bf1d14802e10
     console.log(`Starting optimized product sync map (Batch Size: ${BATCH_SIZE}, Throttle: ${INTER_BATCH_DELAY}ms)...`);
     let batchNo = 0;
 
@@ -566,6 +548,9 @@ export class ProductSyncMapService {
     };
   }
 }
+
+const productService = new ProductSyncMapService();
+export const localProductServiceMap = productService.sync.bind(productService);
 
 // import { prisma } from "@/lib/prisma";
 // import { getLocalBatchProducts } from "../data/product-local";

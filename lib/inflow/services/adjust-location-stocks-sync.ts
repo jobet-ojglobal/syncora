@@ -340,7 +340,7 @@ export class InventoryLocationSyncService {
     failedIds: string[];
   }> {
     const batchStartTime = performance.now();
-    const modifiedById = "56bfcf3b-3e98-4098-ae8f-2adcb657cb57";
+    const modifiedById = "8ff3e71d-eb02-425d-8e0f-00a69fc8e482";
 
     const locationAdjustmentMap = new Map<string, SyncAdjustmentLine[]>();
 
@@ -601,7 +601,7 @@ export class InventoryLocationSyncService {
   //   failedIds: string[];
   // }> {
   //   const batchStartTime = performance.now();
-  //   const modifiedById = "56bfcf3b-3e98-4098-ae8f-2adcb657cb57";
+  //   const modifiedById = "8ff3e71d-eb02-425d-8e0f-00a69fc8e482";
 
   //   const locationAdjustmentMap = new Map<string, SyncAdjustmentLine[]>();
 
@@ -823,7 +823,7 @@ export class InventoryLocationSyncService {
     failedIds: string[];
   }> {
     const batchStartTime = performance.now();
-    const modifiedById = "56bfcf3b-3e98-4098-ae8f-2adcb657cb57";
+    const modifiedById = "8ff3e71d-eb02-425d-8e0f-00a69fc8e482";
 
     const locationAdjustmentMap = new Map<string, SyncAdjustmentLine[]>();
 
@@ -1153,7 +1153,7 @@ export const inventoryStockLocationSyncService = new InventoryLocationSyncServic
 //   failedIds: string[];
 // }> {
 //   const batchStartTime = performance.now();
-//   const modifiedById = "56bfcf3b-3e98-4098-ae8f-2adcb657cb57";
+//   const modifiedById = "8ff3e71d-eb02-425d-8e0f-00a69fc8e482";
 
 //   const locationAdjustmentMap = new Map<string, SyncAdjustmentLine[]>();
 

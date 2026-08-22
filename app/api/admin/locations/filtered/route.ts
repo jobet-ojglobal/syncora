@@ -16,6 +16,7 @@ export interface LocationRow {
   inflowId: string;
   name: string;
   type: LocationType;
+  isDefault: boolean;
   status: LocationStatus;
   addressLine1: string;
   addressLine2?: string | null;
@@ -63,13 +64,10 @@ export async function GET(request: NextRequest) {
     }
 
     // Filter nested address parameters
-    const addressWhere: Prisma.LocationAddressWhereInput = {};
-    if (type !== "ALL") addressWhere.addressType = { equals: type, mode: "insensitive" };
-
-    if (Object.keys(addressWhere).length > 0) {
-      conditions.push({ address: addressWhere });
+    if (type !== "ALL") {
+      conditions.push({ locationType: type as LocationType});
     }
-
+ 
     // Full-text search across location fields, address, and sublocations
     if (search) {
       conditions.push({
@@ -147,13 +145,14 @@ export async function GET(request: NextRequest) {
       );
 
       const derivedType: LocationType =
-        (loc.address?.addressType?.toUpperCase() as LocationType) || "WAREHOUSE";
+        (loc.locationType?.toUpperCase() as LocationType) || "WAREHOUSE";
 
       return {
         id: loc.id,
         inflowId: loc.inflowId,
         name: loc.name,
         type: derivedType,
+        isDefault: loc.isDefault,
         status: loc.status,
         addressLine1: loc.address?.address1 ?? "N/A",
         addressLine2: loc.address?.address2 ?? null,

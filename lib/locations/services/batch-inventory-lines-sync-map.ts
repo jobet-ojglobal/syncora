@@ -1,11 +1,12 @@
 import { prisma } from "@/lib/prisma";
 import { syncInventoryLines } from "./inventory-line-sync.return-adjustments";
-import { LocalProductInventory, SyncOptions } from "../types";
-import { getLocalInventoryLines } from "../data/product-local";
+import { LocalProductInventory } from "../types";
+import { getLocalBatchInventory } from "../data/product-local";
 import { MidWebhookJobData } from "@/lib/workers/mid.worker";
 import { getMidSyncQueue } from "@/lib/queues/sync.queue";
 import { generateAdjustmentNumber } from "@/utils/adjustment-number";
 import { InflowStockAdjustInput, InflowStockAdjustmentLine } from "@/lib/inflow/types";
+import { SyncOptions } from "@/lib/workers/types";
 
 export class InventorySyncService {
   private sleep(ms: number) {
@@ -35,10 +36,9 @@ export class InventorySyncService {
     const { onProgress, checkSignal,  batchSize, delayBetweenBatchesMs  } = options;
     const BATCH_SIZE = batchSize ?? 500;
     const INTER_BATCH_DELAY = delayBetweenBatchesMs ?? 300;
-    const CLIENT_RETRIES = 1;
 
     const reason = await this.getAdjustmentReason('Integration import');
-    const modifiedBy = "56bfcf3b-3e98-4098-ae8f-2adcb657cb57";
+    const modifiedBy = "8ff3e71d-eb02-425d-8e0f-00a69fc8e482";
 
     const caches = {
       verifiedLocationIds: new Set<string>(),
@@ -51,7 +51,7 @@ export class InventorySyncService {
 
     const allowedIds =
       !syncedAll && selectedRecords && selectedRecords.length > 0
-        ? new Set(selectedRecords.map((item) => String(item.id ?? item.productId)))
+        ? new Set(selectedRecords.map((id) => String(id)))
         : null;
 
     console.log(`Starting batch inventory sync map (Batch Size: ${BATCH_SIZE}, Throttle: ${INTER_BATCH_DELAY}ms)...`);
@@ -61,11 +61,10 @@ export class InventorySyncService {
       // 1. Check signal before starting remote fetch
       if (checkSignal) await checkSignal();
 
-      const rawBatch: LocalProductInventory[] = await getLocalInventoryLines(
+      const rawBatch: LocalProductInventory[] = await getLocalBatchInventory(
         location.url,
         BATCH_SIZE,
         after,
-        CLIENT_RETRIES
       );
 
       if (!rawBatch || rawBatch.length === 0) break;

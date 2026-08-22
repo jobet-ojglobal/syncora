@@ -1,10 +1,10 @@
 import { prisma } from "@/lib/prisma";
 import crypto from "crypto";
-import { SyncOptions } from "../types";
 import { Prisma } from "@/generated/prisma/client";
 import { getLocalBatchCategories, LocalCategory } from "../data/category";
 import { InflowCategory } from "@/lib/inflow/types";
 import { genInflowUniqueSlug } from "@/helpers/genUniqueSlug";
+import { SyncOptions } from "@/lib/workers/types";
 
 type DbClient = Prisma.TransactionClient;
 
@@ -93,7 +93,7 @@ export class CategorySyncMapService {
    * Universal Reusable Sub-Batch Transaction Processor.
    * Processes a concrete set of local categories within a transaction context.
    */
-  async syncBatch(
+  async syncMap(
     tx: DbClient,
     records: LocalCategory[],
     locationInflowId: string,
@@ -185,6 +185,82 @@ export class CategorySyncMapService {
     return { processedCount, results };
   }
 
+  async map(
+    tx: DbClient,
+    records: LocalCategory[],
+    locationInflowId: string,
+    caches: SyncCache,
+    checkSignal?: () => Promise<void>
+  ) {
+    const results: Array<{
+      dataLocalId: string;
+      dataInflowId?: string;
+      status: "synced" | "skipped_not_found";
+    }> = [];
+
+    let processedCount = 0;
+
+    for (const data of records) {
+      if (checkSignal) await checkSignal();
+
+      const trimmedName = data.name?.trim();
+      if (!trimmedName) {
+        results.push({
+          dataLocalId: String(data.categoryId),
+          status: "skipped_not_found",
+        });
+        continue;
+      }
+
+      // 1. Check existing match by name
+      const match = await tx.category.findFirst({
+        where: { name: trimmedName },
+        select: { inflowId: true },
+      });
+
+      if (!match?.inflowId) {
+        results.push({
+          dataLocalId: String(data.categoryId),
+          status: "skipped_not_found",
+        });
+        continue;
+      }
+
+      // 3. Ensure local location bridge mapping
+      const localIdNum = Number(data.categoryId);
+      const locationMap = await tx.categoryLocationMap.findUnique({
+        where: {
+          categoryId_locationId: {
+            categoryId: match.inflowId,
+            locationId: locationInflowId,
+          },
+        },
+        select: { localId: true },
+      });
+
+      if (!locationMap) {
+        await tx.categoryLocationMap.create({
+          data: {
+            categoryId: match.inflowId,
+            locationId: locationInflowId,
+            localId: !isNaN(localIdNum) ? localIdNum : 0,
+          },
+          select: { localId: true },
+        });
+      }
+
+      results.push({
+        dataLocalId: String(data.categoryId),
+        dataInflowId: match.inflowId,
+        status: "synced",
+      });
+
+      processedCount++;
+    }
+
+    return { processedCount, results };
+  }
+
   /**
    * Main Driver Method for Paged/Iterative Inflow API or DB category syncs.
    */
@@ -195,7 +271,7 @@ export class CategorySyncMapService {
       url: string;
     },
     options: SyncOptions,
-    selectedRecords?: any[],
+    selectedRecords?: string[],
     syncedAll?: boolean,
     after: string | undefined = undefined,
   ) {
@@ -208,7 +284,7 @@ export class CategorySyncMapService {
 
     const allowedIds =
       !syncedAll && selectedRecords && selectedRecords.length > 0
-        ? new Set(selectedRecords.map((item) => String(item.id ?? item.categoryId)))
+        ? new Set(selectedRecords.map((id) => String(id)))
         : null;
 
     const syncResults: Array<{
@@ -240,7 +316,6 @@ export class CategorySyncMapService {
       if (allowedIds) {
         batch = batch.filter((item) => allowedIds.has(String(item.categoryId)));
       }
-
       if (batch.length === 0) continue;
 
       if (checkSignal) await checkSignal();
@@ -248,7 +323,7 @@ export class CategorySyncMapService {
       // Execute transaction for current batch
       const { processedCount, results } = await prisma.$transaction(
         async (tx) => {
-          return await this.syncBatch(
+          return await this.map(
             tx,
             batch,
             location.inflowId,
@@ -281,3 +356,6 @@ export class CategorySyncMapService {
     };
   }
 }
+
+const categoryService = new CategorySyncMapService();
+export const localCategoryServiceMap = categoryService.sync.bind(categoryService);

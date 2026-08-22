@@ -330,7 +330,7 @@ export class SublocationInventoryAdjustOutSyncService {
   ) {
     let processedCount = 0;
     const currentTimestamp = new Date().toISOString();
-    const modifiedById = "56bfcf3b-3e98-4098-ae8f-2adcb657cb57";
+    const modifiedById = "8ff3e71d-eb02-425d-8e0f-00a69fc8e482";
 
     for (const product of products) {
       if (checkSignal) await checkSignal();
@@ -412,7 +412,7 @@ export class SublocationInventoryAdjustOutSyncService {
   ) {
     let processedCount = 0;
     const currentTimestamp = new Date().toISOString();
-    const modifiedById = "56bfcf3b-3e98-4098-ae8f-2adcb657cb57";
+    const modifiedById = "8ff3e71d-eb02-425d-8e0f-00a69fc8e482";
 
     // Group adjustments by target Location ID
     const locationAdjustmentMap = new Map<string, SyncAdjustmentLine[]>();

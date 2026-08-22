@@ -33,6 +33,7 @@ type SyncButtonProps = {
   locationId: string;
   source: string;
   title: string;
+  isDisabled: boolean;
 };
 
 export interface SyncSubOption {
@@ -105,7 +106,7 @@ const STATIC_SYNC_CONFIG_REGISTRY: Record<string, SyncOption[]> = {
   ],
 };
 
-export function SyncButtonOptionsPreview({ locationId, source, title }: SyncButtonProps) {
+export function SyncButtonOptionsPreview({ locationId, source, title, isDisabled }: SyncButtonProps) {
   const [jobId, setJobId] = useState<string | null>(null);
   const [progress, setProgress] = useState(0);
   const [status, setStatus] = useState("");
@@ -422,11 +423,11 @@ export function SyncButtonOptionsPreview({ locationId, source, title }: SyncButt
     <div className="space-y-3">
       <Button
         onClick={() => setIsModalOpen(true)}
-        disabled={isSyncing}
+        disabled={isSyncing || isDisabled}
         className="w-full rounded-xl flex items-center justify-center gap-2"
       >
         {isSyncing && <Loader2 className="h-4 w-4 animate-spin" />}
-        {isSyncing ? `${title} Syncing...` : `Sync ${title}`}
+        {isSyncing ? `${title} Syncing...` : `${title}`}
       </Button>
 
       <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>

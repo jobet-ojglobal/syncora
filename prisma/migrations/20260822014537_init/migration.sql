@@ -2,16 +2,31 @@
 CREATE TYPE "UserRole" AS ENUM ('Admin', 'StoreManager', 'Customer', 'InventoryClerk', 'SalesAssociate', 'Cashier', 'WarehouseStaff', 'Auditor', 'SupportStaff');
 
 -- CreateEnum
+CREATE TYPE "ProductType" AS ENUM ('StockedProduct', 'NonstockedProduct', 'Service');
+
+-- CreateEnum
 CREATE TYPE "ProductPriceType" AS ENUM ('FixedPrice', 'FixedMarkup');
+
+-- CreateEnum
+CREATE TYPE "ReorderSettingMethod" AS ENUM ('PurchaseOrder', 'StockTransfer');
 
 -- CreateEnum
 CREATE TYPE "UomCategory" AS ENUM ('COUNT', 'WEIGHT', 'VOLUME', 'LENGTH', 'AREA');
 
 -- CreateEnum
-CREATE TYPE "InventoryAdjustmentReason" AS ENUM ('STOCK_COUNT', 'DAMAGE', 'LOSS', 'THEFT', 'EXPIRED', 'RETURN', 'CORRECTION', 'MANUAL');
+CREATE TYPE "LocationStatus" AS ENUM ('ACTIVE', 'INACTIVE', 'MAINTENANCE');
 
 -- CreateEnum
-CREATE TYPE "AdjustmentStatus" AS ENUM ('DRAFT', 'POSTED', 'VOIDED');
+CREATE TYPE "SerialStatus" AS ENUM ('IN_STOCK', 'RESERVED', 'SOLD', 'DAMAGED');
+
+-- CreateEnum
+CREATE TYPE "AdjustmentStatus" AS ENUM ('DRAFT', 'POSTED', 'VOIDED', 'REVERTED');
+
+-- CreateEnum
+CREATE TYPE "InventoryAdjustmentLineReason" AS ENUM ('STOCK_COUNT', 'DAMAGE', 'LOSS', 'THEFT', 'EXPIRED', 'RETURN', 'CORRECTION', 'MANUAL');
+
+-- CreateEnum
+CREATE TYPE "InventorySerialAdjustmentAction" AS ENUM ('ADD', 'REMOVE', 'MOVE', 'VERIFY');
 
 -- CreateEnum
 CREATE TYPE "InventoryReferenceType" AS ENUM ('SALES_ORDER', 'PURCHASE_ORDER', 'TRANSFER_ORDER', 'ADJUSTMENT', 'RETURN', 'STOCK_COUNT');
@@ -20,7 +35,7 @@ CREATE TYPE "InventoryReferenceType" AS ENUM ('SALES_ORDER', 'PURCHASE_ORDER', '
 CREATE TYPE "InventoryTransactionType" AS ENUM ('PURCHASE', 'PURCHASE_RETURN', 'SALE', 'SALES_RETURN', 'TRANSFER_IN', 'TRANSFER_OUT', 'ADJUSTMENT', 'STOCK_COUNT', 'PRODUCTION_IN', 'PRODUCTION_OUT', 'OPENING_BALANCE');
 
 -- CreateEnum
-CREATE TYPE "TransferOrderStatus" AS ENUM ('DRAFT', 'PENDING', 'IN_TRANSIT', 'RECEIVED', 'CANCELLED');
+CREATE TYPE "TransferOrderStatus" AS ENUM ('DRAFT', 'PENDING', 'IN_TRANSIT', 'RECEIVED', 'PARTIALLY_RECEIVED', 'RECEIVED_DISCREPANCY', 'CANCELLED');
 
 -- CreateEnum
 CREATE TYPE "AccessRight" AS ENUM ('SalesOrderView', 'SalesOrderEdit', 'SalesOrderPick', 'SalesOrderPrioritization', 'CustomerView', 'CustomerEdit', 'SalesPriceEdit', 'PurchaseOrderView', 'PurchaseOrderEdit', 'PurchaseOrderReceive', 'VendorView', 'VendorEdit', 'ReorderStock', 'CountSheetView', 'CountSheetEdit', 'CountSheetOnly', 'TransferStockView', 'TransferStockEdit', 'AdjustStockView', 'AdjustStockEdit', 'CurrentStockView', 'MovementHistoryView', 'ProductView', 'ProductEdit', 'ProductCostingView', 'ProductCostingEdit', 'ProductCategoryEdit', 'ManufacturingOrderView', 'ManufacturingOrderEdit', 'ManufacturingOrderPrioritization', 'StockroomScanView', 'StockroomScanEdit', 'EstimatedLaborHoursView', 'EstimatedLaborHoursEdit', 'ActualLaborHoursView', 'ActualLaborHoursEdit', 'CurrentOperationsView', 'CurrentOperationsEdit', 'SettingsView', 'SettingsEdit', 'ImportData', 'ExportData', 'BackupData', 'PrintSettingsView', 'PrintSettingsEdit', 'ResetAllData', 'Integrations', 'Reports');
@@ -32,13 +47,19 @@ CREATE TYPE "AddressType" AS ENUM ('Commercial', 'Residential');
 CREATE TYPE "CurrencyNegativeType" AS ENUM ('Leading', 'Trailing', 'Parentheses');
 
 -- CreateEnum
-CREATE TYPE "SalesOrderStatus" AS ENUM ('DRAFT', 'CONFIRMED', 'PICKING', 'PACKED', 'SHIPPED', 'COMPLETED', 'CANCELLED');
+CREATE TYPE "SalesOrderPaymentStatus" AS ENUM ('OWING', 'UNINVOICED', 'INVOICED', 'QUOTE', 'PAID');
 
 -- CreateEnum
-CREATE TYPE "PaymentStatus" AS ENUM ('UNPAID', 'PARTIALLY_PAID', 'PAID', 'REFUNDED');
+CREATE TYPE "SalesOrderInventoryStatus" AS ENUM ('STARTED', 'UNFULFILLED', 'FULFILLED', 'QUOTE');
 
 -- CreateEnum
 CREATE TYPE "ReservationStatus" AS ENUM ('STAT');
+
+-- CreateEnum
+CREATE TYPE "PurchaseOrderPaymentStatus" AS ENUM ('OWING', 'UNPAID', 'PAID', 'PARTIAL', 'QUOTE');
+
+-- CreateEnum
+CREATE TYPE "PurchaseOrderInventoryStatus" AS ENUM ('STARTED', 'UNFULFILLED', 'FULFILLED', 'QUOTE');
 
 -- CreateTable
 CREATE TABLE "sync_job" (
@@ -46,8 +67,11 @@ CREATE TABLE "sync_job" (
     "source" TEXT NOT NULL,
     "status" TEXT NOT NULL DEFAULT 'pending',
     "progress" INTEGER NOT NULL DEFAULT 0,
-    "data" JSONB,
+    "hasError" BOOLEAN NOT NULL DEFAULT false,
     "error" TEXT,
+    "errorType" TEXT,
+    "failedAttempts" INTEGER NOT NULL DEFAULT 0,
+    "data" JSONB,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
 
@@ -173,6 +197,7 @@ CREATE TABLE "category" (
     "inflowId" TEXT NOT NULL,
     "name" TEXT NOT NULL,
     "slug" TEXT NOT NULL,
+    "isDefault" BOOLEAN NOT NULL DEFAULT false,
     "description" TEXT,
     "imageUrl" TEXT,
     "parentId" TEXT,
@@ -255,10 +280,12 @@ CREATE TABLE "product" (
     "name" TEXT NOT NULL,
     "slug" TEXT NOT NULL,
     "description" TEXT,
-    "itemType" TEXT,
+    "itemType" "ProductType",
     "autoAssemble" BOOLEAN NOT NULL DEFAULT false,
     "isActive" BOOLEAN NOT NULL DEFAULT true,
     "isManufacturable" BOOLEAN NOT NULL DEFAULT false,
+    "isCloudSynced" BOOLEAN NOT NULL DEFAULT false,
+    "isLocalSynced" BOOLEAN NOT NULL DEFAULT false,
     "includeQuantityBuildable" BOOLEAN NOT NULL DEFAULT false,
     "standardUomName" TEXT,
     "trackExpiry" BOOLEAN NOT NULL DEFAULT false,
@@ -278,6 +305,7 @@ CREATE TABLE "product" (
     "lastModifiedById" TEXT,
     "brandId" TEXT,
     "categoryId" TEXT,
+    "customFields" JSONB,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
     "deletedAt" TIMESTAMP(3),
@@ -508,7 +536,7 @@ CREATE TABLE "product_reorder_setting" (
     "vendorId" TEXT,
     "defaultSublocation" TEXT,
     "enableReordering" BOOLEAN NOT NULL DEFAULT true,
-    "reorderMethod" TEXT NOT NULL DEFAULT 'PurchaseOrder',
+    "reorderMethod" "ReorderSettingMethod" NOT NULL,
     "reorderPoint" DECIMAL(12,4) NOT NULL,
     "reorderQuantity" DECIMAL(12,4) NOT NULL,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -529,17 +557,18 @@ CREATE TABLE "reorder_setting_location_map" (
 );
 
 -- CreateTable
-CREATE TABLE "product_bom" (
+CREATE TABLE "product_boms" (
     "id" TEXT NOT NULL,
     "inflowId" TEXT NOT NULL,
-    "productId" TEXT NOT NULL,
-    "childProductId" TEXT NOT NULL,
-    "quantity" DECIMAL(12,4) NOT NULL,
-    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updatedAt" TIMESTAMP(3) NOT NULL,
-    "deletedAt" TIMESTAMP(3),
+    "product_id" TEXT NOT NULL,
+    "child_product_id" TEXT NOT NULL,
+    "standardQuantity" DECIMAL(12,4) NOT NULL,
+    "uomQuantity" DECIMAL(12,4) NOT NULL,
+    "uom" TEXT,
+    "serialNumbers" TEXT[],
+    "timestamp" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
-    CONSTRAINT "product_bom_pkey" PRIMARY KEY ("id")
+    CONSTRAINT "product_boms_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
@@ -778,6 +807,7 @@ CREATE TABLE "location" (
     "isActive" BOOLEAN NOT NULL DEFAULT true,
     "isDefault" BOOLEAN NOT NULL DEFAULT false,
     "url" TEXT,
+    "status" "LocationStatus" NOT NULL DEFAULT 'ACTIVE',
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
     "deletedAt" TIMESTAMP(3),
@@ -806,6 +836,7 @@ CREATE TABLE "sublocation" (
     "id" TEXT NOT NULL,
     "locationId" TEXT NOT NULL,
     "name" TEXT NOT NULL,
+    "linkedLocationId" TEXT,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
 
@@ -848,7 +879,6 @@ CREATE TABLE "inventory_bin" (
     "inventoryId" TEXT NOT NULL,
     "sublocationId" TEXT NOT NULL,
     "quantity" DECIMAL(18,4) NOT NULL,
-    "serialNumber" TEXT,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
 
@@ -856,55 +886,17 @@ CREATE TABLE "inventory_bin" (
 );
 
 -- CreateTable
-CREATE TABLE "inventory_adjustment" (
-    "id" TEXT NOT NULL,
-    "adjustmentNumber" TEXT NOT NULL,
-    "reason" "InventoryAdjustmentReason" NOT NULL,
-    "notes" TEXT,
-    "performedById" TEXT NOT NULL,
-    "status" "AdjustmentStatus" NOT NULL,
-    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-
-    CONSTRAINT "inventory_adjustment_pkey" PRIMARY KEY ("id")
-);
-
--- CreateTable
-CREATE TABLE "inventory_adjustment_line" (
-    "id" TEXT NOT NULL,
-    "adjustmentId" TEXT NOT NULL,
-    "inventoryId" TEXT,
-    "productId" TEXT NOT NULL,
-    "locationId" TEXT NOT NULL,
-    "sublocationId" TEXT,
-    "quantityBefore" DECIMAL(18,4) NOT NULL,
-    "quantityAdjusted" DECIMAL(18,4) NOT NULL,
-    "quantityAfter" DECIMAL(18,4) NOT NULL,
-    "reason" TEXT,
-    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-
-    CONSTRAINT "inventory_adjustment_line_pkey" PRIMARY KEY ("id")
-);
-
--- CreateTable
-CREATE TABLE "inventoryLedger" (
+CREATE TABLE "inventory_bin_item" (
     "id" TEXT NOT NULL,
     "productId" TEXT NOT NULL,
     "locationId" TEXT NOT NULL,
-    "sublocationId" TEXT,
-    "transactionType" "InventoryTransactionType" NOT NULL,
-    "referenceType" "InventoryReferenceType",
-    "referenceId" TEXT,
-    "performedById" TEXT,
-    "remarks" TEXT,
-    "unitCost" DECIMAL(65,30),
-    "batchNumber" TEXT,
-    "serialNumber" TEXT,
-    "quantityChange" DECIMAL(18,4) NOT NULL,
-    "quantityBefore" DECIMAL(18,4) NOT NULL,
-    "quantityAfter" DECIMAL(18,4) NOT NULL,
+    "inventoryBinId" TEXT,
+    "serialNumber" TEXT NOT NULL,
+    "status" "SerialStatus" NOT NULL DEFAULT 'IN_STOCK',
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
 
-    CONSTRAINT "inventoryLedger_pkey" PRIMARY KEY ("id")
+    CONSTRAINT "inventory_bin_item_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
@@ -919,6 +911,94 @@ CREATE TABLE "adjustment_reason" (
     "deletedAt" TIMESTAMP(3),
 
     CONSTRAINT "adjustment_reason_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "inventory_adjustment" (
+    "id" TEXT NOT NULL,
+    "inflowId" TEXT NOT NULL,
+    "adjustmentNumber" TEXT NOT NULL,
+    "adjustmentReasonId" TEXT,
+    "remarks" TEXT,
+    "performedById" TEXT NOT NULL,
+    "lastModifiedById" TEXT,
+    "status" "AdjustmentStatus" NOT NULL DEFAULT 'DRAFT',
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "inventory_adjustment_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "inventory_adjustment_line" (
+    "id" TEXT NOT NULL,
+    "inflowId" TEXT NOT NULL,
+    "adjustmentId" TEXT NOT NULL,
+    "inventoryId" TEXT,
+    "productId" TEXT NOT NULL,
+    "locationId" TEXT NOT NULL,
+    "inventoryBinId" TEXT,
+    "quantityBefore" DECIMAL(18,4) NOT NULL,
+    "quantityAdjusted" DECIMAL(18,4) NOT NULL,
+    "quantityAfter" DECIMAL(18,4) NOT NULL,
+    "quantityReserved" DECIMAL(18,4),
+    "reason" "InventoryAdjustmentLineReason",
+    "description" TEXT,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "inventory_adjustment_line_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "inventory_adjustment_line_bin" (
+    "id" TEXT NOT NULL,
+    "adjustmentLineId" TEXT NOT NULL,
+    "sublocationId" TEXT NOT NULL,
+    "quantity" DECIMAL(65,30) NOT NULL,
+
+    CONSTRAINT "inventory_adjustment_line_bin_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "inventory_adjustment_serial" (
+    "id" TEXT NOT NULL,
+    "adjustmentLineId" TEXT NOT NULL,
+    "draftBinId" TEXT,
+    "inventoryBinItemId" TEXT,
+    "serialNumber" TEXT NOT NULL,
+    "action" "InventorySerialAdjustmentAction" NOT NULL,
+    "fromInventoryBinId" TEXT,
+    "toInventoryBinId" TEXT,
+
+    CONSTRAINT "inventory_adjustment_serial_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "inventory_ledger" (
+    "id" TEXT NOT NULL,
+    "productId" TEXT NOT NULL,
+    "locationId" TEXT NOT NULL,
+    "sublocationId" TEXT,
+    "transactionType" "InventoryTransactionType" NOT NULL,
+    "referenceType" "InventoryReferenceType",
+    "referenceId" TEXT,
+    "performedById" TEXT,
+    "fromLocationId" TEXT,
+    "toLocationId" TEXT,
+    "fromSublocationId" TEXT,
+    "toSublocationId" TEXT,
+    "batchNumber" TEXT,
+    "inventoryBinItemId" TEXT,
+    "uomName" TEXT,
+    "quantityChange" DECIMAL(18,4) NOT NULL,
+    "quantityBefore" DECIMAL(18,4) NOT NULL,
+    "quantityAfter" DECIMAL(18,4) NOT NULL,
+    "unitCost" DECIMAL(18,5),
+    "totalCost" DECIMAL(18,5),
+    "remarks" TEXT,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "inventory_ledger_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
@@ -1019,6 +1099,9 @@ CREATE TABLE "transfer_order_line" (
     "targetSublocationId" TEXT,
     "quantity" DECIMAL(18,4) NOT NULL,
     "quantityReceived" DECIMAL(65,30),
+    "description" TEXT,
+    "discrepancyQuantity" DECIMAL(18,4),
+    "discrepancyReason" TEXT,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT "transfer_order_line_pkey" PRIMARY KEY ("id")
@@ -1534,10 +1617,10 @@ CREATE TABLE "sales_order" (
     "orderFreight" DECIMAL(18,5) NOT NULL,
     "returnFee" DECIMAL(18,5) NOT NULL,
     "returnFreight" DECIMAL(18,5) NOT NULL,
-    "exchangeRate" DOUBLE PRECISION NOT NULL DEFAULT 1.0,
+    "exchangeRate" DECIMAL(18,10) NOT NULL DEFAULT 1.0,
     "exchangeRateAutoPulled" TIMESTAMP(3),
-    "paymentStatus" "PaymentStatus" NOT NULL,
-    "inventoryStatus" "SalesOrderStatus" NOT NULL,
+    "paymentStatus" "SalesOrderPaymentStatus" NOT NULL,
+    "inventoryStatus" "SalesOrderInventoryStatus" NOT NULL,
     "isCancelled" BOOLEAN NOT NULL DEFAULT false,
     "isCompleted" BOOLEAN NOT NULL DEFAULT false,
     "isFullyPicked" BOOLEAN NOT NULL DEFAULT false,
@@ -1771,10 +1854,10 @@ CREATE TABLE "purchase_order" (
     "freight" DECIMAL(18,5) NOT NULL,
     "returnFee" DECIMAL(18,5) NOT NULL,
     "returnExtra" DECIMAL(18,5) NOT NULL,
-    "exchangeRate" DOUBLE PRECISION NOT NULL DEFAULT 1.0,
+    "exchangeRate" DECIMAL(18,10) NOT NULL DEFAULT 1.0,
     "exchangeRateAutoPulled" TIMESTAMP(3),
-    "paymentStatus" TEXT NOT NULL,
-    "inventoryStatus" TEXT NOT NULL,
+    "paymentStatus" "PurchaseOrderPaymentStatus" NOT NULL,
+    "inventoryStatus" "PurchaseOrderInventoryStatus" NOT NULL,
     "isCancelled" BOOLEAN NOT NULL DEFAULT false,
     "isCompleted" BOOLEAN NOT NULL DEFAULT false,
     "isQuote" BOOLEAN NOT NULL DEFAULT false,
@@ -1919,6 +2002,9 @@ CREATE INDEX "sync_job_status_idx" ON "sync_job"("status");
 
 -- CreateIndex
 CREATE INDEX "sync_job_createdAt_idx" ON "sync_job"("createdAt");
+
+-- CreateIndex
+CREATE INDEX "sync_job_hasError_idx" ON "sync_job"("hasError");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "inflow_webhook_url_key" ON "inflow_webhook"("url");
@@ -2167,16 +2253,13 @@ CREATE INDEX "reorder_setting_location_map_locationId_localId_idx" ON "reorder_s
 CREATE UNIQUE INDEX "reorder_setting_location_map_reorderSettingId_locationId_key" ON "reorder_setting_location_map"("reorderSettingId", "locationId");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "product_bom_inflowId_key" ON "product_bom"("inflowId");
+CREATE UNIQUE INDEX "product_boms_inflowId_key" ON "product_boms"("inflowId");
 
 -- CreateIndex
-CREATE INDEX "product_bom_productId_idx" ON "product_bom"("productId");
+CREATE INDEX "product_boms_product_id_idx" ON "product_boms"("product_id");
 
 -- CreateIndex
-CREATE INDEX "product_bom_childProductId_idx" ON "product_bom"("childProductId");
-
--- CreateIndex
-CREATE UNIQUE INDEX "product_bom_productId_childProductId_key" ON "product_bom"("productId", "childProductId");
+CREATE INDEX "product_boms_child_product_id_idx" ON "product_boms"("child_product_id");
 
 -- CreateIndex
 CREATE INDEX "product_bom_location_map_locationId_localId_idx" ON "product_bom_location_map"("locationId", "localId");
@@ -2308,7 +2391,28 @@ CREATE INDEX "inventory_bin_sublocationId_idx" ON "inventory_bin"("sublocationId
 CREATE UNIQUE INDEX "inventory_bin_inventoryId_sublocationId_key" ON "inventory_bin"("inventoryId", "sublocationId");
 
 -- CreateIndex
+CREATE UNIQUE INDEX "inventory_bin_item_serialNumber_key" ON "inventory_bin_item"("serialNumber");
+
+-- CreateIndex
+CREATE INDEX "inventory_bin_item_productId_locationId_idx" ON "inventory_bin_item"("productId", "locationId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "adjustment_reason_inflowId_key" ON "adjustment_reason"("inflowId");
+
+-- CreateIndex
+CREATE INDEX "adjustment_reason_name_idx" ON "adjustment_reason"("name");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "inventory_adjustment_inflowId_key" ON "inventory_adjustment"("inflowId");
+
+-- CreateIndex
 CREATE UNIQUE INDEX "inventory_adjustment_adjustmentNumber_key" ON "inventory_adjustment"("adjustmentNumber");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "inventory_adjustment_line_inflowId_key" ON "inventory_adjustment_line"("inflowId");
+
+-- CreateIndex
+CREATE INDEX "inventory_adjustment_line_adjustmentId_idx" ON "inventory_adjustment_line"("adjustmentId");
 
 -- CreateIndex
 CREATE INDEX "inventory_adjustment_line_productId_idx" ON "inventory_adjustment_line"("productId");
@@ -2317,31 +2421,52 @@ CREATE INDEX "inventory_adjustment_line_productId_idx" ON "inventory_adjustment_
 CREATE INDEX "inventory_adjustment_line_locationId_idx" ON "inventory_adjustment_line"("locationId");
 
 -- CreateIndex
-CREATE INDEX "inventoryLedger_productId_createdAt_idx" ON "inventoryLedger"("productId", "createdAt");
+CREATE INDEX "inventory_adjustment_line_inventoryBinId_idx" ON "inventory_adjustment_line"("inventoryBinId");
 
 -- CreateIndex
-CREATE INDEX "inventoryLedger_locationId_createdAt_idx" ON "inventoryLedger"("locationId", "createdAt");
+CREATE INDEX "inventory_adjustment_line_bin_adjustmentLineId_idx" ON "inventory_adjustment_line_bin"("adjustmentLineId");
 
 -- CreateIndex
-CREATE INDEX "inventoryLedger_referenceType_referenceId_idx" ON "inventoryLedger"("referenceType", "referenceId");
+CREATE INDEX "inventory_adjustment_line_bin_sublocationId_idx" ON "inventory_adjustment_line_bin"("sublocationId");
 
 -- CreateIndex
-CREATE INDEX "inventoryLedger_transactionType_idx" ON "inventoryLedger"("transactionType");
+CREATE INDEX "inventory_adjustment_serial_adjustmentLineId_idx" ON "inventory_adjustment_serial"("adjustmentLineId");
 
 -- CreateIndex
-CREATE INDEX "inventoryLedger_createdAt_idx" ON "inventoryLedger"("createdAt");
+CREATE INDEX "inventory_adjustment_serial_draftBinId_idx" ON "inventory_adjustment_serial"("draftBinId");
 
 -- CreateIndex
-CREATE INDEX "inventoryLedger_productId_locationId_createdAt_idx" ON "inventoryLedger"("productId", "locationId", "createdAt");
+CREATE INDEX "inventory_adjustment_serial_inventoryBinItemId_idx" ON "inventory_adjustment_serial"("inventoryBinItemId");
 
 -- CreateIndex
-CREATE INDEX "inventoryLedger_sublocationId_idx" ON "inventoryLedger"("sublocationId");
+CREATE INDEX "inventory_adjustment_serial_fromInventoryBinId_idx" ON "inventory_adjustment_serial"("fromInventoryBinId");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "adjustment_reason_inflowId_key" ON "adjustment_reason"("inflowId");
+CREATE INDEX "inventory_adjustment_serial_toInventoryBinId_idx" ON "inventory_adjustment_serial"("toInventoryBinId");
 
 -- CreateIndex
-CREATE INDEX "adjustment_reason_name_idx" ON "adjustment_reason"("name");
+CREATE INDEX "inventory_adjustment_serial_serialNumber_idx" ON "inventory_adjustment_serial"("serialNumber");
+
+-- CreateIndex
+CREATE INDEX "inventory_ledger_productId_createdAt_idx" ON "inventory_ledger"("productId", "createdAt");
+
+-- CreateIndex
+CREATE INDEX "inventory_ledger_locationId_createdAt_idx" ON "inventory_ledger"("locationId", "createdAt");
+
+-- CreateIndex
+CREATE INDEX "inventory_ledger_referenceType_referenceId_idx" ON "inventory_ledger"("referenceType", "referenceId");
+
+-- CreateIndex
+CREATE INDEX "inventory_ledger_transactionType_idx" ON "inventory_ledger"("transactionType");
+
+-- CreateIndex
+CREATE INDEX "inventory_ledger_createdAt_idx" ON "inventory_ledger"("createdAt");
+
+-- CreateIndex
+CREATE INDEX "inventory_ledger_productId_locationId_createdAt_idx" ON "inventory_ledger"("productId", "locationId", "createdAt");
+
+-- CreateIndex
+CREATE INDEX "inventory_ledger_sublocationId_idx" ON "inventory_ledger"("sublocationId");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "StockAdjustment_inflowId_key" ON "StockAdjustment"("inflowId");
@@ -2809,7 +2934,7 @@ ALTER TABLE "user" ADD CONSTRAINT "user_inflowCustomerId_fkey" FOREIGN KEY ("inf
 ALTER TABLE "category" ADD CONSTRAINT "category_parentId_fkey" FOREIGN KEY ("parentId") REFERENCES "category"("inflowId") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "category_location_map" ADD CONSTRAINT "category_location_map_locationId_fkey" FOREIGN KEY ("locationId") REFERENCES "location"("inflowId") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "category_location_map" ADD CONSTRAINT "category_location_map_locationId_fkey" FOREIGN KEY ("locationId") REFERENCES "location"("inflowId") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "category_location_map" ADD CONSTRAINT "category_location_map_categoryId_fkey" FOREIGN KEY ("categoryId") REFERENCES "category"("inflowId") ON DELETE CASCADE ON UPDATE CASCADE;
@@ -2821,7 +2946,7 @@ ALTER TABLE "product_group" ADD CONSTRAINT "product_group_brandId_fkey" FOREIGN 
 ALTER TABLE "product_group" ADD CONSTRAINT "product_group_categoryId_fkey" FOREIGN KEY ("categoryId") REFERENCES "category"("inflowId") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "product_group_location_map" ADD CONSTRAINT "product_group_location_map_locationId_fkey" FOREIGN KEY ("locationId") REFERENCES "location"("inflowId") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "product_group_location_map" ADD CONSTRAINT "product_group_location_map_locationId_fkey" FOREIGN KEY ("locationId") REFERENCES "location"("inflowId") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "product_group_location_map" ADD CONSTRAINT "product_group_location_map_productGroupId_fkey" FOREIGN KEY ("productGroupId") REFERENCES "product_group"("inflowId") ON DELETE CASCADE ON UPDATE CASCADE;
@@ -2833,7 +2958,7 @@ ALTER TABLE "product_variant" ADD CONSTRAINT "product_variant_productGroupId_fke
 ALTER TABLE "product_variant" ADD CONSTRAINT "product_variant_productId_fkey" FOREIGN KEY ("productId") REFERENCES "product"("inflowId") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "product_variant_location_map" ADD CONSTRAINT "product_variant_location_map_locationId_fkey" FOREIGN KEY ("locationId") REFERENCES "location"("inflowId") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "product_variant_location_map" ADD CONSTRAINT "product_variant_location_map_locationId_fkey" FOREIGN KEY ("locationId") REFERENCES "location"("inflowId") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "product_variant_location_map" ADD CONSTRAINT "product_variant_location_map_productVariantId_fkey" FOREIGN KEY ("productVariantId") REFERENCES "product_variant"("inflowId") ON DELETE CASCADE ON UPDATE CASCADE;
@@ -2851,7 +2976,7 @@ ALTER TABLE "product" ADD CONSTRAINT "product_lastModifiedById_fkey" FOREIGN KEY
 ALTER TABLE "product" ADD CONSTRAINT "product_lastVendorId_fkey" FOREIGN KEY ("lastVendorId") REFERENCES "vendor"("inflowId") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "product_location_map" ADD CONSTRAINT "product_location_map_locationId_fkey" FOREIGN KEY ("locationId") REFERENCES "location"("inflowId") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "product_location_map" ADD CONSTRAINT "product_location_map_locationId_fkey" FOREIGN KEY ("locationId") REFERENCES "location"("inflowId") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "product_location_map" ADD CONSTRAINT "product_location_map_productId_fkey" FOREIGN KEY ("productId") REFERENCES "product"("inflowId") ON DELETE CASCADE ON UPDATE CASCADE;
@@ -2863,7 +2988,7 @@ ALTER TABLE "product_price" ADD CONSTRAINT "product_price_pricingSchemeId_fkey" 
 ALTER TABLE "product_price" ADD CONSTRAINT "product_price_productId_fkey" FOREIGN KEY ("productId") REFERENCES "product"("inflowId") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "product_price_location_map" ADD CONSTRAINT "product_price_location_map_locationId_fkey" FOREIGN KEY ("locationId") REFERENCES "location"("inflowId") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "product_price_location_map" ADD CONSTRAINT "product_price_location_map_locationId_fkey" FOREIGN KEY ("locationId") REFERENCES "location"("inflowId") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "product_price_location_map" ADD CONSTRAINT "product_price_location_map_productPriceId_fkey" FOREIGN KEY ("productPriceId") REFERENCES "product_price"("inflowId") ON DELETE CASCADE ON UPDATE CASCADE;
@@ -2878,7 +3003,7 @@ ALTER TABLE "product_cost_adjustment" ADD CONSTRAINT "product_cost_adjustment_pr
 ALTER TABLE "product_cost_adjustment" ADD CONSTRAINT "product_cost_adjustment_lastModifiedById_fkey" FOREIGN KEY ("lastModifiedById") REFERENCES "team_member"("inflowId") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "product_cost_adjustment_location_map" ADD CONSTRAINT "product_cost_adjustment_location_map_locationId_fkey" FOREIGN KEY ("locationId") REFERENCES "location"("inflowId") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "product_cost_adjustment_location_map" ADD CONSTRAINT "product_cost_adjustment_location_map_locationId_fkey" FOREIGN KEY ("locationId") REFERENCES "location"("inflowId") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "product_cost_adjustment_location_map" ADD CONSTRAINT "product_cost_adjustment_location_map_productCostAdjustment_fkey" FOREIGN KEY ("productCostAdjustmentId") REFERENCES "product_cost_adjustment"("inflowId") ON DELETE CASCADE ON UPDATE CASCADE;
@@ -2887,7 +3012,7 @@ ALTER TABLE "product_cost_adjustment_location_map" ADD CONSTRAINT "product_cost_
 ALTER TABLE "product_barcode" ADD CONSTRAINT "product_barcode_productId_fkey" FOREIGN KEY ("productId") REFERENCES "product"("inflowId") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "product_barcode_location_map" ADD CONSTRAINT "product_barcode_location_map_locationId_fkey" FOREIGN KEY ("locationId") REFERENCES "location"("inflowId") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "product_barcode_location_map" ADD CONSTRAINT "product_barcode_location_map_locationId_fkey" FOREIGN KEY ("locationId") REFERENCES "location"("inflowId") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "product_barcode_location_map" ADD CONSTRAINT "product_barcode_location_map_productBarcodeId_fkey" FOREIGN KEY ("productBarcodeId") REFERENCES "product_barcode"("inflowId") ON DELETE CASCADE ON UPDATE CASCADE;
@@ -2899,13 +3024,13 @@ ALTER TABLE "product_operation" ADD CONSTRAINT "product_operation_productId_fkey
 ALTER TABLE "product_operation" ADD CONSTRAINT "product_operation_operationTypeId_fkey" FOREIGN KEY ("operationTypeId") REFERENCES "operation_type"("inflowId") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "product_operation_location_map" ADD CONSTRAINT "product_operation_location_map_locationId_fkey" FOREIGN KEY ("locationId") REFERENCES "location"("inflowId") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "product_operation_location_map" ADD CONSTRAINT "product_operation_location_map_locationId_fkey" FOREIGN KEY ("locationId") REFERENCES "location"("inflowId") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "product_operation_location_map" ADD CONSTRAINT "product_operation_location_map_productOperationId_fkey" FOREIGN KEY ("productOperationId") REFERENCES "product_operation"("inflowId") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "operation_type_location_map" ADD CONSTRAINT "operation_type_location_map_locationId_fkey" FOREIGN KEY ("locationId") REFERENCES "location"("inflowId") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "operation_type_location_map" ADD CONSTRAINT "operation_type_location_map_locationId_fkey" FOREIGN KEY ("locationId") REFERENCES "location"("inflowId") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "operation_type_location_map" ADD CONSTRAINT "operation_type_location_map_operationTypeId_fkey" FOREIGN KEY ("operationTypeId") REFERENCES "operation_type"("inflowId") ON DELETE CASCADE ON UPDATE CASCADE;
@@ -2926,7 +3051,7 @@ ALTER TABLE "product_attachment" ADD CONSTRAINT "product_attachment_productId_fk
 ALTER TABLE "product_attachment" ADD CONSTRAINT "product_attachment_lastModifiedById_fkey" FOREIGN KEY ("lastModifiedById") REFERENCES "team_member"("inflowId") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "product_attachment_location_map" ADD CONSTRAINT "product_attachment_location_map_locationId_fkey" FOREIGN KEY ("locationId") REFERENCES "location"("inflowId") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "product_attachment_location_map" ADD CONSTRAINT "product_attachment_location_map_locationId_fkey" FOREIGN KEY ("locationId") REFERENCES "location"("inflowId") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "product_attachment_location_map" ADD CONSTRAINT "product_attachment_location_map_productAttachmentId_fkey" FOREIGN KEY ("productAttachmentId") REFERENCES "product_attachment"("inflowId") ON DELETE CASCADE ON UPDATE CASCADE;
@@ -2935,7 +3060,7 @@ ALTER TABLE "product_attachment_location_map" ADD CONSTRAINT "product_attachment
 ALTER TABLE "product_cost" ADD CONSTRAINT "product_cost_productId_fkey" FOREIGN KEY ("productId") REFERENCES "product"("inflowId") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "product_cost_location_map" ADD CONSTRAINT "product_cost_location_map_locationId_fkey" FOREIGN KEY ("locationId") REFERENCES "location"("inflowId") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "product_cost_location_map" ADD CONSTRAINT "product_cost_location_map_locationId_fkey" FOREIGN KEY ("locationId") REFERENCES "location"("inflowId") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "product_cost_location_map" ADD CONSTRAINT "product_cost_location_map_productCostId_fkey" FOREIGN KEY ("productCostId") REFERENCES "product_cost"("inflowId") ON DELETE CASCADE ON UPDATE CASCADE;
@@ -2944,7 +3069,7 @@ ALTER TABLE "product_cost_location_map" ADD CONSTRAINT "product_cost_location_ma
 ALTER TABLE "product_reorder_setting" ADD CONSTRAINT "product_reorder_setting_productId_fkey" FOREIGN KEY ("productId") REFERENCES "product"("inflowId") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "product_reorder_setting" ADD CONSTRAINT "product_reorder_setting_locationId_fkey" FOREIGN KEY ("locationId") REFERENCES "location"("inflowId") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "product_reorder_setting" ADD CONSTRAINT "product_reorder_setting_locationId_fkey" FOREIGN KEY ("locationId") REFERENCES "location"("inflowId") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "product_reorder_setting" ADD CONSTRAINT "product_reorder_setting_fromLocationId_fkey" FOREIGN KEY ("fromLocationId") REFERENCES "location"("inflowId") ON DELETE SET NULL ON UPDATE CASCADE;
@@ -2953,22 +3078,22 @@ ALTER TABLE "product_reorder_setting" ADD CONSTRAINT "product_reorder_setting_fr
 ALTER TABLE "product_reorder_setting" ADD CONSTRAINT "product_reorder_setting_vendorId_fkey" FOREIGN KEY ("vendorId") REFERENCES "vendor"("inflowId") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "reorder_setting_location_map" ADD CONSTRAINT "reorder_setting_location_map_locationId_fkey" FOREIGN KEY ("locationId") REFERENCES "location"("inflowId") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "reorder_setting_location_map" ADD CONSTRAINT "reorder_setting_location_map_locationId_fkey" FOREIGN KEY ("locationId") REFERENCES "location"("inflowId") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "reorder_setting_location_map" ADD CONSTRAINT "reorder_setting_location_map_reorderSettingId_fkey" FOREIGN KEY ("reorderSettingId") REFERENCES "product_reorder_setting"("inflowId") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "product_bom" ADD CONSTRAINT "product_bom_productId_fkey" FOREIGN KEY ("productId") REFERENCES "product"("inflowId") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "product_boms" ADD CONSTRAINT "product_boms_product_id_fkey" FOREIGN KEY ("product_id") REFERENCES "product"("inflowId") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "product_bom" ADD CONSTRAINT "product_bom_childProductId_fkey" FOREIGN KEY ("childProductId") REFERENCES "product"("inflowId") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "product_boms" ADD CONSTRAINT "product_boms_child_product_id_fkey" FOREIGN KEY ("child_product_id") REFERENCES "product"("inflowId") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "product_bom_location_map" ADD CONSTRAINT "product_bom_location_map_locationId_fkey" FOREIGN KEY ("locationId") REFERENCES "location"("inflowId") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "product_bom_location_map" ADD CONSTRAINT "product_bom_location_map_locationId_fkey" FOREIGN KEY ("locationId") REFERENCES "location"("inflowId") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "product_bom_location_map" ADD CONSTRAINT "product_bom_location_map_productBomId_fkey" FOREIGN KEY ("productBomId") REFERENCES "product_bom"("inflowId") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "product_bom_location_map" ADD CONSTRAINT "product_bom_location_map_productBomId_fkey" FOREIGN KEY ("productBomId") REFERENCES "product_boms"("inflowId") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "product_uom" ADD CONSTRAINT "product_uom_productId_fkey" FOREIGN KEY ("productId") REFERENCES "product"("inflowId") ON DELETE CASCADE ON UPDATE CASCADE;
@@ -2995,7 +3120,7 @@ ALTER TABLE "product_image" ADD CONSTRAINT "product_image_groupId_fkey" FOREIGN 
 ALTER TABLE "product_image" ADD CONSTRAINT "product_image_productId_fkey" FOREIGN KEY ("productId") REFERENCES "product"("inflowId") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "product_image_location_map" ADD CONSTRAINT "product_image_location_map_locationId_fkey" FOREIGN KEY ("locationId") REFERENCES "location"("inflowId") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "product_image_location_map" ADD CONSTRAINT "product_image_location_map_locationId_fkey" FOREIGN KEY ("locationId") REFERENCES "location"("inflowId") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "product_image_location_map" ADD CONSTRAINT "product_image_location_map_productImageId_fkey" FOREIGN KEY ("productImageId") REFERENCES "product_image"("inflowId") ON DELETE CASCADE ON UPDATE CASCADE;
@@ -3019,7 +3144,7 @@ ALTER TABLE "product_group_option" ADD CONSTRAINT "product_group_option_attribut
 ALTER TABLE "product_group_option" ADD CONSTRAINT "product_group_option_productGroupId_fkey" FOREIGN KEY ("productGroupId") REFERENCES "product_group"("inflowId") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "product_group_option_location_map" ADD CONSTRAINT "product_group_option_location_map_locationId_fkey" FOREIGN KEY ("locationId") REFERENCES "location"("inflowId") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "product_group_option_location_map" ADD CONSTRAINT "product_group_option_location_map_locationId_fkey" FOREIGN KEY ("locationId") REFERENCES "location"("inflowId") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "product_group_option_location_map" ADD CONSTRAINT "product_group_option_location_map_productGroupOptionId_fkey" FOREIGN KEY ("productGroupOptionId") REFERENCES "product_group_option"("inflowId") ON DELETE CASCADE ON UPDATE CASCADE;
@@ -3031,7 +3156,7 @@ ALTER TABLE "product_group_option_value" ADD CONSTRAINT "product_group_option_va
 ALTER TABLE "product_group_option_value" ADD CONSTRAINT "product_group_option_value_optionId_fkey" FOREIGN KEY ("optionId") REFERENCES "product_group_option"("inflowId") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "product_group_option_value_location_map" ADD CONSTRAINT "product_group_option_value_location_map_locationId_fkey" FOREIGN KEY ("locationId") REFERENCES "location"("inflowId") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "product_group_option_value_location_map" ADD CONSTRAINT "product_group_option_value_location_map_locationId_fkey" FOREIGN KEY ("locationId") REFERENCES "location"("inflowId") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "product_group_option_value_location_map" ADD CONSTRAINT "product_group_option_value_location_map_productGroupOption_fkey" FOREIGN KEY ("productGroupOptionValueId") REFERENCES "product_group_option_value"("inflowId") ON DELETE CASCADE ON UPDATE CASCADE;
@@ -3076,6 +3201,9 @@ ALTER TABLE "location_address" ADD CONSTRAINT "location_address_locationId_fkey"
 ALTER TABLE "sublocation" ADD CONSTRAINT "sublocation_locationId_fkey" FOREIGN KEY ("locationId") REFERENCES "location"("inflowId") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
+ALTER TABLE "sublocation" ADD CONSTRAINT "sublocation_linkedLocationId_fkey" FOREIGN KEY ("linkedLocationId") REFERENCES "location"("inflowId") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
 ALTER TABLE "sublocation_location_map" ADD CONSTRAINT "sublocation_location_map_locationId_fkey" FOREIGN KEY ("locationId") REFERENCES "location"("inflowId") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
@@ -3097,10 +3225,25 @@ ALTER TABLE "inventory_bin" ADD CONSTRAINT "inventory_bin_inventoryId_fkey" FORE
 ALTER TABLE "inventory_bin" ADD CONSTRAINT "inventory_bin_sublocationId_fkey" FOREIGN KEY ("sublocationId") REFERENCES "sublocation"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "inventory_adjustment" ADD CONSTRAINT "inventory_adjustment_performedById_fkey" FOREIGN KEY ("performedById") REFERENCES "user"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "inventory_bin_item" ADD CONSTRAINT "inventory_bin_item_productId_fkey" FOREIGN KEY ("productId") REFERENCES "product"("inflowId") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "inventory_adjustment_line" ADD CONSTRAINT "inventory_adjustment_line_adjustmentId_fkey" FOREIGN KEY ("adjustmentId") REFERENCES "inventory_adjustment"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "inventory_bin_item" ADD CONSTRAINT "inventory_bin_item_locationId_fkey" FOREIGN KEY ("locationId") REFERENCES "location"("inflowId") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "inventory_bin_item" ADD CONSTRAINT "inventory_bin_item_inventoryBinId_fkey" FOREIGN KEY ("inventoryBinId") REFERENCES "inventory_bin"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "inventory_adjustment" ADD CONSTRAINT "inventory_adjustment_performedById_fkey" FOREIGN KEY ("performedById") REFERENCES "team_member"("inflowId") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "inventory_adjustment" ADD CONSTRAINT "inventory_adjustment_lastModifiedById_fkey" FOREIGN KEY ("lastModifiedById") REFERENCES "team_member"("inflowId") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "inventory_adjustment" ADD CONSTRAINT "inventory_adjustment_adjustmentReasonId_fkey" FOREIGN KEY ("adjustmentReasonId") REFERENCES "adjustment_reason"("inflowId") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "inventory_adjustment_line" ADD CONSTRAINT "inventory_adjustment_line_adjustmentId_fkey" FOREIGN KEY ("adjustmentId") REFERENCES "inventory_adjustment"("inflowId") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "inventory_adjustment_line" ADD CONSTRAINT "inventory_adjustment_line_productId_fkey" FOREIGN KEY ("productId") REFERENCES "product"("inflowId") ON DELETE CASCADE ON UPDATE CASCADE;
@@ -3109,25 +3252,55 @@ ALTER TABLE "inventory_adjustment_line" ADD CONSTRAINT "inventory_adjustment_lin
 ALTER TABLE "inventory_adjustment_line" ADD CONSTRAINT "inventory_adjustment_line_locationId_fkey" FOREIGN KEY ("locationId") REFERENCES "location"("inflowId") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "inventory_adjustment_line" ADD CONSTRAINT "inventory_adjustment_line_sublocationId_fkey" FOREIGN KEY ("sublocationId") REFERENCES "sublocation"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "inventory_adjustment_line" ADD CONSTRAINT "inventory_adjustment_line_inventoryBinId_fkey" FOREIGN KEY ("inventoryBinId") REFERENCES "inventory_bin"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "inventoryLedger" ADD CONSTRAINT "inventoryLedger_productId_fkey" FOREIGN KEY ("productId") REFERENCES "product"("inflowId") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "inventory_adjustment_line_bin" ADD CONSTRAINT "inventory_adjustment_line_bin_adjustmentLineId_fkey" FOREIGN KEY ("adjustmentLineId") REFERENCES "inventory_adjustment_line"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "inventoryLedger" ADD CONSTRAINT "inventoryLedger_locationId_fkey" FOREIGN KEY ("locationId") REFERENCES "location"("inflowId") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "inventory_adjustment_line_bin" ADD CONSTRAINT "inventory_adjustment_line_bin_sublocationId_fkey" FOREIGN KEY ("sublocationId") REFERENCES "sublocation"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "inventoryLedger" ADD CONSTRAINT "inventoryLedger_performedById_fkey" FOREIGN KEY ("performedById") REFERENCES "team_member"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+ALTER TABLE "inventory_adjustment_serial" ADD CONSTRAINT "inventory_adjustment_serial_adjustmentLineId_fkey" FOREIGN KEY ("adjustmentLineId") REFERENCES "inventory_adjustment_line"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "inventoryLedger" ADD CONSTRAINT "inventoryLedger_sublocationId_fkey" FOREIGN KEY ("sublocationId") REFERENCES "sublocation"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+ALTER TABLE "inventory_adjustment_serial" ADD CONSTRAINT "inventory_adjustment_serial_draftBinId_fkey" FOREIGN KEY ("draftBinId") REFERENCES "inventory_adjustment_line_bin"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "inventory_adjustment_serial" ADD CONSTRAINT "inventory_adjustment_serial_inventoryBinItemId_fkey" FOREIGN KEY ("inventoryBinItemId") REFERENCES "inventory_bin_item"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "inventory_adjustment_serial" ADD CONSTRAINT "inventory_adjustment_serial_fromInventoryBinId_fkey" FOREIGN KEY ("fromInventoryBinId") REFERENCES "inventory_bin"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "inventory_adjustment_serial" ADD CONSTRAINT "inventory_adjustment_serial_toInventoryBinId_fkey" FOREIGN KEY ("toInventoryBinId") REFERENCES "inventory_bin"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "inventory_ledger" ADD CONSTRAINT "inventory_ledger_productId_fkey" FOREIGN KEY ("productId") REFERENCES "product"("inflowId") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "inventory_ledger" ADD CONSTRAINT "inventory_ledger_locationId_fkey" FOREIGN KEY ("locationId") REFERENCES "location"("inflowId") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "inventory_ledger" ADD CONSTRAINT "inventory_ledger_sublocationId_fkey" FOREIGN KEY ("sublocationId") REFERENCES "sublocation"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "inventory_ledger" ADD CONSTRAINT "inventory_ledger_performedById_fkey" FOREIGN KEY ("performedById") REFERENCES "team_member"("inflowId") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "inventory_ledger" ADD CONSTRAINT "inventory_ledger_inventoryBinItemId_fkey" FOREIGN KEY ("inventoryBinItemId") REFERENCES "inventory_bin_item"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "inventory_ledger" ADD CONSTRAINT "inventory_ledger_fromLocationId_fkey" FOREIGN KEY ("fromLocationId") REFERENCES "location"("inflowId") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "inventory_ledger" ADD CONSTRAINT "inventory_ledger_toLocationId_fkey" FOREIGN KEY ("toLocationId") REFERENCES "location"("inflowId") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "StockAdjustment" ADD CONSTRAINT "StockAdjustment_adjustmentReasonId_fkey" FOREIGN KEY ("adjustmentReasonId") REFERENCES "adjustment_reason"("inflowId") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "StockAdjustment" ADD CONSTRAINT "StockAdjustment_locationId_fkey" FOREIGN KEY ("locationId") REFERENCES "location"("inflowId") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "StockAdjustment" ADD CONSTRAINT "StockAdjustment_locationId_fkey" FOREIGN KEY ("locationId") REFERENCES "location"("inflowId") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "StockAdjustment" ADD CONSTRAINT "StockAdjustment_lastModifiedById_fkey" FOREIGN KEY ("lastModifiedById") REFERENCES "team_member"("inflowId") ON DELETE SET NULL ON UPDATE CASCADE;
@@ -3166,7 +3339,7 @@ ALTER TABLE "transfer_order_line" ADD CONSTRAINT "transfer_order_line_sourceSubl
 ALTER TABLE "transfer_order_line" ADD CONSTRAINT "transfer_order_line_targetSublocationId_fkey" FOREIGN KEY ("targetSublocationId") REFERENCES "sublocation"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "team_member_location_map_extended" ADD CONSTRAINT "team_member_location_map_extended_locationId_fkey" FOREIGN KEY ("locationId") REFERENCES "location"("inflowId") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "team_member_location_map_extended" ADD CONSTRAINT "team_member_location_map_extended_locationId_fkey" FOREIGN KEY ("locationId") REFERENCES "location"("inflowId") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "team_member_location_map_extended" ADD CONSTRAINT "team_member_location_map_extended_teamMemberId_fkey" FOREIGN KEY ("teamMemberId") REFERENCES "team_member"("inflowId") ON DELETE CASCADE ON UPDATE CASCADE;
@@ -3211,7 +3384,7 @@ ALTER TABLE "customer" ADD CONSTRAINT "customer_defaultBillingAddressId_fkey" FO
 ALTER TABLE "customer" ADD CONSTRAINT "customer_defaultShippingAddressId_fkey" FOREIGN KEY ("defaultShippingAddressId") REFERENCES "business_partner_address"("inflowId") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "customer_location_map" ADD CONSTRAINT "customer_location_map_locationId_fkey" FOREIGN KEY ("locationId") REFERENCES "location"("inflowId") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "customer_location_map" ADD CONSTRAINT "customer_location_map_locationId_fkey" FOREIGN KEY ("locationId") REFERENCES "location"("inflowId") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "customer_location_map" ADD CONSTRAINT "customer_location_map_customerId_fkey" FOREIGN KEY ("customerId") REFERENCES "customer"("inflowId") ON DELETE CASCADE ON UPDATE CASCADE;
@@ -3223,7 +3396,7 @@ ALTER TABLE "customer_due" ADD CONSTRAINT "customer_due_customerId_fkey" FOREIGN
 ALTER TABLE "customer_due" ADD CONSTRAINT "customer_due_currencyId_fkey" FOREIGN KEY ("currencyId") REFERENCES "currency"("inflowId") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "customer_due_location_map" ADD CONSTRAINT "customer_due_location_map_locationId_fkey" FOREIGN KEY ("locationId") REFERENCES "location"("inflowId") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "customer_due_location_map" ADD CONSTRAINT "customer_due_location_map_locationId_fkey" FOREIGN KEY ("locationId") REFERENCES "location"("inflowId") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "customer_due_location_map" ADD CONSTRAINT "customer_due_location_map_customerDueId_fkey" FOREIGN KEY ("customerDueId") REFERENCES "customer_due"("inflowId") ON DELETE CASCADE ON UPDATE CASCADE;
@@ -3235,7 +3408,7 @@ ALTER TABLE "customer_balance" ADD CONSTRAINT "customer_balance_customerId_fkey"
 ALTER TABLE "customer_balance" ADD CONSTRAINT "customer_balance_currencyId_fkey" FOREIGN KEY ("currencyId") REFERENCES "currency"("inflowId") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "customer_balance_location_map" ADD CONSTRAINT "customer_balance_location_map_locationId_fkey" FOREIGN KEY ("locationId") REFERENCES "location"("inflowId") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "customer_balance_location_map" ADD CONSTRAINT "customer_balance_location_map_locationId_fkey" FOREIGN KEY ("locationId") REFERENCES "location"("inflowId") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "customer_balance_location_map" ADD CONSTRAINT "customer_balance_location_map_customerBalanceId_fkey" FOREIGN KEY ("customerBalanceId") REFERENCES "customer_balance"("inflowId") ON DELETE CASCADE ON UPDATE CASCADE;
@@ -3247,7 +3420,7 @@ ALTER TABLE "customer_credit" ADD CONSTRAINT "customer_credit_customerId_fkey" F
 ALTER TABLE "customer_credit" ADD CONSTRAINT "customer_credit_currencyId_fkey" FOREIGN KEY ("currencyId") REFERENCES "currency"("inflowId") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "customer_credit_location_map" ADD CONSTRAINT "customer_credit_location_map_locationId_fkey" FOREIGN KEY ("locationId") REFERENCES "location"("inflowId") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "customer_credit_location_map" ADD CONSTRAINT "customer_credit_location_map_locationId_fkey" FOREIGN KEY ("locationId") REFERENCES "location"("inflowId") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "customer_credit_location_map" ADD CONSTRAINT "customer_credit_location_map_customerCreditId_fkey" FOREIGN KEY ("customerCreditId") REFERENCES "customer_credit"("inflowId") ON DELETE CASCADE ON UPDATE CASCADE;
@@ -3271,7 +3444,7 @@ ALTER TABLE "vendor" ADD CONSTRAINT "vendor_lastModifiedById_fkey" FOREIGN KEY (
 ALTER TABLE "vendor" ADD CONSTRAINT "vendor_defaultAddressId_fkey" FOREIGN KEY ("defaultAddressId") REFERENCES "business_partner_address"("inflowId") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "vendor_location_map" ADD CONSTRAINT "vendor_location_map_locationId_fkey" FOREIGN KEY ("locationId") REFERENCES "location"("inflowId") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "vendor_location_map" ADD CONSTRAINT "vendor_location_map_locationId_fkey" FOREIGN KEY ("locationId") REFERENCES "location"("inflowId") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "vendor_location_map" ADD CONSTRAINT "vendor_location_map_vendorId_fkey" FOREIGN KEY ("vendorId") REFERENCES "vendor"("inflowId") ON DELETE CASCADE ON UPDATE CASCADE;
@@ -3280,7 +3453,7 @@ ALTER TABLE "vendor_location_map" ADD CONSTRAINT "vendor_location_map_vendorId_f
 ALTER TABLE "vendor_attachment" ADD CONSTRAINT "vendor_attachment_vendorId_fkey" FOREIGN KEY ("vendorId") REFERENCES "vendor"("inflowId") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "vendor_attachment_location_map" ADD CONSTRAINT "vendor_attachment_location_map_locationId_fkey" FOREIGN KEY ("locationId") REFERENCES "location"("inflowId") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "vendor_attachment_location_map" ADD CONSTRAINT "vendor_attachment_location_map_locationId_fkey" FOREIGN KEY ("locationId") REFERENCES "location"("inflowId") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "vendor_attachment_location_map" ADD CONSTRAINT "vendor_attachment_location_map_vendorAttachmentId_fkey" FOREIGN KEY ("vendorAttachmentId") REFERENCES "vendor_attachment"("inflowId") ON DELETE CASCADE ON UPDATE CASCADE;
@@ -3292,7 +3465,7 @@ ALTER TABLE "vendor_item" ADD CONSTRAINT "vendor_item_vendorId_fkey" FOREIGN KEY
 ALTER TABLE "vendor_item" ADD CONSTRAINT "vendor_item_productId_fkey" FOREIGN KEY ("productId") REFERENCES "product"("inflowId") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "vendor_item_location_map" ADD CONSTRAINT "vendor_item_location_map_locationId_fkey" FOREIGN KEY ("locationId") REFERENCES "location"("inflowId") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "vendor_item_location_map" ADD CONSTRAINT "vendor_item_location_map_locationId_fkey" FOREIGN KEY ("locationId") REFERENCES "location"("inflowId") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "vendor_item_location_map" ADD CONSTRAINT "vendor_item_location_map_vendorItemId_fkey" FOREIGN KEY ("vendorItemId") REFERENCES "vendor_item"("inflowId") ON DELETE CASCADE ON UPDATE CASCADE;
@@ -3304,7 +3477,7 @@ ALTER TABLE "vendor_due" ADD CONSTRAINT "vendor_due_vendorId_fkey" FOREIGN KEY (
 ALTER TABLE "vendor_due" ADD CONSTRAINT "vendor_due_currencyId_fkey" FOREIGN KEY ("currencyId") REFERENCES "currency"("inflowId") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "vendor_due_location_map" ADD CONSTRAINT "vendor_due_location_map_locationId_fkey" FOREIGN KEY ("locationId") REFERENCES "location"("inflowId") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "vendor_due_location_map" ADD CONSTRAINT "vendor_due_location_map_locationId_fkey" FOREIGN KEY ("locationId") REFERENCES "location"("inflowId") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "vendor_due_location_map" ADD CONSTRAINT "vendor_due_location_map_vendorDueId_fkey" FOREIGN KEY ("vendorDueId") REFERENCES "vendor_due"("inflowId") ON DELETE CASCADE ON UPDATE CASCADE;
@@ -3316,7 +3489,7 @@ ALTER TABLE "vendor_balance" ADD CONSTRAINT "vendor_balance_vendorId_fkey" FOREI
 ALTER TABLE "vendor_balance" ADD CONSTRAINT "vendor_balance_currencyId_fkey" FOREIGN KEY ("currencyId") REFERENCES "currency"("inflowId") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "vendor_balance_location_map" ADD CONSTRAINT "vendor_balance_location_map_locationId_fkey" FOREIGN KEY ("locationId") REFERENCES "location"("inflowId") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "vendor_balance_location_map" ADD CONSTRAINT "vendor_balance_location_map_locationId_fkey" FOREIGN KEY ("locationId") REFERENCES "location"("inflowId") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "vendor_balance_location_map" ADD CONSTRAINT "vendor_balance_location_map_vendorBalanceId_fkey" FOREIGN KEY ("vendorBalanceId") REFERENCES "vendor_balance"("inflowId") ON DELETE CASCADE ON UPDATE CASCADE;
@@ -3328,7 +3501,7 @@ ALTER TABLE "vendor_credit" ADD CONSTRAINT "vendor_credit_vendorId_fkey" FOREIGN
 ALTER TABLE "vendor_credit" ADD CONSTRAINT "vendor_credit_currencyId_fkey" FOREIGN KEY ("currencyId") REFERENCES "currency"("inflowId") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "vendor_credit_location_map" ADD CONSTRAINT "vendor_credit_location_map_locationId_fkey" FOREIGN KEY ("locationId") REFERENCES "location"("inflowId") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "vendor_credit_location_map" ADD CONSTRAINT "vendor_credit_location_map_locationId_fkey" FOREIGN KEY ("locationId") REFERENCES "location"("inflowId") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "vendor_credit_location_map" ADD CONSTRAINT "vendor_credit_location_map_vendorCreditId_fkey" FOREIGN KEY ("vendorCreditId") REFERENCES "vendor_credit"("inflowId") ON DELETE CASCADE ON UPDATE CASCADE;
@@ -3340,19 +3513,19 @@ ALTER TABLE "taxing_scheme" ADD CONSTRAINT "taxing_scheme_defaultTaxCodeId_fkey"
 ALTER TABLE "tax_code" ADD CONSTRAINT "tax_code_taxingSchemeId_fkey" FOREIGN KEY ("taxingSchemeId") REFERENCES "taxing_scheme"("inflowId") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "taxing_scheme_location_map" ADD CONSTRAINT "taxing_scheme_location_map_locationId_fkey" FOREIGN KEY ("locationId") REFERENCES "location"("inflowId") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "taxing_scheme_location_map" ADD CONSTRAINT "taxing_scheme_location_map_locationId_fkey" FOREIGN KEY ("locationId") REFERENCES "location"("inflowId") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "taxing_scheme_location_map" ADD CONSTRAINT "taxing_scheme_location_map_taxingSchemeId_fkey" FOREIGN KEY ("taxingSchemeId") REFERENCES "taxing_scheme"("inflowId") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "tax_code_location_map" ADD CONSTRAINT "tax_code_location_map_locationId_fkey" FOREIGN KEY ("locationId") REFERENCES "location"("inflowId") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "tax_code_location_map" ADD CONSTRAINT "tax_code_location_map_locationId_fkey" FOREIGN KEY ("locationId") REFERENCES "location"("inflowId") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "tax_code_location_map" ADD CONSTRAINT "tax_code_location_map_taxCodeId_fkey" FOREIGN KEY ("taxCodeId") REFERENCES "tax_code"("inflowId") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "currency_location_map" ADD CONSTRAINT "currency_location_map_locationId_fkey" FOREIGN KEY ("locationId") REFERENCES "location"("inflowId") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "currency_location_map" ADD CONSTRAINT "currency_location_map_locationId_fkey" FOREIGN KEY ("locationId") REFERENCES "location"("inflowId") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "currency_location_map" ADD CONSTRAINT "currency_location_map_currencyId_fkey" FOREIGN KEY ("currencyId") REFERENCES "currency"("inflowId") ON DELETE CASCADE ON UPDATE CASCADE;
@@ -3364,13 +3537,13 @@ ALTER TABLE "currency_conversion" ADD CONSTRAINT "currency_conversion_currencyId
 ALTER TABLE "pricing_scheme" ADD CONSTRAINT "pricing_scheme_currencyId_fkey" FOREIGN KEY ("currencyId") REFERENCES "currency"("inflowId") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "pricing_scheme_location_map" ADD CONSTRAINT "pricing_scheme_location_map_locationId_fkey" FOREIGN KEY ("locationId") REFERENCES "location"("inflowId") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "pricing_scheme_location_map" ADD CONSTRAINT "pricing_scheme_location_map_locationId_fkey" FOREIGN KEY ("locationId") REFERENCES "location"("inflowId") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "pricing_scheme_location_map" ADD CONSTRAINT "pricing_scheme_location_map_pricingSchemeId_fkey" FOREIGN KEY ("pricingSchemeId") REFERENCES "pricing_scheme"("inflowId") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "payment_term_location_map" ADD CONSTRAINT "payment_term_location_map_locationId_fkey" FOREIGN KEY ("locationId") REFERENCES "location"("inflowId") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "payment_term_location_map" ADD CONSTRAINT "payment_term_location_map_locationId_fkey" FOREIGN KEY ("locationId") REFERENCES "location"("inflowId") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "payment_term_location_map" ADD CONSTRAINT "payment_term_location_map_paymentTermId_fkey" FOREIGN KEY ("paymentTermId") REFERENCES "payment_terms"("inflowId") ON DELETE CASCADE ON UPDATE CASCADE;
@@ -3394,7 +3567,7 @@ ALTER TABLE "sales_order" ADD CONSTRAINT "sales_order_salesRepTeamMemberId_fkey"
 ALTER TABLE "sales_order" ADD CONSTRAINT "sales_order_paymentTermsId_fkey" FOREIGN KEY ("paymentTermsId") REFERENCES "payment_terms"("inflowId") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "sales_order_location_map" ADD CONSTRAINT "sales_order_location_map_locationId_fkey" FOREIGN KEY ("locationId") REFERENCES "location"("inflowId") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "sales_order_location_map" ADD CONSTRAINT "sales_order_location_map_locationId_fkey" FOREIGN KEY ("locationId") REFERENCES "location"("inflowId") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "sales_order_location_map" ADD CONSTRAINT "sales_order_location_map_salesOrderId_fkey" FOREIGN KEY ("salesOrderId") REFERENCES "sales_order"("inflowId") ON DELETE CASCADE ON UPDATE CASCADE;
@@ -3466,7 +3639,7 @@ ALTER TABLE "purchase_order" ADD CONSTRAINT "purchase_order_assignedToTeamMember
 ALTER TABLE "purchase_order" ADD CONSTRAINT "purchase_order_approverTeamMemberId_fkey" FOREIGN KEY ("approverTeamMemberId") REFERENCES "team_member"("inflowId") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "purchase_order_location_map" ADD CONSTRAINT "purchase_order_location_map_locationId_fkey" FOREIGN KEY ("locationId") REFERENCES "location"("inflowId") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "purchase_order_location_map" ADD CONSTRAINT "purchase_order_location_map_locationId_fkey" FOREIGN KEY ("locationId") REFERENCES "location"("inflowId") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "purchase_order_location_map" ADD CONSTRAINT "purchase_order_location_map_purchaseOrderId_fkey" FOREIGN KEY ("purchaseOrderId") REFERENCES "purchase_order"("inflowId") ON DELETE CASCADE ON UPDATE CASCADE;

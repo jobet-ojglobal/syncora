@@ -8,7 +8,7 @@ type SyncOptions = {
 };
 
 export class CurrencySyncMapService {
-  async sync(
+  async syncMap(
     location: {
       inflowId: string;
       name: string;
@@ -113,6 +113,118 @@ export class CurrencySyncMapService {
         });
 
         await Promise.all(mappingPromises);
+        processed = validCurrencies.length;
+      },
+      {
+        timeout: 30000,
+      }
+    );
+
+    if (onProgress) {
+      await onProgress(processed);
+    }
+
+    return {
+      currenciesProcessed: processed,
+      syncedAt: new Date().toISOString(),
+      results: syncResults,
+    };
+  }
+
+  async map(
+    location: {
+      inflowId: string;
+      name: string;
+      url: string;
+    },
+    options: SyncOptions,
+    selectedRecords?: any[],
+    syncedAll?: boolean,
+  ) {
+    const { onProgress } = options;
+    let currencies = await getCurrencies(location.url);
+
+    if (!syncedAll && selectedRecords && selectedRecords.length > 0) {
+      const allowedIds = new Set(selectedRecords.map((item) => String(item.id)));
+      currencies = currencies.filter((data: any) =>
+        allowedIds.has(String(data.currencyId))
+      );
+    }
+
+    let processed = 0;
+
+    const syncResults: Array<{
+      currencyInflowId: string;
+      localCurrencyId?: number;
+      status: "synced" | "skipped_not_found";
+    }> = [];
+
+    await prisma.$transaction(
+      async (tx) => {
+        /**
+         * Step 1: Query global availability by unique isoCode.
+         * If missing, push to results as skipped and return null.
+         */
+        const resolvedCurrencies = await Promise.all(
+          currencies.map(async (currency) => {
+            const match = await tx.currency.findUnique({
+              where: { isoCode: currency.code },
+              select: { inflowId: true },
+            });
+
+            if (!match) {
+              syncResults.push({
+                currencyInflowId: String(currency.currencyId),
+                status: "skipped_not_found",
+              });
+              return null;
+            }
+
+            return { incoming: currency, existing: match };
+          })
+        );
+
+        // Filter out null entries safely with strict type narrowing
+        const validCurrencies = resolvedCurrencies.filter(
+          (c): c is NonNullable<typeof c> => c !== null
+        );
+
+        /**
+         * Step 2: Bridge connection inside Location Mapping safely
+         */
+        await Promise.all(
+          validCurrencies.map(async ({ incoming, existing }) => {
+            // Check if mapping row is already established
+            let locationMap = await tx.currencyLocationMap.findUnique({
+              where: {
+                currencyId_locationId: {
+                  currencyId: existing.inflowId,
+                  locationId: location.inflowId,
+                },
+              },
+              select: { localId: true },
+            });
+
+            // Create connection mapping if it doesn't exist
+            if (!locationMap) {
+              locationMap = await tx.currencyLocationMap.create({
+                data: {
+                  currencyId: existing.inflowId,
+                  locationId: location.inflowId,
+                  localId: Number(incoming.currencyId),
+                },
+                select: { localId: true },
+              });
+            }
+
+            syncResults.push({
+              currencyInflowId: String(incoming.currencyId),
+              localCurrencyId: locationMap.localId,
+              status: "synced",
+            });
+          })
+        );
+
         processed = validCurrencies.length;
       },
       {

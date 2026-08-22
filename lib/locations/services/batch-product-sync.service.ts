@@ -6,31 +6,8 @@ import { InflowCustomFields, InflowProduct } from "@/lib/inflow/types";
 import { localProductItemType } from "@/helpers/product.helper";
 import { syncProduct } from "./product-sync";
 import { Prisma } from "@/generated/prisma/client";
-import { generateSku2Variant2 } from "@/helpers/genSKU";
-
-/**
- * Helper to safely convert string/numeric flags or booleans
- */
-function parseBooleanFlag(value: unknown): boolean {
-  if (typeof value === "boolean") return value;
-  if (typeof value === "number") return value === 1;
-  if (typeof value === "string") return value === "1" || value.toLowerCase() === "true";
-  return false;
-}
-
-/**
- * Helper to generate URL-safe product slugs
- */
-function generateSlug(name: string, fallbackId: string): string {
-  const baseSlug = name
-    .toLowerCase()
-    .trim()
-    .replace(/[^\w\s-]/g, "")
-    .replace(/[\s_-]+/g, "-")
-    .replace(/^-+|-+$/g, "");
-
-  return baseSlug || `product-${fallbackId}`;
-}
+import { generateSku2Variant2, generateSku2Variant2V2 } from "@/helpers/genSKU";
+import { parseBooleanFlag } from "@/helpers";
 
 type SyncOptions = {
   onProgress?: (processedCount: number) => Promise<void>;
@@ -62,7 +39,7 @@ export async function mapLocalToInflowPayload(
   product: LocalProductWithRelations,
   brandCustomName?: string,
   currentTimestamp: string = new Date().toISOString(),
-  lastModifiedById: string = "56bfcf3b-3e98-4098-ae8f-2adcb657cb57",
+  lastModifiedById: string = "8ff3e71d-eb02-425d-8e0f-00a69fc8e482",
 ): Promise<InflowProduct & { isCloudSynced: boolean }> {
   const trimmedName = product.name?.trim() || "";
 
@@ -183,7 +160,7 @@ export class ProductSyncMapService {
 
     const allowedIds =
       !syncedAll && selectedRecords && selectedRecords.length > 0
-        ? new Set(selectedRecords.map((item) => String(item.id ?? item.productId)))
+        ? new Set(selectedRecords.map((id) => String(id)))
         : null;
 
     const defaultCategory = await prisma.category.findFirst({
@@ -219,7 +196,7 @@ export class ProductSyncMapService {
         location.url,
         BATCH_SIZE,
         after,
-        [],
+        ["prices","bom",],
         CLIENT_RETRIES
       );
 
@@ -269,7 +246,7 @@ export class ProductSyncMapService {
             if (!match) {
               const generatedInflowId = crypto.randomUUID().toLowerCase();
               const currentTimestamp = new Date().toISOString();
-              const modifiedById = "56bfcf3b-3e98-4098-ae8f-2adcb657cb57";
+              const modifiedById = "8ff3e71d-eb02-425d-8e0f-00a69fc8e482";
 
               // const taxingSchemeLocalId = Number(product.taxingSchemeId);
               const categoryLocalId = Number(product.categoryId);
@@ -287,7 +264,6 @@ export class ProductSyncMapService {
               ]);
 
               // 1. Build Custom Fields (Brand dynamics)
-              
               let setCategoryId: string | null = category?.categoryId || null;
 
               if (!product.categoryId) {
@@ -298,7 +274,7 @@ export class ProductSyncMapService {
               }
 
               const brandName = product.customFields?.custom7 || "";
-              const skuGenerated = generateSku2Variant2(brandName, trimmedName, []);
+              const skuGenerated = generateSku2Variant2V2(brandName, trimmedName, []);
 
               const payload: InflowProduct & { slug?: string } = {
                 productId: generatedInflowId,
@@ -452,12 +428,12 @@ export class ProductSyncMapService {
               });
             }
 
-            // if (!match.isLocalSynced) {
-            //   await tx.product.updateMany({
-            //     where: { inflowId: match.inflowId },
-            //     data: { isLocalSynced: true },
-            //   });
-            // }
+            if (!match.isLocalSynced) {
+              await tx.product.updateMany({
+                where: { inflowId: match.inflowId },
+                data: { isLocalSynced: true },
+              });
+            }
 
             syncResults.push({
               productLocalId: String(product.productId),
@@ -494,3 +470,6 @@ export class ProductSyncMapService {
     };
   }
 }
+
+const productService = new ProductSyncMapService();
+export const localProductServiceSyncMap = productService.sync.bind(productService);

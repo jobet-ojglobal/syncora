@@ -35,7 +35,6 @@ export async function getCategory(categoryID: string) {
   return await inflow.get<InflowCategory>(`/categories/${categoryID}`);
 }
 
-
 // import { InflowCategory, InflowProduct } from "../types";
 
 // export async function getCategories() {

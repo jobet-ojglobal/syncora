@@ -55,7 +55,7 @@ export function UomForm({ uomListLookup, initialData }: UomFormProps) {
   );
 
   const onSubmit = async (values: UomInput) => {
-    values.code = values.code.trim().toUpperCase();
+    values.code = values.code.trim();
 
     try {
       const response = await fetch("/api/admin/uoms", {

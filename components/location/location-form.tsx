@@ -24,6 +24,7 @@ import { FormTextarea } from "../shared/form-textarea";
 import { FormSelect } from "../shared/form-select";
 import { FormInput } from "../shared/form-input";
 import { FormSwitch } from "../shared/form-switch";
+import { LocationType } from "@/generated/prisma/enums";
 
 interface addressType {
   address1: string | null;
@@ -33,7 +34,6 @@ interface addressType {
   country: string | null;
   postalCode: string | null;
   remarks: string | null;
-  addressType: string | null;
 }
 
 interface LocationFormProps {
@@ -44,6 +44,7 @@ interface LocationFormProps {
     isDefault: boolean;
     url: string;
     address: addressType | null;
+    locationType: LocationType;
     sublocations: { id: string; name: string }[];
   } | null;
   onSuccess?: () => void;
@@ -52,7 +53,6 @@ interface LocationFormProps {
 export function LocationForm({ initialData, onSuccess }: LocationFormProps) {
   const router = useRouter();
   const isEditMode = !!initialData;
-  const [showUrl, setShowUrl] = useState(false);
 
   const form = useForm<LocationInput>({
     resolver: zodResolver(locationSchema),
@@ -61,6 +61,7 @@ export function LocationForm({ initialData, onSuccess }: LocationFormProps) {
       name: initialData?.name || "",
       isActive: initialData?.isActive ?? true,
       isDefault: initialData?.isDefault ?? false,
+      locationType: initialData?.locationType ?? "STORE",
       url: initialData?.url ?? "",
       address: initialData?.address
         ? {
@@ -70,7 +71,6 @@ export function LocationForm({ initialData, onSuccess }: LocationFormProps) {
             state: initialData.address.state ?? "",
             country: initialData.address.country ?? "",
             postalCode: initialData.address.postalCode ?? "",
-            addressType: initialData.address.addressType ?? "",
             remarks: initialData.address.remarks ?? "",
           }
         : null,
@@ -142,7 +142,7 @@ export function LocationForm({ initialData, onSuccess }: LocationFormProps) {
                 </CardTitle>
               </div>
             </CardHeader>
-            <CardContent className="space-y-6 pt-6">
+            <CardContent className="space-y-3 pt-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <FormInput
                   name="name"
@@ -152,14 +152,18 @@ export function LocationForm({ initialData, onSuccess }: LocationFormProps) {
                   classNameLabel=" font-semibold text-xs"
                   required
                 />
-                <FormInput
-                  name="url"
+                <FormSelect
+                  name="locationType"
                   control={control}
-                  label="Location Endpoint"
-                  icon={Globe}
-                  isSecret
-                  placeholder="https://"
-                  autoComplete="off"
+                  label="Site Use Designation"
+                  placeholder="Type"
+                  required
+                  options={[
+                    { id: "WAREHOUSE", name: "Warehouse" },
+                    { id: "STORE", name: "Store" },
+                    { id: "FULFILLMENT_CENTER", name: "Fulfillment Center" },
+                    { id: "TRANSIT", name: "Transit" },
+                  ]}
                   classNameLabel=" font-semibold text-xs"
                 />
                 <FormSwitch
@@ -181,6 +185,16 @@ export function LocationForm({ initialData, onSuccess }: LocationFormProps) {
                   className=" p-2.5"
                 />
               </div>
+              <FormInput
+                  name="url"
+                  control={control}
+                  label="Location Endpoint"
+                  icon={Globe}
+                  isSecret
+                  placeholder="https://"
+                  autoComplete="off"
+                  classNameLabel=" font-semibold text-xs"
+                />
 
             </CardContent>
           </Card>
@@ -215,7 +229,6 @@ export function LocationForm({ initialData, onSuccess }: LocationFormProps) {
                       state: "",
                       postalCode: "",
                       country: "",
-                      addressType: "",
                       remarks: "",
                     }, { shouldValidate: true });
                   }
@@ -284,19 +297,7 @@ export function LocationForm({ initialData, onSuccess }: LocationFormProps) {
                       classNameLabel=" font-semibold text-xs"
                       required
                     />
-                    <FormSelect
-                      name="address.addressType"
-                      control={control}
-                      label="Site Use Designation"
-                      placeholder="Type"
-                      options={[
-                        { id: "WAREHOUSE", name: "Warehouse" },
-                        { id: "STORE", name: "Store" },
-                        { id: "FULFILLMENT_CENTER", name: "Fulfillment Center" },
-                        { id: "TRANSIT", name: "Transit" },
-                      ]}
-                      classNameLabel=" font-semibold text-xs"
-                    />
+                    
                     <FormTextarea
                       name="address.remarks"
                       control={control}

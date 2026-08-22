@@ -1,10 +1,11 @@
 import { prisma } from "@/lib/prisma";
 import crypto from "crypto";
-import { LocalCurrency, SyncOptions } from "../types";
+import { LocalCurrency } from "../types";
 import { Prisma } from "@/generated/prisma/client";
 import { getLocalBatchCurrencies } from "../data/currency";
 import { InflowCurrency } from "@/lib/inflow/types";
 import { CurrencyRules, getCurrencyFormattingRules } from "@/helpers/currency";
+import { SyncOptions } from "@/lib/workers/sync.worker";
 
 type DbClient = Prisma.TransactionClient;
 
@@ -56,7 +57,7 @@ export class CurrencySyncMapService {
   ) {
     if (!payload.currencyId) return null;
 
-    const verifiedCategories = caches?.verifiedCurrencyIds ?? new Set<string>();
+    const verifiedCurrencies = caches?.verifiedCurrencyIds ?? new Set<string>();
 
     const isExist = await tx.currency.findFirst({
       where: {
@@ -68,7 +69,7 @@ export class CurrencySyncMapService {
     });
 
     if (isExist) {
-      verifiedCategories.add(isExist.inflowId);
+      verifiedCurrencies.add(isExist.inflowId);
       return isExist;
     }
 
@@ -86,16 +87,16 @@ export class CurrencySyncMapService {
       update: {},
     });
 
-    verifiedCategories.add(syncedCurrency.inflowId);
+    verifiedCurrencies.add(syncedCurrency.inflowId);
 
     return syncedCurrency;
   }
 
   /**
    * Universal Reusable Sub-Batch Transaction Processor.
-   * Processes a concrete set of local categories within a transaction context.
+   * Processes a concrete set of local currencies within a transaction context.
    */
-  async syncBatch(
+  async syncMap(
     tx: DbClient,
     records: LocalCurrency[],
     locationInflowId: string,
@@ -189,6 +190,82 @@ export class CurrencySyncMapService {
     return { processedCount, results };
   }
 
+  async map(
+    tx: DbClient,
+    records: LocalCurrency[],
+    locationInflowId: string,
+    caches: SyncCache,
+    checkSignal?: () => Promise<void>
+  ) {
+    const results: Array<{
+      dataLocalId: string;
+      dataInflowId?: string;
+      status: "synced" | "skipped_not_found";
+    }> = [];
+
+    let processedCount = 0;
+
+    for (const data of records) {
+      if (checkSignal) await checkSignal();
+
+      const trimmedName = data.code?.trim();
+      if (!trimmedName) {
+        results.push({
+          dataLocalId: String(data.currencyId),
+          status: "skipped_not_found",
+        });
+        continue;
+      }
+
+      // 1. Check existing match by name
+      const match = await tx.currency.findFirst({
+        where: { isoCode: trimmedName },
+        select: { inflowId: true },
+      });
+
+      if (!match?.inflowId) {
+        results.push({
+          dataLocalId: String(data.currencyId),
+          status: "skipped_not_found",
+        });
+        continue;
+      }
+
+      // 3. Ensure local location bridge mapping
+      const localIdNum = Number(data.currencyId);
+      const locationMap = await tx.currencyLocationMap.findUnique({
+        where: {
+          currencyId_locationId: {
+            currencyId: match.inflowId,
+            locationId: locationInflowId,
+          },
+        },
+        select: { localId: true },
+      });
+
+      if (!locationMap) {
+        await tx.currencyLocationMap.create({
+          data: {
+            currencyId: match.inflowId,
+            locationId: locationInflowId,
+            localId: !isNaN(localIdNum) ? localIdNum : 0,
+          },
+          select: { localId: true },
+        });
+      }
+
+      results.push({
+        dataLocalId: String(data.currencyId),
+        dataInflowId: match.inflowId,
+        status: "synced",
+      });
+
+      processedCount++;
+    }
+
+    return { processedCount, results };
+  }
+
   /**
    * Main Driver Method for Paged/Iterative Inflow API or DB currency syncs.
    */
@@ -199,7 +276,7 @@ export class CurrencySyncMapService {
       url: string;
     },
     options: SyncOptions,
-    selectedRecords?: any[],
+    selectedRecords?: string[],
     syncedAll?: boolean,
     after: string | undefined = undefined,
   ) {
@@ -212,7 +289,7 @@ export class CurrencySyncMapService {
 
     const allowedIds =
       !syncedAll && selectedRecords && selectedRecords.length > 0
-        ? new Set(selectedRecords.map((item) => String(item.id ?? item.currencyId)))
+        ? new Set(selectedRecords.map((id) => String(id)))
         : null;
 
     const syncResults: Array<{
@@ -252,7 +329,7 @@ export class CurrencySyncMapService {
       // Execute transaction for current batch
       const { processedCount, results } = await prisma.$transaction(
         async (tx) => {
-          return await this.syncBatch(
+          return await this.map(
             tx,
             batch,
             location.inflowId,
@@ -267,7 +344,7 @@ export class CurrencySyncMapService {
       syncResults.push(...results);
       batchNo++;
 
-      console.log(`Batch #${batchNo} completed. Processed ${totalProcessed} categories.`);
+      console.log(`Batch #${batchNo} completed. Processed ${totalProcessed} currencies.`);
 
       if (onProgress) await onProgress(totalProcessed);
 
@@ -279,9 +356,12 @@ export class CurrencySyncMapService {
     }
 
     return {
-      categoriesProcessed: totalProcessed,
+      currencyProcessed: totalProcessed,
       syncedAt: new Date().toISOString(),
       results: syncResults,
     };
   }
 }
+
+const currencyService = new CurrencySyncMapService();
+export const localCurrencyServiceMap = currencyService.sync.bind(currencyService);

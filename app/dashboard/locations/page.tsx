@@ -75,6 +75,7 @@ export interface LocationRow {
   inflowId: string;
   name: string;
   type: LocationType;
+  isDefault: boolean;
   status: LocationStatus;
   addressLine1: string;
   addressLine2?: string | null;
@@ -441,8 +442,14 @@ export default function LocationListPage() {
 
                         {/* Facility Name */}
                         <TableCell className="p-3.5 align-middle">
-                          <div className="font-semibold text-foreground text-xs leading-tight">
+                          <div className="font-semibold text-foreground text-xs leading-tight  flex flex-wrap items-center gap-2">
                             {location.name}
+
+                             {location.isDefault && (
+                            <Badge variant="secondary" className="bg-indigo-50 dark:bg-indigo-950/40 border-indigo-200 dark:border-indigo-900 text-indigo-700 dark:text-indigo-400 text-[10px] font-semibold h-5">
+                              Primary Hub
+                            </Badge>
+                          )}
                           </div>
                           {location.managerName && (
                             <div className="text-[10px] text-muted-foreground flex items-center gap-1 mt-0.5">
@@ -450,6 +457,7 @@ export default function LocationListPage() {
                               <span className="truncate">{location.managerName}</span>
                             </div>
                           )}
+                         
                         </TableCell>
 
                         {/* Facility Type */}

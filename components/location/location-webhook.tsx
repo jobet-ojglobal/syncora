@@ -311,7 +311,7 @@ export const LocationWebhookWorkspace = ({ selectedLocationInflowId }: LocationW
             </Card>
 
             {/* BATCH ENGINE SYNC UTILITIES SIDEBAR */}
-            <Card className="md:col-span-1">
+            {/* <Card className="md:col-span-1">
               <CardHeader>
                 <CardTitle>Batch Diagnostics</CardTitle>
                 <CardDescription>Force historical inventory execution sweeps manually.</CardDescription>
@@ -322,12 +322,12 @@ export const LocationWebhookWorkspace = ({ selectedLocationInflowId }: LocationW
                 <SyncButtonPreviewOptions source="taxing_schemes_local" title="Taxing Schemes" locationId={selectedLocationInflowId} isDisabled={!webhook} />
                 <SyncButtonPreviewOptions source="pricing_schemes_local" title="Pricing Schemes" locationId={selectedLocationInflowId} isDisabled={!webhook} />
                 <SyncButtonPreviewOptions source="products_local" title="Products" locationId={selectedLocationInflowId} isDisabled={!webhook} />
-                {/* <SyncButtonPreviewOptions source="inventory_lines_local" title="Inventory Lines" locationId={selectedLocationInflowId} isDisabled={!webhook} /> */}
+                <SyncButtonPreviewOptions source="inventory_lines_local" title="Inventory Lines" locationId={selectedLocationInflowId} isDisabled={!webhook} />
                 <SyncButtonPreviewOptions source="payment_terms_local" title="Payment Terms" locationId={selectedLocationInflowId} isDisabled={!webhook} />
                 <SyncButtonPreviewOptions source="customers_local" title="Customers" locationId={selectedLocationInflowId} isDisabled={!webhook} />
                 <SyncButtonPreviewOptions source="locations_local" title="Locations" locationId={selectedLocationInflowId} isDisabled={!webhook} />
               </CardContent>
-            </Card>
+            </Card> */}
 
             <Card className="md:col-span-1">
               <CardHeader>
@@ -335,7 +335,15 @@ export const LocationWebhookWorkspace = ({ selectedLocationInflowId }: LocationW
                 <CardDescription>Force historical inventory execution sweeps manually.</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4 pt-0 max-h-[300px] overflow-y-auto">
-                <SyncButtonOptionsPreview locationId={selectedLocationInflowId} source="inventory_lines_local" title="Local Inventory Lines" />
+                <SyncButtonOptionsPreview isDisabled={!webhook} locationId={selectedLocationInflowId} source="categories_local" title="Map Categories" />
+                <SyncButtonOptionsPreview isDisabled={!webhook} locationId={selectedLocationInflowId} source="currencies_local" title="Map Currency" />
+                <SyncButtonOptionsPreview isDisabled={!webhook} locationId={selectedLocationInflowId} source="taxing_schemes_local" title="Map Taxing Schemes" />
+                <SyncButtonOptionsPreview isDisabled={!webhook} locationId={selectedLocationInflowId} source="pricing_schemes_local" title="Map Pricing Schemes" />
+                <SyncButtonOptionsPreview isDisabled={!webhook} locationId={selectedLocationInflowId} source="products_local_map" title="Map Products " />
+                <SyncButtonOptionsPreview isDisabled={!webhook} locationId={selectedLocationInflowId} source="payment_terms_local" title="Map Payment Terms" />
+                <SyncButtonOptionsPreview isDisabled={!webhook} locationId={selectedLocationInflowId} source="customers_local" title="Map Customers" />
+                <SyncButtonOptionsPreview isDisabled={!webhook} locationId={selectedLocationInflowId} source="locations_local" title="Map Locations" />
+                <SyncButtonOptionsPreview isDisabled={!webhook} locationId={selectedLocationInflowId} source="inventory_lines_local" title="Sync Inventory Lines" />
               </CardContent>
             </Card>
           </div>

@@ -156,7 +156,7 @@ export async function mapLocalToInflowPayload(
     remarks: product.remarks,
     categoryId: setCategoryId,
     lastVendorId: product.lastVendorId,
-    lastModifiedById: "56bfcf3b-3e98-4098-ae8f-2adcb657cb57",
+    lastModifiedById: "8ff3e71d-eb02-425d-8e0f-00a69fc8e482",
     createdDttm: product.createdAt.toISOString(),
     lastModifiedDateTime: product.updatedAt.toISOString(),
 

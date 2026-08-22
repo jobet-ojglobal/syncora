@@ -1,29 +1,19 @@
 // workers/product.worker.ts
-
 import { Job, Worker } from "bullmq";
 import { prisma } from "@/lib/prisma";
 import { connection } from "@/lib/redis";
+import { SyncOptions } from "./types";
 
-// Local Imports
-import { CategorySyncMapService as LocalCategorySyncMapService } from "../locations/services/batch-category-sync-map";
-import { CurrencySyncMapService as LocalCurrencySyncMapService } from "../locations/services/batch-currency-sync-map";
-import { PaymentTermSyncMapService as LocalPaymentTermSyncMapService } from "../locations/services/payment-term-sync-map.service";
-import { PricingSchemeSyncMapService as LocalPricingSchemeSyncMapService } from "../locations/services/pricing-scheme-sync-map.service";
-import { TaxingSchemeSyncMapService as LocalTaxingSchemeSyncMapService } from "../locations/services/taxing-scheme-sync-map.service";
-import { CustomerSyncMapService as LocalCustomerSyncMapService } from "../locations/services/customer-sync-map.service";
-import { ProductSyncMapService as LocalProductSyncMapService } from "../locations/services/batch-product-sync-map";
-import { SublocationSyncMapService as LocalSublocationSyncMapService } from "../locations/services/sublocation-sync-map.service";
-import { inventoryLocalSyncService } from "../locations/services/batch-inventory-sync-adjustment.service";
-
-// Local Service 
-const categoryServiceLocal = new LocalCategorySyncMapService();
-const currencyServiceLocal = new LocalCurrencySyncMapService();
-const paymentServiceLocal = new LocalPaymentTermSyncMapService();
-const pricingServiceLocal = new LocalPricingSchemeSyncMapService();
-const taxingSchemeServiceLocal = new LocalTaxingSchemeSyncMapService();
-const customerServiceLocal = new LocalCustomerSyncMapService();
-const productServiceLocal = new LocalProductSyncMapService();
-const sublocationServiceLocal = new LocalSublocationSyncMapService();
+import { localCategoryServiceMap } from "../locations/services/batch-category-sync-map";
+import { localCurrencyServiceMap } from "../locations/services/batch-currency-sync-map";
+import { localProductServiceMap } from "../locations/services/batch-product-sync-map";
+import { localInventoryServiceMap } from "../locations/services/batch-inventory-sync-adjustment.service";
+import { localLocationServiceSyncMap } from "../locations/services/batch-location-service";
+import { localTaxingSchemeServiceMap } from "../locations/services/batch-taxing-scheme-service";
+import { localPricingSchemeServiceMap } from "../locations/services/batch-pricing-scheme-service";
+import { localPaymentTermServiceMap } from "../locations/services/batch-payment-term-map";
+import { localCustomerServiceSyncMap } from "../locations/services/batch-customer-sync-map";
+import { localProductServiceSyncMap } from "../locations/services/batch-product-sync.service";
 
 export interface BaseSyncResult {
   processedCount: number;
@@ -50,13 +40,6 @@ interface SyncWebhookJobData {
   after: string;
   location: { inflowId: string; name: string; url: string };
 }
-
-export type SyncOptions = {
-  onProgress?: (progress: number) => Promise<void>;
-  checkSignal?: () => Promise<void>;
-  batchSize?: number;
-  delayBetweenBatchesMs?: number;
-};
 
 /**
  * Ensures job isn't cancelled. Throws SyncCancelledError if cancelled.
@@ -95,7 +78,7 @@ const safeUpdateJob = async (jobId: string, progress: number) => {
 const worker = new Worker<SyncWebhookJobData>(
   "local_sync",
   async (job: Job<SyncWebhookJobData>) => {
-    const { jobId, source, includes, selectedRecords = [] , selectedLocations = [], syncedAll, brandCustomName, after, location } = job.data;
+    const { jobId, source, selectedRecords = [] , selectedLocations = [], syncedAll, brandCustomName, after, location } = job.data;
 
     console.log(`[Local Sync Worker] Processing job source: ${source} for location ${location?.name || "cloud"}`);
 
@@ -118,33 +101,35 @@ const worker = new Worker<SyncWebhookJobData>(
 
       switch (source) {
         case "categories_local":
-          result = await categoryServiceLocal.sync(location, syncOptions, selectedRecords, syncedAll);
+          result = await localCategoryServiceMap(location, syncOptions, selectedRecords, syncedAll);
           break;
         case "currencies_local": 
-          result = await currencyServiceLocal.sync(location, syncOptions, selectedRecords, syncedAll);
+          result = await localCurrencyServiceMap(location, syncOptions, selectedRecords, syncedAll);
           break;
         case "payment_terms_local":
-          result = await paymentServiceLocal.sync(location, syncOptions, selectedRecords, syncedAll);
+          result = await localPaymentTermServiceMap(location, syncOptions, selectedRecords, syncedAll);
           break;
         case "pricing_schemes_local":
-          result = await pricingServiceLocal.sync(location, syncOptions, selectedRecords, syncedAll);
+          result = await localPricingSchemeServiceMap(location, syncOptions, selectedRecords, syncedAll);
           break;
         case "taxing_schemes_local":
-          result = await taxingSchemeServiceLocal.sync(location, syncOptions, selectedRecords, syncedAll);
+          result = await localTaxingSchemeServiceMap(location, syncOptions, selectedRecords, syncedAll);
           break;
         case "customers_local":
-          result = await customerServiceLocal.sync(location, syncOptions, selectedRecords, syncedAll);
+          result = await localCustomerServiceSyncMap(location, syncOptions, selectedRecords, syncedAll);
           break;
         case "locations_local":
-          result = await sublocationServiceLocal.sync(location, syncOptions, selectedRecords, syncedAll);
+          result = await localLocationServiceSyncMap(location, syncOptions, selectedRecords, syncedAll);
           break;
-        case "products_local":
-          result = await productServiceLocal.sync(location, syncOptions, selectedRecords, syncedAll, "custom7");
+        case "products_local_map":
+          result = await localProductServiceMap(location, syncOptions, selectedRecords, syncedAll, after);
+          break;
+        case "products_local_sync":
+          result = await localProductServiceSyncMap(location, syncOptions, selectedRecords, syncedAll, brandCustomName, after);
           break;
         case "inventory_lines_local":
-          result = await inventoryLocalSyncService.batchSync(location, syncOptions, after, selectedRecords, selectedLocations, syncedAll);
+          result = await localInventoryServiceMap(location, syncOptions, after, selectedRecords, selectedLocations, syncedAll);
           break;
-     
         default:
           throw new Error(
             `Unsupported sync source: ${source}`

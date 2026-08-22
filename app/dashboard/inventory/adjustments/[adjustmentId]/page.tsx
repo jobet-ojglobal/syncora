@@ -179,7 +179,7 @@ export default function InventoryAdjustmentDetailsPage({
                 adjustmentId={adjustmentId}
                 adjustmentNumber={adjustment.adjustmentNumber}
                 status={adjustment.status}
-                currentUserId={"56bfcf3b-3e98-4098-ae8f-2adcb657cb57"}
+                currentUserId={"8ff3e71d-eb02-425d-8e0f-00a69fc8e482"}
                 onSuccess={()=> mutate() }
               />
             )
