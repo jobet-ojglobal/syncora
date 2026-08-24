@@ -342,8 +342,11 @@ export const LocationWebhookWorkspace = ({ selectedLocationInflowId }: LocationW
                 <SyncButtonOptionsPreview isDisabled={!webhook} locationId={selectedLocationInflowId} source="products_local_map" title="Map Products " />
                 <SyncButtonOptionsPreview isDisabled={!webhook} locationId={selectedLocationInflowId} source="payment_terms_local" title="Map Payment Terms" />
                 <SyncButtonOptionsPreview isDisabled={!webhook} locationId={selectedLocationInflowId} source="customers_local" title="Map Customers" />
+                <SyncButtonOptionsPreview isDisabled={!webhook} locationId={selectedLocationInflowId} source="vendors_local" title="Map Vendors" />
                 <SyncButtonOptionsPreview isDisabled={!webhook} locationId={selectedLocationInflowId} source="locations_local" title="Map Locations" />
+                <SyncButtonOptionsPreview isDisabled={!webhook} locationId={selectedLocationInflowId} source="products_local_sync" title="Sync Products " />
                 <SyncButtonOptionsPreview isDisabled={!webhook} locationId={selectedLocationInflowId} source="inventory_lines_local" title="Sync Inventory Lines" />
+                
               </CardContent>
             </Card>
           </div>

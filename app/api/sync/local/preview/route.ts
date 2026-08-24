@@ -6,6 +6,7 @@ import { getLocalBatchPaymentTerms } from "@/lib/locations/data/payment-term";
 import { getLocalBatchPricingSchemes } from "@/lib/locations/data/pricing-scheme";
 import { getLocalBatchProducts, getLocalBatchInventory } from "@/lib/locations/data/product-local";
 import { getLocalBatchTaxingSchemes } from "@/lib/locations/data/taxing-scheme";
+import { getLocalBatchVendors } from "@/lib/locations/data/vendors";
 import { prisma } from "@/lib/prisma";
 import { NextResponse } from "next/server";
 
@@ -203,6 +204,27 @@ export async function POST(req: Request) {
         ...loc,
         itemId: loc.customerId,
         name: loc.name || "Unnamed Customer",
+      }));
+
+      const endCursor = normalizedItems.length > 0 
+        ? normalizedItems[normalizedItems.length - 1].itemId 
+        : null;
+
+      return NextResponse.json({
+        items: normalizedItems,
+        pageInfo: {
+        hasNextPage: rawList.length === count,
+        endCursor,
+        },
+      });
+    } else if (source === "vendors_local") {
+      const items = await getLocalBatchVendors(location.url, count, after);
+      const rawList = Array.isArray(items) ? items : [];
+
+      const normalizedItems = rawList.map((loc: any) => ({
+        ...loc,
+        itemId: loc.vendorId,
+        name: loc.name || "Unnamed Vendor",
       }));
 
       const endCursor = normalizedItems.length > 0 

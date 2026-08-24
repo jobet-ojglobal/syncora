@@ -1,5 +1,7 @@
 // lib/locations/types/product-sync.types.ts
 
+import { InflowCurrency } from "@/lib/inflow/types";
+
 export interface LocalCurrency {
   currencyId: string;
   code: string;
@@ -149,6 +151,7 @@ export interface LocalProduct {
   serials?: LocalProductSerial[];
   cost: string | null;
   inventoryLines?: LocalInventoryLine[];
+  image?: string | null;
 }
 
 export interface LocalProductSerial {
@@ -350,6 +353,7 @@ export interface CustomerPayload {
   phone: string;
   fax: string;
   email: string;
+  taxExemptNumber?: string | null;
   
   // Primary Address
   address1: string;
@@ -383,6 +387,7 @@ export interface CustomerPayload {
   shippingAddressRemarks: string;
   shippingAddressType: number | string | null;
   
+  
   // Custom Fields
   custom1: string;
   custom2: string;
@@ -394,6 +399,10 @@ export interface CustomerPayload {
   custom8: string;
   custom9: string;
   custom10: string;
+
+  dues: [],
+  balances: [],
+  credits: [],
   
   // Metadata & System Info
   lastModUserId: number;
@@ -449,6 +458,12 @@ export interface VendorPayload {
   custom8: string;
   custom9: string;
   custom10: string;
+
+  dues: InflowVendorDue[],
+  balances: InflowVendorBalance[],
+  credits: InflowVendorCredit[],
+  vendorItems: InflowVendorItem[],
+  attachments: InflowAttachment[],
   
   // Metadata & System Info
   lastModUserId: number;
@@ -458,3 +473,51 @@ export interface VendorPayload {
   website: string;
   syncedAt: string;
 }
+
+export interface InflowVendorItem {
+  vendorItemId: string;
+  cost: string | null;
+  leadTimeDays: number | null;
+  lineNum: number | null;
+  productId: string;
+  timestamp?: string;
+  vendorId: string;
+  vendorItemCode: string | null; 
+}
+
+export interface InflowVendorBalance {
+  vendorBalanceId: string;
+  vendorId: string;
+  currencyId: string;
+  balance: string;
+  currency?: InflowCurrency | null;
+}
+
+export interface InflowVendorCredit {
+  vendorCreditId: string;
+  vendorId: string;
+  currencyId: string;
+  credit: string;
+  currency?: InflowCurrency | null;
+}
+
+export interface InflowVendorDue {
+  vendorDueId: string;
+  currencyId: string;
+
+  amountCurrent: string;
+  amount1To30: string;
+  amount31To60: string;
+  amount61Plus: string;
+
+  currency?: InflowCurrency | null;
+}
+
+// export interface InflowAttachment {
+//   inflowId: string;
+//   fileName: string | null;
+//   fileUrl: string | null;
+//   fileSize: number | null;
+//   contentType: string | null;
+//   timestamp?: string | null;
+// }

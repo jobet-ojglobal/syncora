@@ -4,7 +4,9 @@
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { TeamMemberForm } from "@/components/team-member/team-member-form";
-import { Loader2, ShieldCheck } from "lucide-react";
+import { ArrowLeft, Loader2, ShieldCheck } from "lucide-react";
+import Link from "next/link";
+import PageHeader from "@/components/layout/dashboard/PageHeader";
 
 export default function EditTeamMemberPage() {
   const params = useParams();
@@ -39,15 +41,30 @@ export default function EditTeamMemberPage() {
   );
 
   return (
-    <div className="w-full max-w-5xl mx-auto p-6 space-y-4">
-      <div>
-        <h1 className="text-xl font-bold tracking-tight text-foreground flex items-center gap-2">
-          <ShieldCheck className="w-5 h-5 text-primary" /> Modify Operative Authority Settings
-        </h1>
-        <p className="text-xs text-muted-foreground mt-0.5">
-          Adjust active operational clearance zones or revoke system access tokens for this directory ledger file card.
-        </p>
-      </div>
+    // <div className="w-full max-w-5xl mx-auto p-6 space-y-4">
+    //   <div>
+    //     <h1 className="text-xl font-bold tracking-tight text-foreground flex items-center gap-2">
+    //       <ShieldCheck className="w-5 h-5 text-primary" /> Modify Operative Authority Settings
+    //     </h1>
+    //     <p className="text-xs text-muted-foreground mt-0.5">
+    //       Adjust active operational clearance zones or revoke system access tokens for this directory ledger file card.
+    //     </p>
+    //   </div>
+    <div className="w-full max-w-[1500px] mx-auto p-4 sm:p-6 space-y-6 text-xs">
+      {/* HEADER */}
+      <Link
+        href="/dashboard/team-members"
+        className="inline-flex items-center gap-2 text-sm font-medium text-slate-600 hover:text-slate-900"
+      >
+        <ArrowLeft className="h-4 w-4" />
+          Back to Team Members
+      </Link>
+      <PageHeader
+        title="Add New Member"
+        description="Adjust active operational clearance zones or revoke system access tokens for this directory ledger file card."
+        icon={ShieldCheck}
+      />
+    
 
       <TeamMemberForm 
         locationLookup={hydrationData.locationLookup} 

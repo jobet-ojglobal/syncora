@@ -5,7 +5,7 @@ import { prisma } from "@/lib/prisma";
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { name, email, isActive, canBeSalesRep, accessAllLocations, accessRights, locationInflowIds } = body;
+    const { name, email, isActive, isInternal, canBeSalesRep, accessAllLocations, accessRights, locationInflowIds } = body;
 
     if (!name || !email) {
       return NextResponse.json({ error: "Missing core directory criteria properties parameters fields." }, { status: 400 });
@@ -16,7 +16,7 @@ export async function POST(request: NextRequest) {
     const memberRecord = await prisma.$transaction(async (tx) => {
       // 1. Establish core team identity baseline profile card
       const member = await tx.teamMember.create({
-        data: { inflowId: memberInflowId, name, email, isActive, canBeSalesRep, accessAllLocations }
+        data: { inflowId: memberInflowId, name, email, isActive, isInternal, canBeSalesRep, accessAllLocations }
       });
 
       // 2. Hydrate explicit access control junction keys rows
@@ -55,7 +55,7 @@ export async function POST(request: NextRequest) {
 export async function PATCH(request: NextRequest) {
   try {
     const body = await request.json();
-    const { id, name, email, isActive, canBeSalesRep, accessAllLocations, accessRights, locationInflowIds } = body;
+    const { id, name, email, isActive, isInternal, canBeSalesRep, accessAllLocations, accessRights, locationInflowIds } = body;
 
     if (!id) {
       return NextResponse.json({ error: "Target structural context validation missing identity token." }, { status: 400 });
@@ -69,7 +69,7 @@ export async function PATCH(request: NextRequest) {
       // Update structural status and identification variables fields parameters
       const member = await tx.teamMember.update({
         where: { id },
-        data: { name, email, isActive, canBeSalesRep, accessAllLocations }
+        data: { name, email, isActive, isInternal, canBeSalesRep, accessAllLocations }
       });
 
       // Insert updated security access credentials flags loops blocks arrays

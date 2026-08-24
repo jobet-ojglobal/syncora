@@ -375,7 +375,7 @@ export async function POST(request: NextRequest) {
           originCountry: originCountry?.trim() || null,
           hsTariffNumber: hsTariffNumber?.trim() || null,
           remarks: remarks?.trim() || null,
-          standardUomName: standardUomName.trim().toUpperCase(), 
+          standardUomName: standardUomName.trim(), 
           customFields: toJsonInput(customFields),
 
           purchasingUom: purchasingUomId ? {
@@ -919,7 +919,7 @@ export async function PATCH(request: NextRequest) {
           originCountry: originCountry?.trim() || null,
           hsTariffNumber: hsTariffNumber?.trim() || null,
           remarks: remarks?.trim() || null,
-          standardUomName: standardUomName.trim().toUpperCase(),
+          standardUomName: standardUomName.trim(),
           customFields: toJsonInput(customFields)
         }
       });
