@@ -26,6 +26,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import { EmptyBPartnersButton } from "@/components/partner/empty-business-partner";
 
 interface BusinessPartnerRow {
   id: string;
@@ -141,6 +142,11 @@ export default function BusinessPartnerListPage() {
           />
         </div>
 
+        <EmptyBPartnersButton
+          role={roleFilter}
+          onSuccess={handleRefresh}
+        />
+
         {/* Dynamic Role Filter Tabs */}
         <div className="flex bg-muted p-1 rounded-lg text-xs font-semibold shrink-0">
           {(["ALL", "CUSTOMER", "VENDOR"] as const).map((role) => (
@@ -154,6 +160,7 @@ export default function BusinessPartnerListPage() {
               {role.toLowerCase()}s
             </button>
           ))}
+
         </div>
       </div>
 

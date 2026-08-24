@@ -16,6 +16,7 @@ export type InflowCustomerInput = {
   pricingSchemeId: string | null;
   defaultBillingAddressId: string | null;
   defaultShippingAddressId: string | null;
+  lastModifiedById: string | null;
   dues: Array<{
     inflowId: string;
     currencyId: string;
@@ -55,6 +56,7 @@ export async function upsertCustomer(
     pricingSchemeId: input.pricingSchemeId,
     defaultBillingAddressId: input.defaultBillingAddressId,
     defaultShippingAddressId: input.defaultShippingAddressId,
+    lastModifiedById: input.lastModifiedById,
   };
 
   // 1. Core Profile Sync

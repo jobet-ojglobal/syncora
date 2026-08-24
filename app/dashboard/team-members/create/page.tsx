@@ -2,8 +2,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Loader2, UserPlus } from "lucide-react";
+import { ArrowLeft, Loader2, UserPlus } from "lucide-react";
 import { TeamMemberForm } from "@/components/team-member/team-member-form";
+import Link from "next/link";
+import PageHeader from "@/components/layout/dashboard/PageHeader";
 
 export default function CreateTeamMemberPage() {
   const [hydrationData, setHydrationData] = useState<{ locationLookup: any[] } | null>(null);
@@ -32,15 +34,29 @@ export default function CreateTeamMemberPage() {
   );
 
   return (
-    <div className="w-full max-w-5xl mx-auto p-6 space-y-4">
-      <div>
-        <h1 className="text-xl font-bold tracking-tight text-foreground flex items-center gap-2">
-          <UserPlus className="w-5 h-5 text-primary" /> Provision New Operative
-        </h1>
-        <p className="text-xs text-muted-foreground mt-0.5">
-          Establish directory identity handles and register security privilege parameters.
-        </p>
-      </div>
+    // <div className="w-full max-w-5xl mx-auto p-6 space-y-4">
+    //   <div>
+    //     <h1 className="text-xl font-bold tracking-tight text-foreground flex items-center gap-2">
+    //       <UserPlus className="w-5 h-5 text-primary" /> Provision New Operative
+    //     </h1>
+    //     <p className="text-xs text-muted-foreground mt-0.5">
+    //       Establish directory identity handles and register security privilege parameters.
+    //     </p>
+    //   </div>
+    <div className="w-full max-w-[1500px] mx-auto p-4 sm:p-6 space-y-6 text-xs">
+          {/* HEADER */}
+          <Link
+            href="/dashboard/team-members"
+            className="inline-flex items-center gap-2 text-sm font-medium text-slate-600 hover:text-slate-900"
+          >
+            <ArrowLeft className="h-4 w-4" />
+             Back to Team Members
+          </Link>
+          <PageHeader
+            title="Add New Member"
+            description="Establish directory identity handles and register security privilege parameters."
+            icon={UserPlus}
+          />
 
       <TeamMemberForm
         locationLookup={hydrationData.locationLookup} 

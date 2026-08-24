@@ -46,6 +46,7 @@ export async function GET(request: NextRequest) {
         name: profile.name,
         email: profile.email,
         isActive: profile.isActive,
+        isInternal: profile.isInternal,
         canBeSalesRep: profile.canBeSalesRep,
         accessAllLocations: profile.accessAllLocations,
         // Remap direct rows back into string token arrays matching React Hook Form state

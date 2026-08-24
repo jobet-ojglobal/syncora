@@ -14,6 +14,7 @@ import { localPricingSchemeServiceMap } from "../locations/services/batch-pricin
 import { localPaymentTermServiceMap } from "../locations/services/batch-payment-term-map";
 import { localCustomerServiceSyncMap } from "../locations/services/batch-customer-sync-map";
 import { localProductServiceSyncMap } from "../locations/services/batch-product-sync.service";
+import { localVendorServiceSyncMap } from "../locations/services/batch-vendor-sync-map";
 
 export interface BaseSyncResult {
   processedCount: number;
@@ -118,6 +119,9 @@ const worker = new Worker<SyncWebhookJobData>(
         case "customers_local":
           result = await localCustomerServiceSyncMap(location, syncOptions, selectedRecords, syncedAll);
           break;
+        case "vendors_local":
+          result = await localVendorServiceSyncMap(location, syncOptions, selectedRecords, syncedAll);
+          break;
         case "locations_local":
           result = await localLocationServiceSyncMap(location, syncOptions, selectedRecords, syncedAll);
           break;
@@ -125,7 +129,7 @@ const worker = new Worker<SyncWebhookJobData>(
           result = await localProductServiceMap(location, syncOptions, selectedRecords, syncedAll, after);
           break;
         case "products_local_sync":
-          result = await localProductServiceSyncMap(location, syncOptions, selectedRecords, syncedAll, brandCustomName, after);
+          result = await localProductServiceSyncMap(location, syncOptions, selectedRecords, syncedAll, "custom7", ["image"], after); //"prices", "bom", "coreData"
           break;
         case "inventory_lines_local":
           result = await localInventoryServiceMap(location, syncOptions, after, selectedRecords, selectedLocations, syncedAll);

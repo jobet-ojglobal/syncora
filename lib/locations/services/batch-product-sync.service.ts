@@ -1,12 +1,11 @@
+import crypto from "crypto";
 import { prisma } from "@/lib/prisma";
 import { getLocalBatchProducts } from "../data/product-local";
-import crypto from "crypto";
 import { LocalProduct } from "../types";
-import { InflowCustomFields, InflowProduct } from "@/lib/inflow/types";
+import { InflowProduct } from "@/lib/inflow/types";
 import { localProductItemType } from "@/helpers/product.helper";
 import { syncProduct } from "./product-sync";
-import { Prisma } from "@/generated/prisma/client";
-import { generateSku2Variant2, generateSku2Variant2V2 } from "@/helpers/genSKU";
+import { generateSku2Variant2V2 } from "@/helpers/genSKU";
 import { parseBooleanFlag } from "@/helpers";
 
 type SyncOptions = {
@@ -16,163 +15,79 @@ type SyncOptions = {
   delayBetweenBatchesMs?: number;
 };
 
-type LocalProductWithRelations = Prisma.ProductGetPayload<{
-  include: {
-    brand: true;
-    category: true;
-    prices: true;
-    salesUom: { 
-      include: { uom: true }
-    };
-    purchasingUom:  { 
-      include: { uom: true }
-    };
-  };
-}>;
+type SyncLocation = {
+  inflowId: string;
+  name: string;
+  url: string;
+};
 
-/**
- * Core Payload Transformer
- * Converts a raw local product record (with Prisma relations) to the structured InflowProduct payload.
- * Map bin sublocation linkedLocationId to inventoryLines.locationId.
- */
-export async function mapLocalToInflowPayload(
-  product: LocalProductWithRelations,
-  brandCustomName?: string,
-  currentTimestamp: string = new Date().toISOString(),
-  lastModifiedById: string = "8ff3e71d-eb02-425d-8e0f-00a69fc8e482",
-): Promise<InflowProduct & { isCloudSynced: boolean }> {
-  const trimmedName = product.name?.trim() || "";
-
-  // 1. Build Custom Fields (Brand dynamics)
-  const existingCustomFields = (product.customFields as Record<string, string>) || {};
-  const customFields: InflowCustomFields = { ...existingCustomFields };
-
-  const brandName = product.brand?.name;
-  if (brandName) {
-    if (brandCustomName) {
-      customFields[brandCustomName as keyof InflowCustomFields] = brandName;
-    } else {
-      customFields.custom7 = brandName;
-    }
-  }
-
-  let setCategoryId: string | null = product.categoryId;
-
-  if (!product.categoryId) {
-    const defaultCategory = await prisma.category.findFirst({
-      where: { isDefault: true },
-    });
-    setCategoryId = defaultCategory?.inflowId || null;
-  }
-
-  // 3. Map final payload
-  return {
-    productId: product.inflowId,
-    isCloudSynced: product.isCloudSynced,
-    sku: product.sku,
-    name: trimmedName,
-    description: product.description,
-    itemType: product.itemType || "stockedProduct",
-    autoAssemble: product.autoAssemble,
-    isActive: product.isActive,
-    isManufacturable: product.isManufacturable,
-    includeQuantityBuildable: product.includeQuantityBuildable,
-    standardUomName: product.standardUomName,
-
-    trackExpiry: product.trackExpiry,
-    trackLots: product.trackLots,
-    trackSerials: product.trackSerials,
-
-    shelfLifeDays: product.shelfLifeDays,
-    sellBeforeExpiryDays: product.sellBeforeExpiryDays,
-    expiryNotificationDays: product.expiryNotificationDays,
-
-    weight: product.weight?.toString() || null,
-    width: product.width?.toString() || null,
-    height: product.height?.toString() || null,
-    length: product.length?.toString() || null,
-
-    originCountry: product.originCountry,
-    hsTariffNumber: product.hsTariffNumber,
-    remarks: product.remarks,
-    categoryId: setCategoryId,
-    lastVendorId: product.lastVendorId,
-    lastModifiedById,
-    createdDttm: product.createdAt.toISOString(),
-    lastModifiedDateTime: product.updatedAt.toISOString(),
-    purchasingUom: product.purchasingUom?.uom.name
-      ? {
-          name: product.purchasingUom.uom.name || "",
-          conversionRatio: {
-            standardQuantity: String(product.purchasingUom.standardQuantity) || "1.0000",
-            uomQuantity: String(product.purchasingUom.uomQuantity) || "1.0000",
-          },
-        }
-      : null,
-    salesUom: product.salesUom?.uom.name
-      ? {
-          name: product.salesUom.uom.name || "",
-          conversionRatio: {
-            standardQuantity: String(product.salesUom.standardQuantity) || "1.0000",
-            uomQuantity: String(product.salesUom.uomQuantity) || "1.0000",
-          },
-        }
-      : null,
-    customFields,
-    images: [],
-    inventoryLines: [],
-    prices: product.prices.map((p) => ({
-      productPriceId: p.inflowId,
-      pricingSchemeId: p.pricingSchemeId,
-      productId: p.productId,
-      priceType: p.priceType,
-      unitPrice: p.unitPrice?.toString() || "0",
-      fixedMarkup: p.fixedMarkup?.toString() || "0",
-    })),
-  };
-}
+type SyncResultItem = {
+  productLocalId: string;
+  productInflowId?: string;
+  status: "synced" | "skipped_not_found";
+};
 
 export class ProductSyncMapService {
-  private sleep(ms: number) {
+  private sleep(ms: number): Promise<void> {
     return new Promise((resolve) => setTimeout(resolve, ms));
   }
 
+  async resolveLocationMappedId(
+    localId: number | undefined,
+    cache: Map<number, string>,
+    fetcher: () => Promise<{ categoryId?: string; vendorId?: string; teamMemberId?: string } | null>,
+    keyField: 'categoryId' | 'vendorId' | 'teamMemberId'
+  ): Promise<string | null> {
+    if (!localId || isNaN(localId)) return null;
+    if (cache.has(localId)) return cache.get(localId)!;
+
+    const match = await fetcher();
+    const value = match?.[keyField] || null;
+    if (value) cache.set(localId, value);
+    return value;
+  }
+
   async sync(
-    location: {
-      inflowId: string;
-      name: string;
-      url: string;
-    },
+    location: SyncLocation,
     options: SyncOptions,
-    selectedRecords?: any[],
+    selectedRecords?: (string | number)[],
     syncedAll?: boolean,
     brandCustomName?: string,
-    after: string | undefined = undefined
+    includes?: string[],
+    after?: string,
   ) {
     const { onProgress, checkSignal } = options;
-    // higher batch size
-    const BATCH_SIZE = options?.batchSize ?? 500; 
-    const INTER_BATCH_DELAY = options?.delayBetweenBatchesMs ?? 300;
+    const hasImage = (includes ?? []).includes("image");
+    const hasCoreProductData = (includes ?? []).includes("coreData");
+
+    const BATCH_SIZE = options?.batchSize ?? (!hasImage ? 500 : 20);
+    const INTER_BATCH_DELAY = options?.delayBetweenBatchesMs ?? 10;
     const CLIENT_RETRIES = 1;
 
     let totalProcessed = 0;
     let hasMore = true;
+    let currentAfter = after;
 
     const allowedIds =
       !syncedAll && selectedRecords && selectedRecords.length > 0
-        ? new Set(selectedRecords.map((id) => String(id)))
+        ? new Set(selectedRecords.map(String))
         : null;
 
-    const defaultCategory = await prisma.category.findFirst({
-          where: { isDefault: true },
-          select: { inflowId: true, name: true, isDefault: true },
-        });
+    const [defaultCategory, defaultTeamMember] = await Promise.all([
+      prisma.category.findFirst({
+        where: { isDefault: true },
+        select: { inflowId: true },
+      }),
+      prisma.teamMember.findFirst({
+        where: { isInternal: true },
+        select: { inflowId: true },
+      }),
+    ]);
 
-    const syncResults: Array<{
-      productLocalId: string;
-      productInflowId?: string;
-      status: "synced" | "skipped_not_found";
-    }> = [];
+    const fallbackCategoryId = defaultCategory?.inflowId || null;
+    const fallbackTeamMemberId = defaultTeamMember?.inflowId || null;
+
+    const syncResults: SyncResultItem[] = [];
 
     const caches = {
       verifiedTeamMemberIds: new Set<string>(),
@@ -184,10 +99,8 @@ export class ProductSyncMapService {
       verifiedOperationTypes: new Set<string>(),
       verifiedPricingSchemeIds: new Set<string>(),
       verifiedProductIds: new Set<string>(),
+      verifiedBrands: new Map<string, string>(),
     };
-
-    console.log(`Starting optimized product sync map (Batch Size: ${BATCH_SIZE}, Throttle: ${INTER_BATCH_DELAY}ms)...`);
-    let batchNo = 0;
 
     while (hasMore) {
       if (checkSignal) await checkSignal();
@@ -195,14 +108,14 @@ export class ProductSyncMapService {
       const rawBatch: LocalProduct[] = await getLocalBatchProducts(
         location.url,
         BATCH_SIZE,
-        after,
-        ["prices","bom",],
+        currentAfter,
+        includes,
         CLIENT_RETRIES
       );
 
       if (!rawBatch || rawBatch.length === 0) break;
 
-      after = String(rawBatch[rawBatch.length - 1].productId);
+      currentAfter = String(rawBatch[rawBatch.length - 1].productId);
       if (rawBatch.length < BATCH_SIZE) hasMore = false;
 
       let batch = rawBatch;
@@ -214,7 +127,6 @@ export class ProductSyncMapService {
 
       if (checkSignal) await checkSignal();
 
-      // Execute transactional batch process sequentially to avoid deadlocks
       const batchProcessedCount = await prisma.$transaction(
         async (tx) => {
           let batchProcessed = 0;
@@ -222,10 +134,7 @@ export class ProductSyncMapService {
           for (const product of batch) {
             if (checkSignal) await checkSignal();
 
-            // skip inactive products
-            if (!parseBooleanFlag(product.isActive)) {
-              continue;
-            }
+            if (!parseBooleanFlag(product.isActive)) continue;
 
             const trimmedName = product.name?.trim();
             if (!trimmedName) {
@@ -236,48 +145,57 @@ export class ProductSyncMapService {
               continue;
             }
 
-            // 1. Check existing match by name
+            // 1. Look for existing product
             let match = await tx.product.findFirst({
               where: { name: trimmedName },
               select: { inflowId: true, isLocalSynced: true },
             });
 
-            // 2. If no match exists, prepare payload & invoke syncProduct
-            if (!match) {
-              const generatedInflowId = crypto.randomUUID().toLowerCase();
-              const currentTimestamp = new Date().toISOString();
-              const modifiedById = "8ff3e71d-eb02-425d-8e0f-00a69fc8e482";
+            const targetInflowId = match?.inflowId || crypto.randomUUID().toLowerCase();
+            const currentTimestamp = new Date().toISOString();
 
-              // const taxingSchemeLocalId = Number(product.taxingSchemeId);
+            // 2. Prepare payload dynamically based on requested sync flags
+            let payload: InflowProduct & { slug?: string };
+
+            if (!hasCoreProductData && hasImage) {
+              // --- IMAGE-ONLY SYNC ---
+              payload = {
+                productId: targetInflowId,
+                name: trimmedName,
+                image: product.image,
+              } as InflowProduct;
+            } else {
+              // --- FULL CORE DATA / UPSERT SYNC ---
               const categoryLocalId = Number(product.categoryId);
+              const lastVendorId = Number(product.lastVendorId);
+              const lastModifiedById = Number(product.lastModifiedById);
 
-              const [category] = await Promise.all([
-                !isNaN(categoryLocalId) && product.categoryId != null
+              const [categoryMap, vendorMap, teamMemberMap] = await Promise.all([
+                product.categoryId && !isNaN(categoryLocalId)
                   ? tx.categoryLocationMap.findFirst({
-                      where: {
-                        locationId: location.inflowId,
-                        localId: categoryLocalId,
-                      },
+                      where: { locationId: location.inflowId, localId: categoryLocalId },
                       select: { categoryId: true },
+                    })
+                  : null,
+                product.lastVendorId && !isNaN(lastVendorId)
+                  ? tx.vendorLocationMap.findFirst({
+                      where: { locationId: location.inflowId, localId: lastVendorId },
+                      select: { vendorId: true },
+                    })
+                  : null,
+                product.lastModifiedById && !isNaN(lastModifiedById)
+                  ? tx.teamMemberLocationMapExtended.findFirst({
+                      where: { locationId: location.inflowId, localId: lastModifiedById },
+                      select: { teamMemberId: true },
                     })
                   : null,
               ]);
 
-              // 1. Build Custom Fields (Brand dynamics)
-              let setCategoryId: string | null = category?.categoryId || null;
-
-              if (!product.categoryId) {
-                const defaultCategory = await prisma.category.findFirst({
-                  where: { isDefault: true },
-                });
-                setCategoryId = defaultCategory?.inflowId || null;
-              }
-
               const brandName = product.customFields?.custom7 || "";
               const skuGenerated = generateSku2Variant2V2(brandName, trimmedName, []);
 
-              const payload: InflowProduct & { slug?: string } = {
-                productId: generatedInflowId,
+              payload = {
+                productId: targetInflowId,
                 sku: skuGenerated,
                 name: trimmedName,
                 description: product.description ?? null,
@@ -286,116 +204,63 @@ export class ProductSyncMapService {
                 isActive: parseBooleanFlag(product.isActive),
                 isManufacturable: parseBooleanFlag(product.isManufacturable),
                 includeQuantityBuildable: parseBooleanFlag(product.includeQuantityBuildable),
-                standardUomName: product.standardUomName || null,
-
+                standardUomName: product.standardUomName || "ea.",
                 trackExpiry: parseBooleanFlag(product.trackExpiry),
                 trackLots: parseBooleanFlag(product.trackLots),
                 trackSerials: parseBooleanFlag(product.trackSerials),
-
                 shelfLifeDays: product.shelfLifeDays ?? null,
                 sellBeforeExpiryDays: product.sellBeforeExpiryDays ?? null,
                 expiryNotificationDays: product.expiryNotificationDays ?? null,
-
                 weight: product.weight != null ? String(product.weight) : null,
                 width: product.width != null ? String(product.width) : null,
                 height: product.height != null ? String(product.height) : null,
                 length: product.length != null ? String(product.length) : null,
-
                 originCountry: product.originCountry || null,
                 hsTariffNumber: product.hsTariffNumber || null,
                 remarks: product.remarks || null,
-                categoryId: setCategoryId,
-                lastVendorId: null,
-                lastModifiedById: modifiedById,
+                categoryId: categoryMap?.categoryId || fallbackCategoryId,
+                lastVendorId: vendorMap?.vendorId || null,
+                lastModifiedById: teamMemberMap?.teamMemberId || fallbackTeamMemberId,
                 createdDttm: currentTimestamp,
                 lastModifiedDateTime: product.lastModifiedDateTime || currentTimestamp,
                 timestamp: currentTimestamp,
-
-                purchasingUom: product.purchasingUom
-                  ? {
-                      name: product.purchasingUom.poUomName || "",
-                      conversionRatio: {
-                        standardQuantity: product.purchasingUom.poUomRatioStd || "1.0000",
-                        uomQuantity: product.purchasingUom.poUomRatio || "1.0000",
-                      },
-                    }
-                  : null,
-
-                salesUom: product.salesUom
-                  ? {
-                      name: product.salesUom.soUomName || "",
-                      conversionRatio: {
-                        standardQuantity: product.salesUom.soUomRatioStd || "1.0000",
-                        uomQuantity: product.salesUom.soUomRatio || "1.0000",
-                      },
-                    }
-                  : null,
-
-                customFields: {
-                  custom1: product.customFields?.custom1 || undefined,
-                  custom2: product.customFields?.custom2 || undefined,
-                  custom3: product.customFields?.custom3 || undefined,
-                  custom4: product.customFields?.custom4 || undefined,
-                  custom5: product.customFields?.custom5 || undefined,
-                  custom6: product.customFields?.custom6 || undefined,
-                  custom7: product.customFields?.custom7 || undefined,
-                  custom8: product.customFields?.custom8 || undefined,
-                  custom9: product.customFields?.custom9 || undefined,
-                  custom10: product.customFields?.custom10 || undefined,
-                },
-
+                customFields: product.customFields,
                 productBarcodes: product.barcode?.trim()
                   ? [
                       {
                         productBarcodeId: crypto.randomUUID().toLowerCase(),
                         barcode: product.barcode.trim(),
                         lineNum: 1,
-                        productId: generatedInflowId,
+                        productId: targetInflowId,
                         timestamp: currentTimestamp,
                       },
                     ]
                   : [],
-
-                prices: product.prices
-                  ? product.prices.map((p) => ({
-                      productPriceId: crypto.randomUUID().toLowerCase(),
-                      productId: generatedInflowId,
-                      pricingSchemeId: String(p.pricingSchemeId),
-                      priceType: p.priceType || "FixedPrice",
-                      fixedMarkup: p.fixedMarkup != null ? String(p.fixedMarkup) : null,
-                      unitPrice: String(p.unitPrice ?? 0),
-                      timestamp: currentTimestamp,
-                    }))
-                  : [],
-
-                images: [],
-                inventoryLines: [],
-                productVariant: undefined as any,
+                prices: (product.prices ?? []).map((p) => ({
+                  productPriceId: crypto.randomUUID().toLowerCase(),
+                  productId: targetInflowId,
+                  pricingSchemeId: String(p.pricingSchemeId),
+                  priceType: p.priceType || "FixedPrice",
+                  fixedMarkup: p.fixedMarkup != null ? String(p.fixedMarkup) : null,
+                  unitPrice: String(p.unitPrice ?? 0),
+                  timestamp: currentTimestamp,
+                })),
                 itemBoms: product.itemBoms || [],
                 attachments: product.attachments || [],
-                taxCodes: [],
-                reorderSettings: [],
-                productOperations: [],
-                cost: product.cost
-                  ? {
-                      productCostId: crypto.randomUUID().toLowerCase(),
-                      productId: generatedInflowId,
-                      cost: String(product.cost),
-                    }
-                  : undefined,
-              };
-
-              match = await syncProduct(
-                tx,
-                payload,
-                undefined,
-                undefined,
-                true,
-                brandCustomName,
-                caches,
-                defaultCategory?.inflowId
-              );
+                image: hasImage ? product.image : undefined,
+              } as InflowProduct;
             }
+
+            // 3. Delegate Upsert logic to syncProduct
+            match = await syncProduct(
+              tx,
+              payload,
+              undefined,
+              undefined,
+              hasCoreProductData,
+              brandCustomName,
+              caches
+            );
 
             if (!match?.inflowId || !location.inflowId) {
               syncResults.push({
@@ -405,31 +270,29 @@ export class ProductSyncMapService {
               continue;
             }
 
-            // 3. Bridge mapping record
+            // 4. Bridge local ID to location mapping table
             const localIdNum = Number(product.productId);
-            let locationMap = await tx.productLocationMap.findUnique({
+            const validLocalId = !isNaN(localIdNum) ? localIdNum : 0;
+
+            await tx.productLocationMap.upsert({
               where: {
                 productId_locationId: {
                   productId: match.inflowId,
                   locationId: location.inflowId,
                 },
               },
-              select: { localId: true },
+              create: {
+                productId: match.inflowId,
+                locationId: location.inflowId,
+                localId: validLocalId,
+              },
+              update: {
+                localId: validLocalId,
+              },
             });
 
-            if (!locationMap) {
-              locationMap = await tx.productLocationMap.create({
-                data: {
-                  productId: match.inflowId,
-                  locationId: location.inflowId,
-                  localId: !isNaN(localIdNum) ? localIdNum : 0,
-                },
-                select: { localId: true },
-              });
-            }
-
             if (!match.isLocalSynced) {
-              await tx.product.updateMany({
+              await tx.product.update({
                 where: { inflowId: match.inflowId },
                 data: { isLocalSynced: true },
               });
@@ -440,8 +303,7 @@ export class ProductSyncMapService {
               productInflowId: match.inflowId,
               status: "synced",
             });
-            
-            console.log(`Product mapped: #${match.inflowId} completed.`);
+
             batchProcessed++;
           }
 
@@ -451,9 +313,6 @@ export class ProductSyncMapService {
       );
 
       totalProcessed += batchProcessedCount;
-      batchNo++;
-
-      console.log(`Batch #${batchNo} completed. Processed ${totalProcessed} products. `);
 
       if (onProgress) await onProgress(totalProcessed);
       if (checkSignal) await checkSignal();
@@ -469,6 +328,381 @@ export class ProductSyncMapService {
       results: syncResults,
     };
   }
+
+  // async sync(
+  //   location: SyncLocation,
+  //   options: SyncOptions,
+  //   selectedRecords?: (string | number)[],
+  //   syncedAll?: boolean,
+  //   brandCustomName?: string,
+  //   includes?: string[],
+  //   after?: string,
+  // ) {
+  //   const { onProgress, checkSignal } = options;
+  //   let BATCH_SIZE = options?.batchSize ?? 30;
+  //   const INTER_BATCH_DELAY = options?.delayBetweenBatchesMs ?? 10;
+  //   const CLIENT_RETRIES = 1;
+
+  //   let totalProcessed = 0;
+  //   let hasMore = true;
+  //   let currentAfter = after;
+
+  //   const hasImage = (includes ?? []).includes("image");
+  //   BATCH_SIZE = hasImage ? 10 : 500;
+  //   const hasCoreProductData = (includes ?? []).includes("coreData");
+
+  //   const allowedIds =
+  //     !syncedAll && selectedRecords && selectedRecords.length > 0
+  //       ? new Set(selectedRecords.map(String))
+  //       : null;
+
+  //   // Fetch fallback defaults ONCE outside the main loop
+  //   const [defaultCategory, defaultTeamMember] = await Promise.all([
+  //     prisma.category.findFirst({
+  //       where: { isDefault: true },
+  //       select: { inflowId: true },
+  //     }),
+  //     prisma.teamMember.findFirst({
+  //       where: { isInternal: true },
+  //       select: { inflowId: true },
+  //     }),
+  //   ]);
+
+  //   const fallbackCategoryId = defaultCategory?.inflowId || null;
+  //   const fallbackTeamMemberId = defaultTeamMember?.inflowId || null;
+
+  //   const syncResults: SyncResultItem[] = [];
+
+  //   const caches = {
+  //     verifiedTeamMemberIds: new Set<string>(),
+  //     verifiedCategoryIds: new Set<string>(),
+  //     verifiedVendorIds: new Set<string>(),
+  //     verifiedLocationIds: new Set<string>(),
+  //     verifiedTaxingSchemes: new Set<string>(),
+  //     verifiedTaxCodes: new Set<string>(),
+  //     verifiedOperationTypes: new Set<string>(),
+  //     verifiedPricingSchemeIds: new Set<string>(),
+  //     verifiedProductIds: new Set<string>(),
+  //     verifiedBrands: new Map<string, string>(),
+  //   };
+
+  //   console.log(
+  //     `Starting optimized product sync map (Batch Size: ${BATCH_SIZE}, Throttle: ${INTER_BATCH_DELAY}ms)...`
+  //   );
+  //   let batchNo = 0;
+
+  //   while (hasMore) {
+  //     if (checkSignal) await checkSignal();
+
+  //     const rawBatch: LocalProduct[] = await getLocalBatchProducts(
+  //       location.url,
+  //       BATCH_SIZE,
+  //       currentAfter,
+  //       includes,
+  //       CLIENT_RETRIES
+  //     );
+
+  //     if (!rawBatch || rawBatch.length === 0) break;
+
+  //     currentAfter = String(rawBatch[rawBatch.length - 1].productId);
+  //     if (rawBatch.length < BATCH_SIZE) hasMore = false;
+
+  //     let batch = rawBatch;
+  //     if (allowedIds) {
+  //       batch = batch.filter((item) => allowedIds.has(String(item.productId)));
+  //     }
+
+  //     if (batch.length === 0) continue;
+
+  //     if (checkSignal) await checkSignal();
+
+  //     // Sequential transactional processing to prevent database deadlocks
+  //     const batchProcessedCount = await prisma.$transaction(
+  //       async (tx) => {
+  //         let batchProcessed = 0;
+
+  //         for (const product of batch) {
+  //           if (checkSignal) await checkSignal();
+
+  //           if (!parseBooleanFlag(product.isActive)) {
+  //             continue;
+  //           }
+
+  //           // Check existing mapping within this specific location
+  //           const existingMappedProduct = product.productId
+  //             ? await tx.productLocationMap.findFirst({
+  //                 where: {
+  //                   locationId: location.inflowId,
+  //                   localId: Number(product.productId),
+  //                 },
+  //                 select: {
+  //                   localId: true,
+  //                   productId: true,
+  //                 },
+  //               })
+  //             : null;
+
+  //           // Skip record if already mapped and update flag is false
+  //           if (existingMappedProduct) {
+  //             continue;
+  //           }
+
+  //           const trimmedName = product.name?.trim();
+  //           if (!trimmedName) {
+  //             syncResults.push({
+  //               productLocalId: String(product.productId),
+  //               status: "skipped_not_found",
+  //             });
+  //             continue;
+  //           }
+
+  //           // 1. Check existing match by name
+  //           let match = await tx.product.findFirst({
+  //             where: { name: trimmedName },
+  //             select: { inflowId: true, isLocalSynced: true },
+  //           });
+
+  //           // 2. If no match exists, map location mappings and sync product
+  //           // if (!match) {
+  //             console.log("Not match! Syncing...")
+  //             const generatedInflowId = crypto.randomUUID().toLowerCase();
+  //             const currentTimestamp = new Date().toISOString();
+
+  //             const categoryLocalId = Number(product.categoryId);
+  //             const lastVendorId = Number(product.lastVendorId);
+  //             const lastModifiedById = Number(product.lastModifiedById);
+
+  //             const [categoryMap, vendorMap, teamMemberMap] = await Promise.all([
+  //               product.categoryId && !isNaN(categoryLocalId)
+  //                 ? tx.categoryLocationMap.findFirst({
+  //                     where: {
+  //                       locationId: location.inflowId,
+  //                       localId: categoryLocalId,
+  //                     },
+  //                     select: { categoryId: true },
+  //                   })
+  //                 : null,
+  //               product.lastVendorId && !isNaN(lastVendorId)
+  //                 ? tx.vendorLocationMap.findFirst({
+  //                     where: {
+  //                       locationId: location.inflowId,
+  //                       localId: lastVendorId,
+  //                     },
+  //                     select: { vendorId: true },
+  //                   })
+  //                 : null,
+  //               product.lastModifiedById && !isNaN(lastModifiedById)
+  //                 ? tx.teamMemberLocationMapExtended.findFirst({
+  //                     where: {
+  //                       locationId: location.inflowId,
+  //                       localId: lastModifiedById,
+  //                     },
+  //                     select: { teamMemberId: true },
+  //                   })
+  //                 : null,
+  //             ]);
+
+  //             const brandName = product.customFields?.custom7 || "";
+  //             const skuGenerated = generateSku2Variant2V2(brandName, trimmedName, []);
+
+  //             const payload: InflowProduct & { slug?: string } = {
+  //               productId: generatedInflowId,
+  //               sku: skuGenerated,
+  //               name: trimmedName,
+  //               description: product.description ?? null,
+  //               itemType: localProductItemType(product.itemType),
+  //               autoAssemble: parseBooleanFlag(product.autoAssemble),
+  //               isActive: parseBooleanFlag(product.isActive),
+  //               isManufacturable: parseBooleanFlag(product.isManufacturable),
+  //               includeQuantityBuildable: parseBooleanFlag(product.includeQuantityBuildable),
+  //               standardUomName: product.standardUomName || "ea.",
+
+  //               trackExpiry: parseBooleanFlag(product.trackExpiry),
+  //               trackLots: parseBooleanFlag(product.trackLots),
+  //               trackSerials: parseBooleanFlag(product.trackSerials),
+
+  //               shelfLifeDays: product.shelfLifeDays ?? null,
+  //               sellBeforeExpiryDays: product.sellBeforeExpiryDays ?? null,
+  //               expiryNotificationDays: product.expiryNotificationDays ?? null,
+
+  //               weight: product.weight != null ? String(product.weight) : null,
+  //               width: product.width != null ? String(product.width) : null,
+  //               height: product.height != null ? String(product.height) : null,
+  //               length: product.length != null ? String(product.length) : null,
+
+  //               originCountry: product.originCountry || null,
+  //               hsTariffNumber: product.hsTariffNumber || null,
+  //               remarks: product.remarks || null,
+  //               categoryId: categoryMap?.categoryId || fallbackCategoryId,
+  //               lastVendorId: vendorMap?.vendorId || null,
+  //               lastModifiedById: teamMemberMap?.teamMemberId || fallbackTeamMemberId,
+  //               createdDttm: currentTimestamp,
+  //               lastModifiedDateTime: product.lastModifiedDateTime || currentTimestamp,
+  //               timestamp: currentTimestamp,
+
+  //               purchasingUom: product.purchasingUom
+  //                 ? {
+  //                     name: product.purchasingUom.poUomName || "ea.",
+  //                     conversionRatio: {
+  //                       standardQuantity: product.purchasingUom.poUomRatioStd || "1.0000",
+  //                       uomQuantity: product.purchasingUom.poUomRatio || "1.0000",
+  //                     },
+  //                   }
+  //                 : null,
+
+  //               salesUom: product.salesUom
+  //                 ? {
+  //                     name: product.salesUom.soUomName || "ea.",
+  //                     conversionRatio: {
+  //                       standardQuantity: product.salesUom.soUomRatioStd || "1.0000",
+  //                       uomQuantity: product.salesUom.soUomRatio || "1.0000",
+  //                     },
+  //                   }
+  //                 : null,
+
+  //               customFields: {
+  //                 custom1: product.customFields?.custom1 || undefined,
+  //                 custom2: product.customFields?.custom2 || undefined,
+  //                 custom3: product.customFields?.custom3 || undefined,
+  //                 custom4: product.customFields?.custom4 || undefined,
+  //                 custom5: product.customFields?.custom5 || undefined,
+  //                 custom6: product.customFields?.custom6 || undefined,
+  //                 custom7: product.customFields?.custom7 || undefined,
+  //                 custom8: product.customFields?.custom8 || undefined,
+  //                 custom9: product.customFields?.custom9 || undefined,
+  //                 custom10: product.customFields?.custom10 || undefined,
+  //               },
+
+  //               productBarcodes: product.barcode?.trim()
+  //                 ? [
+  //                     {
+  //                       productBarcodeId: crypto.randomUUID().toLowerCase(),
+  //                       barcode: product.barcode.trim(),
+  //                       lineNum: 1,
+  //                       productId: generatedInflowId,
+  //                       timestamp: currentTimestamp,
+  //                     },
+  //                   ]
+  //                 : [],
+
+  //               prices: product.prices
+  //                 ? product.prices.map((p) => ({
+  //                     productPriceId: crypto.randomUUID().toLowerCase(),
+  //                     productId: generatedInflowId,
+  //                     pricingSchemeId: String(p.pricingSchemeId),
+  //                     priceType: p.priceType || "FixedPrice",
+  //                     fixedMarkup: p.fixedMarkup != null ? String(p.fixedMarkup) : null,
+  //                     unitPrice: String(p.unitPrice ?? 0),
+  //                     timestamp: currentTimestamp,
+  //                   }))
+  //                 : [],
+
+  //               images: [],
+  //               inventoryLines: [],
+  //               productVariant: undefined,
+  //               itemBoms: product.itemBoms || [],
+  //               attachments: product.attachments || [],
+  //               taxCodes: [],
+  //               reorderSettings: [],
+  //               productOperations: [],
+  //               cost: product.cost
+  //                 ? {
+  //                     productCostId: crypto.randomUUID().toLowerCase(),
+  //                     productId: generatedInflowId,
+  //                     cost: String(product.cost),
+  //                   }
+  //                 : undefined,
+  //               image: product.image
+  //             };
+
+  //             match = await syncProduct(
+  //               tx,
+  //               payload,
+  //               undefined,
+  //               undefined,
+  //               hasCoreProductData,
+  //               brandCustomName,
+  //               caches
+  //             );
+
+  //             // export async function syncProduct(
+  //             //   tx: Tx,
+  //             //   product: InflowProduct,
+  //             //   groupId?: string,
+  //             //   firstProductInGroup?: InflowProduct,
+  //             //   hasCoreProductData?: boolean,
+  //             //   brandCustomName?: string | null,
+  //             //   caches?: SyncCache,
+  //             // ) {
+  //           // }
+
+  //           if (!match?.inflowId || !location.inflowId) {
+  //             syncResults.push({
+  //               productLocalId: String(product.productId),
+  //               status: "skipped_not_found",
+  //             });
+  //             continue;
+  //           }
+
+  //           // 3. Bridge mapping record upsert/check
+  //           const localIdNum = Number(product.productId);
+  //           const validLocalId = !isNaN(localIdNum) ? localIdNum : 0;
+
+  //           await tx.productLocationMap.upsert({
+  //             where: {
+  //               productId_locationId: {
+  //                 productId: match.inflowId,
+  //                 locationId: location.inflowId,
+  //               },
+  //             },
+  //             create: {
+  //               productId: match.inflowId,
+  //               locationId: location.inflowId,
+  //               localId: validLocalId,
+  //             },
+  //             update: {},
+  //           });
+
+  //           if (!match.isLocalSynced) {
+  //             await tx.product.update({
+  //               where: { inflowId: match.inflowId },
+  //               data: { isLocalSynced: true },
+  //             });
+  //           }
+
+  //           syncResults.push({
+  //             productLocalId: String(product.productId),
+  //             productInflowId: match.inflowId,
+  //             status: "synced",
+  //           });
+
+  //           batchProcessed++;
+  //         }
+
+  //         return batchProcessed;
+  //       },
+  //       { timeout: 60000 }
+  //     );
+
+  //     totalProcessed += batchProcessedCount;
+  //     batchNo++;
+
+  //     console.log(`Batch #${batchNo} completed. Processed ${totalProcessed} products.`);
+
+  //     if (onProgress) await onProgress(totalProcessed);
+  //     if (checkSignal) await checkSignal();
+
+  //     if (INTER_BATCH_DELAY > 0) {
+  //       await this.sleep(INTER_BATCH_DELAY);
+  //     }
+  //   }
+
+  //   return {
+  //     productsProcessed: totalProcessed,
+  //     syncedAt: new Date().toISOString(),
+  //     results: syncResults,
+  //   };
+  // }
 }
 
 const productService = new ProductSyncMapService();

@@ -1,6 +1,7 @@
 import { BranchClient } from "../location.client";
 import { InflowCustomer as CloudCustomerType } from "@/lib/inflow/types";
-import { LocalCustomer } from "../types";
+import { CustomerPayload, LocalCustomer } from "../types";
+import { LocationClient } from "../location-client.limit";
 
 export async function getCustomer(
   batchId: string,
@@ -69,8 +70,8 @@ export async function getLocalBatchCustomers(
     params.append("after", after);
   }
 
-  const apiClient = new BranchClient(url);
-  return apiClient.get<LocalCustomer[]>(
+  const apiClient = new LocationClient(url);
+  return apiClient.get<CustomerPayload[]>(
     `/inflow-local/customers?${params.toString()}`
   );
 }

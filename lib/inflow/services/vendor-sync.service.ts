@@ -1,10 +1,7 @@
 // services/sync/products/vendor-sync.service.ts
 import { prisma } from "@/lib/prisma";
-import { getVendorIncludes, getVendors } from "../data/vendors";
+import { getVendorIncludes } from "../data/vendors";
 import { syncVendor } from "./vendor.sync";
-import { Prisma } from "@/generated/prisma/client";
-
-
 
 type SyncOptions = {
   onProgress?: (processedCount: number) => Promise<void>;

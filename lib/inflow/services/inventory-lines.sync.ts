@@ -1,4 +1,5 @@
 // lib/inflow/services/inventory-lines.sync.ts
+
 import { Prisma } from "@/generated/prisma/client";
 import { InflowInventoryLine, InflowLocation } from "../types";
 import { syncLocation } from "./location.sync";
@@ -9,8 +10,13 @@ type SyncCache = {
   verifiedLocationIds?: Set<string>;
 };
 
-const toDecimal = (value: string | number | null | undefined): Prisma.Decimal => {
-  if (value === null || value === undefined || value === "") return new Prisma.Decimal(0);
+const toDecimal = (
+  value: string | number | null | undefined
+): Prisma.Decimal => {
+  if (value === null || value === undefined || value === "") {
+    return new Prisma.Decimal(0);
+  }
+
   return new Prisma.Decimal(value);
 };
 
@@ -21,78 +27,169 @@ export async function syncInventoryLines(
   caches?: SyncCache,
   selectedLocationIds?: string[]
 ) {
-  if (!inventoryLines.length) return;
+  console.log(`\n============================================================`);
+  console.log(`[INVENTORY SYNC START] Product ID: ${productId}`);
+  console.log(`[INVENTORY SYNC] Received raw inventoryLines count: ${inventoryLines.length}`);
+  console.log(`============================================================\n`);
 
-  // 1. Filter lines by selected location scope (if scoped)
+  if (!inventoryLines.length) {
+    console.log(`[INVENTORY SYNC] No inventory lines provided. Exiting.`);
+    return;
+  }
+
+  // ============================================================
+  // 1. Filter inventory lines by selected location scope
+  // ============================================================
+
   const linesToSync = selectedLocationIds?.length
-    ? inventoryLines.filter(
-        (line) => line.locationId && selectedLocationIds.includes(line.locationId)
-      )
+    ? inventoryLines.filter((line) => {
+        const locId = line.locationId || line.location?.locationId;
+        return locId && selectedLocationIds.includes(locId);
+      })
     : inventoryLines;
 
-  if (!linesToSync.length) return;
+  console.log(`[INVENTORY SYNC] Selected Location IDs Filter:`, selectedLocationIds ?? "ALL LOCATIONS");
+  console.log(`[INVENTORY SYNC] Lines to sync after location filter: ${linesToSync.length}`);
+  console.dir(linesToSync, { depth: null, colors: true });
 
-  const verifiedLocations = caches?.verifiedLocationIds ?? new Set<string>();
+  if (!linesToSync.length) {
+    console.log(`[INVENTORY SYNC] No lines to sync after location filtering. Exiting.`);
+    return;
+  }
 
-  // 2. Ensure parent Locations exist in DB
+  const verifiedLocations =
+    caches?.verifiedLocationIds ?? new Set<string>();
+
+  // ============================================================
+  // 2. Ensure parent Locations exist
+  // ============================================================
+
   const uniqueLocationsToSync = new Map<string, InflowLocation>();
+
   for (const line of linesToSync) {
-    if (line.location && !verifiedLocations.has(line.location.locationId)) {
-      uniqueLocationsToSync.set(line.location.locationId, line.location);
+    const locId = line.locationId || line.location?.locationId;
+    if (
+      locId &&
+      line.location &&
+      !verifiedLocations.has(locId)
+    ) {
+      uniqueLocationsToSync.set(locId, line.location);
     }
   }
 
   for (const [locId, locData] of uniqueLocationsToSync) {
+    console.log(`[INVENTORY SYNC] Syncing parent location: ${locId}`);
     await syncLocation(tx, locData);
     verifiedLocations.add(locId);
   }
 
-  // 3. Upsert Sublocations (Ignore empty strings / floor stock)
-  const sublocationsToCreate: { locationId: string; name: string }[] = [];
+  // ============================================================
+  // 3. Create named Sublocations
+  //
+  // Empty/null sublocation = FLOOR STOCK.
+  // We intentionally do NOT create a Sublocation for it.
+  // ============================================================
+
+  const sublocationsToCreate: {
+    locationId: string;
+    name: string;
+  }[] = [];
+
   const requiredSublocationKeys = new Set<string>();
 
   for (const line of linesToSync) {
+    const locId = line.locationId || line.location?.locationId;
     const subName = line.sublocation?.trim();
-    if (!line.locationId || !subName) continue; // Skip empty sublocation strings
 
-    const subKey = `${line.locationId}_${subName}`;
+    // Empty sublocation = floor stock
+    if (!locId || !subName) {
+      continue;
+    }
+
+    const subKey = `${locId}_${subName}`;
+
     if (!requiredSublocationKeys.has(subKey)) {
       requiredSublocationKeys.add(subKey);
-      sublocationsToCreate.push({ locationId: line.locationId, name: subName });
+
+      sublocationsToCreate.push({
+        locationId: locId,
+        name: subName,
+      });
     }
   }
 
   if (sublocationsToCreate.length > 0) {
+    console.log(`[INVENTORY SYNC] Upserting Sublocations:`, sublocationsToCreate);
     await Promise.all(
       sublocationsToCreate.map((sub) =>
         tx.sublocation.upsert({
           where: {
-            locationId_name: { locationId: sub.locationId, name: sub.name },
+            locationId_name: {
+              locationId: sub.locationId,
+              name: sub.name,
+            },
           },
-          create: { locationId: sub.locationId, name: sub.name },
+          create: {
+            locationId: sub.locationId,
+            name: sub.name,
+          },
           update: {},
         })
       )
     );
   }
 
-  // Fetch sublocation IDs map
-  const targetLocationIds = [...new Set(linesToSync.map((l) => l.locationId))];
+  // ============================================================
+  // 4. Fetch Sublocation IDs
+  // ============================================================
+
+  const targetLocationIds = [
+    ...new Set(
+      linesToSync
+        .map((line) => line.locationId || line.location?.locationId)
+        .filter(Boolean) as string[]
+    ),
+  ];
+
+  console.log(`[INVENTORY SYNC] Target Location IDs for DB Query:`, targetLocationIds);
+
   const dbSublocations = await tx.sublocation.findMany({
-    where: { locationId: { in: targetLocationIds } },
-    select: { id: true, locationId: true, name: true },
+    where: {
+      locationId: {
+        in: targetLocationIds,
+      },
+    },
+    select: {
+      id: true,
+      locationId: true,
+      name: true,
+    },
   });
 
   const sublocationIdMap = new Map<string, string>();
+
   for (const sub of dbSublocations) {
-    sublocationIdMap.set(`${sub.locationId}_${sub.name}`, sub.id);
+    sublocationIdMap.set(
+      `${sub.locationId}_${sub.name}`,
+      sub.id
+    );
   }
 
-  // 4. Aggregations: Total Quantity & Serials
-  const locationTotals = new Map<string, Prisma.Decimal>();
-  const sublocationTotals = new Map<string, { sublocationId: string; totalQty: Prisma.Decimal }>();
+  // ============================================================
+  // 5. Aggregate inventory
+  // ============================================================
 
-  // Track serial items with quantity state
+  const locationTotals = new Map<string, Prisma.Decimal>();
+
+  const sublocationTotals = new Map<
+    string,
+    {
+      sublocationId: string;
+      totalQty: Prisma.Decimal;
+    }
+  >();
+
+  // Serial inventory to synchronize
   const serialsToSync: {
     serialNumber: string;
     locationId: string;
@@ -100,65 +197,172 @@ export async function syncInventoryLines(
     quantity: Prisma.Decimal;
   }[] = [];
 
-  for (const line of linesToSync) {
-    if (!line.locationId) continue;
+  console.log(`\n[INVENTORY SYNC] Step 5: Beginning Line-by-Line Aggregation...`);
 
-    const lineQty = toDecimal(line.quantityOnHand);
+  for (let idx = 0; idx < linesToSync.length; idx++) {
+    const line = linesToSync[idx];
+    const locId = line.locationId || line.location?.locationId;
+
+    if (!locId) {
+      console.warn(`[INVENTORY SYNC WARN] Line #${idx} missing locationId! Line skipped:`, line);
+      continue;
+    }
+
+    const serial = line.serial?.trim();
+
+    // Fallback: If a serial exists but quantityOnHand is null, undefined, or 0, default it to 1.00
+    // Replace lines 212-218 in Step 5:
+
+    let rawQty: string | number | null | undefined = line.quantityOnHand;
+
+    console.log(rawQty)
+
+    // Explicitly handle empty/zero quantity for serial lines without TypeScript overlap errors
+    if (
+      serial &&
+      (rawQty === null ||
+        rawQty === undefined ||
+        (rawQty as unknown) === 0 ||
+        (rawQty as unknown) === "")
+    ) {
+      rawQty = 1;
+      console.log(
+        `[INVENTORY SYNC] Line #${idx}: Serial '${serial}' missing quantityOnHand; defaulted quantity to 1`
+      );
+    }
+
+    const lineQty = toDecimal(rawQty);
+
+    console.log(`[INVENTORY SYNC] Processing Line #${idx}:`, {
+      serial,
+      locId,
+      sublocation: line.sublocation ?? "FLOOR STOCK (null)",
+      rawQuantityOnHand: line.quantityOnHand,
+      parsedLineQty: lineQty.toString(),
+    });
+
+    // ----------------------------------------------------------
+    // Location total
+    // ----------------------------------------------------------
+
+    const currentLocTotal =
+      locationTotals.get(locId) ?? new Prisma.Decimal(0);
+
+    const newLocTotal = currentLocTotal.plus(lineQty);
+    locationTotals.set(locId, newLocTotal);
+
+    console.log(`  -> Running total for Location '${locId}': ${newLocTotal.toString()}`);
+
+    // ----------------------------------------------------------
+    // Sublocation
+    // ----------------------------------------------------------
+
     const subName = line.sublocation?.trim();
-
-    // Sum overall location stock
-    const currentLocTotal = locationTotals.get(line.locationId) ?? new Prisma.Decimal(0);
-    locationTotals.set(line.locationId, currentLocTotal.plus(lineQty));
 
     let assignedSublocationId: string | null = null;
 
-    // Sum bin sublocation stock if non-empty
     if (subName) {
-      const subId = sublocationIdMap.get(`${line.locationId}_${subName}`);
+      const subId = sublocationIdMap.get(`${locId}_${subName}`);
+
       if (subId) {
         assignedSublocationId = subId;
-        const subKey = `${line.locationId}_${subId}`;
-        const existingSub = sublocationTotals.get(subKey) ?? {
-          sublocationId: subId,
-          totalQty: new Prisma.Decimal(0),
-        };
-        existingSub.totalQty = existingSub.totalQty.plus(lineQty);
+
+        const subKey = `${locId}_${subId}`;
+
+        const existingSub =
+          sublocationTotals.get(subKey) ?? {
+            sublocationId: subId,
+            totalQty: new Prisma.Decimal(0),
+          };
+
+        existingSub.totalQty =
+          existingSub.totalQty.plus(lineQty);
+
         sublocationTotals.set(subKey, existingSub);
+      } else {
+        console.warn(`[INVENTORY SYNC WARN] Sublocation ID not found in map for key: ${locId}_${subName}`);
       }
     }
 
-    // Collect serial details
-    const serial = line.serial?.trim();
+    // ----------------------------------------------------------
+    // Serial
+    // ----------------------------------------------------------
+
     if (serial) {
       serialsToSync.push({
         serialNumber: serial,
-        locationId: line.locationId,
+        locationId: locId,
         sublocationId: assignedSublocationId,
         quantity: lineQty,
       });
     }
   }
 
-  // 5. Fetch existing inventory records for comparison
+  console.log(`\n[INVENTORY SYNC] Final Aggregated Location Totals:`);
+  for (const [locId, total] of locationTotals) {
+    console.log(`  Location [${locId}]: ${total.toString()}`);
+  }
+
+  // ============================================================
+  // 6. Fetch existing Inventory records
+  // ============================================================
+
   const existingInventories = await tx.inventory.findMany({
-    where: { productId, locationId: { in: targetLocationIds } },
+    where: {
+      productId,
+      locationId: {
+        in: targetLocationIds,
+      },
+    },
   });
 
-  const existingInventoryMap = new Map<string, (typeof existingInventories)[0]>();
+  const existingInventoryMap = new Map<
+    string,
+    (typeof existingInventories)[0]
+  >();
+
   for (const inv of existingInventories) {
     existingInventoryMap.set(inv.locationId, inv);
   }
 
-  const binIdMap = new Map<string, string>(); // `${locationId}_${sublocationId}` -> inventoryBin.id
+  // ============================================================
+  // 7. Create/update Inventory and InventoryBin
+  // ============================================================
+
+  const binIdMap = new Map<string, string>();
+
   const ledgerEntriesToCreate: Prisma.InventoryLedgerCreateManyInput[] = [];
 
-  // 6. Update Inventory, Bins, and prepare Ledger entries
   for (const [locationId, newTotalQty] of locationTotals) {
     const existingInv = existingInventoryMap.get(locationId);
-    const existingReserved = existingInv?.quantityReserved ?? new Prisma.Decimal(0);
+
+    const existingQtyBefore =
+      existingInv?.quantityOnHand ?? new Prisma.Decimal(0);
+
+    const existingReserved =
+      existingInv?.quantityReserved ?? new Prisma.Decimal(0);
+
+    const qtyChange = newTotalQty.minus(existingQtyBefore);
+
+    console.log(`[INVENTORY SYNC] Upserting Inventory for Location '${locationId}':`, {
+      productId,
+      existingQtyBefore: existingQtyBefore.toString(),
+      newTotalQty: newTotalQty.toString(),
+      qtyChange: qtyChange.toString(),
+    });
+
+    // ----------------------------------------------------------
+    // Inventory
+    // ----------------------------------------------------------
 
     const inventory = await tx.inventory.upsert({
-      where: { productId_locationId: { productId, locationId } },
+      where: {
+        productId_locationId: {
+          productId,
+          locationId,
+        },
+      },
+
       create: {
         productId,
         locationId,
@@ -167,6 +371,7 @@ export async function syncInventoryLines(
         quantityReserved: existingReserved,
         lastMovementAt: new Date(),
       },
+
       update: {
         quantityOnHand: newTotalQty,
         quantityAvailable: newTotalQty.minus(existingReserved),
@@ -174,94 +379,601 @@ export async function syncInventoryLines(
       },
     });
 
-    // Fetch existing bins for ledger delta calculations
-    const existingBins = await tx.inventoryBin.findMany({
-      where: { inventoryId: inventory.id },
-    });
+    // ----------------------------------------------------------
+    // Inventory bins for NAMED sublocations only
+    // ----------------------------------------------------------
 
-    const existingBinMap = new Map<string, Prisma.Decimal>();
-    for (const bin of existingBins) {
-      existingBinMap.set(bin.sublocationId, bin.quantity);
+    const sublocationEntries = Array.from(
+      sublocationTotals.entries()
+    ).filter(([subKey]) => subKey.startsWith(`${locationId}_`));
+
+    const bins = await Promise.all(
+      sublocationEntries.map(([_, { sublocationId, totalQty }]) =>
+        tx.inventoryBin.upsert({
+          where: {
+            inventoryId_sublocationId: {
+              inventoryId: inventory.id,
+              sublocationId,
+            },
+          },
+          create: {
+            inventoryId: inventory.id,
+            sublocationId,
+            quantity: totalQty,
+          },
+          update: {
+            quantity: totalQty,
+          },
+        })
+      )
+    );
+
+    for (const bin of bins) {
+      binIdMap.set(`${locationId}_${bin.sublocationId}`, bin.id);
     }
 
-    // Update sublocation bins in parallel
-    const sublocationEntries = Array.from(sublocationTotals.entries()).filter(
-      ([subKey]) => subKey.startsWith(`${locationId}_`)
-    );
+    // ----------------------------------------------------------
+    // Inventory ledger
+    // ----------------------------------------------------------
 
-    await Promise.all(
-      sublocationEntries.map(async ([, { sublocationId, totalQty }]) => {
-        const binQtyBefore = existingBinMap.get(sublocationId) ?? new Prisma.Decimal(0);
-        const binQtyChange = totalQty.minus(binQtyBefore);
-
-        const bin = await tx.inventoryBin.upsert({
-          where: {
-            inventoryId_sublocationId: { inventoryId: inventory.id, sublocationId },
-          },
-          create: { inventoryId: inventory.id, sublocationId, quantity: totalQty },
-          update: { quantity: totalQty },
-        });
-
-        binIdMap.set(`${locationId}_${sublocationId}`, bin.id);
-
-        if (!binQtyChange.equals(0)) {
-          ledgerEntriesToCreate.push({
-            productId,
-            locationId,
-            sublocationId,
-            transactionType: "OPENING_BALANCE",
-            quantityBefore: binQtyBefore,
-            quantityChange: binQtyChange,
-            quantityAfter: totalQty,
-            remarks: "System Inbound Cloud Inventory Sync",
-          });
-        }
-      })
-    );
+    if (!qtyChange.equals(0)) {
+      ledgerEntriesToCreate.push({
+        productId,
+        locationId,
+        sublocationId: null,
+        transactionType: "OPENING_BALANCE",
+        quantityBefore: existingQtyBefore,
+        quantityChange: qtyChange,
+        quantityAfter: newTotalQty,
+        remarks: "System Inbound Cloud Inventory Sync",
+      });
+    }
   }
 
-  // 7. Bulk insert Ledger records
+  // ============================================================
+  // 8. Bulk create ledger entries
+  // ============================================================
+
   if (ledgerEntriesToCreate.length > 0) {
+    console.log(`[INVENTORY SYNC] Creating ${ledgerEntriesToCreate.length} Ledger entries.`);
     await tx.inventoryLedger.createMany({
       data: ledgerEntriesToCreate,
     });
   }
 
-  // 8. Process Serials (Handle stock transfers & zero-qty records)
+  // ============================================================
+  // 9. Sync serialized inventory
+  // ============================================================
+
   if (serialsToSync.length > 0) {
+    console.log(`[INVENTORY SYNC] Syncing ${serialsToSync.length} serial numbers:`, serialsToSync);
     await Promise.all(
       serialsToSync.map((item) => {
         const isAvailable = item.quantity.greaterThan(0);
-        const inventoryBinId = item.sublocationId
-          ? binIdMap.get(`${item.locationId}_${item.sublocationId}`) ?? null
-          : null;
+
+        let inventoryBinId: string | null = null;
+
+        if (item.sublocationId) {
+          inventoryBinId =
+            binIdMap.get(`${item.locationId}_${item.sublocationId}`) ??
+            null;
+        }
 
         return tx.inventoryBinItem.upsert({
-          where: { serialNumber: item.serialNumber },
+          where: {
+            serialNumber: item.serialNumber,
+          },
           create: {
             productId,
             locationId: item.locationId,
-            inventoryBinId: isAvailable ? inventoryBinId : null,
+            inventoryBinId,
             serialNumber: item.serialNumber,
             status: isAvailable ? "IN_STOCK" : "SOLD",
           },
           update: {
             productId,
-            // If qty > 0, move serial to the new active location; keep old location if qty is 0
-            ...(isAvailable && {
-              locationId: item.locationId,
-              inventoryBinId,
-              status: "IN_STOCK",
-            }),
-            ...(!isAvailable && {
-              status: "SOLD", //TRANSFERRED // Mark status appropriately when zero qty payload arrives
-            }),
+            locationId: item.locationId,
+            inventoryBinId,
+            status: isAvailable ? "IN_STOCK" : "SOLD",
           },
         });
       })
     );
   }
+
+  console.log(`[INVENTORY SYNC SUCCESS] Completed sync for Product ID: ${productId}\n`);
 }
+
+// 8/24/26
+// // lib/inflow/services/inventory-lines.sync.ts
+
+// import { Prisma } from "@/generated/prisma/client";
+// import { InflowInventoryLine, InflowLocation } from "../types";
+// import { syncLocation } from "./location.sync";
+
+// type Tx = Prisma.TransactionClient;
+
+// type SyncCache = {
+//   verifiedLocationIds?: Set<string>;
+// };
+
+// const toDecimal = (
+//   value: string | number | null | undefined
+// ): Prisma.Decimal => {
+//   if (value === null || value === undefined || value === "") {
+//     return new Prisma.Decimal(0);
+//   }
+
+//   return new Prisma.Decimal(value);
+// };
+
+// export async function syncInventoryLines(
+//   tx: Tx,
+//   productId: string,
+//   inventoryLines: InflowInventoryLine[],
+//   caches?: SyncCache,
+//   selectedLocationIds?: string[]
+// ) {
+//   if (!inventoryLines.length) return;
+
+//   // ============================================================
+//   // 1. Filter inventory lines by selected location scope
+//   // ============================================================
+
+//   const linesToSync = selectedLocationIds?.length
+//     ? inventoryLines.filter(
+//         (line) =>
+//           line.locationId &&
+//           selectedLocationIds.includes(line.locationId)
+//       )
+//     : inventoryLines;
+
+//   if (!linesToSync.length) return;
+
+//   const verifiedLocations =
+//     caches?.verifiedLocationIds ?? new Set<string>();
+
+//   // ============================================================
+//   // 2. Ensure parent Locations exist
+//   // ============================================================
+
+//   const uniqueLocationsToSync = new Map<string, InflowLocation>();
+
+//   for (const line of linesToSync) {
+//     if (
+//       line.location &&
+//       !verifiedLocations.has(line.location.locationId)
+//     ) {
+//       uniqueLocationsToSync.set(
+//         line.location.locationId,
+//         line.location
+//       );
+//     }
+//   }
+
+//   for (const [locId, locData] of uniqueLocationsToSync) {
+//     await syncLocation(tx, locData);
+//     verifiedLocations.add(locId);
+//   }
+
+//   // ============================================================
+//   // 3. Create named Sublocations
+//   //
+//   // Empty/null sublocation = FLOOR STOCK.
+//   // We intentionally do NOT create a Sublocation for it.
+//   // ============================================================
+
+//   const sublocationsToCreate: {
+//     locationId: string;
+//     name: string;
+//   }[] = [];
+
+//   const requiredSublocationKeys = new Set<string>();
+
+//   for (const line of linesToSync) {
+//     const subName = line.sublocation?.trim();
+
+//     // Empty sublocation = floor stock
+//     if (!line.locationId || !subName) {
+//       continue;
+//     }
+
+//     const subKey = `${line.locationId}_${subName}`;
+
+//     if (!requiredSublocationKeys.has(subKey)) {
+//       requiredSublocationKeys.add(subKey);
+
+//       sublocationsToCreate.push({
+//         locationId: line.locationId,
+//         name: subName,
+//       });
+//     }
+//   }
+
+//   if (sublocationsToCreate.length > 0) {
+//     await Promise.all(
+//       sublocationsToCreate.map((sub) =>
+//         tx.sublocation.upsert({
+//           where: {
+//             locationId_name: {
+//               locationId: sub.locationId,
+//               name: sub.name,
+//             },
+//           },
+//           create: {
+//             locationId: sub.locationId,
+//             name: sub.name,
+//           },
+//           update: {},
+//         })
+//       )
+//     );
+//   }
+
+//   // ============================================================
+//   // 4. Fetch Sublocation IDs
+//   // ============================================================
+
+//   const targetLocationIds = [
+//     ...new Set(
+//       linesToSync
+//         .map((line) => line.locationId)
+//         .filter(Boolean)
+//     ),
+//   ];
+
+//   const dbSublocations = await tx.sublocation.findMany({
+//     where: {
+//       locationId: {
+//         in: targetLocationIds,
+//       },
+//     },
+//     select: {
+//       id: true,
+//       locationId: true,
+//       name: true,
+//     },
+//   });
+
+//   const sublocationIdMap = new Map<string, string>();
+
+//   for (const sub of dbSublocations) {
+//     sublocationIdMap.set(
+//       `${sub.locationId}_${sub.name}`,
+//       sub.id
+//     );
+//   }
+
+//   // ============================================================
+//   // 5. Aggregate inventory
+//   // ============================================================
+
+//   const locationTotals = new Map<
+//     string,
+//     Prisma.Decimal
+//   >();
+
+//   const sublocationTotals = new Map<
+//     string,
+//     {
+//       sublocationId: string;
+//       totalQty: Prisma.Decimal;
+//     }
+//   >();
+
+//   // Serial inventory to synchronize
+//   const serialsToSync: {
+//     serialNumber: string;
+//     locationId: string;
+//     sublocationId: string | null;
+//     quantity: Prisma.Decimal;
+//   }[] = [];
+
+//   for (const line of linesToSync) {
+//     if (!line.locationId) continue;
+
+//     const lineQty = toDecimal(line.quantityOnHand);
+
+//     // ----------------------------------------------------------
+//     // Location total
+//     // ----------------------------------------------------------
+
+//     const currentLocTotal =
+//       locationTotals.get(line.locationId) ??
+//       new Prisma.Decimal(0);
+
+//     locationTotals.set(
+//       line.locationId,
+//       currentLocTotal.plus(lineQty)
+//     );
+
+//     // ----------------------------------------------------------
+//     // Sublocation
+//     //
+//     // null = FLOOR STOCK
+//     // ----------------------------------------------------------
+
+//     const subName = line.sublocation?.trim();
+
+//     let assignedSublocationId: string | null = null;
+
+//     if (subName) {
+//       const subId = sublocationIdMap.get(
+//         `${line.locationId}_${subName}`
+//       );
+
+//       if (subId) {
+//         assignedSublocationId = subId;
+
+//         const subKey = `${line.locationId}_${subId}`;
+
+//         const existingSub =
+//           sublocationTotals.get(subKey) ?? {
+//             sublocationId: subId,
+//             totalQty: new Prisma.Decimal(0),
+//           };
+
+//         existingSub.totalQty =
+//           existingSub.totalQty.plus(lineQty);
+
+//         sublocationTotals.set(subKey, existingSub);
+//       }
+//     }
+
+//     // ----------------------------------------------------------
+//     // Serial
+//     // ----------------------------------------------------------
+
+//     const serial = line.serial?.trim();
+
+//     if (serial) {
+//       serialsToSync.push({
+//         serialNumber: serial,
+//         locationId: line.locationId,
+
+//         // IMPORTANT:
+//         // null means this serial is FLOOR STOCK.
+//         //
+//         // If a named sublocation exists, this contains
+//         // the InventoryBin's sublocation ID.
+//         sublocationId: assignedSublocationId,
+
+//         quantity: lineQty,
+//       });
+//     }
+//   }
+
+//   // ============================================================
+//   // 6. Fetch existing Inventory records
+//   // ============================================================
+
+//   const existingInventories = await tx.inventory.findMany({
+//     where: {
+//       productId,
+//       locationId: {
+//         in: targetLocationIds,
+//       },
+//     },
+//   });
+
+//   const existingInventoryMap = new Map<
+//     string,
+//     (typeof existingInventories)[0]
+//   >();
+
+//   for (const inv of existingInventories) {
+//     existingInventoryMap.set(inv.locationId, inv);
+//   }
+
+//   // ============================================================
+//   // 7. Create/update Inventory and InventoryBin
+//   // ============================================================
+
+//   const binIdMap = new Map<string, string>();
+
+//   const ledgerEntriesToCreate: Prisma.InventoryLedgerCreateManyInput[] =
+//     [];
+
+//   for (const [locationId, newTotalQty] of locationTotals) {
+//     const existingInv =
+//       existingInventoryMap.get(locationId);
+
+//     const existingQtyBefore =
+//       existingInv?.quantityOnHand ??
+//       new Prisma.Decimal(0);
+
+//     const existingReserved =
+//       existingInv?.quantityReserved ??
+//       new Prisma.Decimal(0);
+
+//     const qtyChange =
+//       newTotalQty.minus(existingQtyBefore);
+
+//     // ----------------------------------------------------------
+//     // Inventory
+//     // ----------------------------------------------------------
+
+//     const inventory = await tx.inventory.upsert({
+//       where: {
+//         productId_locationId: {
+//           productId,
+//           locationId,
+//         },
+//       },
+
+//       create: {
+//         productId,
+//         locationId,
+//         quantityOnHand: newTotalQty,
+//         quantityAvailable: newTotalQty,
+//         quantityReserved: existingReserved,
+//         lastMovementAt: new Date(),
+//       },
+
+//       update: {
+//         quantityOnHand: newTotalQty,
+//         quantityAvailable:
+//           newTotalQty.minus(existingReserved),
+//         lastMovementAt: new Date(),
+//       },
+//     });
+
+//     // ----------------------------------------------------------
+//     // Inventory bins for NAMED sublocations only
+//     //
+//     // Floor stock does NOT get an InventoryBin.
+//     // ----------------------------------------------------------
+
+//     const sublocationEntries = Array.from(
+//       sublocationTotals.entries()
+//     ).filter(([subKey]) =>
+//       subKey.startsWith(`${locationId}_`)
+//     );
+
+//     for (const [
+//       ,
+//       { sublocationId, totalQty },
+//     ] of sublocationEntries) {
+//       const bin = await tx.inventoryBin.upsert({
+//         where: {
+//           inventoryId_sublocationId: {
+//             inventoryId: inventory.id,
+//             sublocationId,
+//           },
+//         },
+
+//         create: {
+//           inventoryId: inventory.id,
+//           sublocationId,
+//           quantity: totalQty,
+//         },
+
+//         update: {
+//           quantity: totalQty,
+//         },
+//       });
+
+//       binIdMap.set(
+//         `${locationId}_${sublocationId}`,
+//         bin.id
+//       );
+//     }
+
+//     // ----------------------------------------------------------
+//     // Inventory ledger
+//     // ----------------------------------------------------------
+
+//     if (!qtyChange.equals(0)) {
+//       ledgerEntriesToCreate.push({
+//         productId,
+//         locationId,
+
+//         // Location-level movement.
+//         // Do not associate this with a specific bin.
+//         sublocationId: null,
+
+//         transactionType: "OPENING_BALANCE",
+
+//         quantityBefore: existingQtyBefore,
+//         quantityChange: qtyChange,
+//         quantityAfter: newTotalQty,
+
+//         remarks:
+//           "System Inbound Cloud Inventory Sync",
+//       });
+//     }
+//   }
+
+//   // ============================================================
+//   // 8. Bulk create ledger entries
+//   // ============================================================
+
+//   if (ledgerEntriesToCreate.length > 0) {
+//     await tx.inventoryLedger.createMany({
+//       data: ledgerEntriesToCreate,
+//     });
+//   }
+
+//   // ============================================================
+//   // 9. Sync serialized inventory
+//   //
+//   // Serialized product:
+//   //
+//   //   Named sublocation
+//   //     -> InventoryBinItem.inventoryBinId = bin.id
+//   //
+//   //   Empty/null sublocation
+//   //     -> InventoryBinItem.inventoryBinId = null
+//   //     -> FLOOR STOCK
+//   // ============================================================
+
+//   if (serialsToSync.length > 0) {
+//     for (const item of serialsToSync) {
+//       const isAvailable = item.quantity.greaterThan(0);
+
+//       let inventoryBinId: string | null = null;
+
+//       // --------------------------------------------------------
+//       // Named sublocation
+//       // --------------------------------------------------------
+
+//       if (item.sublocationId) {
+//         inventoryBinId =
+//           binIdMap.get(
+//             `${item.locationId}_${item.sublocationId}`
+//           ) ?? null;
+//       }
+
+//       // --------------------------------------------------------
+//       // Empty sublocation = FLOOR STOCK
+//       //
+//       // inventoryBinId intentionally remains null.
+//       // --------------------------------------------------------
+
+//       if (!item.sublocationId) {
+//         inventoryBinId = null;
+//       }
+
+//       // --------------------------------------------------------
+//       // Upsert serial
+//       // --------------------------------------------------------
+
+//       await tx.inventoryBinItem.upsert({
+//         where: {
+//           serialNumber: item.serialNumber,
+//         },
+
+//         create: {
+//           productId,
+//           locationId: item.locationId,
+
+//           // null = floor stock
+//           inventoryBinId,
+
+//           serialNumber: item.serialNumber,
+
+//           status: isAvailable
+//             ? "IN_STOCK"
+//             : "SOLD",
+//         },
+
+//         update: {
+//           productId,
+//           locationId,
+
+//           // IMPORTANT:
+//           // Explicitly set this to null when the serial
+//           // moves to floor stock.
+//           inventoryBinId,
+
+//           status: isAvailable
+//             ? "IN_STOCK"
+//             : "SOLD",
+//         },
+//       });
+//     }
+//   }
+// }
 
 // 8/18/2026
 // import { Prisma } from "@/generated/prisma/client";

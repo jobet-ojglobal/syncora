@@ -6,6 +6,7 @@ export const teamMemberSchema = z.object({
   name: z.string().min(1, "Team member display identity name is required"),
   email: z.string().email("A valid internal corporate email address is required"),
   isActive: z.boolean(),
+  isInternal: z.boolean(),
   canBeSalesRep: z.boolean(),
   accessAllLocations: z.boolean(),
   

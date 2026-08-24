@@ -156,6 +156,7 @@ export interface InflowProduct {
 
   createdDttm: string;
   timestamp?: string;
+  image?: string | null;
 }
 
 export interface InflowDefaultImage {

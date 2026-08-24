@@ -1,3 +1,29 @@
+import { Prisma } from "@/generated/prisma/client";
+import { prisma } from "@/lib/prisma";
+
+type Tx = Prisma.TransactionClient;
+
+export async function syncBrand(
+  tx:  typeof prisma | Tx,
+  brandName?: string | null
+): Promise<{ id: string, name: string} | null> {
+  if (!brandName?.trim()) {
+    return null;
+  }
+
+  const brand = await tx.brand.upsert({
+    where: {
+      name: brandName.trim(),
+    },
+    create: {
+      name: brandName.trim(),
+    },
+    update: {},
+  });
+ 
+  return brand;
+}
+
 // import { Prisma, PrismaClient } from "@/generated/prisma/client";
 // import { genInflowUniqueSlug } from "@/helpers/genUniqueSlug";
 

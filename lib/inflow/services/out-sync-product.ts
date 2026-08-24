@@ -54,20 +54,35 @@ export function mapLocalProductToInflowPayload(
         productId: product.inflowId || "",
       }
     : undefined;
+  
+  const imageProxyUrl = "https://drench-nugget-blip.ngrok-free.dev";
 
   // 3. Resolve Default Image (e.g., using the first image from the relation list)
   const primaryImage = product.images?.[0];
   const mappedDefaultImage = primaryImage
     ? {
+        // imageId: primaryImage.inflowId,
+        // largeUrl: primaryImage.largeUrl || "",
+        // mediumUncroppedUrl: primaryImage.mediumUncroppedUrl || "",
+        // mediumUrl: primaryImage.mediumUrl || "",
+        // originalUrl: primaryImage.originalUrl || "",
+        // smallUrl: primaryImage.smallUrl || "",
+        // thumbUrl: primaryImage.thumbUrl || "",
         imageId: primaryImage.inflowId,
-        largeUrl: primaryImage.largeUrl || "",
-        mediumUncroppedUrl: primaryImage.mediumUncroppedUrl || "",
-        mediumUrl: primaryImage.mediumUrl || "",
-        originalUrl: primaryImage.originalUrl || "",
-        smallUrl: primaryImage.smallUrl || "",
-        thumbUrl: primaryImage.thumbUrl || "",
+        largeUrl: null,
+        mediumUncroppedUrl: null,
+        mediumUrl: null,
+        originalUrl: primaryImage.originalUrl
+          ? primaryImage.originalUrl.replace(
+              "https://inflowclouduser.blob.core.windows.net",
+              imageProxyUrl ?? ""
+            )
+          : null,
+        smallUrl: null,
+        thumbUrl: null,
       }
     : undefined;
+
 
   return {
     productId: product.inflowId,
@@ -132,15 +147,39 @@ export function mapLocalProductToInflowPayload(
     customFields,
 
     // Corrected Images Array Mapping
+    // images: Array.isArray(product.images)
+    //   ? product.images.map((img) => ({
+    //       // imageId: img.inflowId,
+    //       // largeUrl: img.largeUrl || null,
+    //       // mediumUncroppedUrl: img.mediumUncroppedUrl || null,
+    //       // mediumUrl: img.mediumUrl || null,
+    //       // originalUrl: img.originalUrl || null,
+    //       // smallUrl: img.smallUrl || null,
+    //       // thumbUrl: img.thumbUrl || null,
+    //       imageId: img.inflowId,
+    //       largeUrl: null,
+    //       mediumUncroppedUrl: null,
+    //       mediumUrl: null,
+    //       originalUrl: `https://drench-nugget-blip.ngrok-free.dev/${img.originalUrl}` || null,
+    //       smallUrl: null,
+    //       thumbUrl: null,
+    //       // https://drench-nugget-blip.ngrok-free.dev/
+    //     }))
+    //   : [],
     images: Array.isArray(product.images)
       ? product.images.map((img) => ({
           imageId: img.inflowId,
-          largeUrl: img.largeUrl || null,
-          mediumUncroppedUrl: img.mediumUncroppedUrl || null,
-          mediumUrl: img.mediumUrl || null,
-          originalUrl: img.originalUrl || null,
-          smallUrl: img.smallUrl || null,
-          thumbUrl: img.thumbUrl || null,
+          largeUrl: null,
+          mediumUncroppedUrl: null,
+          mediumUrl: null,
+          originalUrl: img.originalUrl
+            ? img.originalUrl.replace(
+                "https://inflowclouduser.blob.core.windows.net",
+                imageProxyUrl ?? ""
+              )
+            : null,
+          smallUrl: null,
+          thumbUrl: null,
         }))
       : [],
 
@@ -384,6 +423,8 @@ export class ProductOutSyncService {
         modifiedById
       )
     );
+
+    console.log(JSON.stringify(payloads, null, 2))
 
     const successfulIds: string[] = [];
     const failedIds: string[] = [];

@@ -11,6 +11,7 @@ import Link from "next/link"
 import { Layers, Plus } from "lucide-react"
 import { toast } from "sonner"
 import { CloudSyncButton } from "@/components/integration/cloud-sync-button"
+import { EmptyProductsButton } from "../empty-product-button"
 
 interface HydrationPayload {
   brands: any[];
@@ -171,6 +172,7 @@ export default function AdminServerSideProductsPage() {
         title="Master Product Catalog" 
         description="Manage global trade line SKUs, nested barcode structures, multi-tier transactional UOM variables, and active tracking variables." 
         >
+        <EmptyProductsButton  onSuccess={fetchServerSideData} />
         <CloudSyncButton
           source="cloudsync_products" 
         />

@@ -1,11 +1,12 @@
 import { prisma } from "@/lib/prisma";
 import { getLocalBatchProducts } from "../data/product-local";
 import crypto from "crypto";
-import { LocalProduct, SyncOptions } from "../types";
+import { LocalProduct } from "../types";
 import { InflowProduct } from "@/lib/inflow/types";
 import { localProductItemType } from "@/helpers/product.helper";
 import { syncProduct } from "./product-sync";
 import { Prisma } from "@/generated/prisma/client";
+import { SyncOptions } from "@/lib/workers/types";
 
 type DbClient = Prisma.TransactionClient;
 
