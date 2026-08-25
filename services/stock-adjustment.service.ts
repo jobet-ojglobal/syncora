@@ -5,9 +5,13 @@ import {
   InventorySerialAdjustmentAction,
 } from "@/generated/prisma/client";
 <<<<<<< HEAD
+<<<<<<< HEAD
 import { StockAdjustmentLineInput } from "@/schemas/stock-adjustment.schema";
 =======
 >>>>>>> f774fa4d46540598445552ff7ba82d06bcdf5aad
+=======
+import { Decimal } from "@prisma/client/runtime/client";
+>>>>>>> e7535b2729bb2048f41ba43b001606d17015dad3
 
 export interface StockAdjustmentBinInput {
   sublocationId: string;
@@ -75,6 +79,14 @@ export interface ProcessedAdjustmentResult {
     serials: string[];
     description?: string;
   }>;
+}
+
+export interface CancelAdjustmentPayload {
+  adjustmentId: string;
+  performedById: string;
+  remarks?: string;
+  batchSize?: number;
+  delayMs?: number;
 }
 
 export class AdjustmentService {
@@ -551,17 +563,25 @@ export class AdjustmentService {
                 const item = existingSerialMap.get(sn)!;
                 const targetBinId = serialToBinIdMap.get(sn) || null;
 
-                if (item.inventoryBinId !== targetBinId) {
+                const needsStatusUpdate = item.status !== "IN_STOCK";
+                const needsBinUpdate = item.inventoryBinId !== targetBinId;
+
+                if (needsStatusUpdate || needsBinUpdate) {
                   await tx.inventoryBinItem.update({
                     where: { id: item.id },
-                    data: { inventoryBinId: targetBinId },
+                    data: {
+                      inventoryBinId: targetBinId,
+                      status: "IN_STOCK", // Reactivate non-IN_STOCK serials back to IN_STOCK
+                    },
                   });
 
                   serialAuditsToCreate.push({
                     adjustmentLineId: fallbackLineId!,
                     inventoryBinItemId: item.id,
                     serialNumber: sn,
-                    action: InventorySerialAdjustmentAction.MOVE,
+                    action: needsStatusUpdate 
+                      ? InventorySerialAdjustmentAction.ADD 
+                      : InventorySerialAdjustmentAction.MOVE,
                     fromInventoryBinId: item.inventoryBinId,
                     toInventoryBinId: targetBinId,
                   });
@@ -577,6 +597,38 @@ export class AdjustmentService {
                 }
               }
             }
+
+            // for (const sn of allIncomingSerials) {
+            //   if (existingSerialMap.has(sn)) {
+            //     const item = existingSerialMap.get(sn)!;
+            //     const targetBinId = serialToBinIdMap.get(sn) || null;
+
+            //     if (item.inventoryBinId !== targetBinId) {
+            //       await tx.inventoryBinItem.update({
+            //         where: { id: item.id },
+            //         data: { inventoryBinId: targetBinId },
+            //       });
+
+            //       serialAuditsToCreate.push({
+            //         adjustmentLineId: fallbackLineId!,
+            //         inventoryBinItemId: item.id,
+            //         serialNumber: sn,
+            //         action: InventorySerialAdjustmentAction.MOVE,
+            //         fromInventoryBinId: item.inventoryBinId,
+            //         toInventoryBinId: targetBinId,
+            //       });
+            //     } else {
+            //       serialAuditsToCreate.push({
+            //         adjustmentLineId: fallbackLineId!,
+            //         inventoryBinItemId: item.id,
+            //         serialNumber: sn,
+            //         action: InventorySerialAdjustmentAction.VERIFY,
+            //         fromInventoryBinId: targetBinId,
+            //         toInventoryBinId: targetBinId,
+            //       });
+            //     }
+            //   }
+            // }
           }
         
           // } else {
@@ -799,6 +851,323 @@ export class AdjustmentService {
     return result;
   }
 
+  async cancelAdjustment(payload: CancelAdjustmentPayload) {
+    const {
+      adjustmentId,
+      performedById,
+      remarks,
+      batchSize = 100,
+      delayMs = 300,
+    } = payload;
+
+    const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+    // 1. Validate original adjustment and create top-level reversal record
+    const { originalAdjustment, cancellationAdjustment } = await this.prisma.$transaction(
+      async (tx) => {
+        const original = await tx.inventoryAdjustment.findUnique({
+          where: { id: adjustmentId },
+          include: {
+            lines: {
+              include: {
+                serials: true,
+                draftBins: true,
+              },
+            },
+          },
+        });
+
+        if (!original) {
+          throw new Error("Original adjustment not found.");
+        }
+
+        if (original.status !== AdjustmentStatus.POSTED) {
+          throw new Error(
+            `Only POSTED adjustments can be cancelled. Current status: ${original.status}`
+          );
+        }
+
+        // Mark original status as REVERTED
+        await tx.inventoryAdjustment.update({
+          where: { id: adjustmentId },
+          data: {
+            status: AdjustmentStatus.REVERTED,
+            lastModifiedById: performedById,
+          },
+        });
+
+        // Generate reversal identifiers
+        const cancelInflowId = crypto.randomUUID().toLowerCase();
+        const cancelAdjustmentNumber = `${original.adjustmentNumber}-REV`;
+
+        // Create the reversing InventoryAdjustment
+        const cancellation = await tx.inventoryAdjustment.create({
+          data: {
+            inflowId: cancelInflowId,
+            adjustmentNumber: cancelAdjustmentNumber,
+            adjustmentReasonId: original.adjustmentReasonId,
+            remarks:
+              remarks || `Reversal of adjustment #${original.adjustmentNumber}`,
+            performedById,
+            status: AdjustmentStatus.POSTED,
+          },
+        });
+
+        return { originalAdjustment: original, cancellationAdjustment: cancellation };
+      }
+    );
+
+    // 2. Partition lines into batches
+    const lines = originalAdjustment.lines;
+    const lineBatches: (typeof lines)[] = [];
+
+    for (let i = 0; i < lines.length; i += batchSize) {
+      lineBatches.push(lines.slice(i, i + batchSize));
+    }
+
+    const allReversalLines: Array<{
+      inflowId: string | null;
+      productId: string;
+      quantityOnHand: number;
+      quantityAdjusted: number;
+      sublocation: string | null;
+      serials: string[];
+      description?: string;
+    }> = [];
+
+    // 3. Process line batches sequentially
+    for (let i = 0; i < lineBatches.length; i++) {
+      const batch = lineBatches[i];
+
+      const batchResults = await this.prisma.$transaction(async (tx) => {
+        const batchReversalLines = [];
+
+        for (const line of batch) {
+          const originalQty = new Decimal(line.quantityAdjusted);
+          const invertedQty = originalQty.negated();
+
+          // Get stock baseline
+          const inventory = await tx.inventory.findUnique({
+            where: {
+              productId_locationId: {
+                productId: line.productId,
+                locationId: line.locationId,
+              },
+            },
+          });
+
+          const currentOnHand = inventory?.quantityOnHand ?? new Decimal(0);
+          const newOnHand = currentOnHand.add(invertedQty);
+
+          if (newOnHand.isNegative()) {
+            throw new Error(
+              `Cannot revert line: Reversing this quantity causes negative stock for product ${line.productId}.`
+            );
+          }
+
+          // Update Inventory master record
+          await tx.inventory.update({
+            where: {
+              productId_locationId: {
+                productId: line.productId,
+                locationId: line.locationId,
+              },
+            },
+            data: {
+              quantityOnHand: newOnHand,
+              quantityAvailable: inventory?.quantityAvailable
+                ? inventory.quantityAvailable.add(invertedQty)
+                : newOnHand,
+              lastMovementAt: new Date(),
+            },
+          });
+
+          // Create reversing adjustment line
+          const lineInflowId = crypto.randomUUID().toLowerCase();
+          const cancelLine = await tx.inventoryAdjustmentLine.create({
+            data: {
+              inflowId: lineInflowId,
+              adjustmentId: cancellationAdjustment.inflowId,
+              productId: line.productId,
+              locationId: line.locationId,
+              inventoryBinId: line.inventoryBinId,
+              quantityBefore: currentOnHand,
+              quantityAdjusted: invertedQty,
+              quantityAfter: newOnHand,
+              reason: InventoryAdjustmentLineReason.CORRECTION,
+              description: `Reversal line for ${line.inflowId}`,
+            },
+          });
+
+          // Process draftBins reversal
+          for (const draftBin of line.draftBins) {
+            const invertedBinQty = new Decimal(draftBin.quantity).negated();
+
+            const inventoryBin = await tx.inventoryBin.findFirst({
+              where: {
+                inventory: {
+                  productId: line.productId,
+                  locationId: line.locationId,
+                },
+                sublocationId: draftBin.sublocationId,
+              },
+            });
+
+            if (inventoryBin) {
+              await tx.inventoryBin.update({
+                where: { id: inventoryBin.id },
+                data: { quantity: inventoryBin.quantity.add(invertedBinQty) },
+              });
+            }
+          }
+
+          // Process serial numbers reversal
+          const reversedSerials: string[] = [];
+          for (const serial of line.serials) {
+            reversedSerials.push(serial.serialNumber);
+
+            const serialItem = await tx.inventoryBinItem.findUnique({
+              where: { serialNumber: serial.serialNumber },
+            });
+
+            let newAction = serial.action;
+            if (serial.action === InventorySerialAdjustmentAction.ADD) {
+              newAction = InventorySerialAdjustmentAction.REMOVE;
+              if (serialItem) {
+                await tx.inventoryBinItem.update({
+                  where: { id: serialItem.id },
+                  data: { status: "VOIDED" },
+                });
+              }
+            } else if (serial.action === InventorySerialAdjustmentAction.REMOVE) {
+              newAction = InventorySerialAdjustmentAction.ADD;
+              if (serialItem) {
+                await tx.inventoryBinItem.update({
+                  where: { id: serialItem.id },
+                  data: { status: "IN_STOCK" },
+                });
+              }
+            }
+
+            await tx.inventoryAdjustmentSerial.create({
+              data: {
+                adjustmentLineId: cancelLine.id,
+                serialNumber: serial.serialNumber,
+                action: newAction,
+                inventoryBinItemId: serial.inventoryBinItemId,
+                fromInventoryBinId: serial.toInventoryBinId,
+                toInventoryBinId: serial.fromInventoryBinId,
+              },
+            });
+          }
+
+          // Log transaction ledger record
+          await tx.inventoryLedger.create({
+            data: {
+              productId: line.productId,
+              locationId: line.locationId,
+              transactionType: "ADJUSTMENT",
+              referenceType: "ADJUSTMENT",
+              referenceId: cancellationAdjustment.adjustmentNumber,
+              performedById,
+              quantityChange: invertedQty,
+              quantityBefore: currentOnHand,
+              quantityAfter: newOnHand,
+              remarks: `Cancelled adjustment #${originalAdjustment.adjustmentNumber}`,
+            },
+          });
+
+          const lineSerialList = line.serials.map((s) => s.serialNumber);
+          const adjustedQtyNum = invertedQty.toNumber();
+
+          batchReversalLines.push({
+            inflowId: cancelLine.inflowId,
+            productId: line.productId,
+            quantityOnHand: newOnHand.toNumber(),
+            quantityAdjusted: adjustedQtyNum,
+            sublocation: line.inventoryBinId ?? null,
+            // Slice serials if quantity is smaller than array length, or pass lineSerialList
+            serials: lineSerialList.slice(0, Math.abs(adjustedQtyNum)), 
+            description: cancelLine.description ?? undefined,
+          });
+
+          // batchReversalLines.push({
+          //   inflowId: cancelLine.inflowId,
+          //   productId: line.productId,
+          //   quantityOnHand: newOnHand.toNumber(),
+          //   quantityAdjusted: invertedQty.toNumber(),
+          //   sublocation: line.inventoryBinId ?? null,
+          //   serials: reversedSerials,
+          //   description: cancelLine.description ?? undefined,
+          // });
+        }
+
+        return batchReversalLines;
+      });
+
+      allReversalLines.push(...batchResults);
+
+      if (i < lineBatches.length - 1) {
+        await delay(delayMs);
+      }
+    }
+
+    const processedResult: ProcessedAdjustmentResult = {
+      adjustment: cancellationAdjustment,
+      createdAdjustmentLines: allReversalLines,
+    };
+
+    // 4. Queue background synchronization on successful completion
+    await this.dispatchCancelBackgroundSync(processedResult, {
+      performedById,
+      locationId: originalAdjustment.lines[0]?.locationId || "",
+      reasonId: cancellationAdjustment.adjustmentReasonId || undefined,
+      remarks: cancellationAdjustment.remarks || undefined,
+    });
+
+    return cancellationAdjustment;
+  }
+
+  async dispatchCancelBackgroundSync(
+    result: ProcessedAdjustmentResult,
+    meta: { performedById: string; locationId: string; reasonId?: string; remarks?: string }
+  ) {
+    const inflowPayload = {
+      stockAdjustmentId: result.adjustment.inflowId,
+      adjustmentNumber: result.adjustment.adjustmentNumber,
+      adjustmentReasonId: meta.reasonId || "",
+      date: new Date().toISOString(),
+      isCancelled: false,
+      lastModifiedById: meta.performedById,
+      locationId: meta.locationId,
+      remarks: meta.remarks || "",
+      lines: result.createdAdjustmentLines.map((createdLine) => {
+        const qtyDelta = createdLine.quantityAdjusted ?? createdLine.quantityOnHand;
+        return {
+          stockAdjustmentLineId: createdLine.inflowId,
+          productId: createdLine.productId,
+          sublocation: createdLine.sublocation,
+          quantity: {
+            standardQuantity: qtyDelta > 0 ? `+${qtyDelta}` : String(qtyDelta),
+            uomQuantity: qtyDelta > 0 ? `+${qtyDelta}` : String(qtyDelta),
+            uom: "ea.",
+            serialNumbers: createdLine.serials,
+          },
+          description: createdLine.description,
+        };
+      }),
+    };
+
+    console.log(JSON.stringify(inflowPayload, null, 2));
+
+    await this.queueProvider?.addJob("stock_adjust_upsert", {
+      source: "STOCK_ADJUST_UPSERT_CLOUD",
+      model: "StockAdjustment",
+      payload: inflowPayload,
+      timestamp: new Date().toISOString(),
+    });
+  }
+
   private async dispatchBackgroundSync(
     result: ProcessedAdjustmentResult,
     payload: PostAdjustmentPayload
@@ -828,6 +1197,8 @@ export class AdjustmentService {
         };
       }),
     };
+
+    console.log(JSON.stringify(inflowPayload, null, 2))
 
     await this.queueProvider?.addJob("stock_adjust_upsert", {
       source: "STOCK_ADJUST_UPSERT_CLOUD",

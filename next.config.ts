@@ -39,6 +39,12 @@ const nextConfig: NextConfig = {
         hostname: 'drench-nugget-blip.ngrok-free.dev',
         port: '',
         pathname: '/**', // This allows any path under the hostname
+      },
+      {
+        protocol: 'https',
+        hostname: 'res.cloudinary.com',
+        port: '',
+        pathname: '/**', // This allows any path under the hostname
       }
     ],
   }

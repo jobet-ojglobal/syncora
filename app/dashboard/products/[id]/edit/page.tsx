@@ -34,12 +34,12 @@ export default async function EditProductPage({ params }: Props) {
         },
         purchasingUom: {
           include: {
-            uom: { select: { code: true, name: true } }
+            uom: { select: { id: true, name: true } }
           }
         },
         salesUom: {
           include: {
-            uom: { select: { code: true, name: true } }
+            uom: { select: { id: true, name: true } }
           }
         },
         barcodes: {
@@ -108,12 +108,12 @@ export default async function EditProductPage({ params }: Props) {
       fixedMarkup: Number(p.fixedMarkup) || 0,
     })),
     purchasingUom: prodData.purchasingUom ? {
-      name: prodData.purchasingUom.uom?.code || prodData.purchasingUom.uom?.name || "",
+      name: prodData.purchasingUom.uomId || "",
       standardQuantity: Number(prodData.purchasingUom.standardQuantity),
       uomQuantity: Number(prodData.purchasingUom.uomQuantity)
     } : null,
     salesUom: prodData.salesUom ? {
-      name: prodData.salesUom.uom?.code || prodData.salesUom.uom?.name || "",
+      name: prodData.salesUom.uomId || "",
       standardQuantity: Number(prodData.salesUom.standardQuantity),
       uomQuantity: Number(prodData.salesUom.uomQuantity)
     } : null,

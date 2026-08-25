@@ -48,6 +48,8 @@ export async function saveCheckProductImage(
     const matches = base64Data.match(/^data:image\/([a-zA-Z0-9]+);base64,(.+)$/);
     if (!matches || matches.length !== 3) return null;
 
+    const siteUrl = process.env.SITE_URL || "";
+
     const rawExt = matches[1].toLowerCase();
     const fileExt = rawExt === "jpeg" ? "jpg" : rawExt;
     const base64String = matches[2];
@@ -70,7 +72,7 @@ export async function saveCheckProductImage(
     try {
       await access(absolutePath);
       console.log(`[Cache Hit] Image already exists at ${relativePath}`);
-      return relativePath; // Early return on cache hit
+      return `${siteUrl}${relativePath}`; // Early return on cache hit
     } catch {
       // File does not exist -> proceed to create/write
     }
@@ -79,7 +81,7 @@ export async function saveCheckProductImage(
     const buffer = Buffer.from(base64String, "base64");
     await writeFile(absolutePath, buffer);
 
-    return relativePath;
+    return `${siteUrl}${relativePath}`;
   } catch (error) {
     console.error(`Failed to save product image for product ID ${productId}:`, error);
     return null;

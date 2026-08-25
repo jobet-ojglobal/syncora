@@ -25,6 +25,7 @@ import { toast } from "sonner";
 
 interface CloudSyncButtonProps {
   source?: string;
+  title?: string;
   locationId?: string;
   locationName?: string;
   onSyncComplete?: () => void;
@@ -32,6 +33,7 @@ interface CloudSyncButtonProps {
 
 export function CloudSyncButton({
   source = "outsync_inventory_levels",
+  title,
   locationId,
   locationName,
   onSyncComplete,
@@ -245,7 +247,7 @@ export function CloudSyncButton({
         ) : (
           <CloudSync className="w-3.5 h-3.5" />
         )}
-        Sync to Cloud
+        { title ? title : "Sync to Cloud" }
       </Button>
 
       {/* Cloud Sync Progress Overlay / Status Banner */}

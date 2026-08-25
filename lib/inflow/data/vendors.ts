@@ -90,5 +90,14 @@ export async function upsertVendor(
   );
 }
 
+export async function upsertBulkVendors(
+  data: InflowVendor[]
+) {
+  return await inflow.put<InflowVendor>(
+    `/vendors?include=addresses,attachments,balances,credits,currency,dues,lastModifiedBy,taxingScheme,vendorItems.product,defaultPaymentTerms,defaultAddress`,
+    data
+  );
+}
+
 
 

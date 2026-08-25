@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import { InflowProduct, InflowCustomFields } from "@/lib/inflow/types";
+import { InflowProduct, InflowCustomFields, InflowVendor } from "@/lib/inflow/types";
 import { Prisma } from "@/generated/prisma/client";
 import { upsertProduct, upsertProductBulk } from "../data/products";
 import { SyncOptions } from "@/lib/workers/sync.worker";
@@ -15,7 +15,7 @@ export type LocalProductWithRelations = Prisma.ProductGetPayload<{
         parent: true; 
       };
     };
-
+    lastVendor: { include: { businessPartner: true } };
     cost: true;
     prices: true;
     images: true;
@@ -23,6 +23,137 @@ export type LocalProductWithRelations = Prisma.ProductGetPayload<{
     salesUom: { include: { uom: true } };
   };
 }>;
+
+// export function mapLocalProductToInflowPayload(
+//   product: LocalProductWithRelations,
+//   defaultCategoryPayload: { inflowId: string; name: string; isDefault: boolean } | null,
+//   brandCustomName?: string,
+//   modifiedById?: string
+// ): InflowProduct & { isCloudSynced: boolean } {
+//   const trimmedName = product.name?.trim() || "";
+//   const existingCustomFields = (product.customFields as Record<string, string>) || {};
+//   const customFields: InflowCustomFields = { ...existingCustomFields };
+
+//   const brandName = product.brand?.name;
+//   if (brandName) {
+//     if (brandCustomName) {
+//       customFields[brandCustomName as keyof InflowCustomFields] = brandName;
+//     } else {
+//       customFields.custom7 = brandName;
+//     }
+//   }
+
+//   const cat = product.category;
+
+//   // 2. Resolve Cost Object Mapping
+//   const productCost = product.cost;
+//   const mappedCost = productCost
+//     ? {
+//         cost: productCost.cost?.toString() || "0",
+//         productCostId: productCost.inflowId,
+//         productId: product.inflowId || "",
+//       }
+//     : undefined;
+
+//   // 3. Resolve Default Image (e.g., using the first image from the relation list)
+//   const primaryImage = product.images?.[0];
+//   const mappedDefaultImage = primaryImage
+//     ? {
+//         imageId: primaryImage.inflowId,
+//         largeUrl: primaryImage.largeUrl || "",
+//         mediumUncroppedUrl: primaryImage.mediumUncroppedUrl || "",
+//         mediumUrl: primaryImage.mediumUrl || "",
+//         originalUrl: primaryImage.originalUrl || "",
+//         smallUrl: primaryImage.smallUrl || "",
+//         thumbUrl: primaryImage.thumbUrl || "",
+//       }
+//     : undefined;
+
+
+//   return {
+//     productId: product.inflowId,
+//     isCloudSynced: product.isCloudSynced,
+//     sku: product.sku,
+//     name: trimmedName,
+//     description: product.description,
+//     itemType: product.itemType || "stockedProduct",
+//     autoAssemble: product.autoAssemble,
+//     isActive: product.isActive,
+//     isManufacturable: product.isManufacturable,
+//     includeQuantityBuildable: product.includeQuantityBuildable,
+//     standardUomName: product.standardUomName,
+
+//     trackExpiry: false, // product.trackExpiry,
+//     trackLots: false, //product.trackLots,
+//     trackSerials: product.trackSerials,
+
+//     shelfLifeDays: null, // product.shelfLifeDays,
+//     sellBeforeExpiryDays: null, // product.sellBeforeExpiryDays,
+//     expiryNotificationDays: null, // product.expiryNotificationDays,
+
+//     weight: product.weight?.toString() || null,
+//     width: product.width?.toString() || null,
+//     height: product.height?.toString() || null,
+//     length: product.length?.toString() || null,
+
+//     originCountry: product.originCountry,
+//     hsTariffNumber: product.hsTariffNumber,
+//     remarks: product.remarks,
+//     categoryId: cat?.inflowId || defaultCategoryPayload?.inflowId || null,
+//     lastVendorId: product.lastVendorId,
+//     lastModifiedById: modifiedById || null,
+//     createdDttm: product.createdAt.toISOString(),
+//     lastModifiedDateTime: product.updatedAt.toISOString(),
+
+//     cost: mappedCost,
+//     defaultImage: mappedDefaultImage,
+
+//     // Dynamic Purchasing UOM Mapping
+//     purchasingUom: product.purchasingUom
+//       ? {
+//           name: product.purchasingUom.uom.name,
+//           conversionRatio: {
+//             standardQuantity: product.purchasingUom.standardQuantity?.toString() || "1",
+//             uomQuantity: product.purchasingUom.uomQuantity?.toString() || "1",
+//           },
+//         }
+//       : null,
+
+//     // Dynamic Sales UOM Mapping
+//     salesUom: product.salesUom
+//       ? {
+//           name: product.salesUom.uom.name,
+//           conversionRatio: {
+//             standardQuantity: product.salesUom.standardQuantity?.toString() || "1",
+//             uomQuantity: product.salesUom.uomQuantity?.toString() || "1",
+//           },
+//         }
+//       : null,
+
+//     customFields,
+
+//     images: Array.isArray(product.images)
+//       ? product.images.map((img) => ({
+//         imageId: img.inflowId,
+//         largeUrl: img.largeUrl || null,
+//         mediumUncroppedUrl: img.mediumUncroppedUrl || null,
+//         mediumUrl: img.mediumUrl || null,
+//         originalUrl: img.originalUrl || null,
+//         smallUrl: img.smallUrl || null,
+//         thumbUrl: img.thumbUrl || null,
+//       }))
+//       : [],
+
+//     prices: product.prices.map((p) => ({
+//       productPriceId: p.inflowId,
+//       pricingSchemeId: p.pricingSchemeId,
+//       productId: p.productId,
+//       priceType: p.priceType,
+//       unitPrice: p.unitPrice?.toString() || "0",
+//       fixedMarkup: p.fixedMarkup?.toString() || "0",
+//     })),
+//   };
+// }
 
 export function mapLocalProductToInflowPayload(
   product: LocalProductWithRelations,
@@ -45,6 +176,32 @@ export function mapLocalProductToInflowPayload(
 
   const cat = product.category;
 
+  // 1. Resolve Vendor Object Mapping
+  const mappedVendor: InflowVendor | undefined = product.lastVendor
+    ? {
+        vendorId: product.lastVendor.inflowId,
+        name: product.lastVendor.businessPartner?.name || "",
+        contactName: product.lastVendor.businessPartner?.contactName || null,
+        currencyId: product.lastVendor.currencyId || null,
+        customFields: null,
+        defaultAddressId: product.lastVendor.defaultAddressId || null,
+        defaultCarrier: product.lastVendor.defaultCarrier || null,
+        defaultPaymentMethod: product.lastVendor.defaultPaymentMethod || null,
+        defaultPaymentTermsId: product.lastVendor.defaultPaymentTermsId || null,
+        discount: product.lastVendor.discount?.toString() || null,
+        email: product.lastVendor.businessPartner?.email || null,
+        fax: product.lastVendor.businessPartner?.fax || null,
+        isActive: product.lastVendor.businessPartner?.isActive ?? true,
+        isTaxInclusivePricing: product.lastVendor.isTaxInclusivePricing,
+        lastModifiedById: modifiedById || null,
+        leadTimeDays: product.lastVendor.leadTimeDays || null,
+        phone: product.lastVendor.businessPartner?.phone || null,
+        remarks: product.lastVendor.businessPartner?.remarks || null,
+        taxingSchemeId: product.lastVendor.taxingSchemeId || null,
+        website: product.lastVendor.businessPartner?.website || null,
+      }
+    : undefined;
+
   // 2. Resolve Cost Object Mapping
   const productCost = product.cost;
   const mappedCost = productCost
@@ -54,35 +211,24 @@ export function mapLocalProductToInflowPayload(
         productId: product.inflowId || "",
       }
     : undefined;
-  
-  const imageProxyUrl = "https://drench-nugget-blip.ngrok-free.dev";
 
-  // 3. Resolve Default Image (e.g., using the first image from the relation list)
+  // 3. Resolve Default Image
+
+
   const primaryImage = product.images?.[0];
-  const mappedDefaultImage = primaryImage
+  const imageUrl = product?.images[0]?.originalUrl;
+
+  const mappedDefaultImage = primaryImage && imageUrl?.includes("cloudinary.com")
     ? {
-        // imageId: primaryImage.inflowId,
-        // largeUrl: primaryImage.largeUrl || "",
-        // mediumUncroppedUrl: primaryImage.mediumUncroppedUrl || "",
-        // mediumUrl: primaryImage.mediumUrl || "",
-        // originalUrl: primaryImage.originalUrl || "",
-        // smallUrl: primaryImage.smallUrl || "",
-        // thumbUrl: primaryImage.thumbUrl || "",
         imageId: primaryImage.inflowId,
-        largeUrl: null,
-        mediumUncroppedUrl: null,
-        mediumUrl: null,
-        originalUrl: primaryImage.originalUrl
-          ? primaryImage.originalUrl.replace(
-              "https://inflowclouduser.blob.core.windows.net",
-              imageProxyUrl ?? ""
-            )
-          : null,
-        smallUrl: null,
-        thumbUrl: null,
+        largeUrl: primaryImage.largeUrl || "",
+        mediumUncroppedUrl: primaryImage.mediumUncroppedUrl || "",
+        mediumUrl: primaryImage.mediumUrl || "",
+        originalUrl: primaryImage.originalUrl || "",
+        smallUrl: primaryImage.smallUrl || "",
+        thumbUrl: primaryImage.thumbUrl || "",
       }
     : undefined;
-
 
   return {
     productId: product.inflowId,
@@ -96,33 +242,26 @@ export function mapLocalProductToInflowPayload(
     isManufacturable: product.isManufacturable,
     includeQuantityBuildable: product.includeQuantityBuildable,
     standardUomName: product.standardUomName,
-
-    trackExpiry: false, // product.trackExpiry,
-    trackLots: false, //product.trackLots,
+    trackExpiry: false,
+    trackLots: false,
     trackSerials: product.trackSerials,
 
-    shelfLifeDays: null, // product.shelfLifeDays,
-    sellBeforeExpiryDays: null, // product.sellBeforeExpiryDays,
-    expiryNotificationDays: null, // product.expiryNotificationDays,
-
+    shelfLifeDays: null,
+    sellBeforeExpiryDays: null,
+    expiryNotificationDays: null,
     weight: product.weight?.toString() || null,
     width: product.width?.toString() || null,
     height: product.height?.toString() || null,
     length: product.length?.toString() || null,
-
     originCountry: product.originCountry,
     hsTariffNumber: product.hsTariffNumber,
     remarks: product.remarks,
     categoryId: cat?.inflowId || defaultCategoryPayload?.inflowId || null,
+    lastVendor: mappedVendor,
     lastVendorId: product.lastVendorId,
     lastModifiedById: modifiedById || null,
-    createdDttm: product.createdAt.toISOString(),
-    lastModifiedDateTime: product.updatedAt.toISOString(),
-
     cost: mappedCost,
     defaultImage: mappedDefaultImage,
-
-    // Dynamic Purchasing UOM Mapping
     purchasingUom: product.purchasingUom
       ? {
           name: product.purchasingUom.uom.name,
@@ -132,8 +271,6 @@ export function mapLocalProductToInflowPayload(
           },
         }
       : null,
-
-    // Dynamic Sales UOM Mapping
     salesUom: product.salesUom
       ? {
           name: product.salesUom.uom.name,
@@ -143,46 +280,20 @@ export function mapLocalProductToInflowPayload(
           },
         }
       : null,
-
     customFields,
-
-    // Corrected Images Array Mapping
-    // images: Array.isArray(product.images)
-    //   ? product.images.map((img) => ({
-    //       // imageId: img.inflowId,
-    //       // largeUrl: img.largeUrl || null,
-    //       // mediumUncroppedUrl: img.mediumUncroppedUrl || null,
-    //       // mediumUrl: img.mediumUrl || null,
-    //       // originalUrl: img.originalUrl || null,
-    //       // smallUrl: img.smallUrl || null,
-    //       // thumbUrl: img.thumbUrl || null,
-    //       imageId: img.inflowId,
-    //       largeUrl: null,
-    //       mediumUncroppedUrl: null,
-    //       mediumUrl: null,
-    //       originalUrl: `https://drench-nugget-blip.ngrok-free.dev/${img.originalUrl}` || null,
-    //       smallUrl: null,
-    //       thumbUrl: null,
-    //       // https://drench-nugget-blip.ngrok-free.dev/
-    //     }))
-    //   : [],
     images: Array.isArray(product.images)
-      ? product.images.map((img) => ({
+    ? product.images
+        .filter((img) => img.originalUrl?.includes("cloudinary.com"))
+        .map((img) => ({
           imageId: img.inflowId,
-          largeUrl: null,
-          mediumUncroppedUrl: null,
-          mediumUrl: null,
-          originalUrl: img.originalUrl
-            ? img.originalUrl.replace(
-                "https://inflowclouduser.blob.core.windows.net",
-                imageProxyUrl ?? ""
-              )
-            : null,
-          smallUrl: null,
-          thumbUrl: null,
+          largeUrl: img.largeUrl || null,
+          mediumUncroppedUrl: img.mediumUncroppedUrl || null,
+          mediumUrl: img.mediumUrl || null,
+          originalUrl: img.originalUrl || null,
+          smallUrl: img.smallUrl || null,
+          thumbUrl: img.thumbUrl || null,
         }))
-      : [],
-
+    : [],
     prices: product.prices.map((p) => ({
       productPriceId: p.inflowId,
       pricingSchemeId: p.pricingSchemeId,
@@ -210,13 +321,17 @@ export class ProductOutSyncService {
     db: DbClient | typeof prisma = prisma,
     take: number = 30,
     cursorId?: string,
-    excludeIds: string[] = []
+    excludeIds: string[] = [],
+    selectedIds?: string[]
   ): Promise<LocalProductWithRelations[]> {
     const whereClause: Prisma.ProductWhereInput = {
       deletedAt: null,
       isActive: true,
-      isCloudSynced: true,
+      isCloudSynced: false,
       ...(excludeIds.length > 0 ? { id: { notIn: excludeIds } } : {}),
+      ...(selectedIds && selectedIds.length > 0
+        ? { inflowId: { in: selectedIds } } // Change 'inflowId' to 'id' if matching by product primary key
+        : {}),
     };
 
     return db.product.findMany({
@@ -231,6 +346,7 @@ export class ProductOutSyncService {
             parent: true,
           },
         },
+        lastVendor: { include: { businessPartner: true } },
         cost: true,
         prices: true,
         images: true,
@@ -494,13 +610,11 @@ export class ProductOutSyncService {
     return { successfulIds, failedIds };
   }
 
-  async sync(options: SyncOptions, brandCustomName?: string) {
+  async sync(options: SyncOptions, brandCustomName?: string, selectedRecords?: string[]) {
     const syncStartTime = performance.now();
     const { onProgress, checkSignal } = options;
-    // Reduced batch size to 20 to keep BullMQ execution time well within stall limits
-    const BATCH_SIZE = options?.batchSize ?? 100 ;//20; 
-    const API_CONCURRENCY = 5 // 3; // 1 request at a time avoids 429 bursts
-    const INTER_BATCH_DELAY = options?.delayBetweenBatchesMs ?? 1000; // 5000; // 1000
+    const BATCH_SIZE = options?.batchSize ?? 100;
+    const INTER_BATCH_DELAY = options?.delayBetweenBatchesMs ?? 1000;
 
     const defaultCategory = await prisma.category.findFirst({
       where: { isDefault: true },
@@ -523,30 +637,34 @@ export class ProductOutSyncService {
       if (checkSignal) await checkSignal();
 
       const fetchStartTime = performance.now();
-      const rawBatch = await this.getProducts(
+      
+      // Pass selectedRecords straight to the DB query
+      const batch: LocalProductWithRelations[] = await this.getProducts(
         prisma,
         BATCH_SIZE,
         undefined,
-        permanentlyFailedIds
+        permanentlyFailedIds,
+        selectedRecords
       );
+      
       const fetchDuration = performance.now() - fetchStartTime;
 
-      if (!rawBatch || rawBatch.length === 0) {
+      if (!batch || batch.length === 0) {
         console.log(`[ProductOutSyncService] No more unsynced products found. Sync complete.`);
         break;
       }
 
       console.log(
-        `[ProductOutSyncService] Fetched ${rawBatch.length} unsynced items in ${this.formatDuration(fetchDuration)}`
+        `[ProductOutSyncService] Fetched ${batch.length} unsynced items in ${this.formatDuration(fetchDuration)}`
       );
 
       if (checkSignal) await checkSignal();
 
       const { successfulIds, failedIds } = await this.processBatchBulk(
-        rawBatch,
+        batch,
         defaultCategory,
         brandCustomName,
-        checkSignal,
+        checkSignal
       );
 
       if (failedIds.length > 0) {
@@ -563,12 +681,11 @@ export class ProductOutSyncService {
         `Processed: ${successfulIds.length}, Failed: ${failedIds.length}. Cumulative: ${totalProcessed}`
       );
 
-      // Heartbeat report to prevent BullMQ stall timeouts
       if (onProgress) {
         await onProgress(totalProcessed);
       }
 
-      if (successfulIds.length === 0 && failedIds.length === rawBatch.length) {
+      if (successfulIds.length === 0 && failedIds.length === batch.length) {
         console.warn(`[ProductOutSyncService] Entire batch failed. Stopping execution loop.`);
         break;
       }
@@ -576,12 +693,14 @@ export class ProductOutSyncService {
       if (INTER_BATCH_DELAY > 0) {
         await this.sleep(INTER_BATCH_DELAY);
       }
-
-      const totalSyncDuration = performance.now() - syncStartTime;
-      console.log(
-        `[ProductOutSyncService] Total job execution completed in ${this.formatDuration(totalSyncDuration)}. Total Processed: ${totalProcessed}, Total Failed: ${permanentlyFailedIds.length}`
-      );
     }
+
+    const totalSyncDuration = performance.now() - syncStartTime;
+    console.log(
+      `[ProductOutSyncService] Total job execution completed in ${this.formatDuration(
+        totalSyncDuration
+      )}. Total Processed: ${totalProcessed}, Total Failed: ${permanentlyFailedIds.length}`
+    );
 
     return {
       productsProcessed: totalProcessed,
@@ -589,6 +708,145 @@ export class ProductOutSyncService {
       syncedAt: new Date().toISOString(),
     };
   }
+
+  
+  // async getProducts(
+  //   db: DbClient | typeof prisma = prisma,
+  //   take: number = 30,
+  //   cursorId?: string,
+  //   excludeIds: string[] = []
+  // ): Promise<LocalProductWithRelations[]> {
+  //   const whereClause: Prisma.ProductWhereInput = {
+  //     deletedAt: null,
+  //     isActive: true,
+  //     isCloudSynced: true,
+  //     ...(excludeIds.length > 0 ? { id: { notIn: excludeIds } } : {}),
+  //   };
+
+  //   return db.product.findMany({
+  //     where: whereClause,
+  //     take,
+  //     ...(cursorId ? { skip: 1, cursor: { id: cursorId } } : {}),
+  //     orderBy: { id: "asc" },
+  //     include: {
+  //       brand: true,
+  //       category: {
+  //         include: {
+  //           parent: true,
+  //         },
+  //       },
+  //       cost: true,
+  //       prices: true,
+  //       images: true,
+  //       salesUom: { include: { uom: true } },
+  //       purchasingUom: { include: { uom: true } },
+  //     },
+  //   });
+  // }
+
+  // async sync(options: SyncOptions, brandCustomName?: string, selectedRecords?: string[] ) {
+  //   const syncStartTime = performance.now();
+  //   const { onProgress, checkSignal } = options;
+  //   // Reduced batch size to 20 to keep BullMQ execution time well within stall limits
+  //   const BATCH_SIZE = options?.batchSize ?? 100 ;//20; 
+  //   const INTER_BATCH_DELAY = options?.delayBetweenBatchesMs ?? 1000; // 5000; // 1000
+
+  //   const defaultCategory = await prisma.category.findFirst({
+  //     where: { isDefault: true },
+  //     select: { inflowId: true, name: true, isDefault: true },
+  //   });
+
+  //   if (!defaultCategory) {
+  //     console.error("[ProductOutSyncService] Sync aborted: Default category not found.");
+  //     return { productsProcessed: 0, syncedAt: new Date().toISOString() };
+  //   }
+
+  //   const allowedIds = selectedRecords && selectedRecords.length > 0
+  //       ? new Set(selectedRecords.map((id) => String(id)))
+  //       : null;
+
+  //   let totalProcessed = 0;
+  //   let batchNo = 0;
+  //   const permanentlyFailedIds: string[] = [];
+
+  //   console.log(`[ProductOutSyncService] Starting sync batching (Size: ${BATCH_SIZE})...`);
+
+  //   while (true) {
+  //     const iterationStartTime = performance.now();
+  //     if (checkSignal) await checkSignal();
+
+  //     const fetchStartTime = performance.now();
+  //     const rawBatch: LocalProductWithRelations[] = await this.getProducts(
+  //       prisma,
+  //       BATCH_SIZE,
+  //       undefined,
+  //       permanentlyFailedIds
+  //     );
+  //     const fetchDuration = performance.now() - fetchStartTime;
+
+  //     let batch = rawBatch;
+  //     if (allowedIds) {
+  //       batch = batch.filter((item) => allowedIds.has(String(item.inflowId)));
+  //     }
+
+  //     if (!batch || batch.length === 0) {
+  //       console.log(`[ProductOutSyncService] No more unsynced products found. Sync complete.`);
+  //       break;
+  //     }
+
+  //     console.log(
+  //       `[ProductOutSyncService] Fetched ${batch.length} unsynced items in ${this.formatDuration(fetchDuration)}`
+  //     );
+
+  //     if (checkSignal) await checkSignal();
+
+  //     const { successfulIds, failedIds } = await this.processBatchBulk(
+  //       batch,
+  //       defaultCategory,
+  //       brandCustomName,
+  //       checkSignal,
+  //     );
+
+  //     if (failedIds.length > 0) {
+  //       permanentlyFailedIds.push(...failedIds);
+  //     }
+
+  //     totalProcessed += successfulIds.length;
+  //     batchNo++;
+
+  //     const iterationDuration = performance.now() - iterationStartTime;
+
+  //     console.log(
+  //       `[ProductOutSyncService] Batch #${batchNo} done in ${this.formatDuration(iterationDuration)}. ` +
+  //       `Processed: ${successfulIds.length}, Failed: ${failedIds.length}. Cumulative: ${totalProcessed}`
+  //     );
+
+  //     // Heartbeat report to prevent BullMQ stall timeouts
+  //     if (onProgress) {
+  //       await onProgress(totalProcessed);
+  //     }
+
+  //     if (successfulIds.length === 0 && failedIds.length === batch.length) {
+  //       console.warn(`[ProductOutSyncService] Entire batch failed. Stopping execution loop.`);
+  //       break;
+  //     }
+
+  //     if (INTER_BATCH_DELAY > 0) {
+  //       await this.sleep(INTER_BATCH_DELAY);
+  //     }
+
+  //     const totalSyncDuration = performance.now() - syncStartTime;
+  //     console.log(
+  //       `[ProductOutSyncService] Total job execution completed in ${this.formatDuration(totalSyncDuration)}. Total Processed: ${totalProcessed}, Total Failed: ${permanentlyFailedIds.length}`
+  //     );
+  //   }
+
+  //   return {
+  //     productsProcessed: totalProcessed,
+  //     failedCount: permanentlyFailedIds.length,
+  //     syncedAt: new Date().toISOString(),
+  //   };
+  // }
 }
 
 export const productOutSyncService = new ProductOutSyncService();

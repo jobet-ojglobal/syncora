@@ -38,7 +38,7 @@ import {
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 import { Field, FieldContent, FieldDescription, FieldError, FieldGroup, FieldLabel, FieldLegend, FieldSet } from "@/components/ui/field";
-import { generateSku2Variant2 } from "@/helpers/genSKU";
+import { generateSku2Variant2, generateSku2Variant2V2GNoSpace } from "@/helpers/genSKU";
 import React, { useEffect, useMemo, useState } from "react";
 import { BrandSelect } from "../shared/brand-select";
 import { CategorySelect } from "../shared/category-select";
@@ -373,7 +373,7 @@ export function ProductForm({  brands, uoms, groups: productGroups, pricingSchem
   }, [selectedGroupDetails]);
 
 
-   const currentSelectionBreakdown = useMemo(() => {
+  const currentSelectionBreakdown = useMemo(() => {
     if (!watchedVariantSignature || !computedVariantSlotsFromOptions) return [];
 
     // 1. Find the current selected variant intersection slot
@@ -420,14 +420,39 @@ export function ProductForm({  brands, uoms, groups: productGroups, pricingSchem
     [brands]
   );
 
-  useEffect(() => {
-    if (isEditMode || !watchedBrandId) return;
-    const brandName = brandMap[watchedBrandId];
-    if (!brandName || !watchedName) return;
+  // useEffect(() => {
+  //   if (isEditMode || !watchedBrandId) return;
+  //   const brandName = brandMap[watchedBrandId];
+  //   if (!brandName || !watchedName) return;
 
-    const sku = generateSku2Variant2(brandName, watchedName, []);
-    setValue("sku", sku);
-  }, [watchedName, watchedBrandId, brandMap, isEditMode, setValue]);
+  //   const sku = generateSku2Variant2(brandName, watchedName, []);
+  //   setValue("sku", sku);
+  // }, [watchedName, watchedBrandId, brandMap, isEditMode, setValue]);
+
+  // Find selected brand object dynamically from props
+  const selectedBrand = useMemo(
+    () => brands?.find((b) => b.id === watchedBrandId),
+    [brands, watchedBrandId]
+  );
+
+  const handleGenerateSKU = () => {
+    const brandName = selectedBrand?.name || "";
+    const trimmedName = watchedName?.trim() || "";
+
+    if (!trimmedName) {
+      // You can use your toast library here (e.g. toast.error("Please enter a product name first"))
+      return;
+    }
+
+    // Generate SKU using your utility function
+    const skuGenerated = generateSku2Variant2V2GNoSpace(brandName, trimmedName, []);
+
+    // Update React Hook Form value & touch state
+    setValue("sku", skuGenerated, {
+      shouldValidate: true,
+      shouldDirty: true,
+    });
+  };
   
 
   const variantOptions: SelectOption[] = React.useMemo(() => {
@@ -484,114 +509,154 @@ export function ProductForm({  brands, uoms, groups: productGroups, pricingSchem
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-6 ">
 
       <div className="bg-card border rounded-xl p-5 space-y-4 shadow-xs">
-            <div className="space-y-0.5 border-b pb-2">
-              <FieldLegend className="flex items-center gap-2 text-sm font-semibold ">
-                <Package className="w-4 h-4 text-primary" /> 
-                Master SKU Core Identification
-              </FieldLegend>
-            </div>
+        <div className="space-y-0.5 border-b pb-2">
+          <FieldLegend className="flex items-center gap-2 text-sm font-semibold ">
+            <Package className="w-4 h-4 text-primary" /> 
+            Master SKU Core Identification
+          </FieldLegend>
+        </div>
 
-
-            <FieldSet className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <Controller 
-                control={control} 
-                name="name"
-                render={({ field, fieldState }) => (
-                  <Field className="md:col-span-2">
-                    <FieldLabel htmlFor="form-name">
-                      Product Master Display Title <b className="text-red-500">*</b>
-                    </FieldLabel>
-                    <Input
-                      {...field}
-                      placeholder="e.g. Premium Ergonomic Office Chair"
-                      id="form-name"
-                      aria-invalid={fieldState.invalid}
-                    />
-                    {fieldState.invalid && <FieldError className="text-xs" errors={[fieldState.error]} />}
-                  </Field>
-                )}
-              />
-              <Controller 
-                control={control} 
-                name="sku"
-                render={({ field, fieldState }) => (
-                  <Field className="md:col-span-1">
-                    <FieldLabel htmlFor="form-sku">
-                      SKU / Custom Identity <b className="text-red-500">*</b>
-                    </FieldLabel>
-                    <Input
-                      {...field}
-                      placeholder="PROD-CHAIR-001"
-                      id="form-sku"
-                      aria-invalid={fieldState.invalid}
-                    />
-                    {fieldState.invalid && <FieldError className="text-xs" errors={[fieldState.error]} />}
-                  </Field>
-                )}
-              />
-
-            </FieldSet>
-
-            <FieldSet className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <Field className="md:col-span-1">
-                <FieldLabel>Brand</FieldLabel>
-                <Controller
-                  name="brandId"
-                  control={control}
-                  render={({ field }) => 
-                    <BrandSelect value={field.value ?? undefined} onChange={field.onChange} className="h-8" />}
+        {initialData?.purchasingUom?.name}
+        <FieldSet className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <Controller 
+            control={control} 
+            name="name"
+            render={({ field, fieldState }) => (
+              <Field className="md:col-span-2">
+                <FieldLabel htmlFor="form-name">
+                  Product Master Display Title <b className="text-red-500">*</b>
+                </FieldLabel>
+                <Input
+                  {...field}
+                  placeholder="e.g. Premium Ergonomic Office Chair"
+                  id="form-name"
+                  aria-invalid={fieldState.invalid}
                 />
+                {fieldState.invalid && <FieldError className="text-xs" errors={[fieldState.error]} />}
               </Field>
-
+            )}
+          />
+          <Controller 
+            control={control} 
+            name="sku"
+            render={({ field, fieldState }) => (
               <Field className="md:col-span-1">
-                <FieldLabel>Category</FieldLabel>
-                <Controller
-                  name="categoryId"
-                  control={control}
-                  render={({ field }) => <CategorySelect value={field.value ?? undefined} onChange={field.onChange} className="h-8" />}
-                />
-              </Field>
+                <div className="flex items-center justify-between">
+                  <FieldLabel htmlFor="form-sku">
+                    SKU / Custom Identity <b className="text-red-500">*</b>
+                  </FieldLabel>
+                  
+                  {/* Generate SKU Button */}
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="h-6 px-2 text-xs text-primary hover:text-primary/80 flex items-center gap-1"
+                    onClick={handleGenerateSKU}
+                    disabled={!watchedName?.trim()}
+                    title="Auto-generate SKU based on Brand and Product Name"
+                  >
+                    <Sparkles className="w-3 h-3" />
+                    Generate SKU
+                  </Button>
+                </div>
 
-              <FormSelect
-                name="standardUomName"
-                control={control}
-                label="Base System UOM"
-                placeholder="-- Select UOM --"
-                options={uoms.map((item) => ({
-                  id: item.code,
-                  name: `${item.name} (${item.code})`,
-                }))}
-                required
-                emptyMessage="No base unit available"
-                classNameLabel="text-muted-foreground font-semibold"
-              />
-
-            </FieldSet>
-
-            <Controller
-              name="description"
-              control={control}
-              render={({ field, fieldState }) => (
-                <Field data-invalid={fieldState.invalid} className="md:col-span-3">
-                  <FieldLabel htmlFor="form-prod-description">Public Summary Description</FieldLabel>
-                  <Textarea
-                    value={field.value ?? ""}
-                    onBlur={field.onBlur}
-                    ref={field.ref}
-                    onChange={(e) => {
-                      const val = e.target.value;
-                      field.onChange(val === "" ? null : val); 
-                    }}
-                    id="form-prod-description"
+                <div className="relative flex items-center mt-1">
+                  <Input
+                    {...field}
+                    placeholder="e.g. WEIFENG-WT-5601"
+                    id="form-sku"
                     aria-invalid={fieldState.invalid}
-                    placeholder="Provide descriptive high-fidelity characteristics detailing materials..." 
-                    rows={3}
                   />
-                  {fieldState.invalid && <FieldError className="text-xs" errors={[fieldState.error]} />}
-                </Field>
-              )}
+                </div>
+
+                {fieldState.invalid && (
+                  <FieldError className="text-xs" errors={[fieldState.error]} />
+                )}
+              </Field>
+            )}
+          />
+          {/* <Controller 
+            control={control} 
+            name="sku"
+            render={({ field, fieldState }) => (
+              <Field className="md:col-span-1">
+                <FieldLabel htmlFor="form-sku">
+                  SKU / Custom Identity <b className="text-red-500">*</b>
+                </FieldLabel>
+                <Input
+                  {...field}
+                  placeholder="PROD-CHAIR-001"
+                  id="form-sku"
+                  aria-invalid={fieldState.invalid}
+                />
+                {fieldState.invalid && <FieldError className="text-xs" errors={[fieldState.error]} />}
+              </Field>
+            )}
+          /> */}
+
+        </FieldSet>
+
+        <FieldSet className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <Field className="md:col-span-1">
+            <FieldLabel>Brand</FieldLabel>
+            <Controller
+              name="brandId"
+              control={control}
+              render={({ field }) => 
+                <BrandSelect value={field.value ?? undefined} onChange={field.onChange} className="h-8" />}
             />
-          </div>
+          </Field>
+
+          <Field className="md:col-span-1">
+            <FieldLabel>Category</FieldLabel>
+            <Controller
+              name="categoryId"
+              control={control}
+              render={({ field }) => <CategorySelect value={field.value ?? undefined} onChange={field.onChange} className="h-8" />}
+            />
+          </Field>
+
+          <FormSelect
+            name="standardUomName"
+            control={control}
+            label="Base System UOM"
+            placeholder="-- Select UOM --"
+            options={uoms.map((item) => ({
+              id: item.code,
+              name: `${item.name} (${item.code})`,
+            }))}
+            required
+            emptyMessage="No base unit available"
+            classNameLabel="text-muted-foreground font-semibold"
+          />
+
+        </FieldSet>
+
+        <Controller
+          name="description"
+          control={control}
+          render={({ field, fieldState }) => (
+            <Field data-invalid={fieldState.invalid} className="md:col-span-3">
+              <FieldLabel htmlFor="form-prod-description">Public Summary Description</FieldLabel>
+              <Textarea
+                value={field.value ?? ""}
+                onBlur={field.onBlur}
+                ref={field.ref}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  field.onChange(val === "" ? null : val); 
+                }}
+                id="form-prod-description"
+                aria-invalid={fieldState.invalid}
+                placeholder="Provide descriptive high-fidelity characteristics detailing materials..." 
+                rows={3}
+              />
+              {fieldState.invalid && <FieldError className="text-xs" errors={[fieldState.error]} />}
+            </Field>
+          )}
+        />
+      </div>
           
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         
@@ -865,7 +930,20 @@ export function ProductForm({  brands, uoms, groups: productGroups, pricingSchem
               <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
                 Inbound Supply / Purchasing Conversion
               </h4>
-              <Controller
+              <FormSelect
+                name="purchasingUom.name"
+                control={control}
+                label="Base System UOM"
+                placeholder="-- Select UOM --"
+                options={uoms.map((item) => ({
+                  id: item.id,
+                  name: `${item.name} (${item.code})`,
+                }))}
+                required
+                emptyMessage="No base unit available"
+                classNameLabel="text-muted-foreground font-semibold"
+              />
+              {/* <Controller
                 name="purchasingUom.name"
                 control={control}
                 render={({ field, fieldState }) => (
@@ -901,7 +979,7 @@ export function ProductForm({  brands, uoms, groups: productGroups, pricingSchem
                     )}
                   </Field>
                 )}
-              />
+              /> */}
              
               <div className="grid grid-cols-2 gap-2">
                 <Controller 
@@ -964,7 +1042,20 @@ export function ProductForm({  brands, uoms, groups: productGroups, pricingSchem
               <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
                 Outbound / Sales Channels Conversion
               </h4>
-              <Controller
+              <FormSelect
+                name="salesUom.name"
+                control={control}
+                label="Base System UOM"
+                placeholder="-- Select UOM --"
+                options={uoms.map((item) => ({
+                  id: item.id,
+                  name: `${item.name} (${item.code})`,
+                }))}
+                required
+                emptyMessage="No base unit available"
+                classNameLabel="text-muted-foreground font-semibold"
+              />
+              {/* <Controller
                 name="salesUom.name"
                 control={control}
                 render={({ field, fieldState }) => (
@@ -1000,7 +1091,7 @@ export function ProductForm({  brands, uoms, groups: productGroups, pricingSchem
                     )}
                   </Field>
                 )}
-              />
+              /> */}
              
               <div className="grid grid-cols-2 gap-2">
                 <Controller 

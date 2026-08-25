@@ -433,7 +433,7 @@ export class InventorySyncService {
     //   );
     // }
 
-    const CHUNK_SIZE = 100;
+    const CHUNK_SIZE = 200;
 
     for (const [targetLocationId, adjustmentLines] of locationAdjustmentMap) {
       if (adjustmentLines.length === 0) continue;

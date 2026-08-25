@@ -1367,6 +1367,7 @@ enum SerialStatus {
   RESERVED
   SOLD
   DAMAGED
+  VOIDED
 }
 
 model AdjustmentReason {
@@ -2217,6 +2218,7 @@ model Vendor {
   inflowId                  String @unique
   businessPartnerId         String @unique
   isTaxInclusivePricing     Boolean @default(false)
+  isCloudSynced             Boolean @default(false)
   defaultCarrier            String?
   defaultPaymentMethod      String?
   discount                  Decimal? @db.Decimal(10,2)

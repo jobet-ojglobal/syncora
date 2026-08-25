@@ -11,6 +11,8 @@ import { reorderMethodSwitcher, productTypeSwitcher } from "@/helpers/product.he
 import { syncBrand } from "./ensure.service";
 import { saveCheckProductImage, saveProductImage } from "@/utils/saveImage";
 import { checkIfImageExists } from "@/utils/checkImageExist";
+import { storeBlobImage } from "@/utils/blobStoreImage";
+import { storeImageToCloudinary } from "@/utils/cloudinaryStoreImage";
 
 type Tx = Prisma.TransactionClient;
 
@@ -55,7 +57,20 @@ export async function syncProduct(
 
   const localProduct = await tx.product.findUnique({
     where: { inflowId: product.productId },
+    include: {
+      images: {
+        orderBy: { position: "asc" },
+        take: 1,
+        select: { originalUrl: true }
+      }
+    }
   });
+
+  const imageUrl = localProduct?.images[0]?.originalUrl;
+
+  // if (imageUrl?.includes("storage.com") && product.image) {
+  //   return localProduct;
+  // }
 
   // 2. Brand Resolution & Verification
   let validBrandId: string | null = null;
@@ -96,7 +111,7 @@ export async function syncProduct(
 
   // 3. Image Preparation & Local Asset Conversion
   if (product.image && product.image.startsWith("data:image")) {
-    const publicImagePath = await saveCheckProductImage(
+    const publicImagePath = await storeImageToCloudinary(
       product.productId,
       product.name || "unnamed",
       product.image
@@ -117,9 +132,10 @@ export async function syncProduct(
     } else {
       product.images = [];
     }
-  } else {
-    product.images = [];
   }
+  //  else {
+  //   product.images = [];
+  // }
 
   // 4. Core Product Upsert logic
   let validProductData: Product | null = null;

@@ -783,12 +783,12 @@ export async function POST(req: Request) {
       };
 
       const midQueue = getMidSyncQueue();
-      // await midQueue.add("stock_adjust_upsert", {
-      //   source: "STOCK_ADJUST_UPSERT_CLOUD",
-      //   model: "StockAdjustment",
-      //   payload: inflowPayload,
-      //   timestamp: new Date().toISOString(),
-      // });
+      await midQueue.add("stock_adjust_upsert", {
+        source: "STOCK_ADJUST_UPSERT_CLOUD",
+        model: "StockAdjustment",
+        payload: inflowPayload,
+        timestamp: new Date().toISOString(),
+      });
     }
 
     return NextResponse.json(

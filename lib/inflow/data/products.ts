@@ -127,7 +127,7 @@ export async function upsertProduct(payload: Partial<InflowProduct>) {
 }
 
 export async function upsertProductBulk(payload: Partial<InflowProduct>[]) {
-  return inflowLimit.put<InflowProduct[]>("/products", payload);
+  return inflowLimit.put<InflowProduct[]>("/products?include=lastVendor", payload);
 }
 
 export async function deleteProduct(productId: string) {
