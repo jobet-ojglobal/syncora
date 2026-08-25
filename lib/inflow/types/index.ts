@@ -130,7 +130,7 @@ export interface InflowProduct {
   categoryId: string | null;
   lastVendorId: string | null;
   lastModifiedById: string | null;
-  lastModifiedDateTime: string;
+  lastModifiedDateTime?: string;
   
   purchasingUom: InflowPurchasingUom | null;
   salesUom: InflowSalesUom | null;
@@ -154,7 +154,7 @@ export interface InflowProduct {
   lastVendor?: InflowVendor;
   lastModifiedBy?: InflowTeamMember;
 
-  createdDttm: string;
+  createdDttm?: string;
   timestamp?: string;
   image?: string | null;
 }
@@ -896,12 +896,12 @@ export interface InflowVendor {
   isActive: boolean;
   isTaxInclusivePricing: boolean;
   lastModifiedById: string | null;
-  lastModifiedDttm: string | null;
+  lastModifiedDttm?: string | null;
   leadTimeDays: number | null;
   phone: string | null;
   remarks: string | null;
   taxingSchemeId: string | null;
-  timestamp: string;
+  timestamp?: string;
   website: string | null;
   
   // Included relations via API payload definition parameters

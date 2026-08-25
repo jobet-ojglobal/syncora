@@ -268,24 +268,52 @@ export async function POST(request: NextRequest) {
     }
 
     // 2. Pre-fetch target UOM IDs using the incoming Frontend Code Tokens
-    const codeLookups = Array.from(new Set([
-      purchasingUom?.name,
-      salesUom?.name
-    ].filter(Boolean)));
+    // const codeLookups = Array.from(new Set([
+    //   purchasingUom?.name,
+    //   salesUom?.name
+    // ].filter(Boolean)));
 
-    const matchingUoms = await prisma.unitOfMeasure.findMany({
-      where: { code: { in: codeLookups } },
-      select: { id: true, code: true }
-    });
+    // const matchingUoms = await prisma.unitOfMeasure.findMany({
+    //   where: { code: { in: codeLookups } },
+    //   select: { id: true, code: true }
+    // });
 
-    const uomMap = Object.fromEntries(matchingUoms.map(u => [u.code, u.id]));
-    const purchasingUomId = purchasingUom?.name ? uomMap[purchasingUom.name] : null;
-    const salesUomId = salesUom?.name ? uomMap[salesUom.name] : null;
+    // const uomMap = Object.fromEntries(matchingUoms.map(u => [u.code, u.id]));
+    // const purchasingUomId = purchasingUom?.name ? uomMap[purchasingUom.name] : null;
+    // const salesUomId = salesUom?.name ? uomMap[salesUom.name] : null;
 
-    if ((purchasingUom?.name && !purchasingUomId) || (salesUom?.name && !salesUomId)) {
-      return NextResponse.json({ 
-        error: "Referenced operational Multi-tier calculation metric unit is not registered within system catalogs." 
-      }, { status: 400 });
+    // if ((purchasingUom?.name && !purchasingUomId) || (salesUom?.name && !salesUomId)) {
+    //   return NextResponse.json({ 
+    //     error: "Referenced operational Multi-tier calculation metric unit is not registered within system catalogs." 
+    //   }, { status: 400 });
+    // }
+
+    // Extract UOM Codes robustly (handling both .uomCode and legacy .name props)
+    const purchasingCode = purchasingUom?.uomCode || purchasingUom?.name || null;
+    const salesCode = salesUom?.uomCode || salesUom?.name || null;
+
+    // 2. Lookup UOM IDs from catalog
+    const codeLookups = Array.from(
+      new Set([purchasingCode, salesCode].filter(Boolean))
+    ) as string[];
+
+    const matchingUoms = codeLookups.length > 0
+      ? await prisma.unitOfMeasure.findMany({
+          where: { code: { in: codeLookups } },
+          select: { id: true, code: true, name: true },
+        })
+      : [];
+
+    const uomMap = Object.fromEntries(matchingUoms.map((u) => [u.code, u.id]));
+
+    const purchasingUomId = purchasingCode ? uomMap[purchasingCode] : null;
+    const salesUomId = salesCode ? uomMap[salesCode] : null;
+
+    if ((purchasingCode && !purchasingUomId) || (salesCode && !salesUomId)) {
+      return NextResponse.json(
+        { error: "Referenced Unit of Measure is not registered in system catalogs." },
+        { status: 400 }
+      );
     }
 
     // 🎯 Reconcile nested 1:Many pricing tier catalog matrix (Option B - Sync-Friendly)
@@ -541,14 +569,14 @@ export async function POST(request: NextRequest) {
       } 
 
       const newCustomFields: InflowCustomFields = {};
-      const brandCustomName = "custom1";
+      const brandCustomName = "custom7";
 
       const brandName = newProduct.brand?.name;
       if (brandName) {
         if (brandCustomName) {
           newCustomFields[brandCustomName as keyof InflowCustomFields] = brandName;
         } else {
-          newCustomFields.custom1 = brandName;
+          newCustomFields.custom7 = brandName;
         }
       }
 
@@ -565,7 +593,7 @@ export async function POST(request: NextRequest) {
         isActive: newProduct.isActive,
         isManufacturable: newProduct.isManufacturable,
         includeQuantityBuildable: newProduct.includeQuantityBuildable,
-        standardUomName: newProduct.standardUomName,
+        standardUomName: newProduct.standardUomName || "ea.",
         trackExpiry: newProduct.trackExpiry,
         trackLots: newProduct.trackLots,
         trackSerials: newProduct.trackSerials,
@@ -596,21 +624,40 @@ export async function POST(request: NextRequest) {
 
         totalQuantityOnHand: 20,
 
-        salesUom: {
-          name: newProduct.salesUom?.uom.name,
-          conversion: {
-            standardQuantity: newProduct.salesUom?.standardQuantity,
-            uomQuantity: newProduct.salesUom?.uomQuantity
-          }
-        },
+        purchasingUom: newProduct.purchasingUom?.uom.name
+          ? {
+              name: newProduct.purchasingUom.uom.name,
+              conversionRatio: {
+                standardQuantity: newProduct.purchasingUom.standardQuantity?.toString() || "1",
+                uomQuantity: newProduct.purchasingUom.uomQuantity?.toString() || "1",
+              },
+            }
+          : null,
+        salesUom: newProduct.salesUom
+          ? {
+              name: newProduct.salesUom.uom.name,
+              conversionRatio: {
+                standardQuantity: newProduct.salesUom.standardQuantity?.toString() || "1",
+                uomQuantity: newProduct.salesUom.uomQuantity?.toString() || "1",
+              },
+            }
+          : null,
+
+        // salesUom: {
+        //   name: newProduct.salesUom?.uom.name || "ea.",
+        //   conversionRatio: {
+        //     standardQuantity: newProduct.salesUom?.standardQuantity || "1",
+        //     uomQuantity: newProduct.salesUom?.uomQuantity || "1"
+        //   }
+        // },
         
-        purchasingUom: {
-          name: newProduct.purchasingUom?.uom.name,
-          conversion: {
-            standardQuantity: newProduct.purchasingUom?.standardQuantity,
-            uomQuantity: newProduct.purchasingUom?.uomQuantity
-          }
-        },
+        // purchasingUom: {
+        //   name: newProduct.purchasingUom?.uom.name || "ea.",
+        //   conversionRatio: {
+        //     standardQuantity: newProduct.purchasingUom?.standardQuantity || "1",
+        //     uomQuantity: newProduct.purchasingUom?.uomQuantity || "1"
+        //   }
+        // },
 
         // Subordinate Embedded Framework Elements
         cost: newProduct.cost ? {
@@ -757,17 +804,17 @@ export async function POST(request: NextRequest) {
                   weight: cleanInflowPayload.weight,
                 },
 
-                salesUom: {
+                salesUom: cleanInflowPayload.salesUom ? {
                   name: cleanInflowPayload.salesUom.name || "",
-                  ratioStd: cleanInflowPayload.salesUom.conversion.standardQuantity,
-                  ratio: cleanInflowPayload.salesUom.conversion.uomQuantity
-                },
+                  ratioStd: cleanInflowPayload.salesUom.conversionRatio.standardQuantity,
+                  ratio: cleanInflowPayload.salesUom.conversionRatio.uomQuantity
+                } : null,
 
-                purchaseUom: {
+                purchaseUom: cleanInflowPayload.purchasingUom ? {
                   name: cleanInflowPayload.purchasingUom.name || "",
-                  ratioStd: cleanInflowPayload.purchasingUom.conversion.standardQuantity,
-                  ratio: cleanInflowPayload.purchasingUom.conversion.uomQuantity
-                },
+                  ratioStd: cleanInflowPayload.purchasingUom.conversionRatio.standardQuantity,
+                  ratio: cleanInflowPayload.purchasingUom.conversionRatio.uomQuantity
+                } : null,
 
                 prices: cleanInflowPayload.prices.map(p => {
                   const match = existingPricingMaps.find(
@@ -841,28 +888,56 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ error: "Missing required core identifying target reference pointer." }, { status: 400 });
     }
 
-    // 2. Pre-fetch corresponding operational UOM system IDs using Code mapping tokens
-    const codeLookups = Array.from(new Set([
-      purchasingUom?.name,
-      salesUom?.name
-    ].filter(Boolean)));
+    // // 2. Pre-fetch corresponding operational UOM system IDs using Code mapping tokens
+    // const codeLookups = Array.from(new Set([
+    //   purchasingUom?.name,
+    //   salesUom?.name
+    // ].filter(Boolean)));
 
-    const matchingUoms = await prisma.unitOfMeasure.findMany({
-      where: {
-        code: { in: codeLookups }
-      },
-      select: { id: true, code: true }
-    });
+    // const matchingUoms = await prisma.unitOfMeasure.findMany({
+    //   where: {
+    //     code: { in: codeLookups }
+    //   },
+    //   select: { id: true, code: true }
+    // });
 
-    const uomMap = Object.fromEntries(matchingUoms.map(u => [u.code, u.id]));
+    // const uomMap = Object.fromEntries(matchingUoms.map(u => [u.code, u.id]));
 
-    const purchasingUomId = purchasingUom?.name ? uomMap[purchasingUom.name] : null;
-    const salesUomId = salesUom?.name ? uomMap[salesUom.name] : null;
+    // const purchasingUomId = purchasingUom?.name ? uomMap[purchasingUom.name] : null;
+    // const salesUomId = salesUom?.name ? uomMap[salesUom.name] : null;
 
-    if ((purchasingUom?.name && !purchasingUomId) || (salesUom?.name && !salesUomId)) {
-      return NextResponse.json({ 
-        error: "Referenced operational Multi-tier calculation metric unit is not registered within system catalogs." 
-      }, { status: 400 });
+    // if ((purchasingUom?.name && !purchasingUomId) || (salesUom?.name && !salesUomId)) {
+    //   return NextResponse.json({ 
+    //     error: "Referenced operational Multi-tier calculation metric unit is not registered within system catalogs." 
+    //   }, { status: 400 });
+    // }
+
+    // Extract UOM Codes robustly (handling both .uomCode and legacy .name props)
+    const purchasingUomId = purchasingUom?.name || null;
+    const salesUomId = salesUom?.name || null;
+
+    // 2. Lookup UOM IDs from catalog
+    // const codeLookups = Array.from(
+    //   new Set([purchasingCode, salesCode].filter(Boolean))
+    // ) as string[];
+
+    // const matchingUoms = codeLookups.length > 0
+    //   ? await prisma.unitOfMeasure.findMany({
+    //       where: { code: { in: codeLookups } },
+    //       select: { id: true, code: true, name: true },
+    //     })
+    //   : [];
+
+    // const uomMap = Object.fromEntries(matchingUoms.map((u) => [u.code, u.id]));
+
+    // const purchasingUomId = purchasingCode ? uomMap[purchasingCode] : null;
+    // const salesUomId = salesCode ? uomMap[salesCode] : null;
+
+    if (!purchasingUomId || !salesUomId) {
+      return NextResponse.json(
+        { error: "Referenced Unit of Measure is not registered in system catalogs." },
+        { status: 400 }
+      );
     }
 
     const slug = await genUniqueSlug(name, prisma.product);
@@ -1096,7 +1171,7 @@ export async function PATCH(request: NextRequest) {
         }
       }
 
-      // G. Reconcile Purchasing UOM Configuration
+      // G. Purchasing UOM Sync
       if (purchasingUomId) {
         await tx.productUom.upsert({
           where: { productId: inflowId },
@@ -1116,7 +1191,7 @@ export async function PATCH(request: NextRequest) {
         await tx.productUom.deleteMany({ where: { productId: inflowId } });
       }
 
-      // H. Reconcile Sales Channels UOM Configuration
+      // H. Sales UOM Sync
       if (salesUomId) {
         await tx.productSalesUom.upsert({
           where: { productId: inflowId },
@@ -1135,6 +1210,46 @@ export async function PATCH(request: NextRequest) {
       } else {
         await tx.productSalesUom.deleteMany({ where: { productId: inflowId } });
       }
+
+      // // G. Reconcile Purchasing UOM Configuration
+      // if (purchasingUomId) {
+      //   await tx.productUom.upsert({
+      //     where: { productId: inflowId },
+      //     update: {
+      //       uomId: purchasingUomId,
+      //       standardQuantity: Number(purchasingUom.standardQuantity) || 1,
+      //       uomQuantity: Number(purchasingUom.uomQuantity) || 1,
+      //     },
+      //     create: {
+      //       productId: inflowId,
+      //       uomId: purchasingUomId,
+      //       standardQuantity: Number(purchasingUom.standardQuantity) || 1,
+      //       uomQuantity: Number(purchasingUom.uomQuantity) || 1,
+      //     },
+      //   });
+      // } else {
+      //   await tx.productUom.deleteMany({ where: { productId: inflowId } });
+      // }
+
+      // // H. Reconcile Sales Channels UOM Configuration
+      // if (salesUomId) {
+      //   await tx.productSalesUom.upsert({
+      //     where: { productId: inflowId },
+      //     update: {
+      //       uomId: salesUomId,
+      //       standardQuantity: Number(salesUom.standardQuantity) || 1,
+      //       uomQuantity: Number(salesUom.uomQuantity) || 1,
+      //     },
+      //     create: {
+      //       productId: inflowId,
+      //       uomId: salesUomId,
+      //       standardQuantity: Number(salesUom.standardQuantity) || 1,
+      //       uomQuantity: Number(salesUom.uomQuantity) || 1,
+      //     },
+      //   });
+      // } else {
+      //   await tx.productSalesUom.deleteMany({ where: { productId: inflowId } });
+      // }
 
       // I. Reconcile Barcodes Matrix
       const validBarcodes = barcodes.filter((b: any) => b?.barcode?.trim());
@@ -1244,14 +1359,14 @@ export async function PATCH(request: NextRequest) {
       } 
 
       const newCustomFields: InflowCustomFields = {};
-      const brandCustomName = "custom1";
+      const brandCustomName = "custom7";
 
       const brandName = updatedProduct.brand?.name;
       if (brandName) {
         if (brandCustomName) {
           newCustomFields[brandCustomName as keyof InflowCustomFields] = brandName;
         } else {
-          newCustomFields.custom1 = brandName;
+          newCustomFields.custom7 = brandName;
         }
       }
 
@@ -1269,17 +1384,17 @@ export async function PATCH(request: NextRequest) {
         isActive: updatedProduct.isActive,
         isManufacturable: updatedProduct.isManufacturable,
         includeQuantityBuildable: updatedProduct.includeQuantityBuildable,
-        standardUomName: updatedProduct.standardUomName,
+        standardUomName: updatedProduct.standardUomName || "ea.",
         trackExpiry: updatedProduct.trackExpiry,
         trackLots: updatedProduct.trackLots,
         trackSerials: updatedProduct.trackSerials,
         shelfLifeDays: null, // updatedProduct.shelfLifeDays,
         sellBeforeExpiryDays: null, // updatedProduct.sellBeforeExpiryDays,
         expiryNotificationDays: null, // updatedProduct.expiryNotificationDays,
-        weight: updatedProduct.weight?.toString() || null,
-        width: updatedProduct.width?.toString() || null,
-        height: updatedProduct.height?.toString() || null,
-        length: updatedProduct.length?.toString() || null,
+        weight: updatedProduct.weight?.toString() || 0,
+        width: updatedProduct.width?.toString() || 0,
+        height: updatedProduct.height?.toString() || 0,
+        length: updatedProduct.length?.toString() || 0,
         originCountry: updatedProduct.originCountry,
         hsTariffNumber: updatedProduct.hsTariffNumber,
         remarks: updatedProduct.remarks,
@@ -1293,20 +1408,39 @@ export async function PATCH(request: NextRequest) {
 
         totalQuantityOnHand: 20,
 
-        salesUom: {
-          name: updatedProduct.salesUom?.uom.name,
-          conversion: {
-            standardQuantity: updatedProduct.salesUom?.standardQuantity,
-            uomQuantity: updatedProduct.salesUom?.uomQuantity
-          }
-        },
-        purchasingUom: {
-          name: updatedProduct.purchasingUom?.uom.name,
-          conversion: {
-            standardQuantity: updatedProduct.purchasingUom?.standardQuantity,
-            uomQuantity: updatedProduct.purchasingUom?.uomQuantity
-          }
-        },
+        purchasingUom: updatedProduct.purchasingUom
+          ? {
+              name: "ea.",
+              conversionRatio: {
+                standardQuantity: updatedProduct.purchasingUom.standardQuantity?.toString() || "1",
+                uomQuantity: updatedProduct.purchasingUom.uomQuantity?.toString() || "1",
+              },
+            }
+          : null,
+        salesUom: updatedProduct.salesUom
+          ? {
+              name: "ea.",
+              conversionRatio: {
+                standardQuantity: updatedProduct.salesUom.standardQuantity?.toString() || "1",
+                uomQuantity: updatedProduct.salesUom.uomQuantity?.toString() || "1",
+              },
+            }
+          : null,
+
+        // salesUom: {
+        //   name: updatedProduct.salesUom?.uom.name || "ea.",
+        //   conversionRatio: {
+        //     standardQuantity: updatedProduct.salesUom?.standardQuantity || "1",
+        //     uomQuantity: updatedProduct.salesUom?.uomQuantity || "1"
+        //   }
+        // },
+        // purchasingUom: {
+        //   name: updatedProduct.purchasingUom?.uom.name || "ea.",
+        //   conversionRatio: {
+        //     standardQuantity: updatedProduct.purchasingUom?.standardQuantity || "1",
+        //     uomQuantity: updatedProduct.purchasingUom?.uomQuantity || "1"
+        //   }
+        // },
 
         // Subordinate Embedded Framework Elements
         cost: updatedProduct.cost ? {
@@ -1617,17 +1751,17 @@ export async function PATCH(request: NextRequest) {
                   weight: cleanInflowPayload.weight,
                 },
 
-                salesUom: {
+                salesUom: cleanInflowPayload.salesUom ? {
                   name: cleanInflowPayload.salesUom.name || "",
-                  ratioStd: cleanInflowPayload.salesUom.conversion.standardQuantity,
-                  ratio: cleanInflowPayload.salesUom.conversion.uomQuantity
-                },
+                  ratioStd: cleanInflowPayload.salesUom.conversionRatio.standardQuantity,
+                  ratio: cleanInflowPayload.salesUom.conversionRatio.uomQuantity
+                } : null,
 
-                purchaseUom: {
+                purchaseUom: cleanInflowPayload.purchasingUom ? {
                   name: cleanInflowPayload.purchasingUom.name || "",
-                  ratioStd: cleanInflowPayload.purchasingUom.conversion.standardQuantity,
-                  ratio: cleanInflowPayload.purchasingUom.conversion.uomQuantity
-                },
+                  ratioStd: cleanInflowPayload.purchasingUom.conversionRatio.standardQuantity,
+                  ratio: cleanInflowPayload.purchasingUom.conversionRatio.uomQuantity
+                } : null,
 
                 prices: cleanInflowPayload.prices.map(p => {
                   const match = existingPricingMaps.find(

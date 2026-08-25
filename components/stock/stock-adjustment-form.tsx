@@ -254,7 +254,7 @@ export function StockAdjustmentForm({
           lines: processedLines,
         };
 
-        const response = await fetch("/api/admin/inventory/adjustment", {
+        const response = await fetch("/api/admin/inventory/adjustment-2", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(cleanedPayload),

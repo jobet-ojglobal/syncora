@@ -178,6 +178,92 @@ generateSku2Variant2V2(
   []
 );
 
+export function generateSku2Variant2V2G(
+  brand: string,
+  productName: string,
+  variants: string[] = []
+): string {
+  const cleanBrand = brand?.trim() || "";
+  let cleanedName = productName?.trim() || "";
+
+  // 1. Remove brand from productName if it starts with or contains the brand (case-insensitive)
+  if (cleanBrand && cleanedName) {
+    const brandRegex = new RegExp(`\\b${escapeRegExp(cleanBrand)}\\b`, "gi");
+    cleanedName = cleanedName.replace(brandRegex, "").trim();
+  }
+
+  // 2. Extract product model/name parts, cleaning up leftover extra spaces or hyphens
+  const productCode = cleanedName
+    ? cleanedName
+        .split(/\s+/)
+        .filter(Boolean)
+        .map((part) => part.toUpperCase())
+        .join("-")
+    : "";
+
+  // 3. Process variants (clean and uppercase whole words)
+  const variantCodes = variants
+    .map((v) => v?.trim().toUpperCase())
+    .filter((v): v is string => Boolean(v));
+
+  // 4. Combine all parts with hyphens
+  return [cleanBrand.toUpperCase(), productCode, ...variantCodes]
+    .filter(Boolean)
+    .join("-");
+}
+
+export function generateSku2Variant2V2GNoSpace(
+  brand: string,
+  productName: string,
+  variants: string[] = []
+): string {
+  // 1. Normalize and collapse spaces in brand
+  const cleanBrand = brand ? brand.trim().replace(/\s+/g, " ") : "";
+  let cleanedName = productName ? productName.trim().replace(/\s+/g, " ") : "";
+
+  // 2. Remove multi-word brand name from product name if present (case-insensitive)
+  if (cleanBrand && cleanedName) {
+    const brandRegex = new RegExp(`\\b${escapeRegExp(cleanBrand)}\\b`, "gi");
+    cleanedName = cleanedName.replace(brandRegex, "").trim();
+  }
+
+  // 3. Extract and format brand code (e.g. "Weifeng One" -> "WEIFENG-ONE")
+  const brandCode = cleanBrand
+    ? cleanBrand.split(/\s+/).map((w) => w.toUpperCase()).join("-")
+    : "";
+
+  // 4. Extract product name/model parts, replacing spaces with hyphens
+  const productCode = cleanedName
+    ? cleanedName
+        .split(/\s+/)
+        .filter(Boolean)
+        .map((part) => part.toUpperCase())
+        .join("-")
+    : "";
+
+  // 5. Clean up each variant (trim, collapse internal spaces to hyphens, uppercase)
+  const variantCodes = variants
+    .map((v) =>
+      v
+        ? v
+            .trim()
+            .replace(/\s+/g, "-") // Convert spaces inside variants to hyphens (e.g., "Dark Blue" -> "DARK-BLUE")
+            .toUpperCase()
+        : ""
+    )
+    .filter((v): v is string => Boolean(v));
+
+  // 6. Combine all non-empty sections
+  return [brandCode, productCode, ...variantCodes]
+    .filter(Boolean)
+    .join("-");
+}
+
+// Helper to escape special regex characters in brand names (e.g., "A&B", "Brand+")
+function escapeRegExp(string: string): string {
+  return string.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
 // =========== SKU 2 USING Variant 2 =============
 
 export function generateSku2Variant3(

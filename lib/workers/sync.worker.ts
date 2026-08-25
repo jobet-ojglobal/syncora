@@ -39,6 +39,7 @@ import { inventoryStockLocationSyncService } from "../inflow/services/adjust-loc
 import { ProductOutSyncService } from "../inflow/services/out-sync-product";
 import { productInventoryOutSyncService } from "../inflow/services/out-sync-product-inventory";
 import { cloudInventorySyncService } from "../inflow/services/batch-inventory-sync.service";
+import { localVendorSyncService } from "../inflow/services/out-sync-vendors";
 
 const testService = new TestSyncService();
 const categoryService = new CategorySyncService();
@@ -324,7 +325,11 @@ const worker = new Worker<SyncWebhookJobData>(
           result = await productInventoryOutSyncService.syncNoCheckCloudSync(syncOptions, ["e4cc6c9a-9d2b-49eb-a331-361ef582fc7f"], brandCustomName);
           break;
         case "cloudsync_products":
-          result = await productOutSyncService.sync(syncOptions, brandCustomName);
+          result = await productOutSyncService.sync(syncOptions, brandCustomName, []);
+          break;
+
+        case "cloudsync_vendors":
+          result = await localVendorSyncService(syncOptions, []);
           break;
 
         // Mid Sync

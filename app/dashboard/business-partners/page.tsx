@@ -27,6 +27,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { EmptyBPartnersButton } from "@/components/partner/empty-business-partner";
+import { CloudSyncButton } from "@/components/integration/cloud-sync-button";
 
 interface BusinessPartnerRow {
   id: string;
@@ -142,10 +143,16 @@ export default function BusinessPartnerListPage() {
           />
         </div>
 
-        <EmptyBPartnersButton
-          role={roleFilter}
-          onSuccess={handleRefresh}
-        />
+        <div>
+          <EmptyBPartnersButton
+            role={roleFilter}
+            onSuccess={handleRefresh}
+          />
+          <CloudSyncButton
+            source="cloudsync_vendors" 
+            title="Sync Vendors"
+          />
+        </div>
 
         {/* Dynamic Role Filter Tabs */}
         <div className="flex bg-muted p-1 rounded-lg text-xs font-semibold shrink-0">

@@ -462,25 +462,25 @@ export const localProductServiceMap = productService.sync.bind(productService);
 //                   lastModifiedDateTime: product.lastModifiedDateTime || currentTimestamp,
 //                   timestamp: currentTimestamp,
 
-//                   purchasingUom: product.purchasingUom
-//                     ? {
-//                         name: product.purchasingUom.poUomName || "",
-//                         conversionRatio: {
-//                           standardQuantity: product.purchasingUom.poUomRatioStd || "1.0000",
-//                           uomQuantity: product.purchasingUom.poUomRatio || "1.0000",
-//                         },
-//                       }
-//                     : null,
+                  // purchasingUom: product.purchasingUom
+                  //   ? {
+                  //       name: product.purchasingUom.poUomName || "",
+                  //       conversionRatio: {
+                  //         standardQuantity: product.purchasingUom.poUomRatioStd || "1.0000",
+                  //         uomQuantity: product.purchasingUom.poUomRatio || "1.0000",
+                  //       },
+                  //     }
+                  //   : null,
 
-//                   salesUom: product.salesUom
-//                     ? {
-//                         name: product.salesUom.soUomName || "",
-//                         conversionRatio: {
-//                           standardQuantity: product.salesUom.soUomRatioStd || "1.0000",
-//                           uomQuantity: product.salesUom.soUomRatio || "1.0000",
-//                         },
-//                       }
-//                     : null,
+                  // salesUom: product.salesUom
+                  //   ? {
+                  //       name: product.salesUom.soUomName || "",
+                  //       conversionRatio: {
+                  //         standardQuantity: product.salesUom.soUomRatioStd || "1.0000",
+                  //         uomQuantity: product.salesUom.soUomRatio || "1.0000",
+                  //       },
+                  //     }
+                  //   : null,
 
 //                   customFields: {
 //                     custom1: product.customFields?.custom1 || undefined,

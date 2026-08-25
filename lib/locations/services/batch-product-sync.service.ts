@@ -5,7 +5,7 @@ import { LocalProduct } from "../types";
 import { InflowProduct } from "@/lib/inflow/types";
 import { localProductItemType } from "@/helpers/product.helper";
 import { syncProduct } from "./product-sync";
-import { generateSku2Variant2V2 } from "@/helpers/genSKU";
+import { generateSku2Variant2V2, generateSku2Variant2V2G, generateSku2Variant2V2GNoSpace } from "@/helpers/genSKU";
 import { parseBooleanFlag } from "@/helpers";
 
 type SyncOptions = {
@@ -60,8 +60,8 @@ export class ProductSyncMapService {
     const hasImage = (includes ?? []).includes("image");
     const hasCoreProductData = (includes ?? []).includes("coreData");
 
-    const BATCH_SIZE = options?.batchSize ?? (!hasImage ? 500 : 20);
-    const INTER_BATCH_DELAY = options?.delayBetweenBatchesMs ?? 10;
+    const BATCH_SIZE = options?.batchSize ?? (!hasImage ? 500 : 10);
+    const INTER_BATCH_DELAY = options?.delayBetweenBatchesMs ?? 1000;
     const CLIENT_RETRIES = 1;
 
     let totalProcessed = 0;
@@ -136,6 +136,9 @@ export class ProductSyncMapService {
 
             if (!parseBooleanFlag(product.isActive)) continue;
 
+            // temporary skip no image
+            // if (!product.image || !product.image.startsWith("data:image")) continue;
+
             const trimmedName = product.name?.trim();
             if (!trimmedName) {
               syncResults.push({
@@ -192,7 +195,16 @@ export class ProductSyncMapService {
               ]);
 
               const brandName = product.customFields?.custom7 || "";
-              const skuGenerated = generateSku2Variant2V2(brandName, trimmedName, []);
+              const skuGenerated = generateSku2Variant2V2GNoSpace(brandName, trimmedName, []);
+
+              // 1. Allowed UOM list definition
+              const ALLOWED_UOMS = ["cases", "pcs.", "ea.", "packs"] as const;
+
+              // 2. Safe normalization helper
+              const sanitizeUom = (val?: string | null): string => {
+                const clean = val?.trim().toLowerCase();
+                return ALLOWED_UOMS.includes(clean as any) ? clean! : "ea.";
+              };
 
               payload = {
                 productId: targetInflowId,
@@ -204,7 +216,28 @@ export class ProductSyncMapService {
                 isActive: parseBooleanFlag(product.isActive),
                 isManufacturable: parseBooleanFlag(product.isManufacturable),
                 includeQuantityBuildable: parseBooleanFlag(product.includeQuantityBuildable),
-                standardUomName: product.standardUomName || "ea.",
+                // Standard UOM validated against allowed list
+                standardUomName: sanitizeUom(product.standardUomName),
+                
+                purchasingUom: product.purchasingUom
+                  ? {
+                      name: sanitizeUom(product.purchasingUom.poUomName),
+                      conversionRatio: {
+                        standardQuantity: product.purchasingUom.poUomRatioStd || "1.0000",
+                        uomQuantity: product.purchasingUom.poUomRatio || "1.0000",
+                      },
+                    }
+                  : null,
+                  
+                salesUom: product.salesUom
+                  ? {
+                      name: sanitizeUom(product.salesUom.soUomName),
+                      conversionRatio: {
+                        standardQuantity: product.salesUom.soUomRatioStd || "1.0000",
+                        uomQuantity: product.salesUom.soUomRatio || "1.0000",
+                      },
+                    }
+                  : null,
                 trackExpiry: parseBooleanFlag(product.trackExpiry),
                 trackLots: parseBooleanFlag(product.trackLots),
                 trackSerials: parseBooleanFlag(product.trackSerials),
