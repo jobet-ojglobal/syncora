@@ -111,12 +111,12 @@ export default async function EditProductPage({ params }: Props) {
       name: prodData.purchasingUom.uomId || "",
       standardQuantity: Number(prodData.purchasingUom.standardQuantity),
       uomQuantity: Number(prodData.purchasingUom.uomQuantity)
-    } : null,
+    } : undefined,
     salesUom: prodData.salesUom ? {
       name: prodData.salesUom.uomId || "",
       standardQuantity: Number(prodData.salesUom.standardQuantity),
       uomQuantity: Number(prodData.salesUom.uomQuantity)
-    } : null,
+    } : undefined,
     images: prodData.images.map((img) => ({
       id: img.id,
       originalUrl: img.originalUrl ?? "",

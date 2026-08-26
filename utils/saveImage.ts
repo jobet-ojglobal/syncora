@@ -63,7 +63,7 @@ export async function saveCheckProductImage(
       .toLowerCase()
       .replace(/[^a-z0-9]/g, "-")
       .replace(/-+/g, "-");
-    const fileName = `[${productId}]-${safeName}.${fileExt}`;
+    const fileName = `${safeName}.${fileExt}`;
 
     const relativePath = `/images/products/${fileName}`;
     const absolutePath = path.join(targetDir, fileName);

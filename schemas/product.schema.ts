@@ -71,7 +71,7 @@ export const productSchema = z.object({
   originCountry: z.string().nullable().optional(),
   hsTariffNumber: z.string().nullable().optional(),
   remarks: z.string().nullable().optional(),
-  standardUomName: z.string().min(1, "Base system UOM is required"),
+  standardUomName: z.string().optional().nullable().or(z.literal("")),
 
   // 💰 Financial Costing & Pricing Elements
   initialCost: z.number("Base cost is required").min(0, "Cost basis cannot be negative"),
@@ -143,7 +143,7 @@ export const productSchema = z.object({
       smallUrl: z.union([z.literal(""), z.string().url("Must be valid asset media CDN source URL")]).nullable().optional(),
       thumbUrl: z.union([z.literal(""), z.string().url("Must be valid asset media CDN source URL")]).nullable().optional(),
     })
-  ).min(1, "At least one product image is required"),
+  ),
 });
 
 export type ProductInput = z.infer<typeof productSchema>;

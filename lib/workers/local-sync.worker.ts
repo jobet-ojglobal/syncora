@@ -129,7 +129,7 @@ const worker = new Worker<SyncWebhookJobData>(
           result = await localProductServiceMap(location, syncOptions, selectedRecords, syncedAll, after);
           break;
         case "products_local_sync":
-          result = await localProductServiceSyncMap(location, syncOptions, selectedRecords, syncedAll, "custom7", ["coreData"], after); //"prices", "bom", "coreData", "image"
+          result = await localProductServiceSyncMap(location, syncOptions, selectedRecords, syncedAll, "custom7", ["image"], after); //"prices", "bom", "coreData", "image"
           break;
         case "inventory_lines_local":
           result = await localInventoryServiceMap(location, syncOptions, after, selectedRecords, selectedLocations, syncedAll);

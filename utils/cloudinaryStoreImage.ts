@@ -11,12 +11,14 @@ export async function storeImageToCloudinary(
       return null;
     }
 
+    const shortId = productId.split("-")[0];
+
     // 2. Format safe public_id (filename in Cloudinary)
     const safeName = rawName
       .toLowerCase()
       .replace(/[^a-z0-9]/g, "-")
       .replace(/-+/g, "-");
-    const publicId = `[${productId}]-${safeName}`;
+    const publicId = `${shortId}-${safeName}`;
 
     // 3. Upload directly to Cloudinary
     const result = await cloudinary.uploader.upload(base64Data, {

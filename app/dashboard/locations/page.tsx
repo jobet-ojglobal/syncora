@@ -439,7 +439,9 @@ export default function LocationListPage() {
                         {/* Facility Name */}
                         <TableCell className="p-3.5 align-middle">
                           <div className="font-semibold text-foreground text-xs leading-tight  flex flex-wrap items-center gap-2">
-                            {location.name}
+                            <Link href={`/dashboard/locations/${location.id}`} className="hover" >
+                              {location.name}
+                            </Link>
 
                              {location.isDefault && (
                             <Badge variant="secondary" className="bg-indigo-50 dark:bg-indigo-950/40 border-indigo-200 dark:border-indigo-900 text-indigo-700 dark:text-indigo-400 text-[10px] font-semibold h-5">

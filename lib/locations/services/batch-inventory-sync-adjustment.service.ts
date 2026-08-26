@@ -68,7 +68,7 @@ export function mapToInflowStockAdjustInput(
         quantity: {
           standardQuantity: qtyDelta > 0 ? `+${qtyDelta}` : String(qtyDelta),
           uomQuantity: qtyDelta > 0 ? `+${qtyDelta}` : String(qtyDelta),
-          uom: "ea.",
+          uom: "",
           serialNumbers: createdLine.serials || [],
         },
         description: createdLine.description,

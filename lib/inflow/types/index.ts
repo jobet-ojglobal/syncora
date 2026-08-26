@@ -132,8 +132,8 @@ export interface InflowProduct {
   lastModifiedById: string | null;
   lastModifiedDateTime?: string;
   
-  purchasingUom: InflowPurchasingUom | null;
-  salesUom: InflowSalesUom | null;
+  purchasingUom?: InflowPurchasingUom | null;
+  salesUom?: InflowSalesUom | null;
   customFields: InflowCustomFields;
 
 

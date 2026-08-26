@@ -90,8 +90,8 @@ export async function DELETE(request: NextRequest) {
     }
 
     // 🛡️ Preflight integrity checking rule check inside database fields before running drops
-    const boundProductCount = await prisma.productUom.count({ where: { uomId: id } });
-    const boundSalesProductCount = await prisma.productSalesUom.count({ where: { uomId: id } });
+    const boundProductCount = await prisma.purchasingUom.count({ where: { uomId: id } });
+    const boundSalesProductCount = await prisma.purchasingUom.count({ where: { uomId: id } });
 
     if (boundProductCount > 0 || boundSalesProductCount > 0) {
       return NextResponse.json(

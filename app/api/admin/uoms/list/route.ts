@@ -16,8 +16,8 @@ export async function GET() {
         },
         _count: {
           select: {
-            productUoms: true,
-            productSalesUoms: true
+            purchasingUoms: true,
+            salesUoms: true
           }
         }
       },
@@ -34,7 +34,7 @@ export async function GET() {
       category: u.category,
       baseFactor: Number(u.baseFactor),
       isActive: u.isActive,
-      dependentProductsCount: u._count.productUoms + u._count.productSalesUoms,
+      dependentProductsCount: u._count.purchasingUoms + u._count.salesUoms,
       explicitConversions: u.fromConversions.map(c => ({
         factor: Number(c.factor),
         targetCode: c.toUom.code,
