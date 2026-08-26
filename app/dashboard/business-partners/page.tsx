@@ -204,6 +204,9 @@ export default function BusinessPartnerListPage() {
                   <TableHead className="w-[190px] text-right text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
                     Outstanding Balance
                   </TableHead>
+                   <TableHead className="w-[190px] text-right text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                    Catalogs
+                  </TableHead>
                   <TableHead className="w-[100px] text-center text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
                     Status
                   </TableHead>
@@ -282,6 +285,15 @@ export default function BusinessPartnerListPage() {
                         <div className="inline-flex items-center gap-1.5 font-mono text-[10px] font-medium text-muted-foreground bg-amber-500/5 border border-amber-200/50 dark:border-amber-900/30 rounded-md px-2 py-0.5 w-full justify-center">
                           <Landmark className="w-3 h-3 text-amber-500" />
                           <span>{partner.vendor.purchaseOrdersCount} PO</span>
+                        </div>
+                      )}
+                    </TableCell>
+
+                    <TableCell className="p-3.5 align-top text-center space-y-1">
+                      {partner.vendor && (
+                        <div className="inline-flex items-center gap-1.5 font-mono text-[10px] font-medium text-muted-foreground bg-amber-500/5 border border-amber-200/50 dark:border-amber-900/30 rounded-md px-2 py-0.5 w-full justify-center">
+                          <Landmark className="w-3 h-3 text-amber-500" />
+                          <span>{partner.vendor.catalogItemsCount} Catalogs</span>
                         </div>
                       )}
                     </TableCell>

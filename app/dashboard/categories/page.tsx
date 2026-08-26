@@ -33,6 +33,7 @@ import {
 } from "@/components/ui/select";
 import { DeleteButton } from "@/components/shared/delete-button";
 import PageHeader from "@/components/layout/dashboard/PageHeader";
+import { ExportCategoryCsvButton } from "@/components/category/export-button";
 
 interface CategoryTreeItem {
   id: string;
@@ -321,6 +322,7 @@ export default function CategoriesListPage() {
         title="Product Categories"
         description="Manage taxonomy groupings, track counts, and review catalog structures."
       >
+        <ExportCategoryCsvButton />
         <Button asChild size="sm" className="gap-1.5 shrink-0">
           <Link href="/dashboard/categories/create">
             <Plus className="w-4 h-4" /> Add Category

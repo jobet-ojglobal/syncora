@@ -1,126 +1,8 @@
 import { prisma } from "@/lib/prisma";
 import { getLocalBatchProducts } from "../data/product-local";
 import { LocalProduct } from "../types";
-import { InflowCustomFields, InflowProduct } from "@/lib/inflow/types";
-import { Prisma } from "@/generated/prisma/client";
 import { SyncOptions } from "@/lib/workers/types";
 import { parseBooleanFlag } from "@/helpers";
-
-type LocalProductWithRelations = Prisma.ProductGetPayload<{
-  include: {
-    brand: true;
-    category: true;
-    prices: true;
-    salesUom: { 
-      include: { uom: true }
-    };
-    purchasingUom:  { 
-      include: { uom: true }
-    };
-  };
-}>;
-
-/**
- * Core Payload Transformer
- * Converts a raw local product record (with Prisma relations) to the structured InflowProduct payload.
- * Map bin sublocation linkedLocationId to inventoryLines.locationId.
- */
-export async function mapLocalToInflowPayload(
-  product: LocalProductWithRelations,
-  brandCustomName?: string,
-  currentTimestamp: string = new Date().toISOString(),
-  lastModifiedById: string = "8ff3e71d-eb02-425d-8e0f-00a69fc8e482",
-): Promise<InflowProduct & { isCloudSynced: boolean }> {
-  const trimmedName = product.name?.trim() || "";
-
-  // 1. Build Custom Fields (Brand dynamics)
-  const existingCustomFields = (product.customFields as Record<string, string>) || {};
-  const customFields: InflowCustomFields = { ...existingCustomFields };
-
-  const brandName = product.brand?.name;
-  if (brandName) {
-    if (brandCustomName) {
-      customFields[brandCustomName as keyof InflowCustomFields] = brandName;
-    } else {
-      customFields.custom7 = brandName;
-    }
-  }
-
-  let setCategoryId: string | null = product.categoryId;
-
-  if (!product.categoryId) {
-    const defaultCategory = await prisma.category.findFirst({
-      where: { isDefault: true },
-    });
-    setCategoryId = defaultCategory?.inflowId || null;
-  }
-
-  // 3. Map final payload
-  return {
-    productId: product.inflowId,
-    isCloudSynced: product.isCloudSynced,
-    sku: product.sku,
-    name: trimmedName,
-    description: product.description,
-    itemType: product.itemType || "stockedProduct",
-    autoAssemble: product.autoAssemble,
-    isActive: product.isActive,
-    isManufacturable: product.isManufacturable,
-    includeQuantityBuildable: product.includeQuantityBuildable,
-    standardUomName: product.standardUomName,
-
-    trackExpiry: product.trackExpiry,
-    trackLots: product.trackLots,
-    trackSerials: product.trackSerials,
-
-    shelfLifeDays: product.shelfLifeDays,
-    sellBeforeExpiryDays: product.sellBeforeExpiryDays,
-    expiryNotificationDays: product.expiryNotificationDays,
-
-    weight: product.weight?.toString() || null,
-    width: product.width?.toString() || null,
-    height: product.height?.toString() || null,
-    length: product.length?.toString() || null,
-
-    originCountry: product.originCountry,
-    hsTariffNumber: product.hsTariffNumber,
-    remarks: product.remarks,
-    categoryId: setCategoryId,
-    lastVendorId: product.lastVendorId,
-    lastModifiedById,
-    createdDttm: product.createdAt.toISOString(),
-    lastModifiedDateTime: product.updatedAt.toISOString(),
-    purchasingUom: product.purchasingUom?.uom.name
-      ? {
-          name: product.purchasingUom.uom.name || "",
-          conversionRatio: {
-            standardQuantity: String(product.purchasingUom.standardQuantity) || "1.0000",
-            uomQuantity: String(product.purchasingUom.uomQuantity) || "1.0000",
-          },
-        }
-      : null,
-    salesUom: product.salesUom?.uom.name
-      ? {
-          name: product.salesUom.uom.name || "",
-          conversionRatio: {
-            standardQuantity: String(product.salesUom.standardQuantity) || "1.0000",
-            uomQuantity: String(product.salesUom.uomQuantity) || "1.0000",
-          },
-        }
-      : null,
-    customFields,
-    images: [],
-    inventoryLines: [],
-    prices: product.prices.map((p) => ({
-      productPriceId: p.inflowId,
-      pricingSchemeId: p.pricingSchemeId,
-      productId: p.productId,
-      priceType: p.priceType,
-      unitPrice: p.unitPrice?.toString() || "0",
-      fixedMarkup: p.fixedMarkup?.toString() || "0",
-    })),
-  };
-}
 
 export class ProductSyncMapService {
 <<<<<<< HEAD
@@ -220,7 +102,6 @@ export class ProductSyncMapService {
         BATCH_SIZE,
         after,
         [],
-        CLIENT_RETRIES
       );
 
 <<<<<<< HEAD

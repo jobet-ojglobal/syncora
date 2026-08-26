@@ -30,10 +30,9 @@ export async function getLocalBatchInventory(
 
 export async function getLocalBatchProducts(
   url: string,
-  count = 30,
+  count = 20,
   after?: string,
   includes: string[] = [],
-  retries: number =  5,
 ) {
   // 1. Specify base relation includes here if needed
   const baseIncludes: string[] = [];

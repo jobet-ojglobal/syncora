@@ -322,7 +322,7 @@ const worker = new Worker<SyncWebhookJobData>(
           result = await inventoryCloudSyncService.sync(syncOptions, selectedLocations[0], selectedRecords);
           break;
         case "cloudsync_product_inventory":
-          result = await productInventoryOutSyncService.syncNoCheckCloudSync(syncOptions, ["e4cc6c9a-9d2b-49eb-a331-361ef582fc7f"], brandCustomName);
+          result = await productInventoryOutSyncService.syncNoCheckCloudSync(syncOptions, [], brandCustomName);
           break;
         case "cloudsync_products":
           result = await productOutSyncService.sync(syncOptions, brandCustomName, []);

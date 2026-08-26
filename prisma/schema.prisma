@@ -342,11 +342,11 @@ model Product {
   brand             Brand? @relation(fields: [brandId], references: [id])
   categoryId        String?
   category          Category? @relation(fields: [categoryId], references: [inflowId], onUpdate: Cascade)
-  lastModifiedBy    TeamMember? @relation(fields: [lastModifiedById], references: [inflowId])
+  lastModifiedBy    TeamMember? @relation(fields: [lastModifiedById], references: [inflowId], onDelete: SetNull)
   lastVendor        Vendor? @relation(fields: [lastVendorId], references: [inflowId])
 
-  purchasingUom         ProductUom?
-  salesUom              ProductSalesUom?
+  purchasingUom         PurchasingUom?
+  salesUom              SalesUom?
   cost                  ProductCost?
   variant               ProductVariant?
 
@@ -644,7 +644,7 @@ model ProductAttachment {
   lastModifiedById String?
 
   product          Product     @relation(fields: [productId], references: [inflowId], onDelete: Cascade)
-  lastModifiedBy   TeamMember? @relation(fields: [lastModifiedById], references: [inflowId])
+  lastModifiedBy   TeamMember? @relation(fields: [lastModifiedById], references: [inflowId], onDelete: SetNull)
 
   localMappings      ProductAttachmentLocationMap[]
 
@@ -815,28 +815,28 @@ model ProductBomLocationMap {
 
 // =========================
 
-model ProductUom {
+model PurchasingUom {
   id               String @id @default(cuid())
   productId        String @unique
   uomId            String
   standardQuantity Decimal @db.Decimal(18,4)
   uomQuantity      Decimal @db.Decimal(18,4)
   product          Product @relation(fields: [productId], references: [inflowId], onDelete: Cascade)
-  uom              UnitOfMeasure @relation(fields: [uomId], references: [id])
+  uom              UnitOfMeasure @relation(fields: [uomId], references: [id], onDelete: Cascade)
 
-  @@map("product_uom")
+  @@map("purchasing_uom")
 }
 
-model ProductSalesUom {
+model SalesUom {
   id               String @id @default(cuid())
   productId        String @unique
   uomId            String
   standardQuantity Decimal @db.Decimal(18,4)
   uomQuantity      Decimal @db.Decimal(18,4)
   product          Product @relation(fields: [productId], references: [inflowId], onDelete: Cascade)
-  uom              UnitOfMeasure @relation(fields: [uomId], references: [id])
+  uom              UnitOfMeasure @relation(fields: [uomId], references: [id], onDelete: Cascade)
 
-  @@map("product_sales_uom")
+  @@map("sales_uom")
 }
 
 model UnitOfMeasure {
@@ -848,8 +848,8 @@ model UnitOfMeasure {
   isActive   Boolean @default(true)
   fromConversions UnitConversion[] @relation("FromUnit")
   toConversions   UnitConversion[] @relation("ToUnit")
-  productSalesUoms ProductSalesUom[]
-  productUoms      ProductUom[]
+  salesUoms       SalesUom[]
+  purchasingUoms  PurchasingUom[]
 
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
@@ -1405,10 +1405,10 @@ model InventoryAdjustment {
   remarks               String?
 
   performedById     String
-  performedBy       TeamMember?               @relation("PerformedAdjustment", fields: [performedById], references: [inflowId])
+  performedBy       TeamMember?               @relation("PerformedAdjustment", fields: [performedById], references: [inflowId], onDelete: Cascade)
 
   lastModifiedById     String?
-  lastModifiedBy       TeamMember?            @relation("ModifiedAdjustment", fields: [lastModifiedById], references: [inflowId])
+  lastModifiedBy       TeamMember?            @relation("ModifiedAdjustment", fields: [lastModifiedById], references: [inflowId], onDelete: SetNull)
 
   adjustmentReason  AdjustmentReason?         @relation(fields: [adjustmentReasonId], references: [inflowId])
 
@@ -1682,7 +1682,7 @@ model StockAdjustment {
 
   adjustmentReason       AdjustmentReason? @relation(fields: [adjustmentReasonId], references: [inflowId])
   location               Location          @relation(fields: [locationId], references: [inflowId], onDelete: Cascade)
-  lastModifiedBy         TeamMember?             @relation(fields: [lastModifiedById], references: [inflowId])
+  lastModifiedBy         TeamMember?             @relation(fields: [lastModifiedById], references: [inflowId], onDelete: SetNull)
   lines                  StockAdjustmentLine[]
   attachments            StockAdjustmentAttachment[]
 
@@ -1733,7 +1733,7 @@ model StockAdjustmentAttachment {
   lastModifiedDate      DateTime?
   lastModifiedById      String?
   stockAdjustment       StockAdjustment @relation(fields: [stockAdjustmentId], references: [id], onDelete: Cascade)
-  lastModifiedBy        TeamMember? @relation(fields: [lastModifiedById], references: [inflowId])
+  lastModifiedBy        TeamMember? @relation(fields: [lastModifiedById], references: [inflowId], onDelete: SetNull)
 
   @@index([stockAdjustmentId])
 }
@@ -2059,7 +2059,7 @@ model Customer {
   pricingScheme PricingScheme? @relation(fields: [pricingSchemeId], references: [inflowId])
   taxingScheme TaxingScheme? @relation(fields: [taxingSchemeId], references: [inflowId])
   defaultSalesRep TeamMember? @relation("CustomerSalesRep", fields: [defaultSalesRepTeamMemberId], references: [inflowId])
-  lastModifiedBy TeamMember? @relation("CustomerLastModifiedBy", fields: [lastModifiedById], references: [inflowId])
+  lastModifiedBy TeamMember? @relation("CustomerLastModifiedBy", fields: [lastModifiedById], references: [inflowId], onDelete: SetNull)
 
   defaultBillingAddress BusinessPartnerAddress? @relation("CustomerBillingAddress",fields: [defaultBillingAddressId], references: [inflowId])
   defaultShippingAddress BusinessPartnerAddress? @relation("CustomerShippingAddress",fields: [defaultShippingAddressId], references: [inflowId])
@@ -2778,13 +2778,13 @@ model SalesOrder {
   location               Location? @relation(fields: [locationId], references: [inflowId], onDelete: SetNull)
   
   assignedToTeamMemberId String?
-  assignedToTeamMember   TeamMember? @relation("AssignedOrders", fields: [assignedToTeamMemberId], references: [inflowId])
+  assignedToTeamMember   TeamMember? @relation("AssignedOrders", fields: [assignedToTeamMemberId], references: [inflowId], onDelete: SetNull)
   
   confirmerTeamMemberId  String?
-  confirmerTeamMember    TeamMember? @relation("ConfirmedOrders", fields: [confirmerTeamMemberId], references: [inflowId])
+  confirmerTeamMember    TeamMember? @relation("ConfirmedOrders", fields: [confirmerTeamMemberId], references: [inflowId], onDelete: SetNull)
   
   salesRepTeamMemberId   String?
-  salesRepTeamMember     TeamMember? @relation("SalesRepOrders", fields: [salesRepTeamMemberId], references: [inflowId])
+  salesRepTeamMember     TeamMember? @relation("SalesRepOrders", fields: [salesRepTeamMemberId], references: [inflowId], onDelete: SetNull)
   salesRep               String?
 
   paymentTermsId         String?
@@ -3129,10 +3129,10 @@ model PurchaseOrder {
   location               Location? @relation(fields: [locationId], references: [inflowId], onDelete: SetNull)
 
   assignedToTeamMemberId String?
-  assignedToTeamMember   TeamMember? @relation("POAssignedOrders", fields: [assignedToTeamMemberId], references: [inflowId])
+  assignedToTeamMember   TeamMember? @relation("POAssignedOrders", fields: [assignedToTeamMemberId], references: [inflowId], onDelete: SetNull)
   
   approverTeamMemberId   String?
-  approverTeamMember     TeamMember? @relation("POApprovedOrders", fields: [approverTeamMemberId], references: [inflowId])
+  approverTeamMember     TeamMember? @relation("POApprovedOrders", fields: [approverTeamMemberId], references: [inflowId], onDelete: SetNull)
 
   lastModifiedById       String?
   currencyId             String?

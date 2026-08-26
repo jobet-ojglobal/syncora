@@ -750,7 +750,7 @@ export function SyncButtonOptionsPreview({ locationId, source, title, isDisabled
           <div className="space-y-1">
             <div className="flex justify-between text-xs text-muted-foreground">
               <span>{title} Sync Progress</span>
-              <span>{Math.round(progress)}%</span>
+              <span>{Math.round(progress)}</span>
             </div>
             <Progress value={progress} className="h-2" />
           </div>

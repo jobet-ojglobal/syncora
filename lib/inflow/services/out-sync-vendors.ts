@@ -34,11 +34,11 @@ export function mapLocalVendorToInflowPayload(
     fax: vendor.businessPartner?.fax || null,
     isActive: vendor.businessPartner?.isActive ?? true,
     isTaxInclusivePricing: vendor.isTaxInclusivePricing ?? false,
-    lastModifiedById: modifiedById || vendor.lastModifiedById || null,
+    lastModifiedById: "8ff3e71d-eb02-425d-8e0f-00a69fc8e482", // modifiedById || vendor.lastModifiedById || null,
     leadTimeDays: vendor.leadTimeDays || null,
     phone: vendor.businessPartner?.phone || null,
     remarks: vendor.businessPartner?.remarks || null,
-    taxingSchemeId: vendor.taxingSchemeId || null,
+    taxingSchemeId: "c6ee7beb-b629-441c-bfa0-761929afa46e", // vendor.taxingSchemeId || null,
     website: vendor.businessPartner?.website || null,
   };
 }
@@ -64,7 +64,7 @@ export class VendorOutSyncService {
   ): Promise<LocalVendorWithRelations[]> {
     const whereClause: Prisma.VendorWhereInput = {
       deletedAt: null,
-      isCloudSynced: false,
+      // isCloudSynced: false,
       businessPartner: {
         isActive: true,
       },

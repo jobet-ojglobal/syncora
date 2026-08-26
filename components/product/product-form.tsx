@@ -33,7 +33,9 @@ import {
   X,
   Key,
   Search,
-  Sparkles
+  Sparkles,
+  MinusCircle,
+  PlusCircle
 } from "lucide-react";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
@@ -153,6 +155,12 @@ export function ProductForm({  brands, uoms, groups: productGroups, pricingSchem
   // Place inside your component:
   const [expandedIndex, setExpandedIndex] = useState<number | null>(null);
   const [tagInput, setTagInput] = useState("");
+  const [showPurchasingUom, setShowPurchasingUom] = useState(
+    !!initialData?.purchasingUom?.name
+  );
+  const [showSalesUom, setShowSalesUom] = useState(
+    !!initialData?.salesUom?.name
+  );
 
   const toggleExpand = (idx: number) => {
     setExpandedIndex(expandedIndex === idx ? null : idx);
@@ -252,16 +260,16 @@ export function ProductForm({  brands, uoms, groups: productGroups, pricingSchem
       hsTariffNumber: initialData?.hsTariffNumber || "",
       remarks: initialData?.remarks || "",
       standardUomName: initialData?.standardUomName || "", 
-      purchasingUom: {
+      purchasingUom: initialData?.purchasingUom ? {
         name: initialData?.purchasingUom?.name || "",
         standardQuantity: initialData?.purchasingUom?.standardQuantity ? Number(initialData.purchasingUom.standardQuantity) : 1,
         uomQuantity: initialData?.purchasingUom?.uomQuantity ? Number(initialData.purchasingUom.uomQuantity) : 1,
-      },
-      salesUom: {
+      } : undefined,
+      salesUom: initialData?.salesUom ? {
         name: initialData?.salesUom?.name || "",
         standardQuantity: initialData?.salesUom?.standardQuantity ? Number(initialData.salesUom.standardQuantity) : 1,
         uomQuantity: initialData?.salesUom?.uomQuantity ? Number(initialData.salesUom.uomQuantity) : 1,
-      },
+      } : undefined,
       barcodes: initialData?.barcodes?.map((b: any) => ({ id: b.id, barcode: b.barcode })) || [],
       images: initialData?.images?.map((img: any) => ({ 
         id: img.id, 
@@ -310,7 +318,6 @@ export function ProductForm({  brands, uoms, groups: productGroups, pricingSchem
     setValue("tags", watchedTags.filter(t => t !== tagToRemove));
   };
   
-  
   // Watch the matrix relationship variables
   const watchedGroupId = useWatch({ control, name: "productGroupId" });
   const watchedVariantSignature = useWatch({ control, name: "variantSignature" });
@@ -321,8 +328,6 @@ export function ProductForm({  brands, uoms, groups: productGroups, pricingSchem
     if (!watchedGroupId || !productGroups) return null;
     return productGroups.find(g => g.inflowId === watchedGroupId);
   }, [watchedGroupId, productGroups]);
-
-  
 
   const computedVariantSlotsFromOptions = useMemo(() => {
     if (!selectedGroupDetails || !selectedGroupDetails.options || selectedGroupDetails.options.length === 0) {
@@ -453,6 +458,20 @@ export function ProductForm({  brands, uoms, groups: productGroups, pricingSchem
       shouldDirty: true,
     });
   };
+
+  const handleTogglePurchasingUom = () => {
+    if (showPurchasingUom) {
+      setValue("purchasingUom", undefined, { shouldDirty: true });
+    }
+    setShowPurchasingUom(!showPurchasingUom);
+  };
+
+  const handleToggleSalesUom = () => {
+    if (showSalesUom) {
+      setValue("salesUom", undefined, { shouldDirty: true });
+    }
+    setShowSalesUom(!showSalesUom);
+  };
   
 
   const variantOptions: SelectOption[] = React.useMemo(() => {
@@ -470,8 +489,15 @@ export function ProductForm({  brands, uoms, groups: productGroups, pricingSchem
   }, [selectedGroupDetails, computedVariantSlotsFromOptions, form]);
 
   const onSubmit = async (values: ProductInput) => {
-
-    console.log("Submitting values:", values);
+    if (!values.standardUomName) {
+      values.standardUomName = undefined;
+    }
+    if (!values.purchasingUom?.name) {
+      values.purchasingUom = undefined;
+    }
+    if (!values.salesUom?.name) {
+      values.salesUom = undefined;
+    }
 
     if(values.itemType !== "StockedProduct") {
       values.trackExpiry = false;
@@ -551,7 +577,7 @@ export function ProductForm({  brands, uoms, groups: productGroups, pricingSchem
                     type="button"
                     variant="ghost"
                     size="sm"
-                    className="h-6 px-2 text-xs text-primary hover:text-primary/80 flex items-center gap-1"
+                    className="h-4 px-2 text-xs text-primary hover:text-primary/80 flex items-center gap-1"
                     onClick={handleGenerateSKU}
                     disabled={!watchedName?.trim()}
                     title="Auto-generate SKU based on Brand and Product Name"
@@ -561,7 +587,7 @@ export function ProductForm({  brands, uoms, groups: productGroups, pricingSchem
                   </Button>
                 </div>
 
-                <div className="relative flex items-center mt-1">
+                <div className="relative flex items-center">
                   <Input
                     {...field}
                     placeholder="e.g. WEIFENG-WT-5601"
@@ -576,28 +602,23 @@ export function ProductForm({  brands, uoms, groups: productGroups, pricingSchem
               </Field>
             )}
           />
-          {/* <Controller 
-            control={control} 
-            name="sku"
-            render={({ field, fieldState }) => (
-              <Field className="md:col-span-1">
-                <FieldLabel htmlFor="form-sku">
-                  SKU / Custom Identity <b className="text-red-500">*</b>
-                </FieldLabel>
-                <Input
-                  {...field}
-                  placeholder="PROD-CHAIR-001"
-                  id="form-sku"
-                  aria-invalid={fieldState.invalid}
-                />
-                {fieldState.invalid && <FieldError className="text-xs" errors={[fieldState.error]} />}
-              </Field>
-            )}
-          /> */}
-
         </FieldSet>
 
-        <FieldSet className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <FieldSet className={cn("grid grid-cols-1 gap-4 ", isEditMode ? "md:grid-cols-2" : "md:grid-cols-3" )}>
+          { !isEditMode && (
+          <FormSelect
+            name="itemType"
+            control={control}
+            label="Item Classification Type"
+            placeholder="-- Select Item Type --"
+            options={[
+              { id: "StockedProduct", name: "Stock Product" },
+              { id: "NonstockedProduct", name: "Non-Stock Product" },
+              { id: "Service", name: "Service" },
+            ]}
+            emptyMessage="No item type available"
+          />
+          )}
           <Field className="md:col-span-1">
             <FieldLabel>Brand</FieldLabel>
             <Controller
@@ -617,19 +638,7 @@ export function ProductForm({  brands, uoms, groups: productGroups, pricingSchem
             />
           </Field>
 
-          <FormSelect
-            name="standardUomName"
-            control={control}
-            label="Base System UOM"
-            placeholder="-- Select UOM --"
-            options={uoms.map((item) => ({
-              id: item.code,
-              name: `${item.name} (${item.code})`,
-            }))}
-            required
-            emptyMessage="No base unit available"
-            classNameLabel="text-muted-foreground font-semibold"
-          />
+          
 
         </FieldSet>
 
@@ -662,11 +671,6 @@ export function ProductForm({  brands, uoms, groups: productGroups, pricingSchem
         
         {/* Left Column */}
         <div className="space-y-6">
-          {/* <ProductProfileForm /> */}
-
-          {/* Core Profile */}
-          
-
           {/* Matrix Relationship Binding Section */}
           <div className="bg-card border rounded-xl p-5 space-y-4 shadow-xs">
             <div className="space-y-0.5 flex items-center justify-between border-b pb-2">
@@ -774,38 +778,18 @@ export function ProductForm({  brands, uoms, groups: productGroups, pricingSchem
             </FieldSet>
 
           </div>
-
+          
           {/* Operational Flow Settings */}
-          <div className="bg-card border rounded-xl p-5 space-y-4 shadow-xs">
-            <div className="space-y-0.5 border-b pb-2">
-              <FieldLegend className="flex items-center gap-2 text-sm font-semibold ">
-                <Settings className="w-4 h-4 text-primary" /> 
-                Operational Configurations & Strategy
-              </FieldLegend>
-            </div>
-
-            <FieldSet className="grid grid-cols-1 md:grid-cols-3 gap-6 ">
-              <Controller
-                control={control}
-                name="itemType"
-                render={({ field, fieldState }) => (
-                  <Field className="col-span-1">
-                    <FieldLabel>Item Classification Type</FieldLabel>
-                    <Select onValueChange={field.onChange} value={field.value ?? ""}>
-                      <SelectTrigger className="w-full">
-                        <SelectValue placeholder="Select Item Type" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="StockedProduct">Stock Product</SelectItem>
-                        <SelectItem value="NonstockedProduct">Non-Stock Product</SelectItem>
-                        <SelectItem value="Service">Service</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    {fieldState.error && <FieldError>{fieldState.error.message}</FieldError>}
-                  </Field>
-                )}
-              />
-
+          <Card className="shadow-xs">
+            <CardHeader className="border-b">
+              <CardTitle className="text-sm font-semibold flex items-center justify-between">
+                <div className="flex items-center gap-1.5">
+                  <Settings className="w-4 h-4 text-primary" />
+                  Operational Configurations & Strategy
+                </div>
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="pt-4">
               <div className="md:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-4 bg-muted/10 p-4 border rounded-xl">
                 <div className="flex items-center justify-between gap-4">
                   <FieldLabel className="mb-0 text-xs font-semibold">Catalog Visibility Active</FieldLabel>
@@ -824,9 +808,8 @@ export function ProductForm({  brands, uoms, groups: productGroups, pricingSchem
                   <Controller control={control} name="includeQuantityBuildable" render={({ field }) => <Switch checked={field.value} onCheckedChange={field.onChange} />} />
                 </div>
               </div>
-            </FieldSet>
-
-          </div>
+            </CardContent>
+          </Card>
 
           {/* Traceability Control Flags */}
           { watchedItemType === "StockedProduct" && (
@@ -913,242 +896,154 @@ export function ProductForm({  brands, uoms, groups: productGroups, pricingSchem
               </Field>
             </div>
           </div>
-
           
 
           {/* Operational Multi-tier */}
-          <div className="bg-card border rounded-xl p-5 space-y-4 shadow-xs">
-            <div className="space-y-0.5 flex items-center justify-between  border-b pb-2">
-              <FieldLegend className="flex items-center gap-2 text-sm font-semibold">
-                <Link2 className="w-4 h-4 text-primary" /> 
-                Operational Multi-tier UOM Calculations
-              </FieldLegend>
-            </div>
-
-            {/* Purchasing Mapping Block */}
-            <div className="p-4 bg-muted/20 border rounded-xl space-y-3">
-              <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-                Inbound Supply / Purchasing Conversion
-              </h4>
+          <Card className="shadow-xs">
+            <CardHeader className="border-b">
+              <CardTitle className="text-sm font-semibold flex items-center justify-between">
+                <div className="flex items-center gap-1.5">
+                  <Link2 className="w-4 h-4 text-primary" />
+                  Operational Multi-tier UOM Calculations
+                </div>
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4 pt-4">
+              {/* Base System UOM */}
               <FormSelect
-                name="purchasingUom.name"
+                name="standardUomName"
                 control={control}
                 label="Base System UOM"
-                placeholder="-- Select UOM --"
+                placeholder="-- Select UOM (Optional) --"
                 options={uoms.map((item) => ({
-                  id: item.id,
+                  id: item.code,
                   name: `${item.name} (${item.code})`,
                 }))}
-                required
                 emptyMessage="No base unit available"
-                classNameLabel="text-muted-foreground font-semibold"
               />
-              {/* <Controller
-                name="purchasingUom.name"
-                control={control}
-                render={({ field, fieldState }) => (
-                  <Field data-invalid={fieldState.invalid}>
-                    <FieldLabel htmlFor="form-inbound-uom">
-                      Inbound UOM Unit Tag <b className="text-red-500">*</b>
-                    </FieldLabel>
-                    <FieldContent className="relative">
-                      <Select
-                        name={field.name}
-                        value={field.value ?? ""}
-                        onValueChange={(val) => field.onChange(val === "null" ? "" : val)} 
-                      >
-                        <SelectTrigger
-                          id="form-inbound-uom"
-                          aria-invalid={fieldState.invalid}
-                          className="w-full"
-                        >
-                          <SelectValue placeholder="Select Inbound Unit" />
-                        </SelectTrigger>
-                        <SelectContent position="item-aligned">
-                          { uoms.length > 0 ? (
-                            uoms.map((u) => (
-                            <SelectItem key={u.id} value={u.code}>{u.name} ({u.code})</SelectItem>
-                          ))) : (
-                            <SelectItem value="null">No unit of measure available</SelectItem>
-                          )}
-                        </SelectContent>
-                      </Select>
-                    </FieldContent>
-                    {fieldState.invalid && (
-                      <FieldError errors={[fieldState.error]} />
-                    )}
-                  </Field>
-                )}
-              /> */}
-             
-              <div className="grid grid-cols-2 gap-2">
-                <Controller 
-                  control={control} 
-                  name="purchasingUom.standardQuantity"
-                  render={({ field, fieldState }) => (
-                    <Field>
-                      <FieldLabel htmlFor="form-inbound-standqty">
-                        Standard Base Qty
-                      </FieldLabel>
-                        <Input
-                        // Extract value and onChange to control them explicitly
-                        value={field.value}
-                        onBlur={field.onBlur}
-                        ref={field.ref}
-                        onChange={(e) => {
-                          const val = e.target.value;
-                          field.onChange(val === "" ? "" : Number(val));
-                        }}
-                        id="form-inbound-standqty"
-                        type="number" 
-                        step="0.0001" 
-                        aria-invalid={fieldState.invalid}
-                      />
-                      {fieldState.invalid && <FieldError className="text-xs" errors={[fieldState.error]} />}
-                    </Field>
-                  )}
-                />
-                <Controller 
-                  control={control} 
-                  name="purchasingUom.uomQuantity"
-                  render={({ field, fieldState }) => (
-                    <Field>
-                      <FieldLabel htmlFor="form-inbound-packqty">
-                        Equal to Pack Volume
-                      </FieldLabel>
-                        <Input
-                        // Extract value and onChange to control them explicitly
-                        value={field.value}
-                        onBlur={field.onBlur}
-                        ref={field.ref}
-                        onChange={(e) => {
-                          const val = e.target.value;
-                          field.onChange(val === "" ? "" : Number(val));
-                        }}
-                        id="form-inbound-packqty"
-                        type="number" 
-                        step="0.0001" 
-                        aria-invalid={fieldState.invalid}
-                      />
-                      {fieldState.invalid && <FieldError className="text-xs" errors={[fieldState.error]} />}
-                    </Field>
-                  )}
-                />
-              </div>
-            </div>
 
-            {/* Sales Conversion Mapping Block */}
-            <div className="p-4 bg-muted/20 border rounded-xl space-y-3">
-              <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-                Outbound / Sales Channels Conversion
-              </h4>
-              <FormSelect
-                name="salesUom.name"
-                control={control}
-                label="Base System UOM"
-                placeholder="-- Select UOM --"
-                options={uoms.map((item) => ({
-                  id: item.id,
-                  name: `${item.name} (${item.code})`,
-                }))}
-                required
-                emptyMessage="No base unit available"
-                classNameLabel="text-muted-foreground font-semibold"
-              />
-              {/* <Controller
-                name="salesUom.name"
-                control={control}
-                render={({ field, fieldState }) => (
-                  <Field data-invalid={fieldState.invalid}>
-                    <FieldLabel htmlFor="form-outbound-uom">
-                      Outbound UOM Unit Tag <b className="text-red-500">*</b>
-                    </FieldLabel>
-                    <FieldContent className="relative">
-                      <Select
-                        name={field.name}
-                        value={field.value ?? ""}
-                        onValueChange={(val) => field.onChange(val === "null" ? "" : val)} 
-                      >
-                        <SelectTrigger
-                          id="form-outbound-uom"
-                          aria-invalid={fieldState.invalid}
-                          className="w-full"
-                        >
-                          <SelectValue placeholder="Select Outbound Unit" />
-                        </SelectTrigger>
-                        <SelectContent position="item-aligned">
-                          { uoms.length > 0 ? (
-                            uoms.map((u) => (
-                            <SelectItem key={u.id} value={u.code}>{u.name} ({u.code})</SelectItem>
-                          ))) : (
-                            <SelectItem value="null">No unit of measure available</SelectItem>
-                          )}
-                        </SelectContent>
-                      </Select>
-                    </FieldContent>
-                    {fieldState.invalid && (
-                      <FieldError errors={[fieldState.error]} />
-                    )}
-                  </Field>
-                )}
-              /> */}
-             
-              <div className="grid grid-cols-2 gap-2">
-                <Controller 
-                  control={control} 
-                  name="salesUom.standardQuantity"
-                  render={({ field, fieldState }) => (
-                    <Field>
-                      <FieldLabel htmlFor="form-outbound-standqty">
-                        Standard Base Qty
-                      </FieldLabel>
-                        <Input
-                        // Extract value and onChange to control them explicitly
-                        value={field.value}
-                        onBlur={field.onBlur}
-                        ref={field.ref}
-                        onChange={(e) => {
-                          const val = e.target.value;
-                          field.onChange(val === "" ? "" : Number(val));
-                        }}
-                        id="form-outbound-standqty"
-                        type="number" 
-                        step="0.0001" 
-                        aria-invalid={fieldState.invalid}
-                      />
-                      {fieldState.invalid && <FieldError className="text-xs" errors={[fieldState.error]} />}
-                    </Field>
+              {/* Toggle Action Buttons */}
+              <div className="flex flex-wrap gap-2 pt-2">
+                <Button
+                  type="button"
+                  variant={showPurchasingUom ? "destructive" : "outline"}
+                  size="sm"
+                  className="text-xs"
+                  onClick={handleTogglePurchasingUom}
+                >
+                  {showPurchasingUom ? (
+                    <>
+                      <MinusCircle className="w-3.5 h-3.5 mr-1.5" /> Remove Inbound Conversion
+                    </>
+                  ) : (
+                    <>
+                      <PlusCircle className="w-3.5 h-3.5 mr-1.5" /> Add Inbound / Purchasing UOM
+                    </>
                   )}
-                />
-                <Controller 
-                  control={control} 
-                  name="salesUom.uomQuantity"
-                  render={({ field, fieldState }) => (
-                    <Field>
-                      <FieldLabel htmlFor="form-outbound-packqty">
-                        Equal to Pack Volume
-                      </FieldLabel>
-                        <Input
-                        // Extract value and onChange to control them explicitly
-                        value={field.value}
-                        onBlur={field.onBlur}
-                        ref={field.ref}
-                        onChange={(e) => {
-                          const val = e.target.value;
-                          field.onChange(val === "" ? "" : Number(val));
-                        }}
-                        id="form-outbound-packqty"
-                        type="number" 
-                        step="0.0001" 
-                        aria-invalid={fieldState.invalid}
-                      />
-                      {fieldState.invalid && <FieldError className="text-xs" errors={[fieldState.error]} />}
-                    </Field>
+                </Button>
+
+                <Button
+                  type="button"
+                  variant={showSalesUom ? "destructive" : "outline"}
+                  size="sm"
+                  className="text-xs"
+                  onClick={handleToggleSalesUom}
+                >
+                  {showSalesUom ? (
+                    <>
+                      <MinusCircle className="w-3.5 h-3.5 mr-1.5" /> Remove Outbound Conversion
+                    </>
+                  ) : (
+                    <>
+                      <PlusCircle className="w-3.5 h-3.5 mr-1.5" /> Add Outbound / Sales UOM
+                    </>
                   )}
-                />
+                </Button>
               </div>
-            </div>
-          </div>
+
+              {/* Purchasing Mapping Block */}
+              {showPurchasingUom && (
+                <div className="p-4 bg-muted/20 border rounded-xl space-y-3 transition-all">
+                  <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center justify-between">
+                    <span>Inbound Supply / Purchasing Conversion</span>
+                  </h4>
+                  <FormSelect
+                    name="purchasingUom.name"
+                    control={control}
+                    label="Purchasing Unit"
+                    placeholder="-- Select Purchasing UOM --"
+                    options={uoms.map((item) => ({
+                      id: item.id,
+                      name: `${item.name} (${item.code})`,
+                    }))}
+                    emptyMessage="No unit available"
+                  />
+
+                  <div className="grid grid-cols-2 gap-2">
+                    <FormInput
+                      name="purchasingUom.standardQuantity"
+                      control={control}
+                      label="Standard Base Qty"
+                      step="0.0001"
+                      type="number"
+                      min={0}
+                      placeholder="1.0000"
+                    />
+                    <FormInput
+                      name="purchasingUom.uomQuantity"
+                      control={control}
+                      label="Equal to Pack Volume"
+                      step="0.0001"
+                      type="number"
+                      min={0}
+                      placeholder="1.0000"
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* Sales Conversion Mapping Block */}
+              {showSalesUom && (
+                <div className="p-4 bg-muted/20 border rounded-xl space-y-3 transition-all">
+                  <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center justify-between">
+                    <span>Outbound / Sales Channels Conversion</span>
+                  </h4>
+                  <FormSelect
+                    name="salesUom.name"
+                    control={control}
+                    label="Sales Unit"
+                    placeholder="-- Select Sales UOM --"
+                    options={uoms.map((item) => ({
+                      id: item.id,
+                      name: `${item.name} (${item.code})`,
+                    }))}
+                    emptyMessage="No unit available"
+                  />
+
+                  <div className="grid grid-cols-2 gap-2">
+                    <FormInput
+                      name="salesUom.standardQuantity"
+                      control={control}
+                      label="Standard Base Qty"
+                      step="0.0001"
+                      type="number"
+                      min={0}
+                      placeholder="1.0000"
+                    />
+                    <FormInput
+                      name="salesUom.uomQuantity"
+                      control={control}
+                      label="Equal to Pack Volume"
+                      step="0.0001"
+                      type="number"
+                      min={0}
+                      placeholder="1.0000"
+                    />
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
 
           {/* Additional Remarks */}
           <div className="bg-card border rounded-xl p-5 space-y-4 shadow-xs hidden sm:block">
