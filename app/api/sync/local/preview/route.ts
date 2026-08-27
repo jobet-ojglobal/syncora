@@ -221,7 +221,7 @@ export async function POST(req: Request) {
       const items = await getLocalBatchVendors(location.url, count, after);
       const rawList = Array.isArray(items) ? items : [];
 
-      const normalizedItems = rawList.map((loc: any) => ({
+      const normalizedItems = rawList.filter(item => item.isActive === 1).map((loc: any) => ({
         ...loc,
         itemId: loc.vendorId,
         name: loc.name || "Unnamed Vendor",

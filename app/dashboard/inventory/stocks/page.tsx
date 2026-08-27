@@ -46,6 +46,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Input } from "@/components/ui/input";
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 import { TableMultiSelect } from "@/components/shared/table-multiselect";
+import { ThumbnailViewerCell } from "@/components/shared/thumbnail-viewer-cell";
 
 interface LocationOption {
   inflowId: string;
@@ -365,7 +366,7 @@ export default function InventoryList() {
                       <TableCell className="pl-5">
                         <div className="flex items-center gap-2.5 max-w-[220px]">
                           <div className="w-9 h-9 bg-muted border rounded-lg overflow-hidden flex items-center justify-center shrink-0 relative">
-                            {item.product.thumbnail ? (
+                            {/* {item.product.thumbnail ? (
                               <Image
                                 src={item.product.thumbnail}
                                 alt={item.product.name}
@@ -375,7 +376,11 @@ export default function InventoryList() {
                               />
                             ) : (
                               <Package className="w-4 h-4 text-muted-foreground/50" />
-                            )}
+                            )} */}
+
+                            <ThumbnailViewerCell 
+                              row={{ src: item.product.thumbnail, name: item.product.name }} />
+      
                           </div>
                           <div className="min-w-0">
                             <span className="font-semibold text-foreground text-[13px] block truncate">

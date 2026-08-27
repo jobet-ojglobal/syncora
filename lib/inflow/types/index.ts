@@ -21,30 +21,6 @@ export interface InflowProductGroup {
 }
 
 // =====================================
-// Category
-// =====================================
-
-export interface InflowCategory {
-  categoryId: string;
-  isDefault: boolean;
-  name: string;
-  parentCategoryId: string | null;
-  parentCategory?: InflowCategory;
-  timestamp?: string;
-}
-
-// =====================================
-// Product Group Images
-// =====================================
-
-export interface InflowProductGroupImage {
-  imageId: string;
-  productGroupId: string;
-  productGroupImageId: string;
-  image: InflowProductImage
-}
-
-// =====================================
 // Variant Options
 // =====================================
 
@@ -94,6 +70,32 @@ export interface InflowProductVariant {
 
   productGroup?: InflowProductGroup
 }
+
+// =====================================
+// Category
+// =====================================
+
+export interface InflowCategory {
+  categoryId: string;
+  isDefault: boolean;
+  name: string;
+  parentCategoryId: string | null;
+  parentCategory?: InflowCategory;
+  timestamp?: string;
+}
+
+// =====================================
+// Product Group Images
+// =====================================
+
+export interface InflowProductGroupImage {
+  imageId: string;
+  productGroupId: string;
+  productGroupImageId: string;
+  image: InflowProductImage
+}
+
+
 
 // =====================================
 // Product

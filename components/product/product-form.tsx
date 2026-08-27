@@ -40,7 +40,7 @@ import {
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 import { Field, FieldContent, FieldDescription, FieldError, FieldGroup, FieldLabel, FieldLegend, FieldSet } from "@/components/ui/field";
-import { generateSku2Variant2, generateSku2Variant2V2GNoSpace } from "@/helpers/genSKU";
+import { generateSku2Variant2V2GNoSpace } from "@/helpers/genSKU";
 import React, { useEffect, useMemo, useState } from "react";
 import { BrandSelect } from "../shared/brand-select";
 import { CategorySelect } from "../shared/category-select";
@@ -307,6 +307,7 @@ export function ProductForm({  brands, uoms, groups: productGroups, pricingSchem
   const watchedVariantSignature = useWatch({ control, name: "variantSignature" });
   const watchedImages = useWatch({ control, name: "images" });
   const watchedItemType = useWatch({ control, name: "itemType" });
+  const watchedTrackSerials = useWatch({ control, name: "trackSerials" });
 
   const selectedGroupDetails = useMemo(() => {
     if (!watchedGroupId || !productGroups) return null;
@@ -516,7 +517,7 @@ export function ProductForm({  brands, uoms, groups: productGroups, pricingSchem
   };
 
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className="space-y-6 ">
+    <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
 
       <div className="bg-card border rounded-xl p-5 space-y-4 shadow-xs">
         <div className="space-y-0.5 border-b pb-2">
@@ -805,15 +806,17 @@ export function ProductForm({  brands, uoms, groups: productGroups, pricingSchem
                 </FieldLegend>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-3">
+              <div className={cn('grid grid-cols-1 md:grid-cols-3 gap-4 mt-3', isEditMode && "md:grid-cols-2")}>
                 <div className="flex items-center justify-between border p-3 rounded-xl bg-muted/10 gap-4">
                   <div><FieldLabel className="mb-0 text-xs font-semibold">Lot Tracking</FieldLabel></div>
                   <Controller control={control} name="trackLots" render={({ field }) => <Switch checked={field.value} onCheckedChange={field.onChange} />} />
                 </div>
+                { !isEditMode && (
                 <div className="flex items-center justify-between border p-3 rounded-xl bg-muted/10 gap-4">
                   <div><FieldLabel className="mb-0 text-xs font-semibold">Serial Tracking</FieldLabel></div>
                   <Controller control={control} name="trackSerials" render={({ field }) => <Switch checked={field.value} onCheckedChange={field.onChange} />} />
                 </div>
+                )}
                 <div className="flex items-center justify-between border p-3 rounded-xl bg-muted/10 gap-4">
                   <div><FieldLabel className="mb-0 text-xs font-semibold">Expiry Tracking</FieldLabel></div>
                   <Controller control={control} name="trackExpiry" render={({ field }) => <Switch checked={field.value} onCheckedChange={field.onChange} />} />
@@ -883,151 +886,153 @@ export function ProductForm({  brands, uoms, groups: productGroups, pricingSchem
           
 
           {/* Operational Multi-tier */}
-          <Card className="shadow-xs">
-            <CardHeader className="border-b">
-              <CardTitle className="text-sm font-semibold flex items-center justify-between">
-                <div className="flex items-center gap-1.5">
-                  <Link2 className="w-4 h-4 text-primary" />
-                  Operational Multi-tier UOM Calculations
-                </div>
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4 pt-4">
-              {/* Base System UOM */}
-              <FormSelect
-                name="standardUomName"
-                control={control}
-                label="Base System UOM"
-                placeholder="-- Select UOM (Optional) --"
-                options={uoms.map((item) => ({
-                  id: item.code,
-                  name: `${item.name} (${item.code})`,
-                }))}
-                emptyMessage="No base unit available"
-              />
-
-              {/* Toggle Action Buttons */}
-              <div className="flex flex-wrap gap-2 pt-2">
-                <Button
-                  type="button"
-                  variant={showPurchasingUom ? "destructive" : "outline"}
-                  size="sm"
-                  className="text-xs"
-                  onClick={handleTogglePurchasingUom}
-                >
-                  {showPurchasingUom ? (
-                    <>
-                      <MinusCircle className="w-3.5 h-3.5 mr-1.5" /> Remove Inbound Conversion
-                    </>
-                  ) : (
-                    <>
-                      <PlusCircle className="w-3.5 h-3.5 mr-1.5" /> Add Inbound / Purchasing UOM
-                    </>
-                  )}
-                </Button>
-
-                <Button
-                  type="button"
-                  variant={showSalesUom ? "destructive" : "outline"}
-                  size="sm"
-                  className="text-xs"
-                  onClick={handleToggleSalesUom}
-                >
-                  {showSalesUom ? (
-                    <>
-                      <MinusCircle className="w-3.5 h-3.5 mr-1.5" /> Remove Outbound Conversion
-                    </>
-                  ) : (
-                    <>
-                      <PlusCircle className="w-3.5 h-3.5 mr-1.5" /> Add Outbound / Sales UOM
-                    </>
-                  )}
-                </Button>
-              </div>
-
-              {/* Purchasing Mapping Block */}
-              {showPurchasingUom && (
-                <div className="p-4 bg-muted/20 border rounded-xl space-y-3 transition-all">
-                  <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center justify-between">
-                    <span>Inbound Supply / Purchasing Conversion</span>
-                  </h4>
-                  <FormSelect
-                    name="purchasingUom.name"
-                    control={control}
-                    label="Purchasing Unit"
-                    placeholder="-- Select Purchasing UOM --"
-                    options={uoms.map((item) => ({
-                      id: item.id,
-                      name: `${item.name} (${item.code})`,
-                    }))}
-                    emptyMessage="No unit available"
-                  />
-
-                  <div className="grid grid-cols-2 gap-2">
-                    <FormInput
-                      name="purchasingUom.standardQuantity"
-                      control={control}
-                      label="Standard Base Qty"
-                      step="0.0001"
-                      type="number"
-                      min={0}
-                      placeholder="1.0000"
-                    />
-                    <FormInput
-                      name="purchasingUom.uomQuantity"
-                      control={control}
-                      label="Equal to Pack Volume"
-                      step="0.0001"
-                      type="number"
-                      min={0}
-                      placeholder="1.0000"
-                    />
+          { !watchedTrackSerials && (
+            <Card className="shadow-xs">
+              <CardHeader className="border-b">
+                <CardTitle className="text-sm font-semibold flex items-center justify-between">
+                  <div className="flex items-center gap-1.5">
+                    <Link2 className="w-4 h-4 text-primary" />
+                    Operational Multi-tier UOM Calculations
                   </div>
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4 pt-4">
+                {/* Base System UOM */}
+                <FormSelect
+                  name="standardUomName"
+                  control={control}
+                  label="Base System UOM"
+                  placeholder="-- Select UOM (Optional) --"
+                  options={uoms.map((item) => ({
+                    id: item.code,
+                    name: `${item.name} (${item.code})`,
+                  }))}
+                  emptyMessage="No base unit available"
+                />
+
+                {/* Toggle Action Buttons */}
+                <div className="flex flex-wrap gap-2 pt-2">
+                  <Button
+                    type="button"
+                    variant={showPurchasingUom ? "destructive" : "outline"}
+                    size="sm"
+                    className="text-xs"
+                    onClick={handleTogglePurchasingUom}
+                  >
+                    {showPurchasingUom ? (
+                      <>
+                        <MinusCircle className="w-3.5 h-3.5 mr-1.5" /> Remove Inbound Conversion
+                      </>
+                    ) : (
+                      <>
+                        <PlusCircle className="w-3.5 h-3.5 mr-1.5" /> Add Inbound / Purchasing UOM
+                      </>
+                    )}
+                  </Button>
+
+                  <Button
+                    type="button"
+                    variant={showSalesUom ? "destructive" : "outline"}
+                    size="sm"
+                    className="text-xs"
+                    onClick={handleToggleSalesUom}
+                  >
+                    {showSalesUom ? (
+                      <>
+                        <MinusCircle className="w-3.5 h-3.5 mr-1.5" /> Remove Outbound Conversion
+                      </>
+                    ) : (
+                      <>
+                        <PlusCircle className="w-3.5 h-3.5 mr-1.5" /> Add Outbound / Sales UOM
+                      </>
+                    )}
+                  </Button>
                 </div>
-              )}
 
-              {/* Sales Conversion Mapping Block */}
-              {showSalesUom && (
-                <div className="p-4 bg-muted/20 border rounded-xl space-y-3 transition-all">
-                  <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center justify-between">
-                    <span>Outbound / Sales Channels Conversion</span>
-                  </h4>
-                  <FormSelect
-                    name="salesUom.name"
-                    control={control}
-                    label="Sales Unit"
-                    placeholder="-- Select Sales UOM --"
-                    options={uoms.map((item) => ({
-                      id: item.id,
-                      name: `${item.name} (${item.code})`,
-                    }))}
-                    emptyMessage="No unit available"
-                  />
+                {/* Purchasing Mapping Block */}
+                {showPurchasingUom && (
+                  <div className="p-4 bg-muted/20 border rounded-xl space-y-3 transition-all">
+                    <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center justify-between">
+                      <span>Inbound Supply / Purchasing Conversion</span>
+                    </h4>
+                    <FormSelect
+                      name="purchasingUom.name"
+                      control={control}
+                      label="Purchasing Unit"
+                      placeholder="-- Select Purchasing UOM --"
+                      options={uoms.map((item) => ({
+                        id: item.id,
+                        name: `${item.name} (${item.code})`,
+                      }))}
+                      emptyMessage="No unit available"
+                    />
 
-                  <div className="grid grid-cols-2 gap-2">
-                    <FormInput
-                      name="salesUom.standardQuantity"
-                      control={control}
-                      label="Standard Base Qty"
-                      step="0.0001"
-                      type="number"
-                      min={0}
-                      placeholder="1.0000"
-                    />
-                    <FormInput
-                      name="salesUom.uomQuantity"
-                      control={control}
-                      label="Equal to Pack Volume"
-                      step="0.0001"
-                      type="number"
-                      min={0}
-                      placeholder="1.0000"
-                    />
+                    <div className="grid grid-cols-2 gap-2">
+                      <FormInput
+                        name="purchasingUom.standardQuantity"
+                        control={control}
+                        label="Standard Base Qty"
+                        step="0.0001"
+                        type="number"
+                        min={0}
+                        placeholder="1.0000"
+                      />
+                      <FormInput
+                        name="purchasingUom.uomQuantity"
+                        control={control}
+                        label="Equal to Pack Volume"
+                        step="0.0001"
+                        type="number"
+                        min={0}
+                        placeholder="1.0000"
+                      />
+                    </div>
                   </div>
-                </div>
-              )}
-            </CardContent>
-          </Card>
+                )}
+
+                {/* Sales Conversion Mapping Block */}
+                {showSalesUom && (
+                  <div className="p-4 bg-muted/20 border rounded-xl space-y-3 transition-all">
+                    <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center justify-between">
+                      <span>Outbound / Sales Channels Conversion</span>
+                    </h4>
+                    <FormSelect
+                      name="salesUom.name"
+                      control={control}
+                      label="Sales Unit"
+                      placeholder="-- Select Sales UOM --"
+                      options={uoms.map((item) => ({
+                        id: item.id,
+                        name: `${item.name} (${item.code})`,
+                      }))}
+                      emptyMessage="No unit available"
+                    />
+
+                    <div className="grid grid-cols-2 gap-2">
+                      <FormInput
+                        name="salesUom.standardQuantity"
+                        control={control}
+                        label="Standard Base Qty"
+                        step="0.0001"
+                        type="number"
+                        min={0}
+                        placeholder="1.0000"
+                      />
+                      <FormInput
+                        name="salesUom.uomQuantity"
+                        control={control}
+                        label="Equal to Pack Volume"
+                        step="0.0001"
+                        type="number"
+                        min={0}
+                        placeholder="1.0000"
+                      />
+                    </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          )}
 
           {/* Additional Remarks */}
           <div className="bg-card border rounded-xl p-5 space-y-4 shadow-xs hidden sm:block">

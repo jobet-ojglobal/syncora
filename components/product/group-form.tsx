@@ -1,22 +1,19 @@
 // components/ProductGroupForm.tsx
 "use client";
 
-import { useForm, useFieldArray, useWatch, Controller } from "react-hook-form";
+import { useForm, useFieldArray, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { createProductGroupSchema, ProductGroupInput } from "@/schemas/group.schema";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
-import { Layers, ArrowLeft, Plus, Trash2, X, Check, Sliders, AlertCircle, Barcode, Settings2 } from "lucide-react";
+import { Layers, ArrowLeft, Plus, Trash2, X, Check, Sliders, Barcode, Settings2, ImageIcon, LinkIcon, ChevronUp, ChevronDown, Calendar } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { Field, FieldDescription, FieldGroup, FieldLabel, FieldLegend, FieldSeparator, FieldSet } from "@/components/ui/field";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../ui/select";
+import { Field, FieldContent, FieldDescription, FieldError, FieldGroup, FieldLabel, FieldLegend, FieldSeparator, FieldSet } from "@/components/ui/field";
 import { useEffect, useState } from "react";
-
-
-
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 // Shadcn UI Dialog & Checkbox imports
 import {
   Dialog,
@@ -30,6 +27,12 @@ import {
 import { Checkbox } from "@/components/ui/checkbox";
 import { BrandSelect } from "../shared/brand-select";
 import { CategorySelect } from "../shared/category-select";
+import { DynamicAlert } from "../shared/alert";
+import Image from "next/image";
+import { cn } from "@/lib/utils";
+import { FormInput } from "../shared/form-input";
+import { DEFAULT_CUSTOM_FIELDS } from "@/schemas/product.schema";
+import { FormSelect } from "../shared/form-select";
 
 interface LookupItem {
   id: string;
@@ -96,6 +99,8 @@ export function ProductGroupForm({ brands, attributes, initialData }: ProductGro
   const [selectedAttributeGroup, setSelectedAttributeGroup] = useState<AttributeGroup | null>(null);
   const [pendingSelections, setPendingSelections] = useState<string[]>([]);
 
+  const [expandedIndex, setExpandedIndex] = useState<number | null>(null);
+
 
   // 👇 1. Instantiate the schema dynamically using the incoming 'attributes' prop
   const formSchema = createProductGroupSchema(
@@ -111,13 +116,17 @@ export function ProductGroupForm({ brands, attributes, initialData }: ProductGro
     defaultValues: initialData || {
       id: initialData?.id,
       name: "",
-      skuPattern: initialData?.skuPattern ?? "[BRAND]-[VAL_1]-[VAL_2]-[INDEX]",
+      skuPattern: initialData?.skuPattern ?? "[BRAND]-[PARENT_SKU]-[INDEX]",
       skuSeparator: "-",
       description: "",
       brandId: "",
       categoryId: "",
       isActive: true,
       tags: initialData?.tags ?? [],
+      itemType: initialData?.itemType || "",
+      trackSerials: initialData?.trackSerials ?? false,
+      trackLots: initialData?.trackLots ?? false,
+      trackExpiry: initialData?.trackExpiry ?? false,
       features: initialData?.features?.map((f: any) => ({ key: f.key, value: f.value })) ?? [],
       options: initialData?.options?.map((option: any) => ({
         name: option.name,
@@ -126,6 +135,14 @@ export function ProductGroupForm({ brands, attributes, initialData }: ProductGro
         values: option.values?.map((v: any) => ({ value: v.value, isSkuDriver: v.isSkuDriver ?? true })) ?? [],
       })) ?? [],
       variants: initialData?.variants ?? [],
+      images: initialData?.images.length > 0 ? initialData?.images?.map((img: any) => ({ 
+        id: img.id, 
+        originalUrl: img.originalUrl || "",
+        thumbUrl: img.thumbUrl || "",
+        smallUrl: img.smallUrl || "",
+        mediumUrl: img.mediumUrl || "",
+        largeUrl: img.largeUrl || "",
+      })) : undefined,
     },
   });
 
@@ -135,6 +152,10 @@ export function ProductGroupForm({ brands, attributes, initialData }: ProductGro
     control,
     name: "options",
   });
+  const { fields: imageFields, append: appendImage, remove: removeImage } = useFieldArray({
+    control,
+    name: "images"
+  });
 
   const { fields: featureFields, append: appendFeature, remove: removeFeature } = useFieldArray({
     control,
@@ -143,6 +164,13 @@ export function ProductGroupForm({ brands, attributes, initialData }: ProductGro
 
   const watchedOptions = watch("options");
   const watchedTags = watch("tags") || [];
+  const watchedImages = watch("images");
+  const watchedItemType = watch("itemType");
+  const watchedTrackSerials = watch("trackSerials");
+
+  const toggleExpand = (idx: number) => {
+    setExpandedIndex(expandedIndex === idx ? null : idx);
+  };
 
   const handleTagKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "Enter" || e.key === ",") {
@@ -164,12 +192,16 @@ export function ProductGroupForm({ brands, attributes, initialData }: ProductGro
     reset({
       id: initialData?.id,
       name: initialData.name,
-      skuPattern: initialData?.skuPattern ?? "[BRAND]-[VAL_1]-[VAL_2]-[INDEX]",
+      skuPattern: initialData?.skuPattern ?? "[BRAND]-[PARENT_SKU]-[INDEX]",
       skuSeparator: "-",
       categoryId: initialData.categoryId,
       brandId: initialData.brandId,
       isActive: initialData.isActive,
       tags: initialData.tags ?? [],
+      itemType: initialData?.itemType || "",
+      trackSerials: initialData?.trackSerials ?? false,
+      trackLots: initialData?.trackLots ?? false,
+      trackExpiry: initialData?.trackExpiry ?? false,
       features: initialData.features?.map((f: any) => ({ key: f.key, value: f.value })) ?? [],
       options: initialData.options?.map((option: any) => ({
         name: option.name,
@@ -178,6 +210,14 @@ export function ProductGroupForm({ brands, attributes, initialData }: ProductGro
         values: option.values?.map((v: any) => ({ value: v.value, isSkuDriver: v.isSkuDriver ?? true})) ?? [],
       })) ?? [],
       variants: initialData.variants ?? [],
+      images: initialData?.images.length > 0 ? initialData?.images?.map((img: any) => ({ 
+        id: img.id, 
+        originalUrl: img.originalUrl || "",
+        thumbUrl: img.thumbUrl || "",
+        smallUrl: img.smallUrl || "",
+        mediumUrl: img.mediumUrl || "",
+        largeUrl: img.largeUrl || "",
+      })) : undefined,
     });
   }, [initialData, reset]);
 
@@ -222,6 +262,13 @@ export function ProductGroupForm({ brands, attributes, initialData }: ProductGro
 
   // Stage A: Form Level Interception & Validation
   const onSubmit = async (values: ProductGroupInput) => {
+
+    if(values.itemType !== "StockedProduct") {
+      values.trackExpiry = false;
+      values.trackLots = false;
+      values.trackSerials = false;
+    }
+
     // 1. Run your existing structural validation checks
     const customCollisions = values.options.filter(opt => {
       const isCustom = !opt.attributeId || opt.attributeId === "custom-literal-mode";
@@ -348,7 +395,7 @@ export function ProductGroupForm({ brands, attributes, initialData }: ProductGro
               <Layers className="w-4 h-4 text-primary" /> Root Classification Parent Specification
             </FieldLegend>
 
-            <Field className="md:col-span-2">
+            <Field >
               <FieldLabel>Product Group Label Name *</FieldLabel>
               <Input placeholder="e.g., Premium Cotton Hoodies Line" {...register("name")} />
               {errors.name && <span className="text-xs text-destructive">{errors.name.message}</span>}
@@ -368,21 +415,24 @@ export function ProductGroupForm({ brands, attributes, initialData }: ProductGro
               </div>
             </Field>
 
+       
+
             <Field className="md:col-span-1">
-              <FieldLabel>Manufacturer / Brand Assignment</FieldLabel>
+              <FieldLabel>Brand</FieldLabel>
               <Controller
                 name="brandId"
                 control={control}
-                render={({ field }) => <BrandSelect value={field.value ?? undefined} onChange={field.onChange} />}
+                render={({ field }) => 
+                  <BrandSelect value={field.value ?? undefined} onChange={field.onChange} className="h-9" />}
               />
             </Field>
   
             <Field className="md:col-span-2">
-              <FieldLabel>Master Catalog Department Category</FieldLabel>
+              <FieldLabel>Category</FieldLabel>
               <Controller
                 name="categoryId"
                 control={control}
-                render={({ field }) => <CategorySelect value={field.value ?? undefined} onChange={field.onChange} />}
+                render={({ field }) => <CategorySelect value={field.value ?? undefined} onChange={field.onChange} className="h-9" />}
               />
             </Field>
 
@@ -474,6 +524,264 @@ export function ProductGroupForm({ brands, attributes, initialData }: ProductGro
                 </Field>
               </div>
           </FieldSet>
+        
+          <FieldSeparator />
+
+          {/* Images Section */}
+          <div className="bg-card border rounded-xl p-5 space-y-4 shadow-xs ">
+            <div className="space-y-0.5 border-b pb-2">
+              <FieldLegend className="flex items-center gap-2 text-sm font-semibold">
+                <ImageIcon className="w-4 h-4 text-primary" /> 
+                Media Asset Resource Link Registries
+              </FieldLegend>
+              <p className="text-xs text-muted-foreground">
+                Register and configure responsive CDN image URLs for this product.
+              </p>
+            </div>
+
+            {/* CUSTOM ERROR ALERT FOR Image ARRAY */}
+            {errors.images?.message && !Array.isArray(errors.images) && imageFields.length === 0 && (
+              <DynamicAlert title="Missing Information" description={errors.images.message} variant="destructive" />
+            )}
+            
+            {/* Image Items */}
+            <div className="space-y-3">
+              {imageFields.length === 0 ? (
+                <div className="flex flex-col items-center justify-center p-8 border border-dashed rounded-xl bg-muted/5 text-muted-foreground text-center">
+                  <ImageIcon className="w-8 h-8 mb-2 opacity-40" />
+                  <p className="text-xs font-medium">No images registered yet</p>
+                  <p className="text-[11px] opacity-75 mt-0.5">Click &quot;Bind Image URL&quot; to add your first asset link.</p>
+                </div>
+              ) : (
+                imageFields.map((field, index) => {
+                  const hasError = !!errors.images?.[index]?.originalUrl;
+                  const currentUrl = watchedImages && watchedImages[index]?.originalUrl;
+                  const isValidUrl = currentUrl && /^https?:\/\/.+/i.test(currentUrl);
+
+                  return (
+                    <div 
+                      key={field.id} 
+                      className={cn(
+                        "flex flex-col gap-2 bg-card p-3 border rounded-xl shadow-xs transition-colors",
+                        hasError ? "border-destructive/40 bg-destructive/5" : "hover:border-accent-foreground/10"
+                      )}
+                    >
+                      {/* Primary Link Row with Preview */}
+                      <div className="flex items-center gap-3">
+                        {/* Interactive Thumbnail Preview */}
+                        <div className="w-12 h-12 rounded-lg border bg-muted flex items-center justify-center overflow-hidden shrink-0 shadow-inner">
+                          { isValidUrl ? (
+                            <Image 
+                              src={currentUrl} 
+                              alt="Preview" 
+                              className="w-full h-full object-cover"
+                              onError={(e) => {
+                                // Fallback if URL is structurally valid but doesn't resolve to an image
+                                (e.target as HTMLImageElement).src = "";
+                                (e.target as HTMLImageElement).classList.add("hidden");
+                              }}
+                              height={500}
+                              width={500}
+                            />
+                          ) : (
+                            <ImageIcon className="w-5 h-5 text-muted-foreground/40" />
+                          )}
+                        </div>
+
+                        {/* Main CDN Link Input */}
+                        <div className="flex-1 space-y-1">
+                          <Controller
+                            name={`images.${index}.originalUrl`}
+                            control={control}
+                            render={({ field, fieldState }) => (
+                              <Field data-invalid={fieldState.invalid}>
+                                <FieldContent className="relative">
+                                  <LinkIcon className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-muted-foreground/60" />
+                                  <Input
+                                    {...field}
+                                    id={`form-images.${index}.originalUrl`}
+                                    aria-invalid={fieldState.invalid}
+                                    placeholder="https://cdn.yourstore.com/images/product-main.jpg"
+                                    className="pl-9 h-9 text-xs" 
+                                  />
+                                </FieldContent>
+                              </Field>
+                            )}
+                          />
+                        </div>
+
+                        {/* Row Controls */}
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          {/* Advanced Dimensions Toggle */}
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 text-muted-foreground hover:bg-muted"
+                            onClick={() => toggleExpand(index)}
+                            title="Configure responsive sizes"
+                          >
+                            {expandedIndex === index ? (
+                              <ChevronUp className="w-4 h-4" />
+                            ) : (
+                              <ChevronDown className="w-4 h-4" />
+                            )}
+                          </Button>
+
+                          {/* Remove button */}
+                          { imageFields.length > 1 && (
+                            <Button 
+                              type="button" 
+                              variant="ghost" 
+                              size="icon" 
+                              onClick={() => removeImage(index)} 
+                              className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Error Message */}
+                      {hasError && (
+                        <span className="text-[11px] font-medium text-destructive px-1.5 flex items-center gap-1">
+                          ⚠️ {errors.images?.[index]?.originalUrl?.message}
+                        </span>
+                      )}
+
+                      {/* Advanced Responsive Sizes Panel (Expanded state) */}
+                      {expandedIndex === index && (
+                        <div className="mt-2 pt-3 border-t border-dashed grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                          
+                          <Controller
+                            name={`images.${index}.thumbUrl`}
+                            control={control}
+                            render={({ field, fieldState }) => (
+                              <Field data-invalid={fieldState.invalid} className="space-y-1">
+                                <FieldContent className="relative">
+                                  <Input
+                                    value={field.value ?? ""} // ✅ Safely fall back to "" if value is null
+                                    onBlur={field.onBlur}
+                                    ref={field.ref}
+                                    onChange={(e) => {
+                                      const val = e.target.value;
+                                      field.onChange(val === "" ? null : val); // ✅ Sets null in state if empty, instead of breaking types
+                                    }}
+                                    id={`form-images.${index}.thumbUrl`}
+                                    aria-invalid={fieldState.invalid}
+                                    placeholder="Thumb URL"
+                                    className="h-7 text-xs bg-background" 
+                                  />
+                                </FieldContent>
+                                {fieldState.invalid && <FieldError errors={[fieldState.error]} className="text-[11px] font-medium px-1.5 flex items-center gap-1" />}
+                              </Field>
+                            )}
+                          />
+
+                          <Controller
+                            name={`images.${index}.smallUrl`}
+                            control={control}
+                            render={({ field, fieldState }) => (
+                              <Field data-invalid={fieldState.invalid} className="space-y-1">
+                                <FieldContent className="relative">
+                                  <Input
+                                    value={field.value ?? ""} // ✅ Safely fall back to "" if value is null
+                                    onBlur={field.onBlur}
+                                    ref={field.ref}
+                                    onChange={(e) => {
+                                      const val = e.target.value;
+                                      field.onChange(val === "" ? null : val); // ✅ Sets null in state if empty
+                                    }}
+                                    id={`form-images.${index}.smallUrl`}
+                                    aria-invalid={fieldState.invalid}
+                                    placeholder="Small URL"
+                                    className="h-7 text-xs bg-background" 
+                                  />
+                                </FieldContent>
+                                {fieldState.invalid && <FieldError errors={[fieldState.error]} className="text-[11px] font-medium px-1.5 flex items-center gap-1" />}
+                              </Field>
+                            )}
+                          />
+
+                          <Controller
+                            name={`images.${index}.mediumUrl`}
+                            control={control}
+                            render={({ field, fieldState }) => (
+                              <Field data-invalid={fieldState.invalid} className="space-y-1">
+                                <FieldContent className="relative">
+                                  <Input
+                                    value={field.value ?? ""} // ✅ Safely fall back to "" if value is null
+                                    onBlur={field.onBlur}
+                                    ref={field.ref}
+                                    onChange={(e) => {
+                                      const val = e.target.value;
+                                      field.onChange(val === "" ? null : val); // ✅ Sets null in state if empty
+                                    }}
+                                    id={`form-images.${index}.mediumUrl`}
+                                    aria-invalid={fieldState.invalid}
+                                    placeholder="Medium URL"
+                                    className="h-7 text-xs bg-background" 
+                                  />
+                                </FieldContent>
+                                {fieldState.invalid && <FieldError errors={[fieldState.error]} className="text-[11px] font-medium px-1.5 flex items-center gap-1" />}
+                              </Field>
+                            )}
+                          />
+
+                          <Controller
+                            name={`images.${index}.largeUrl`}
+                            control={control}
+                            render={({ field, fieldState }) => (
+                              <Field data-invalid={fieldState.invalid} className="space-y-1">
+                                <FieldContent className="relative">
+                                  <Input
+                                    value={field.value ?? ""} // ✅ Safely fall back to "" if value is null
+                                    onBlur={field.onBlur}
+                                    ref={field.ref}
+                                    onChange={(e) => {
+                                      const val = e.target.value;
+                                      field.onChange(val === "" ? null : val); // ✅ Sets null in state if empty
+                                    }}
+                                    id={`form-images.${index}.largeUrl`}
+                                    aria-invalid={fieldState.invalid}
+                                    placeholder="Large URL"
+                                    className="h-7 text-xs bg-background" 
+                                  />
+                                </FieldContent>
+                                {fieldState.invalid && <FieldError errors={[fieldState.error]} className="text-[11px] font-medium px-1.5 flex items-center gap-1" />}
+                              </Field>
+                            )}
+                          />
+                          
+                        </div>
+                      )}
+                    </div>
+                  );
+                })
+              )}
+            </div>
+            <Button 
+                type="button" 
+                variant="outline" 
+                size="sm" 
+                onClick={() => {
+                  appendImage({ 
+                    originalUrl: "",
+                    thumbUrl: "",
+                    smallUrl: "",
+                    mediumUrl: "",
+                    largeUrl: "",
+                  });
+                  // Auto-expand the newly created item
+                  setExpandedIndex(imageFields.length);
+                }} 
+                disabled={imageFields.length >= 5}
+                className="h-8 text-xs gap-1.5 shadow-xs w-full" 
+              >
+                <Plus className="w-3.5 h-3.5" /> Bind Image URL
+              </Button>
+          </div>
 
           <FieldSeparator />
 
@@ -748,7 +1056,6 @@ export function ProductGroupForm({ brands, attributes, initialData }: ProductGro
             </div>
           </div>
 
-
           {/* 🏷️ SECTION 2.5: Dynamic SKU Generation Configuration Panel */}
           {watchedOptions.filter((o) => o.isDriver && o.name).length > 0 && (
             <>
@@ -763,6 +1070,48 @@ export function ProductGroupForm({ brands, attributes, initialData }: ProductGro
                     Design your dynamic variant SKU templates by mixing standard syntax layout strings with active option tokens.
                   </FieldDescription>
                 </div>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
+                  <FormSelect
+                    name="itemType"
+                    control={control}
+                    label="Item Classification Type"
+                    placeholder="-- Select Item Type --"
+                    options={[
+                      { id: "StockedProduct", name: "Stock Product" },
+                      { id: "NonstockedProduct", name: "Non-Stock Product" },
+                      { id: "Service", name: "Service" },
+                    ]}
+                    emptyMessage="No item type available"
+                  />
+
+                  
+                </div>
+
+                {/* Traceability Control Flags */}
+                { watchedItemType === "StockedProduct" && (
+                  <div className="bg-card border rounded-xl p-5 space-y-4 shadow-xs">
+                    <div className="space-y-0.5 flex items-center justify-between border-b pb-2">
+                      <FieldLegend className="flex items-center gap-2 text-sm font-semibold ">
+                        <Calendar className="w-4 h-4 text-primary" /> 
+                        Traceability Control Flags
+                      </FieldLegend>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-3">
+                      <div className="flex items-center justify-between border p-3 rounded-xl bg-muted/10 gap-4">
+                        <div><FieldLabel className="mb-0 text-xs font-semibold">Lot Tracking</FieldLabel></div>
+                        <Controller control={control} name="trackLots" render={({ field }) => <Switch checked={field.value} onCheckedChange={field.onChange} />} />
+                      </div>
+                      <div className="flex items-center justify-between border p-3 rounded-xl bg-muted/10 gap-4">
+                        <div><FieldLabel className="mb-0 text-xs font-semibold">Serial Tracking</FieldLabel></div>
+                        <Controller control={control} name="trackSerials" render={({ field }) => <Switch checked={field.value} onCheckedChange={field.onChange} />} />
+                      </div>
+                      <div className="flex items-center justify-between border p-3 rounded-xl bg-muted/10 gap-4">
+                        <div><FieldLabel className="mb-0 text-xs font-semibold">Expiry Tracking</FieldLabel></div>
+                        <Controller control={control} name="trackExpiry" render={({ field }) => <Switch checked={field.value} onCheckedChange={field.onChange} />} />
+                      </div>
+                    </div>
+                  </div>
+                )}
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
                   {/* Formula Template Input */}
@@ -873,6 +1222,76 @@ export function ProductGroupForm({ brands, attributes, initialData }: ProductGro
 
                 {/* Real-Time Live Sandbox Engine Preview Component */}
                 {(() => {
+                  const pattern = watch("skuPattern") || "";
+                  const sep = watch("skuSeparator") ?? "-";
+                  
+                  // 1. Normalize and collapse spaces in brand & product name
+                  const rawBrand = watch("brandId") 
+                    ? brands?.find((b) => b.id === watch("brandId"))?.name || "" 
+                    : "";
+                  const cleanBrand = rawBrand ? rawBrand.trim().replace(/\s+/g, " ") : "";
+                  
+                  const rawName = watch("name") || "";
+                  let cleanedName = rawName ? rawName.trim().replace(/\s+/g, " ") : "";
+
+                  // 2. Remove multi-word brand name from product name if present (case-insensitive)
+                  if (cleanBrand && cleanedName) {
+                    const escapeRegExp = (str: string) => str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+                    const brandRegex = new RegExp(`\\b${escapeRegExp(cleanBrand)}\\b`, "gi");
+                    cleanedName = cleanedName.replace(brandRegex, "").trim().replace(/\s+/g, " ");
+                  }
+
+                  // 3. Extract and format brand code
+                  const brandCode = cleanBrand
+                    ? cleanBrand.split(/\s+/).map((w) => w.toUpperCase()).join("-")
+                    : "BRAND";
+
+                  // 4. Extract parent product code
+                  const productCode = cleanedName
+                    ? cleanedName.split(/\s+/).filter(Boolean).map((part) => part.toUpperCase()).join("-")
+                    : "PARENT";
+
+                  // 5. Build lookup dictionary with tokens
+                  const tokenMap: Record<string, string> = {
+                    "[PARENT_SKU]": productCode,
+                    "[BRAND]": brandCode,
+                    "[INDEX]": "001",
+                  };
+
+                  // Populate driver option token fallbacks (e.g., "Dark Blue" -> "DARK-BLUE")
+                  watchedOptions.forEach((opt) => {
+                    if (opt.isDriver && opt.name?.trim()) {
+                      const tokenKey = `[${opt.name.trim().toUpperCase().replace(/\s+/g, "_")}]`;
+                      const val = opt.values?.[0]?.value || opt.name.trim();
+                      const formattedVal = val.trim().replace(/\s+/g, "-").toUpperCase();
+                      tokenMap[tokenKey] = formattedVal;
+                    }
+                  });
+
+                  // 6. Substitute tokens into template
+                  let compiledPattern = pattern;
+                  Object.entries(tokenMap).forEach(([token, val]) => {
+                    compiledPattern = compiledPattern.split(token).join(val);
+                  });
+
+                  // 7. Strip unmapped tokens, collapse existing delims, and re-join with active separator
+                  const previewCompiled = compiledPattern
+                    .replace(/\[[^\]]+\]/g, "") // Remove remaining unmapped tokens
+                    .split(/[-_/]+/)            // Split by hyphens, underscores, or slashes
+                    .map((part) => part.trim())
+                    .filter(Boolean)
+                    .join(sep);
+
+                  return (
+                    <div className="p-3 rounded-lg border bg-background text-[11px] font-mono flex items-center justify-between text-muted-foreground shadow-2xs">
+                      <span className="font-sans font-medium">Dynamic Live Output Preview:</span>
+                      <span className="font-bold text-primary bg-primary/5 px-2.5 py-1 rounded border border-primary/20 tracking-wider">
+                        {previewCompiled || "EMPTY_TEMPLATE"}
+                      </span>
+                    </div>
+                  );
+                })()}
+                {/* {(() => {
                   const parentMock = watch("name") 
                     ? watch("name").toUpperCase().substring(0, 6).replace(/\s+/g, "") + "-100" 
                     : "PARENT";
@@ -880,7 +1299,7 @@ export function ProductGroupForm({ brands, attributes, initialData }: ProductGro
                   const activeBrandId = watch("brandId");
                   const activeBrandItem = brands.find(b => b.id === activeBrandId);
                   const brandMock = activeBrandItem 
-                    ? activeBrandItem.name.toUpperCase().substring(0, 3).replace(/\s+/g, "") 
+                    ? activeBrandItem.name.toUpperCase()
                     : "BRD";
 
                   const pattern = watch("skuPattern") || "";
@@ -896,6 +1315,7 @@ export function ProductGroupForm({ brands, attributes, initialData }: ProductGro
                     if (opt.isDriver && opt.name) {
                       const targetToken = `[${opt.name.trim().toUpperCase().replace(/\s+/g, "_")}]`;
                       const fallbackVal = opt.values?.[0]?.value || "XYZ";
+                      const geneSKU = generateSku2Variant2V2GNoSpace(brandMock, parentMock, ["METAL","GREEN"])
                       previewCompiled = previewCompiled.split(targetToken).join(fallbackVal.toUpperCase().replace(/\s+/g, ""));
                     }
                   });
@@ -908,11 +1328,10 @@ export function ProductGroupForm({ brands, attributes, initialData }: ProductGro
                       </span>
                     </div>
                   );
-                })()}
+                })()} */}
               </FieldSet>
             </>
           )}
-
 
           {/* 🟢 SECTION 3: Live Matrix Variance Lifecycle Row Management */}
           {watch("variants")?.length > 0 && (

@@ -10,8 +10,6 @@ import {
   getCoreRowModel,
   useReactTable,
 } from "@tanstack/react-table"
-
-
 import {
   Table,
   TableBody,
@@ -66,8 +64,8 @@ interface DataTableProps<TData extends ParsedProduct, TValue> {
 
   // Row mutation bubbles
   onRowDataUpdate?: (inflowId: string, updatedFields: Partial<TData>) => void
-  onRowDelete?: (id: string) => void
-  onBulkDelete?: (ids: string[]) => void
+  onRowDelete?: (id: string) => void;
+  onBulkDelete?: (ids: string[]) => void;
 }
 
 export function ProductDataTable<TData extends ParsedProduct, TValue>({
@@ -88,8 +86,6 @@ export function ProductDataTable<TData extends ParsedProduct, TValue>({
   onRowDelete,
   onBulkDelete
 }: DataTableProps<TData, TValue>) {
-
-   
   
   const [columnVisibility, setColumnVisibility] = React.useState<VisibilityState>({
     purchasingUomText: false,
@@ -378,8 +374,6 @@ export function ProductDataTable<TData extends ParsedProduct, TValue>({
         </Table>
       </div>
 
-      
-
       {/* Pagination Controls */}
       <DataTablePagination
         pageIndex={pagination.pageIndex}
@@ -389,6 +383,13 @@ export function ProductDataTable<TData extends ParsedProduct, TValue>({
         loading={loading}
         onPageChange={(newPageIndex) => {
           onPaginationChange((prev) => ({ ...prev, pageIndex: newPageIndex }))
+        }}
+        onPageSizeChange={(newPageSize) => {
+          onPaginationChange((prev) => ({
+            ...prev,
+            pageSize: newPageSize,
+            pageIndex: 0, // Reset to first page when changing item limit
+          }))
         }}
       />
     </div>

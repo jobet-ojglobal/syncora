@@ -12,7 +12,7 @@ import { WebhookService } from "@/services/webhook.service";
 
 
 interface CloudWebhookJobData {
-  source: "inflow_sales_order" | "inflow_product" | "inflow_customer";
+  source: "inflow_sales_order" | "inflow_product" | "inflow_customer" | "inflow_vendor";
   action: "create" | "update";
   dataId: string;
   loggedEventId: string;
@@ -56,9 +56,6 @@ const cloudWorker = new Worker<CloudWebhookJobData>(
             throw new Error(`Unsupported action: ${action} for source ${source}`);
           }
           break;
-
-        
-
         default:
           throw new Error(`Unsupported webhook sync source: ${source}`);
       }

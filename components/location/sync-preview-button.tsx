@@ -15,6 +15,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Progress } from "../ui/progress";
+import SearchInput from "../shared/search-input";
 
 interface LinkedLocation {
   inflowId: string;
@@ -114,6 +115,8 @@ export function SyncButtonOptionsPreview({ locationId, source, title, isDisabled
   const [isSyncing, setIsSyncing] = useState(false);
   const [showProgress, setShowProgress] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [totalCount, setTotalCount] = useState<number | null>(null);
 
   const [sublocations, setSublocations] = useState<Sublocation[]>([]);
   const [isLoadingLocations, setIsLoadingLocations] = useState(false);
@@ -374,6 +377,7 @@ export function SyncButtonOptionsPreview({ locationId, source, title, isDisabled
       return { ...prev, [parentId]: updatedList };
     });
   };
+  
 
   const startSync = async () => {
     setIsModalOpen(false);
@@ -418,6 +422,17 @@ export function SyncButtonOptionsPreview({ locationId, source, title, isDisabled
 
   const isOptionAllChecked = currentOptions.length > 0 && selectedIds.length === currentOptions.length;
   const isOptionSomeChecked = selectedIds.length > 0 && selectedIds.length < currentOptions.length;
+
+  // Filtered Items Calculation
+  const filteredPreviewItems = useMemo(() => {
+    if (!searchQuery.trim()) return previewItems;
+    
+    const query = searchQuery.toLowerCase();
+    return previewItems.filter((item) => {
+      const name = (item.name || item.title || "").toLowerCase();
+      return name.includes(query);
+    });
+  }, [previewItems, searchQuery]);
 
   return (
     <div className="space-y-3">
@@ -526,15 +541,35 @@ export function SyncButtonOptionsPreview({ locationId, source, title, isDisabled
                   </span>
                 </div>
 
+                {/* Search Input Bar */}
+                {/* <div className="relative">
+                  <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+                  <Input
+                    type="text"
+                    placeholder="Search preview items..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="h-8 pl-8 text-xs bg-background"
+                  />
+                </div> */}
+
+                <div className="w-full">
+                  <SearchInput
+                    placeholder="Filter schemes by system name, ID token..."
+                    searchQuery={searchQuery}
+                    setSearchQuery={setSearchQuery}
+                  />
+                </div>
+
                 {isLoadingPreview ? (
                   <div className="py-8 flex items-center justify-center gap-2 text-xs text-muted-foreground">
                     <Loader2 className="h-4 w-4 animate-spin" /> Loading preview items...
                   </div>
                 ) : previewItems.length > 0 ? (
                   <div className="space-y-2">
-                    {/* SIMPLIFIED PREVIEW ITEMS LIST */}
+    
                     <div className="grid gap-2 max-h-[260px] overflow-y-auto pr-1 pt-1">
-                      {previewItems.map((item, index) => {
+                      {filteredPreviewItems.map((item, index) => {
                         const recordId = item.itemId;
                         const isChecked = selectedItemIds.includes(recordId);
 
@@ -578,6 +613,12 @@ export function SyncButtonOptionsPreview({ locationId, source, title, isDisabled
                           </div>
                         );
                       })}
+
+                      {filteredPreviewItems.length === 0 && (
+                        <div className="py-6 text-xs text-center text-muted-foreground">
+                          No matching items found for &quot;{searchQuery}&quot;.
+                        </div>
+                      )}
                     </div>
 
                     {hasNextPage && (
@@ -599,6 +640,16 @@ export function SyncButtonOptionsPreview({ locationId, source, title, isDisabled
                     No preview items available.
                   </div>
                 )}
+
+                {/* Footer: Item Counter Bar */}
+                <div className="flex items-center justify-between pt-2 border-t text-[11px] text-muted-foreground font-medium">
+                  <span>
+                    Showing {filteredPreviewItems.length} of {previewItems.length} loaded
+                  </span>
+                  <span>
+                    Total Items: {totalCount ?? previewItems.length}
+                  </span>
+                </div>
               </div>
             ) : (
               /* SYNC OPTIONS LIST */
