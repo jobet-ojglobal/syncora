@@ -8,7 +8,6 @@ import { CellAction } from "./status-cell-action"
 import { RowActions } from "./row-actions"
 import { Checkbox } from "@/components/ui/checkbox"
 import { ThumbnailCell } from "./thumbnail-cell"
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 
 // Shape matching your API Map payload precisely
 export type ParsedProduct = {

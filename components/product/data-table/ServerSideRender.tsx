@@ -27,7 +27,7 @@ export default function AdminServerSideProductsPage() {
 
   const [sorting, setSorting] = React.useState<SortingState>([])
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([])
-  const [pagination, setPagination] = React.useState({ pageIndex: 0, pageSize: 50 })
+  const [pagination, setPagination] = React.useState({ pageIndex: 0, pageSize: 25 })
   const [hydrationData, setHydrationData] = React.useState<HydrationPayload | null>(null)
 
   // 🟢 1. Core Data Fetching Engine (Extracted out of useEffect)
@@ -63,7 +63,7 @@ export default function AdminServerSideProductsPage() {
         sortOrder
       })
 
-      const res = await fetch(`/api/admin/products?${query.toString()}`)
+      const res = await fetch(`/api/admin/products/filtered?${query.toString()}`)
       if (res.ok) {
         const result = await res.json()
         setProducts(result.data)
@@ -176,8 +176,6 @@ export default function AdminServerSideProductsPage() {
         <CloudSyncButton
           source="cloudsync_products" 
         />
-
-        
         <Button asChild size="sm" className="gap-1.5 shrink-0">
           <Link href="/dashboard/products/create">
             <Plus className="w-4 h-4" /> Register New Product
@@ -185,9 +183,9 @@ export default function AdminServerSideProductsPage() {
         </Button>
         
         {/* test */}
-        <CloudSyncButton
+        {/* <CloudSyncButton
           source="cloudsync_product_inventory" 
-        />
+        /> */}
 
       </PageHeader>
       

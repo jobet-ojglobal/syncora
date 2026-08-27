@@ -19,6 +19,10 @@ export const createProductGroupSchema = (globalAttributes: GlobalAttributeLookup
     categoryId: z.string().nullable().optional().or(z.literal("")),
     isActive: z.boolean(),
     tags: z.array(z.string()),
+    itemType: z.string().min(1, "Item type name is required"),
+    trackExpiry: z.boolean(),
+    trackLots: z.boolean(),
+    trackSerials: z.boolean(),
     features: z.array(
       z.object({
         key: z.string().min(1, "Label/Key is required"),
@@ -50,6 +54,17 @@ export const createProductGroupSchema = (globalAttributes: GlobalAttributeLookup
         status: z.enum(["active", "unlink", "delete"]), // 👈 Action tracking state
       })
     ),
+    images: z.array(
+      z.object({
+        id: z.string().optional(),
+        originalUrl: z.string().min(1, "Original image link is required").url("Must be valid asset media CDN source URL"),
+        largeUrl: z.union([z.literal(""), z.string().url("Must be valid asset media CDN source URL")]).nullable().optional(),
+        mediumUncroppedUrl: z.union([z.literal(""), z.string().url("Must be valid asset media CDN source URL")]).nullable().optional(),
+        mediumUrl: z.union([z.literal(""), z.string().url("Must be valid asset media CDN source URL")]).nullable().optional(),
+        smallUrl: z.union([z.literal(""), z.string().url("Must be valid asset media CDN source URL")]).nullable().optional(),
+        thumbUrl: z.union([z.literal(""), z.string().url("Must be valid asset media CDN source URL")]).nullable().optional(),
+      })
+    ).optional().nullable(),
   })
   .superRefine((data, ctx) => {
     const seenAttributeIds = new Set<string>();

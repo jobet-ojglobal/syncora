@@ -1,21 +1,17 @@
 import * as React from "react"
-import { Row } from "@tanstack/react-table"
 import Image from "next/image"
-import { ImageOff } from "lucide-react"
+import { Package } from "lucide-react"
 import { cn } from "@/lib/utils"
-import { ParsedProduct } from "./columns"
 import { ImageViewerDialog } from "@/components/shared/image-viewer"
 
-export const ThumbnailCell = ({ row }: { row: Row<ParsedProduct> }) => {
+export const ThumbnailViewerCell = ({ row }: { row: { src: string | null; name: string }}) => {
   const [viewerOpen, setViewerOpen] = React.useState(false)
-  const src = row.getValue("thumbnail") as string | null
-  const productName = row.getValue("name") as string
 
   const gallery = [
     {
-      src: src,
-      label: productName,
-      alt: `${productName} Primary Image`,
+      src: row.src,
+      label: row.name,
+      alt: `${row.name} Primary Image`,
     },
   ]
 
@@ -23,25 +19,28 @@ export const ThumbnailCell = ({ row }: { row: Row<ParsedProduct> }) => {
     <>
       <button
         type="button"
-        disabled={!src}
+        disabled={!row.src}
         onClick={() => setViewerOpen(true)}
         className={cn(
           "relative flex h-10 w-10 shrink-0 items-center justify-center rounded-md border bg-muted overflow-hidden transition-opacity",
-          src ? "cursor-pointer hover:opacity-80" : "cursor-default"
+          row.src ? "cursor-pointer hover:opacity-80" : "cursor-default"
         )}
       >
-        {src ? (
+        {}
+        {row.src ? (
           <Image
-            src={src}
-            alt={productName || "Product Image"}
-            fill
-            sizes="40px"
-            className="object-cover"
+            src={row.src}
+            alt={row.name || "Product Image"}
+            className="w-full h-full object-cover"
+            width={36}
+            height={36}
           />
         ) : (
-          <ImageOff className="h-4 w-4 text-muted-foreground" />
+          <Package className="h-4 w-4 text-muted-foreground" />
         )}
+        {}
       </button>
+        
 
       <ImageViewerDialog
         open={viewerOpen}

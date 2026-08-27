@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server"
-import { prisma } from "@/lib/prisma" // Adjust to your Prisma instance import path
+import { prisma } from "@/lib/prisma"
 
-// Standard headers matching product-details-sample.csv
-const CSV_HEADERS = [
+// Headers for product details CSV
+const DETAILS_CSV_HEADERS = [
   "ProductName",
   "SKU",
   "Category",
@@ -62,10 +62,12 @@ const CSV_HEADERS = [
   "CountryOfOrigin",
 ]
 
+// Headers for product images CSV
+const IMAGES_CSV_HEADERS = ["ProductName", "Sku", "ImageUrl"]
+
 function escapeCsvField(val: unknown): string {
   if (val === null || val === undefined) return ""
   let str = String(val)
-  // If field contains quotes, commas, or newlines, wrap in quotes & escape internal double quotes
   if (str.includes('"') || str.includes(",") || str.includes("\n") || str.includes("\r")) {
     str = `"${str.replace(/"/g, '""')}"`
   }
@@ -76,17 +78,18 @@ export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
 
-    // Check if user selected specific row IDs
+    // Mode choice: "details" (default) or "images"
+    const exportTarget = searchParams.get("type") || "details"
+
+    // Row selection filter
     const selectedIdsParam = searchParams.get("ids")
     const selectedIds = selectedIdsParam ? selectedIdsParam.split(",").filter(Boolean) : []
 
     const whereClause: any = { deletedAt: null }
 
     if (selectedIds.length > 0) {
-      // Export specific selected rows only
       whereClause.id = { in: selectedIds }
     } else {
-      // Apply active query filters for "Export All" matching search criteria
       const search = searchParams.get("search")?.trim() || ""
       const statusParam = searchParams.get("status")
       const brands = searchParams.get("brands")?.split(",").filter(Boolean) || []
@@ -114,7 +117,51 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // Fetch matching products
+    // 🟢 Export Target: PRODUCT IMAGES
+    if (exportTarget === "images") {
+      const productsWithImages = await prisma.product.findMany({
+        where: whereClause,
+        select: {
+          name: true,
+          sku: true,
+          images: {
+            orderBy: { position: "asc" },
+            select: {
+              originalUrl: true,
+              largeUrl: true,
+              mediumUrl: true,
+              thumbUrl: true,
+            },
+          },
+        },
+        orderBy: { updatedAt: "desc" },
+      })
+
+      const rows: string[] = [IMAGES_CSV_HEADERS.join(",")]
+
+      for (const prod of productsWithImages) {
+        // Create a row for each image belonging to the product
+        if (prod.images && prod.images.length > 0) {
+          for (const img of prod.images) {
+            const imageUrl = img.originalUrl || img.largeUrl || img.mediumUrl || img.thumbUrl || ""
+            if (imageUrl) {
+              const rowData = [prod.name]
+              rows.push(rowData.map(escapeCsvField).join(","))
+            }
+          }
+        }
+      }
+
+      return new NextResponse(rows.join("\n"), {
+        status: 200,
+        headers: {
+          "Content-Type": "text/csv; charset=utf-8",
+          "Content-Disposition": `attachment; filename="product-images-export-${new Date().toISOString().split("T")[0]}.csv"`,
+        },
+      })
+    }
+
+    // 🟢 Export Target: PRODUCT DETAILS
     const products = await prisma.product.findMany({
       where: whereClause,
       include: {
@@ -123,92 +170,89 @@ export async function GET(request: NextRequest) {
         purchasingUom: { include: { uom: { select: { name: true, code: true } } } },
         salesUom: { include: { uom: { select: { name: true, code: true } } } },
         barcodes: { select: { barcode: true } },
-        lastVendor: { select: {
-            inflowId: true, 
-            businessPartner: { select: { name: true } } } },
+        lastVendor: {
+          select: {
+            inflowId: true,
+            businessPartner: { select: { name: true } },
+          },
+        },
         cost: true,
         prices: true,
       },
       orderBy: { updatedAt: "desc" },
     })
 
-    // Construct CSV Rows
-    const rows: string[] = [CSV_HEADERS.join(",")]
+    const rows: string[] = [DETAILS_CSV_HEADERS.join(",")]
 
     for (const prod of products) {
-      // Extract pricing maps if stored in prices array
-      const getPrice = (type: string) => prod.prices?.find((p: any) => p.priceType === type)?.unitPrice ?? ""
-
       const rowData: (string | number | boolean | null | undefined)[] = [
-        prod.name, // ProductName
-        prod.sku || "", // SKU
-        prod.category?.name || "Default Category", // Category
-        prod.itemType || "Stocked product", // ItemType
-        prod.trackSerials ?? false, // TrackSerials
-        "", // SerialPrefix
-        "", // SerialNextNumber
-        "", // SerialSuffix
-        prod.description || "", // Description
-        "", // DefaultUnitPrice
-        prod.trackLots ?? false, // TrackLots
-        prod.trackExpiry ?? false, // TrackExpiry
-        prod.shelfLifeDays ?? "", // ShelfLifeDays
-        prod.expiryNotificationDays ?? "", // ExpiryNotificationDays
-        prod.sellBeforeExpiryDays ?? "", // SellBeforeExpiryDays
-        "", // Markup
-        false, // IsFixedMarkup
-        true, // IsTaxInclusivePrice
-        "", // Dealers Price DR
-        "", // Dealers Price SI
-        "", // Ecom Price
-        "", // Special Discount
-        "", // _ SRP
-        "", // ___
-        "", // ____
-        prod.cost?.cost ? Number(prod.cost.cost) : "", // Cost
-        "", // SpecialTaxRate
-        prod.lastVendor?.businessPartner.name || "", // LastVendor
-        "", // VendorProductCode
-        "", // VendorPrice
-        prod.barcodes[0]?.barcode || "", // BarCode
-        prod.standardUomName || "", // Uom
-        prod.salesUom?.uom?.name || "", // SalesUom
-        prod.salesUom?.standardQuantity ? Number(prod.salesUom.standardQuantity) : 1, // SalesUomRatio1
-        prod.salesUom?.uomQuantity ? Number(prod.salesUom.uomQuantity) : 1, // SalesUomRatio2
-        prod.purchasingUom?.uom?.name || "", // PurchasingUom
-        prod.purchasingUom?.standardQuantity ? Number(prod.purchasingUom.standardQuantity) : 1, // PurchasingUomRatio1
-        prod.purchasingUom?.uomQuantity ? Number(prod.purchasingUom.uomQuantity) : 1, // PurchasingUomRatio2
-        prod.length ? Number(prod.length) : "", // ProductLength
-        prod.width ? Number(prod.width) : "", // ProductWidth
-        prod.height ? Number(prod.height) : "", // ProductHeight
-        prod.weight ? Number(prod.weight) : "", // ProductWeight
-        prod.remarks || "", // Remarks
-        prod.includeQuantityBuildable ?? false, // CombineQuantityBuildable
-        prod.autoAssemble ?? false, // AutoManufacture
-        "", // Rack #
-        "", // Freebie 1
-        "", // Freebie 2
-        "", // Movement
-        "", // Freebie 4
-        "", // Source LT
-        prod.brand?.name || "", // Brand
-        "", // Dealer Price Rule
-        "", // Promo
-        prod.isActive ?? true, // IsActive
-        prod.hsTariffNumber || "", // HsCode
-        prod.originCountry || "", // CountryOfOrigin
+        prod.name,
+        prod.sku || "",
+        prod.category?.name || "Default Category",
+        prod.itemType || "Stocked product",
+        prod.trackSerials ?? false,
+        "",
+        "",
+        "",
+        prod.description || "",
+        "",
+        prod.trackLots ?? false,
+        prod.trackExpiry ?? false,
+        prod.shelfLifeDays ?? "",
+        prod.expiryNotificationDays ?? "",
+        prod.sellBeforeExpiryDays ?? "",
+        "",
+        false,
+        true,
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        prod.cost?.cost ? Number(prod.cost.cost) : "",
+        "",
+        prod.lastVendor?.businessPartner?.name || "",
+        "",
+        "",
+        prod.barcodes[0]?.barcode || "",
+        prod.standardUomName || "",
+        prod.salesUom?.uom?.name || "",
+        prod.salesUom?.standardQuantity ? Number(prod.salesUom.standardQuantity) : 1,
+        prod.salesUom?.uomQuantity ? Number(prod.salesUom.uomQuantity) : 1,
+        prod.purchasingUom?.uom?.name || "",
+        prod.purchasingUom?.standardQuantity ? Number(prod.purchasingUom.standardQuantity) : 1,
+        prod.purchasingUom?.uomQuantity ? Number(prod.purchasingUom.uomQuantity) : 1,
+        prod.length ? Number(prod.length) : "",
+        prod.width ? Number(prod.width) : "",
+        prod.height ? Number(prod.height) : "",
+        prod.weight ? Number(prod.weight) : "",
+        prod.remarks || "",
+        prod.includeQuantityBuildable ?? false,
+        prod.autoAssemble ?? false,
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        prod.brand?.name || "",
+        "",
+        "",
+        prod.isActive ?? true,
+        prod.hsTariffNumber || "",
+        prod.originCountry || "",
       ]
 
       rows.push(rowData.map(escapeCsvField).join(","))
     }
 
-    const csvContent = rows.join("\n")
-
-    return new NextResponse(csvContent, {
+    return new NextResponse(rows.join("\n"), {
       status: 200,
       headers: {
         "Content-Type": "text/csv; charset=utf-8",
-        "Content-Disposition": `attachment; filename="product-export-${new Date().toISOString().split("T")[0]}.csv"`,
+        "Content-Disposition": `attachment; filename="product-details-export-${new Date().toISOString().split("T")[0]}.csv"`,
       },
     })
   } catch (error: any) {
@@ -219,3 +263,226 @@ export async function GET(request: NextRequest) {
     )
   }
 }
+
+// // app\api\admin\products\export\route.ts
+// import { NextRequest, NextResponse } from "next/server"
+// import { prisma } from "@/lib/prisma" // Adjust to your Prisma instance import path
+
+// // Standard headers matching product-details-sample.csv
+// const CSV_HEADERS = [
+//   "ProductName",
+//   "SKU",
+//   "Category",
+//   "ItemType",
+//   "TrackSerials",
+//   "SerialPrefix",
+//   "SerialNextNumber",
+//   "SerialSuffix",
+//   "Description",
+//   "DefaultUnitPrice",
+//   "TrackLots",
+//   "TrackExpiry",
+//   "ShelfLifeDays",
+//   "ExpiryNotificationDays",
+//   "SellBeforeExpiryDays",
+//   "Markup",
+//   "IsFixedMarkup",
+//   "IsTaxInclusivePrice",
+//   "Dealers Price DR",
+//   "Dealers Price SI",
+//   "Ecom Price",
+//   "Special Discount",
+//   "_ SRP",
+//   "___",
+//   "____",
+//   "Cost",
+//   "SpecialTaxRate",
+//   "LastVendor",
+//   "VendorProductCode",
+//   "VendorPrice",
+//   "BarCode",
+//   "Uom",
+//   "SalesUom",
+//   "SalesUomRatio1",
+//   "SalesUomRatio2",
+//   "PurchasingUom",
+//   "PurchasingUomRatio1",
+//   "PurchasingUomRatio2",
+//   "ProductLength",
+//   "ProductWidth",
+//   "ProductHeight",
+//   "ProductWeight",
+//   "Remarks",
+//   "CombineQuantityBuildable",
+//   "AutoManufacture",
+//   "Rack #",
+//   "Freebie 1",
+//   "Freebie 2",
+//   "Movement",
+//   "Freebie 4",
+//   "Source LT",
+//   "Brand",
+//   "Dealer Price Rule",
+//   "Promo",
+//   "IsActive",
+//   "HsCode",
+//   "CountryOfOrigin",
+// ]
+
+// function escapeCsvField(val: unknown): string {
+//   if (val === null || val === undefined) return ""
+//   let str = String(val)
+//   // If field contains quotes, commas, or newlines, wrap in quotes & escape internal double quotes
+//   if (str.includes('"') || str.includes(",") || str.includes("\n") || str.includes("\r")) {
+//     str = `"${str.replace(/"/g, '""')}"`
+//   }
+//   return str
+// }
+
+// export async function GET(request: NextRequest) {
+//   try {
+//     const { searchParams } = new URL(request.url)
+
+//     // Check if user selected specific row IDs
+//     const selectedIdsParam = searchParams.get("ids")
+//     const selectedIds = selectedIdsParam ? selectedIdsParam.split(",").filter(Boolean) : []
+
+//     const whereClause: any = { deletedAt: null }
+
+//     if (selectedIds.length > 0) {
+//       // Export specific selected rows only
+//       whereClause.id = { in: selectedIds }
+//     } else {
+//       // Apply active query filters for "Export All" matching search criteria
+//       const search = searchParams.get("search")?.trim() || ""
+//       const statusParam = searchParams.get("status")
+//       const brands = searchParams.get("brands")?.split(",").filter(Boolean) || []
+//       const categories = searchParams.get("categories")?.split(",").filter(Boolean) || []
+
+//       if (search) {
+//         whereClause.OR = [
+//           { name: { contains: search, mode: "insensitive" } },
+//           { sku: { contains: search, mode: "insensitive" } },
+//         ]
+//       }
+
+//       if (statusParam === "active") {
+//         whereClause.isActive = true
+//       } else if (statusParam === "inactive") {
+//         whereClause.isActive = false
+//       }
+
+//       if (brands.length > 0) {
+//         whereClause.brand = { id: { in: brands } }
+//       }
+
+//       if (categories.length > 0) {
+//         whereClause.category = { id: { in: categories } }
+//       }
+//     }
+
+//     // Fetch matching products
+//     const products = await prisma.product.findMany({
+//       where: whereClause,
+//       include: {
+//         brand: { select: { name: true } },
+//         category: { select: { name: true } },
+//         purchasingUom: { include: { uom: { select: { name: true, code: true } } } },
+//         salesUom: { include: { uom: { select: { name: true, code: true } } } },
+//         barcodes: { select: { barcode: true } },
+//         lastVendor: { select: {
+//             inflowId: true, 
+//             businessPartner: { select: { name: true } } } },
+//         cost: true,
+//         prices: true,
+//       },
+//       orderBy: { updatedAt: "desc" },
+//     })
+
+//     // Construct CSV Rows
+//     const rows: string[] = [CSV_HEADERS.join(",")]
+
+//     for (const prod of products) {
+//       // Extract pricing maps if stored in prices array
+//       const getPrice = (type: string) => prod.prices?.find((p: any) => p.priceType === type)?.unitPrice ?? ""
+
+//       const rowData: (string | number | boolean | null | undefined)[] = [
+//         prod.name, // ProductName
+//         prod.sku || "", // SKU
+//         prod.category?.name || "Default Category", // Category
+//         prod.itemType || "Stocked product", // ItemType
+//         prod.trackSerials ?? false, // TrackSerials
+//         "", // SerialPrefix
+//         "", // SerialNextNumber
+//         "", // SerialSuffix
+//         prod.description || "", // Description
+//         "", // DefaultUnitPrice
+//         prod.trackLots ?? false, // TrackLots
+//         prod.trackExpiry ?? false, // TrackExpiry
+//         prod.shelfLifeDays ?? "", // ShelfLifeDays
+//         prod.expiryNotificationDays ?? "", // ExpiryNotificationDays
+//         prod.sellBeforeExpiryDays ?? "", // SellBeforeExpiryDays
+//         "", // Markup
+//         false, // IsFixedMarkup
+//         true, // IsTaxInclusivePrice
+//         "", // Dealers Price DR
+//         "", // Dealers Price SI
+//         "", // Ecom Price
+//         "", // Special Discount
+//         "", // _ SRP
+//         "", // ___
+//         "", // ____
+//         prod.cost?.cost ? Number(prod.cost.cost) : "", // Cost
+//         "", // SpecialTaxRate
+//         prod.lastVendor?.businessPartner.name || "", // LastVendor
+//         "", // VendorProductCode
+//         "", // VendorPrice
+//         prod.barcodes[0]?.barcode || "", // BarCode
+//         prod.standardUomName || "", // Uom
+//         prod.salesUom?.uom?.name || "", // SalesUom
+//         prod.salesUom?.standardQuantity ? Number(prod.salesUom.standardQuantity) : 1, // SalesUomRatio1
+//         prod.salesUom?.uomQuantity ? Number(prod.salesUom.uomQuantity) : 1, // SalesUomRatio2
+//         prod.purchasingUom?.uom?.name || "", // PurchasingUom
+//         prod.purchasingUom?.standardQuantity ? Number(prod.purchasingUom.standardQuantity) : 1, // PurchasingUomRatio1
+//         prod.purchasingUom?.uomQuantity ? Number(prod.purchasingUom.uomQuantity) : 1, // PurchasingUomRatio2
+//         prod.length ? Number(prod.length) : "", // ProductLength
+//         prod.width ? Number(prod.width) : "", // ProductWidth
+//         prod.height ? Number(prod.height) : "", // ProductHeight
+//         prod.weight ? Number(prod.weight) : "", // ProductWeight
+//         prod.remarks || "", // Remarks
+//         prod.includeQuantityBuildable ?? false, // CombineQuantityBuildable
+//         prod.autoAssemble ?? false, // AutoManufacture
+//         "", // Rack #
+//         "", // Freebie 1
+//         "", // Freebie 2
+//         "", // Movement
+//         "", // Freebie 4
+//         "", // Source LT
+//         prod.brand?.name || "", // Brand
+//         "", // Dealer Price Rule
+//         "", // Promo
+//         prod.isActive ?? true, // IsActive
+//         prod.hsTariffNumber || "", // HsCode
+//         prod.originCountry || "", // CountryOfOrigin
+//       ]
+
+//       rows.push(rowData.map(escapeCsvField).join(","))
+//     }
+
+//     const csvContent = rows.join("\n")
+
+//     return new NextResponse(csvContent, {
+//       status: 200,
+//       headers: {
+//         "Content-Type": "text/csv; charset=utf-8",
+//         "Content-Disposition": `attachment; filename="product-export-${new Date().toISOString().split("T")[0]}.csv"`,
+//       },
+//     })
+//   } catch (error: any) {
+//     console.error("CSV Export failure:", error)
+//     return NextResponse.json(
+//       { error: "Failed to generate CSV export file." },
+//       { status: 500 }
+//     )
+//   }
+// }

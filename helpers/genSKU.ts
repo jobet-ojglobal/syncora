@@ -215,7 +215,8 @@ export function generateSku2Variant2V2G(
 export function generateSku2Variant2V2GNoSpace(
   brand: string,
   productName: string,
-  variants: string[] = []
+  variants: string[] = [],
+  separator: string = "-"
 ): string {
   // 1. Normalize and collapse spaces in brand
   const cleanBrand = brand ? brand.trim().replace(/\s+/g, " ") : "";
@@ -238,7 +239,7 @@ export function generateSku2Variant2V2GNoSpace(
         .split(/\s+/)
         .filter(Boolean)
         .map((part) => part.toUpperCase())
-        .join("-")
+        .join(separator)
     : "";
 
   // 5. Clean up each variant (trim, collapse internal spaces to hyphens, uppercase)
