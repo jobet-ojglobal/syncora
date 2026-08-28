@@ -5,6 +5,8 @@ import { cn } from "@/lib/utils";
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { ThemeProvider } from "@/providers/theme.provider";
+import { getCurrentUserBasic } from "@/lib/user";
+import { UserProvider } from "@/context/UserProvider";
 
 // Headings Font mapping to CSS variable --font-heading
 const jetbrainsMonoHeading = JetBrains_Mono({
@@ -83,11 +85,14 @@ export const metadata: Metadata = {
   },
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+
+  const user = await getCurrentUserBasic();
+
   return (
     <html
       lang="en"
@@ -107,7 +112,9 @@ export default function RootLayout({
           disableTransitionOnChange
         >
           <TooltipProvider>
-            {children}
+            {/* <UserProvider initialUser={user}> */}
+              {children}
+            {/* </UserProvider> */}
           </TooltipProvider>
           <Toaster richColors closeButton />
         </ThemeProvider>
