@@ -13,21 +13,22 @@ datasource db {
 }
 
 // Sync Logs
+
 model SyncJob {
-  id        String   @id @default(cuid())
-  source    String
-  status    String   @default("pending")
-  progress  Int      @default(0)
-  hasError       Boolean  @default(false)
+  id             String  @id @default(cuid())
+  source         String
+  status         String  @default("pending")
+  progress       Int     @default(0)
+  hasError       Boolean @default(false)
   error          String?
   errorType      String?
-  failedAttempts Int      @default(0)
+  failedAttempts Int     @default(0)
 
-  data      Json?
+  data Json?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-  
+
   @@index([status])
   @@index([createdAt])
   @@index([hasError])
@@ -35,64 +36,61 @@ model SyncJob {
 }
 
 // INFLOW MODELS
+
 model InflowWebhook {
-  id                      String   @id 
-  url                     String   @unique 
+  id                      String  @id
+  url                     String  @unique
   secret                  String?
   events                  Json
-  isDisabled              Boolean  @default(false)
-  consecutiveFailureCount Int      @default(0)
+  isDisabled              Boolean @default(false)
+  consecutiveFailureCount Int     @default(0)
   lastFailureMessage      String?
 
-  createdAt               DateTime @default(now())
-  updatedAt               DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@map("inflow_webhook")
 }
 
 model InflowWebhookEvent {
-  id          String   @id @default(cuid())
-  eventType   String
-  payload     Json
-  processed   Boolean @default(false)
-  receivedAt  DateTime @default(now())
+  id         String   @id @default(cuid())
+  eventType  String
+  payload    Json
+  processed  Boolean  @default(false)
+  receivedAt DateTime @default(now())
 
   @@index([eventType])
   @@index([receivedAt])
-
   @@map("inflow_webhook_event")
 }
 
-
 model LocationWebhook {
-  id                      String               @id @default(cuid())
-  locationId              String               
-  location                Location             @relation(fields: [locationId], references: [inflowId], onDelete: Cascade)
-  url                     String               @unique
+  id                      String                 @id @default(cuid())
+  locationId              String
+  location                Location               @relation(fields: [locationId], references: [inflowId], onDelete: Cascade)
+  url                     String                 @unique
   secret                  String?
-  events                  Json                 // Array of string event types, e.g., ["salesOrder", "currency", "taxingScheme"]
-  isDisabled              Boolean              @default(false)
-  consecutiveFailureCount Int                  @default(0)
+  events                  Json // Array of string event types, e.g., ["salesOrder", "currency", "taxingScheme"]
+  isDisabled              Boolean                @default(false)
+  consecutiveFailureCount Int                    @default(0)
   lastFailureMessage      String?
-  
-  createdAt               DateTime             @default(now())
-  updatedAt               DateTime             @updatedAt
-  
+  createdAt               DateTime               @default(now())
+  updatedAt               DateTime               @updatedAt
   deliveryLogs            LocationWebhookEvent[]
 
   @@map("location_webhook")
 }
 
 model LocationWebhookEvent {
-  id              String         @id @default(cuid())
+  id                String          @id @default(cuid())
   locationWebhookId String
-  webhook         LocationWebhook  @relation(fields: [locationWebhookId], references: [id], onDelete: Cascade)
-  eventType       String
-  payload         Json
-  responseStatus  Int?           // Store the receiver's HTTP status code (e.g., 200, 500)
-  errorMessage    String?        // Store error details if the fetch fails
-  processed       Boolean        @default(false)
-  receivedAt      DateTime       @default(now())
+  webhook           LocationWebhook @relation(fields: [locationWebhookId], references: [id], onDelete: Cascade)
+  eventType         String
+  payload           Json
+  responseStatus    Int? // Store the receiver's HTTP status code (e.g., 200, 500)
+  errorMessage      String? // Store error details if the fetch fails
+  processed         Boolean         @default(false)
+  receivedAt        DateTime        @default(now())
 
   @@index([eventType])
   @@index([receivedAt])
@@ -109,7 +107,6 @@ model PartnerWebhook {
   isDisabled              Boolean  @default(false)
   consecutiveFailureCount Int      @default(0)
   lastFailureMessage      String?
-  
   createdAt               DateTime @default(now())
   updatedAt               DateTime @updatedAt
 
@@ -128,89 +125,151 @@ model PartnerWebhookEvent {
   @@map("partner_webhook_event")
 }
 
+// enum UserRole {
+//   Admin
+//   StoreManager
+//   Customer
+//   InventoryClerk
+//   SalesAssociate
+//   Cashier
+//   WarehouseStaff
+//   Auditor
+//   SupportStaff
+// }
+
 enum UserRole {
   Admin
-  StoreManager
+  TeamMember
   Customer
-  InventoryClerk
-  SalesAssociate
-  Cashier
-  WarehouseStaff
-  Auditor
-  SupportStaff
 }
 
 model User {
-  id            String    @id // E.g., NextAuth / Clerk generated id
+  id            String   @id // E.g., NextAuth / Clerk generated id
+  username      String   @unique
+  displayUsername   String   
   name          String
-  email         String    @unique
-  emailVerified Boolean   @default(false)
+  email         String   @unique
+  emailVerified Boolean  @default(false)
   image         String?
-  
-  role          UserRole  @default(Customer)
+  role          UserRole @default(Customer)
 
   // --- RELATIONSHIP TO INFLOW TEAM MEMBER ---
-  teamMemberId  String?   @unique
-  teamMember    TeamMember? @relation(fields: [teamMemberId], references: [id], onDelete: SetNull)
+  teamMemberId String?     @unique
+  teamMember   TeamMember? @relation(fields: [teamMemberId], references: [id], onDelete: SetNull)
 
   inflowCustomerId String?   @unique
   inflowCustomer   Customer? @relation(fields: [inflowCustomerId], references: [id], onDelete: SetNull)
 
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
-  deletedAt     DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  locationId String?
+  sessions   Session[]
+  accounts   Account[]
 
   @@map("user")
 }
 
+
+model Session {
+  id        String   @id
+  expiresAt DateTime
+  token     String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  ipAddress String?
+  userAgent String?
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([token])
+  @@index([userId])
+  @@map("session")
+}
+
+model Account {
+  id                    String    @id
+  issuer                String
+  accountId             String
+  providerId            String
+  userId                String
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  accessToken           String?
+  refreshToken          String?
+  idToken               String?
+  accessTokenExpiresAt  DateTime?
+  refreshTokenExpiresAt DateTime?
+  scope                 String?
+  password              String?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  @@unique([issuer, accountId], map: "account_issuer_accountId_uidx")
+  @@index([userId])
+  @@map("account")
+}
+
+model Verification {
+  id         String   @id
+  identifier String
+  value      String
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([identifier])
+  @@map("verification")
+}
+
 model Brand {
-  id          String @id @default(cuid())
-  name        String @unique
+  id          String  @id @default(cuid())
+  name        String  @unique
   description String?
   logoUrl     String?
   websiteUrl  String?
 
-  products    Product[]
-  groups      ProductGroup[]
+  products Product[]
+  groups   ProductGroup[]
 
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  deletedAt   DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
 
   @@map("brand")
 }
 
 model Category {
-  id          String   @id @default(cuid())
-  inflowId    String   @unique
-  name        String
-  slug        String   @unique // e.g., "digital-cameras"
-  isDefault   Boolean  @default(false)    
-  description String?
-  imageUrl    String?
-  parentId          String?
-  parent            Category?  @relation("CategoryToCategory", fields: [parentId], references: [inflowId], onUpdate: Cascade)
-  children          Category[] @relation("CategoryToCategory")
-  productGroups     ProductGroup[]
-  products          Product[]
+  id            String         @id @default(cuid())
+  inflowId      String         @unique
+  name          String
+  slug          String         @unique // e.g., "digital-cameras"
+  isDefault     Boolean        @default(false)
+  description   String?
+  imageUrl      String?
+  parentId      String?
+  parent        Category?      @relation("CategoryToCategory", fields: [parentId], references: [inflowId], onUpdate: Cascade)
+  children      Category[]     @relation("CategoryToCategory")
+  productGroups ProductGroup[]
+  products      Product[]
 
-  localMappings     CategoryLocationMap[]
+  localMappings CategoryLocationMap[]
 
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
-  deletedAt         DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
 
   @@map("category")
 }
 
 model CategoryLocationMap {
-  id             String       @id @default(cuid())
-  categoryId     String       // References Category.inflowId
-  locationId     String       // References your Location table identifier
-  localId        Int          // The unique INT assigned by that specific local database
+  id         String @id @default(cuid())
+  categoryId String // References Category.inflowId
+  locationId String // References your Location table identifier
+  localId    Int // The unique INT assigned by that specific local database
 
-  location       Location? @relation(fields: [locationId], references: [inflowId], onDelete: Cascade)
-  category       Category     @relation(fields: [categoryId], references: [inflowId], onDelete: Cascade, onUpdate: Cascade)
+  location Location? @relation(fields: [locationId], references: [inflowId], onDelete: Cascade)
+  category Category  @relation(fields: [categoryId], references: [inflowId], onDelete: Cascade, onUpdate: Cascade)
 
   @@unique([categoryId, locationId])
   @@index([locationId, localId])
@@ -218,41 +277,40 @@ model CategoryLocationMap {
 }
 
 model ProductGroup {
-  id                String   @id @default(cuid())
-  inflowId          String   @unique
-  name              String 
-  slug              String   @unique 
-  description       String?  @db.Text
-  brandId           String?
-  categoryId        String?
-  isActive          Boolean
+  id          String  @id @default(cuid())
+  inflowId    String  @unique
+  name        String
+  slug        String  @unique
+  description String? @db.Text
+  brandId     String?
+  categoryId  String?
+  isActive    Boolean
 
-  brand             Brand?   @relation(fields: [brandId], references: [id])
-  category          Category? @relation(fields: [categoryId], references: [inflowId], onUpdate: Cascade)
+  brand    Brand?    @relation(fields: [brandId], references: [id])
+  category Category? @relation(fields: [categoryId], references: [inflowId], onUpdate: Cascade)
 
-  variants          ProductVariant[]
-  images            ProductImage[]
-  options           ProductGroupOption[]
-  tags              ProductGroupTag[]
-  features          ProductGroupFeature[]
+  variants ProductVariant[]
+  images   ProductImage[]
+  options  ProductGroupOption[]
+  tags     ProductGroupTag[]
+  features ProductGroupFeature[]
 
-  localMappings     ProductGroupLocationMap[]
-  
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
-  deletedAt         DateTime?
+  localMappings ProductGroupLocationMap[]
+  createdAt     DateTime                  @default(now())
+  updatedAt     DateTime                  @updatedAt
+  deletedAt     DateTime?
 
   @@map("product_group")
 }
 
 model ProductGroupLocationMap {
-  id             String       @id @default(cuid())
-  productGroupId String       // References ProductGroup.inflowId
-  locationId     String       // References your Location table identifier
-  localId        Int          // The unique INT assigned by that specific local database
+  id             String @id @default(cuid())
+  productGroupId String // References ProductGroup.inflowId
+  locationId     String // References your Location table identifier
+  localId        Int // The unique INT assigned by that specific local database
 
-  location       Location? @relation(fields: [locationId], references: [inflowId], onDelete: Cascade)
-  productGroup   ProductGroup @relation(fields: [productGroupId], references: [inflowId], onDelete: Cascade)
+  location     Location?    @relation(fields: [locationId], references: [inflowId], onDelete: Cascade)
+  productGroup ProductGroup @relation(fields: [productGroupId], references: [inflowId], onDelete: Cascade)
 
   @@unique([productGroupId, locationId])
   @@index([locationId, localId])
@@ -260,41 +318,40 @@ model ProductGroupLocationMap {
 }
 
 model ProductVariant {
-  id                String   @id @default(cuid())
-  inflowId          String   @unique
-  productGroupId    String
-  productId         String   @unique
-  defaultPrice      Decimal  @db.Decimal(18,5)
-  isActive          Boolean @default(true)
-  signature         String
-  variantCount      Int @default(0)
+  id             String  @id @default(cuid())
+  inflowId       String  @unique
+  productGroupId String
+  productId      String  @unique
+  defaultPrice   Decimal @db.Decimal(18, 5)
+  isActive       Boolean @default(true)
+  signature      String
+  variantCount   Int     @default(0)
 
-  group             ProductGroup @relation(fields: [productGroupId], references: [inflowId], onDelete: Cascade)
-  product           Product @relation(fields: [productId], references: [inflowId], onDelete: Cascade)
-  selections        ProductVariantSelection[]
+  group      ProductGroup              @relation(fields: [productGroupId], references: [inflowId], onDelete: Cascade)
+  product    Product                   @relation(fields: [productId], references: [inflowId], onDelete: Cascade)
+  selections ProductVariantSelection[]
 
-  localMappings     ProductVariantLocationMap[]
+  localMappings ProductVariantLocationMap[]
 
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
-  deletedAt         DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
 
   @@unique([productGroupId, productId])
   @@unique([productGroupId, signature])
   @@index([productGroupId])
   @@index([productId])
-
   @@map("product_variant")
 }
 
 model ProductVariantLocationMap {
-  id                String       @id @default(cuid())
-  productVariantId  String       // References ProductVariant.inflowId
-  locationId        String       // References your Location table identifier
-  localId           Int          // The unique INT assigned by that specific local database
+  id               String @id @default(cuid())
+  productVariantId String // References ProductVariant.inflowId
+  locationId       String // References your Location table identifier
+  localId          Int // The unique INT assigned by that specific local database
 
-  location          Location? @relation(fields: [locationId], references: [inflowId], onDelete: Cascade)
-  productVariant    ProductVariant @relation(fields: [productVariantId], references: [inflowId], onDelete: Cascade)
+  location       Location?      @relation(fields: [locationId], references: [inflowId], onDelete: Cascade)
+  productVariant ProductVariant @relation(fields: [productVariantId], references: [inflowId], onDelete: Cascade)
 
   @@unique([productVariantId, locationId])
   @@index([locationId, localId])
@@ -308,66 +365,66 @@ enum ProductType {
 }
 
 model Product {
-  id                      String   @id @default(cuid())
-  inflowId                String   @unique
-  sku                     String
-  name                    String
-  slug                    String   @unique 
-  description             String?
-  itemType                ProductType?
-  autoAssemble            Boolean @default(false)
-  isActive                Boolean @default(true)
-  isManufacturable        Boolean @default(false)
-  isCloudSynced           Boolean @default(false)
-  isLocalSynced           Boolean @default(false)
-  includeQuantityBuildable Boolean @default(false)
-  standardUomName         String?
-  trackExpiry             Boolean @default(false)
-  trackLots               Boolean @default(false)
-  trackSerials            Boolean @default(false)
-  shelfLifeDays           Int?
-  sellBeforeExpiryDays    Int?
-  expiryNotificationDays  Int?
-  weight                  Decimal? @db.Decimal(12,4)
-  width                   Decimal? @db.Decimal(12,4)
-  height                  Decimal? @db.Decimal(12,4)
-  length                  Decimal? @db.Decimal(12,4)
-  originCountry           String?
-  hsTariffNumber          String?
-  remarks                 String?
-  lastVendorId            String?
-  lastModifiedById        String?
+  id                       String       @id @default(cuid())
+  inflowId                 String       @unique
+  sku                      String
+  name                     String
+  slug                     String       @unique
+  description              String?
+  itemType                 ProductType?
+  autoAssemble             Boolean      @default(false)
+  isActive                 Boolean      @default(true)
+  isManufacturable         Boolean      @default(false)
+  isCloudSynced            Boolean      @default(false)
+  isLocalSynced            Boolean      @default(false)
+  includeQuantityBuildable Boolean      @default(false)
+  standardUomName          String?
+  trackExpiry              Boolean      @default(false)
+  trackLots                Boolean      @default(false)
+  trackSerials             Boolean      @default(false)
+  shelfLifeDays            Int?
+  sellBeforeExpiryDays     Int?
+  expiryNotificationDays   Int?
+  weight                   Decimal?     @db.Decimal(12, 4)
+  width                    Decimal?     @db.Decimal(12, 4)
+  height                   Decimal?     @db.Decimal(12, 4)
+  length                   Decimal?     @db.Decimal(12, 4)
+  originCountry            String?
+  hsTariffNumber           String?
+  remarks                  String?
+  lastVendorId             String?
+  lastModifiedById         String?
 
-  brandId           String?
-  brand             Brand? @relation(fields: [brandId], references: [id])
-  categoryId        String?
-  category          Category? @relation(fields: [categoryId], references: [inflowId], onUpdate: Cascade)
-  lastModifiedBy    TeamMember? @relation(fields: [lastModifiedById], references: [inflowId], onDelete: SetNull)
-  lastVendor        Vendor? @relation(fields: [lastVendorId], references: [inflowId])
+  brandId        String?
+  brand          Brand?      @relation(fields: [brandId], references: [id])
+  categoryId     String?
+  category       Category?   @relation(fields: [categoryId], references: [inflowId], onUpdate: Cascade)
+  lastModifiedBy TeamMember? @relation(fields: [lastModifiedById], references: [inflowId], onDelete: SetNull)
+  lastVendor     Vendor?     @relation(fields: [lastVendorId], references: [inflowId])
 
-  purchasingUom         PurchasingUom?
-  salesUom              SalesUom?
-  cost                  ProductCost?
-  variant               ProductVariant?
+  purchasingUom PurchasingUom?
+  salesUom      SalesUom?
+  cost          ProductCost?
+  variant       ProductVariant?
 
-  tags              ProductTag[]
-  features          ProductFeature[]
-  inventories       Inventory[]
-  inventoryBinItems    InventoryBinItem[]
-  adjustmentLines   InventoryAdjustmentLine[]
-  costAdjustments   ProductCostAdjustment[]
-  inventoryLedger   InventoryLedger[]
-  transferOrderLines  TransferOrderLine[]
-  barcodes          ProductBarcode[]
-  prices            ProductPrice[]
-  attachments       ProductAttachment[]
-  vendorItems       VendorItem[]
-  productOperations ProductOperation[]
-  taxCodes          ProductTaxCode[]
-  images            ProductImage[]
-  reorderSettings   ReorderSetting[]
-  bomComponents     ProductBom[]      @relation("ParentBom")
-  bomUsedIn         ProductBom[]      @relation("ChildBom")
+  tags               ProductTag[]
+  features           ProductFeature[]
+  inventories        Inventory[]
+  inventoryBinItems  InventoryBinItem[]
+  adjustmentLines    InventoryAdjustmentLine[]
+  costAdjustments    ProductCostAdjustment[]
+  inventoryLedger    InventoryLedger[]
+  transferOrderLines TransferOrderLine[]
+  barcodes           ProductBarcode[]
+  prices             ProductPrice[]
+  attachments        ProductAttachment[]
+  vendorItems        VendorItem[]
+  productOperations  ProductOperation[]
+  taxCodes           ProductTaxCode[]
+  images             ProductImage[]
+  reorderSettings    ReorderSetting[]
+  bomComponents      ProductBom[]              @relation("ParentBom")
+  bomUsedIn          ProductBom[]              @relation("ChildBom")
 
   orderLineItems         SalesOrderLine[]
   packLines              SalesOrderPackLine[]
@@ -376,32 +433,31 @@ model Product {
   pickAllocationLines    SalesOrderPickAllocationLine[]
   pickAllocationFailures SalesOrderPickAllocationFailure[]
 
-
   purchaseLines PurchaseOrderLine[]
   receiveLines  PurchaseOrderReceiveLine[]
   unstockLines  PurchaseOrderUnstockLine[]
 
   stockeAdjustmentLines StockAdjustmentLine[]
 
-  localMappings   ProductLocationMap[]
+  localMappings ProductLocationMap[]
 
-  customFields          Json?
+  customFields Json?
 
-  createdAt             DateTime @default(now())
-  updatedAt             DateTime @updatedAt
-  deletedAt             DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
 
   @@map("product")
 }
 
 model ProductLocationMap {
-  id             String       @id @default(cuid())
-  productId      String       // References Product.inflowId
-  locationId     String       // References your Location table identifier
-  localId        Int          // The unique INT assigned by that specific local database
+  id         String @id @default(cuid())
+  productId  String // References Product.inflowId
+  locationId String // References your Location table identifier
+  localId    Int // The unique INT assigned by that specific local database
 
-  location       Location? @relation(fields: [locationId], references: [inflowId], onDelete: Cascade)
-  product        Product      @relation(fields: [productId], references: [inflowId], onDelete: Cascade)
+  location Location? @relation(fields: [locationId], references: [inflowId], onDelete: Cascade)
+  product  Product   @relation(fields: [productId], references: [inflowId], onDelete: Cascade)
 
   @@unique([productId, locationId])
   @@index([locationId, localId])
@@ -409,45 +465,43 @@ model ProductLocationMap {
 }
 
 enum ProductPriceType {
-  FixedPrice  
-  FixedMarkup  
+  FixedPrice
+  FixedMarkup
 }
 
 model ProductPrice {
-  id                String   @id @default(cuid())
-  inflowId          String   @unique
-  pricingSchemeId   String
-  productId         String   
-  priceType         ProductPriceType
-  unitPrice         Decimal? @db.Decimal(18,5)
-  fixedMarkup       Decimal? @db.Decimal(18,5)
+  id              String           @id @default(cuid())
+  inflowId        String           @unique
+  pricingSchemeId String
+  productId       String
+  priceType       ProductPriceType
+  unitPrice       Decimal?         @db.Decimal(18, 5)
+  fixedMarkup     Decimal?         @db.Decimal(18, 5)
 
-  pricingScheme     PricingScheme @relation(fields: [pricingSchemeId], references: [inflowId], onDelete: Cascade)
-  product           Product @relation(fields: [productId],references: [inflowId], onDelete: Cascade)
+  pricingScheme PricingScheme @relation(fields: [pricingSchemeId], references: [inflowId], onDelete: Cascade)
+  product       Product       @relation(fields: [productId], references: [inflowId], onDelete: Cascade)
 
-  priceTiers        ProductPriceTier[]
-  localMappings     ProductPriceLocationMap[]
+  priceTiers    ProductPriceTier[]
+  localMappings ProductPriceLocationMap[]
 
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
-  deletedAt         DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
 
   @@unique([pricingSchemeId, productId, priceType])
-
   @@index([pricingSchemeId])
   @@index([productId])
-
   @@map("product_price")
 }
 
 model ProductPriceLocationMap {
-  id              String       @id @default(cuid())
-  productPriceId  String       // References ProductPrice.inflowId
-  locationId      String       // References your Location table identifier
-  localId         Int          // The unique INT assigned by that specific local database
+  id             String @id @default(cuid())
+  productPriceId String // References ProductPrice.inflowId
+  locationId     String // References your Location table identifier
+  localId        Int // The unique INT assigned by that specific local database
 
-  location        Location? @relation(fields: [locationId], references: [inflowId], onDelete: Cascade)
-  productPrice    ProductPrice @relation(fields: [productPriceId], references: [inflowId], onDelete: Cascade)
+  location     Location?    @relation(fields: [locationId], references: [inflowId], onDelete: Cascade)
+  productPrice ProductPrice @relation(fields: [productPriceId], references: [inflowId], onDelete: Cascade)
 
   @@unique([productPriceId, locationId])
   @@index([locationId, localId])
@@ -457,9 +511,8 @@ model ProductPriceLocationMap {
 model ProductPriceTier {
   id             String       @id @default(cuid())
   productPriceId String
-  minQuantity    Decimal      @db.Decimal(18,4) // e.g., 10.0000 units
-  unitPrice      Decimal      @db.Decimal(18,5)
-  
+  minQuantity    Decimal      @db.Decimal(18, 4) // e.g., 10.0000 units
+  unitPrice      Decimal      @db.Decimal(18, 5)
   productPrice   ProductPrice @relation(fields: [productPriceId], references: [id], onDelete: Cascade)
 
   @@index([productPriceId])
@@ -467,38 +520,37 @@ model ProductPriceTier {
 }
 
 model ProductCostAdjustment {
-  id                    String   @id @default(cuid())
-  inflowId              String   @unique
-  productId             String
-  lastModifiedById      String?
-  dateTime              DateTime
-  serial                String?
-  unitCost              Decimal  @db.Decimal(18,5)
+  id               String   @id @default(cuid())
+  inflowId         String   @unique
+  productId        String
+  lastModifiedById String?
+  dateTime         DateTime
+  serial           String?
+  unitCost         Decimal  @db.Decimal(18, 5)
 
-  product               Product @relation(fields: [productId],references: [inflowId], onDelete: Cascade)
-  lastModifiedBy        TeamMember? @relation(fields: [lastModifiedById],references: [inflowId], onDelete: SetNull)
+  product        Product     @relation(fields: [productId], references: [inflowId], onDelete: Cascade)
+  lastModifiedBy TeamMember? @relation(fields: [lastModifiedById], references: [inflowId], onDelete: SetNull)
 
-  localMappings         ProductCostAdjustmentLocationMap[]
+  localMappings ProductCostAdjustmentLocationMap[]
 
-  createdAt             DateTime @default(now())
-  updatedAt             DateTime @updatedAt
-  deletedAt             DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
 
   @@index([productId])
   @@index([lastModifiedById])
   @@index([dateTime])
-
   @@map("product_cost_adjustment")
 }
 
 model ProductCostAdjustmentLocationMap {
-  id                       String       @id @default(cuid())
-  productCostAdjustmentId  String       // References ProductCostAdjustment.inflowId
-  locationId               String       // References your Location table identifier
-  localId                  Int          // The unique INT assigned by that specific local database
+  id                      String @id @default(cuid())
+  productCostAdjustmentId String // References ProductCostAdjustment.inflowId
+  locationId              String // References your Location table identifier
+  localId                 Int // The unique INT assigned by that specific local database
 
-  location                 Location? @relation(fields: [locationId], references: [inflowId], onDelete: Cascade)
-  productCostAdjustment    ProductCostAdjustment @relation(fields: [productCostAdjustmentId], references: [inflowId], onDelete: Cascade)
+  location              Location?             @relation(fields: [locationId], references: [inflowId], onDelete: Cascade)
+  productCostAdjustment ProductCostAdjustment @relation(fields: [productCostAdjustmentId], references: [inflowId], onDelete: Cascade)
 
   @@unique([productCostAdjustmentId, locationId])
   @@index([locationId, localId])
@@ -506,32 +558,31 @@ model ProductCostAdjustmentLocationMap {
 }
 
 model ProductBarcode {
-  id            String @id @default(cuid())
-  inflowId      String @unique
-  productId     String
-  barcode       String @unique
-  lineNum       Int
-  product       Product @relation(fields: [productId],references: [inflowId], onDelete: Cascade)
+  id        String  @id @default(cuid())
+  inflowId  String  @unique
+  productId String
+  barcode   String  @unique
+  lineNum   Int
+  product   Product @relation(fields: [productId], references: [inflowId], onDelete: Cascade)
 
-  localMappings   ProductBarcodeLocationMap[]
+  localMappings ProductBarcodeLocationMap[]
 
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-  deletedAt     DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
 
   @@index([productId])
   @@unique([productId, lineNum])
-
   @@map("product_barcode")
 }
 
 model ProductBarcodeLocationMap {
-  id             String       @id @default(cuid())
-  productBarcodeId String     // References ProductBarcode.inflowId
-  locationId     String       // References your Location table identifier
-  localId        Int          // The unique INT assigned by that specific local database
+  id               String @id @default(cuid())
+  productBarcodeId String // References ProductBarcode.inflowId
+  locationId       String // References your Location table identifier
+  localId          Int // The unique INT assigned by that specific local database
 
-  location       Location? @relation(fields: [locationId], references: [inflowId], onDelete: Cascade)
+  location       Location?      @relation(fields: [locationId], references: [inflowId], onDelete: Cascade)
   productBarcode ProductBarcode @relation(fields: [productBarcodeId], references: [inflowId], onDelete: Cascade)
 
   @@unique([productBarcodeId, locationId])
@@ -540,25 +591,25 @@ model ProductBarcodeLocationMap {
 }
 
 model ProductOperation {
-  id                   String        @id @default(cuid())
-  inflowId             String        @unique
+  id                   String  @id @default(cuid())
+  inflowId             String  @unique
   productId            String
   operationTypeId      String
   lineNum              Int
-  cost                 Decimal       @db.Decimal(12, 4)
-  estimatedPerHourCost Decimal       @db.Decimal(12, 4)
-  estimatedSeconds     Decimal       @db.Decimal(12, 4)
-  instructions         String?       @db.Text
-  trackTime            Boolean       @default(false)
+  cost                 Decimal @db.Decimal(12, 4)
+  estimatedPerHourCost Decimal @db.Decimal(12, 4)
+  estimatedSeconds     Decimal @db.Decimal(12, 4)
+  instructions         String? @db.Text
+  trackTime            Boolean @default(false)
 
-  product              Product       @relation(fields: [productId], references: [inflowId], onDelete: Cascade)
-  operationType        OperationType @relation(fields: [operationTypeId], references: [inflowId])
+  product       Product       @relation(fields: [productId], references: [inflowId], onDelete: Cascade)
+  operationType OperationType @relation(fields: [operationTypeId], references: [inflowId])
 
-  localMappings        ProductOperationLocationMap[]
+  localMappings ProductOperationLocationMap[]
 
-  createdAt            DateTime      @default(now())
-  updatedAt            DateTime      @updatedAt
-  deletedAt            DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
 
   @@index([productId])
   @@index([operationTypeId])
@@ -567,12 +618,12 @@ model ProductOperation {
 }
 
 model ProductOperationLocationMap {
-  id               String       @id @default(cuid())
-  productOperationId String     // References ProductOperation.inflowId
-  locationId       String       // References your Location table identifier
-  localId          Int          // The unique INT assigned by that specific local database
+  id                 String @id @default(cuid())
+  productOperationId String // References ProductOperation.inflowId
+  locationId         String // References your Location table identifier
+  localId            Int // The unique INT assigned by that specific local database
 
-  location         Location? @relation(fields: [locationId], references: [inflowId], onDelete: Cascade)
+  location         Location?        @relation(fields: [locationId], references: [inflowId], onDelete: Cascade)
   productOperation ProductOperation @relation(fields: [productOperationId], references: [inflowId], onDelete: Cascade)
 
   @@unique([productOperationId, locationId])
@@ -581,32 +632,32 @@ model ProductOperationLocationMap {
 }
 
 model OperationType {
-  id                   String             @id @default(cuid())
-  inflowId             String             @unique
+  id                   String  @id @default(cuid())
+  inflowId             String  @unique
   name                 String
-  estimatedPerHourCost Decimal            @db.Decimal(12, 4)
-  isActive             Boolean            @default(true)
-  isDefault            Boolean            @default(false)
-  trackTime            Boolean            @default(false)
+  estimatedPerHourCost Decimal @db.Decimal(12, 4)
+  isActive             Boolean @default(true)
+  isDefault            Boolean @default(false)
+  trackTime            Boolean @default(false)
 
-  productOperations    ProductOperation[]
-  localMappings        OperationTypeLocationMap[]
+  productOperations ProductOperation[]
+  localMappings     OperationTypeLocationMap[]
 
-  createdAt            DateTime           @default(now())
-  updatedAt            DateTime           @updatedAt
-  deletedAt            DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
 
   @@map("operation_type")
 }
 
 model OperationTypeLocationMap {
-  id             String       @id @default(cuid())
-  operationTypeId String      // References OperationType.inflowId
-  locationId     String       // References your Location table identifier
-  localId        Int          // The unique INT assigned by that specific local database
+  id              String @id @default(cuid())
+  operationTypeId String // References OperationType.inflowId
+  locationId      String // References your Location table identifier
+  localId         Int // The unique INT assigned by that specific local database
 
-  location       Location? @relation(fields: [locationId], references: [inflowId], onDelete: Cascade)
-  operationType  OperationType @relation(fields: [operationTypeId], references: [inflowId], onDelete: Cascade)
+  location      Location?     @relation(fields: [locationId], references: [inflowId], onDelete: Cascade)
+  operationType OperationType @relation(fields: [operationTypeId], references: [inflowId], onDelete: Cascade)
 
   @@unique([operationTypeId, locationId])
   @@index([locationId, localId])
@@ -614,19 +665,19 @@ model OperationTypeLocationMap {
 }
 
 model ProductTaxCode {
-  id             String       @id @default(cuid())
-  productTaxCodeId String     @unique // Storing payload's productTaxCodeId explicitly
-  productId      String
-  taxCodeId      String
-  taxingSchemeId String
+  id               String @id @default(cuid())
+  productTaxCodeId String @unique // Storing payload's productTaxCodeId explicitly
+  productId        String
+  taxCodeId        String
+  taxingSchemeId   String
 
-  product        Product      @relation(fields: [productId], references: [inflowId], onDelete: Cascade)
-  taxCode        TaxCode      @relation(fields: [taxCodeId], references: [inflowId])
-  taxingScheme   TaxingScheme @relation(fields: [taxingSchemeId], references: [inflowId])
+  product      Product      @relation(fields: [productId], references: [inflowId], onDelete: Cascade)
+  taxCode      TaxCode      @relation(fields: [taxCodeId], references: [inflowId])
+  taxingScheme TaxingScheme @relation(fields: [taxingSchemeId], references: [inflowId])
 
-  createdAt      DateTime     @default(now())
-  updatedAt      DateTime     @updatedAt
-  deletedAt      DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
 
   @@index([productId])
   @@index([taxCodeId])
@@ -636,21 +687,21 @@ model ProductTaxCode {
 }
 
 model ProductAttachment {
-  id               String      @id @default(cuid())
-  inflowId         String      @unique // Storing payload's attachmentId
+  id               String  @id @default(cuid())
+  inflowId         String  @unique // Storing payload's attachmentId
   productId        String
   attachmentUrl    String
   fileName         String
   lastModifiedById String?
 
-  product          Product     @relation(fields: [productId], references: [inflowId], onDelete: Cascade)
-  lastModifiedBy   TeamMember? @relation(fields: [lastModifiedById], references: [inflowId], onDelete: SetNull)
+  product        Product     @relation(fields: [productId], references: [inflowId], onDelete: Cascade)
+  lastModifiedBy TeamMember? @relation(fields: [lastModifiedById], references: [inflowId], onDelete: SetNull)
 
-  localMappings      ProductAttachmentLocationMap[]
+  localMappings ProductAttachmentLocationMap[]
 
-  createdAt        DateTime    @default(now())
-  updatedAt        DateTime    @updatedAt
-  deletedAt        DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
 
   @@index([productId])
   @@index([lastModifiedById])
@@ -658,13 +709,13 @@ model ProductAttachment {
 }
 
 model ProductAttachmentLocationMap {
-  id                  String       @id @default(cuid())
-  productAttachmentId String       // References ProductAttachment.inflowId
-  locationId          String       // References your Location table identifier
-  localId             Int          // The unique INT assigned by that specific local database
+  id                  String @id @default(cuid())
+  productAttachmentId String // References ProductAttachment.inflowId
+  locationId          String // References your Location table identifier
+  localId             Int // The unique INT assigned by that specific local database
 
-  location            Location? @relation(fields: [locationId], references: [inflowId], onDelete: Cascade)
-  productAttachment   ProductAttachment @relation(fields: [productAttachmentId], references: [inflowId], onDelete: Cascade)
+  location          Location?         @relation(fields: [locationId], references: [inflowId], onDelete: Cascade)
+  productAttachment ProductAttachment @relation(fields: [productAttachmentId], references: [inflowId], onDelete: Cascade)
 
   @@unique([productAttachmentId, locationId])
   @@index([locationId, localId])
@@ -672,30 +723,30 @@ model ProductAttachmentLocationMap {
 }
 
 model ProductCost {
-  id            String   @id @default(cuid())
-  inflowId      String   @unique // Storing payload's productCostId
-  productId     String   @unique // Enforces 1:1 relation with Product
-  cost          Decimal  @db.Decimal(12, 4)
+  id        String  @id @default(cuid())
+  inflowId  String  @unique // Storing payload's productCostId
+  productId String  @unique // Enforces 1:1 relation with Product
+  cost      Decimal @db.Decimal(12, 4)
 
-  product       Product  @relation(fields: [productId], references: [inflowId], onDelete: Cascade)
+  product Product @relation(fields: [productId], references: [inflowId], onDelete: Cascade)
 
-  localMappings     ProductCostLocationMap[]
+  localMappings ProductCostLocationMap[]
 
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-  deletedAt     DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
 
   @@map("product_cost")
 }
 
 model ProductCostLocationMap {
-  id             String       @id @default(cuid())
-  productCostId  String       // References ProductCost.inflowId
-  locationId     String       // References your Location table identifier
-  localId        Int          // The unique INT assigned by that specific local database
+  id            String @id @default(cuid())
+  productCostId String // References ProductCost.inflowId
+  locationId    String // References your Location table identifier
+  localId       Int // The unique INT assigned by that specific local database
 
-  location       Location? @relation(fields: [locationId], references: [inflowId], onDelete: Cascade)
-  productCost    ProductCost  @relation(fields: [productCostId], references: [inflowId], onDelete: Cascade)
+  location    Location?   @relation(fields: [locationId], references: [inflowId], onDelete: Cascade)
+  productCost ProductCost @relation(fields: [productCostId], references: [inflowId], onDelete: Cascade)
 
   @@unique([productCostId, locationId])
   @@index([locationId, localId])
@@ -703,28 +754,28 @@ model ProductCostLocationMap {
 }
 
 model ReorderSetting {
-  id                 String   @id @default(cuid())
-  inflowId           String   @unique // Storing payload's reorderSettingsId
+  id                 String               @id @default(cuid())
+  inflowId           String               @unique // Storing payload's reorderSettingsId
   productId          String
   locationId         String
   fromLocationId     String?
   vendorId           String?
   defaultSublocation String?
-  enableReordering   Boolean  @default(true)
+  enableReordering   Boolean              @default(true)
   reorderMethod      ReorderSettingMethod // e.g., PurchaseOrder, TransferOrder
-  reorderPoint       Decimal  @db.Decimal(12, 4)
-  reorderQuantity    Decimal  @db.Decimal(12, 4)
+  reorderPoint       Decimal              @db.Decimal(12, 4)
+  reorderQuantity    Decimal              @db.Decimal(12, 4)
 
-  product            Product  @relation(fields: [productId], references: [inflowId], onDelete: Cascade)
-  location           Location @relation("TargetLocation", fields: [locationId], references: [inflowId], onDelete: Cascade)
-  fromLocation       Location? @relation("SourceLocation", fields: [fromLocationId], references: [inflowId], onDelete: SetNull)
-  vendor             Vendor?   @relation(fields: [vendorId], references: [inflowId], onDelete: SetNull)
+  product      Product   @relation(fields: [productId], references: [inflowId], onDelete: Cascade)
+  location     Location  @relation("TargetLocation", fields: [locationId], references: [inflowId], onDelete: Cascade)
+  fromLocation Location? @relation("SourceLocation", fields: [fromLocationId], references: [inflowId], onDelete: SetNull)
+  vendor       Vendor?   @relation(fields: [vendorId], references: [inflowId], onDelete: SetNull)
 
-  localMappings      ReorderSettingLocationMap[]
+  localMappings ReorderSettingLocationMap[]
 
-  createdAt          DateTime @default(now())
-  updatedAt          DateTime @updatedAt
-  deletedAt          DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
 
   @@index([productId])
   @@index([locationId])
@@ -739,13 +790,13 @@ enum ReorderSettingMethod {
 }
 
 model ReorderSettingLocationMap {
-  id              String       @id @default(cuid())
-  reorderSettingId String      // References reorderSetting.inflowId
-  locationId      String       // References your Location table identifier
-  localId         Int          // The unique INT assigned by that specific local database
+  id               String @id @default(cuid())
+  reorderSettingId String // References reorderSetting.inflowId
+  locationId       String // References your Location table identifier
+  localId          Int // The unique INT assigned by that specific local database
 
-  location        Location? @relation(fields: [locationId], references: [inflowId], onDelete: Cascade)
-  reorderSetting  ReorderSetting @relation(fields: [reorderSettingId], references: [inflowId], onDelete: Cascade)
+  location       Location?      @relation(fields: [locationId], references: [inflowId], onDelete: Cascade)
+  reorderSetting ReorderSetting @relation(fields: [reorderSettingId], references: [inflowId], onDelete: Cascade)
 
   @@unique([reorderSettingId, locationId])
   @@index([locationId, localId])
@@ -753,24 +804,23 @@ model ReorderSettingLocationMap {
 }
 
 model ProductBom {
-  id             String   @id @default(cuid())
-  inflowId       String    @unique
-  productId       String   @map("product_id")
-  childProductId  String   @map("child_product_id")
-  
+  id               String   @id @default(cuid())
+  inflowId         String   @unique
+  productId        String   @map("product_id")
+  childProductId   String   @map("child_product_id")
   // Quantity fields (flattened from InflowBomQuantity)
-  standardQuantity Decimal @db.Decimal(12, 4)
-  uomQuantity      Decimal @db.Decimal(12, 4)
+  standardQuantity Decimal  @db.Decimal(12, 4)
+  uomQuantity      Decimal  @db.Decimal(12, 4)
   uom              String?
   serialNumbers    String[] // Standard string array in PostgreSQL
 
-  timestamp        DateTime @default(now())
+  timestamp DateTime @default(now())
 
   // Relations to parent and child products
   product      Product @relation("ParentBom", fields: [productId], references: [inflowId], onDelete: Cascade)
   childProduct Product @relation("ChildBom", fields: [childProductId], references: [inflowId], onDelete: Cascade)
 
-  localMappings   ProductBomLocationMap[]
+  localMappings ProductBomLocationMap[]
 
   @@index([productId])
   @@index([childProductId])
@@ -800,13 +850,13 @@ model ProductBom {
 // }
 
 model ProductBomLocationMap {
-  id             String       @id @default(cuid())
-  productBomId   String       // References ProductBom.inflowId
-  locationId     String       // References your Location table identifier
-  localId        Int          // The unique INT assigned by that specific local database
+  id           String @id @default(cuid())
+  productBomId String // References ProductBom.inflowId
+  locationId   String // References your Location table identifier
+  localId      Int // The unique INT assigned by that specific local database
 
-  location       Location? @relation(fields: [locationId], references: [inflowId], onDelete: Cascade)
-  productBom     ProductBom   @relation(fields: [productBomId], references: [inflowId], onDelete: Cascade)
+  location   Location?  @relation(fields: [locationId], references: [inflowId], onDelete: Cascade)
+  productBom ProductBom @relation(fields: [productBomId], references: [inflowId], onDelete: Cascade)
 
   @@unique([productBomId, locationId])
   @@index([locationId, localId])
@@ -816,53 +866,53 @@ model ProductBomLocationMap {
 // =========================
 
 model PurchasingUom {
-  id               String @id @default(cuid())
-  productId        String @unique
+  id               String        @id @default(cuid())
+  productId        String        @unique
   uomId            String
-  standardQuantity Decimal @db.Decimal(18,4)
-  uomQuantity      Decimal @db.Decimal(18,4)
-  product          Product @relation(fields: [productId], references: [inflowId], onDelete: Cascade)
+  standardQuantity Decimal       @db.Decimal(18, 4)
+  uomQuantity      Decimal       @db.Decimal(18, 4)
+  product          Product       @relation(fields: [productId], references: [inflowId], onDelete: Cascade)
   uom              UnitOfMeasure @relation(fields: [uomId], references: [id], onDelete: Cascade)
 
   @@map("purchasing_uom")
 }
 
 model SalesUom {
-  id               String @id @default(cuid())
-  productId        String @unique
+  id               String        @id @default(cuid())
+  productId        String        @unique
   uomId            String
-  standardQuantity Decimal @db.Decimal(18,4)
-  uomQuantity      Decimal @db.Decimal(18,4)
-  product          Product @relation(fields: [productId], references: [inflowId], onDelete: Cascade)
+  standardQuantity Decimal       @db.Decimal(18, 4)
+  uomQuantity      Decimal       @db.Decimal(18, 4)
+  product          Product       @relation(fields: [productId], references: [inflowId], onDelete: Cascade)
   uom              UnitOfMeasure @relation(fields: [uomId], references: [id], onDelete: Cascade)
 
   @@map("sales_uom")
 }
 
 model UnitOfMeasure {
-  id         String @id @default(cuid())
-  code       String @unique
-  name       String
-  category   UomCategory
-  baseFactor Decimal @db.Decimal(18,6)
-  isActive   Boolean @default(true)
+  id              String           @id @default(cuid())
+  code            String           @unique
+  name            String
+  category        UomCategory
+  baseFactor      Decimal          @db.Decimal(18, 6)
+  isActive        Boolean          @default(true)
   fromConversions UnitConversion[] @relation("FromUnit")
   toConversions   UnitConversion[] @relation("ToUnit")
   salesUoms       SalesUom[]
   purchasingUoms  PurchasingUom[]
 
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-  deletedAt       DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
 
   @@map("unit_of_measure")
 }
 
 model UnitConversion {
-  id        String @id @default(cuid())
+  id        String        @id @default(cuid())
   fromUomId String
   toUomId   String
-  factor    Decimal @db.Decimal(18,6)
+  factor    Decimal       @db.Decimal(18, 6)
   fromUom   UnitOfMeasure @relation("FromUnit", fields: [fromUomId], references: [id])
   toUom     UnitOfMeasure @relation("ToUnit", fields: [toUomId], references: [id])
 
@@ -879,40 +929,39 @@ enum UomCategory {
 }
 
 model ProductImage {
-  id                  String @id @default(cuid())
-  inflowId            String @unique
-  groupId             String?
-  productId           String?
-  position            Int @default(0)
-  largeUrl            String?
-  mediumUncroppedUrl  String?
-  mediumUrl           String?
-  originalUrl         String?
-  smallUrl            String?
-  thumbUrl            String?
-  group               ProductGroup? @relation(fields: [groupId], references: [inflowId], onDelete: Cascade)
-  product             Product? @relation(fields: [productId], references: [inflowId], onDelete: Cascade)
+  id                 String        @id @default(cuid())
+  inflowId           String        @unique
+  groupId            String?
+  productId          String?
+  position           Int           @default(0)
+  largeUrl           String?
+  mediumUncroppedUrl String?
+  mediumUrl          String?
+  originalUrl        String?
+  smallUrl           String?
+  thumbUrl           String?
+  group              ProductGroup? @relation(fields: [groupId], references: [inflowId], onDelete: Cascade)
+  product            Product?      @relation(fields: [productId], references: [inflowId], onDelete: Cascade)
 
-  localMappings       ProductImageLocationMap[]
+  localMappings ProductImageLocationMap[]
 
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([groupId, position])
   @@index([productId, position])
-
   @@map("product_image")
 }
 
 model ProductImageLocationMap {
-  id             String       @id @default(cuid())
-  productImageId String       // References ProductImage.inflowId
-  locationId     String       // References your Location table identifier
-  localId        Int          // The unique INT assigned by that specific local database
+  id             String  @id @default(cuid())
+  productImageId String // References ProductImage.inflowId
+  locationId     String // References your Location table identifier
+  localId        Int // The unique INT assigned by that specific local database
   imageUrl       String?
 
-  location       Location? @relation(fields: [locationId], references: [inflowId], onDelete: Cascade)
-  productImage   ProductImage @relation(fields: [productImageId], references: [inflowId], onDelete: Cascade)
+  location     Location?    @relation(fields: [locationId], references: [inflowId], onDelete: Cascade)
+  productImage ProductImage @relation(fields: [productImageId], references: [inflowId], onDelete: Cascade)
 
   @@unique([productImageId, locationId])
   @@index([locationId, localId])
@@ -920,81 +969,78 @@ model ProductImageLocationMap {
 }
 
 model Attribute {
-  id        String @id @default(cuid())
-  name      String @unique
-  values    AttributeValue[]
+  id            String               @id @default(cuid())
+  name          String               @unique
+  values        AttributeValue[]
   inflowOptions ProductGroupOption[]
 
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-  deletedAt       DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
 
   @@map("attribute")
 }
 
 model AttributeValue {
-  id          String @id @default(cuid())
-  value       String
-  hexCode     String?
-  attributeId String
-  attribute   Attribute @relation(fields: [attributeId], references: [id], onDelete: Cascade)
+  id           String                    @id @default(cuid())
+  value        String
+  hexCode      String?
+  attributeId  String
+  attribute    Attribute                 @relation(fields: [attributeId], references: [id], onDelete: Cascade)
   inflowValues ProductGroupOptionValue[]
 
   @@unique([attributeId, value])
 }
 
-
 model ProductVariantSelection {
-  id                     String @id @default(cuid())
-  variantId              String
-  optionId               String
-  optionValueId          String
+  id            String @id @default(cuid())
+  variantId     String
+  optionId      String
+  optionValueId String
 
-  variant                ProductVariant @relation(fields: [variantId],references: [inflowId], onDelete: Cascade)
-  option                 ProductGroupOption @relation(fields: [optionId],references: [inflowId], onDelete: Cascade)
-  optionValue            ProductGroupOptionValue @relation(fields: [optionValueId], references: [inflowId], onDelete: Cascade)
+  variant     ProductVariant          @relation(fields: [variantId], references: [inflowId], onDelete: Cascade)
+  option      ProductGroupOption      @relation(fields: [optionId], references: [inflowId], onDelete: Cascade)
+  optionValue ProductGroupOptionValue @relation(fields: [optionValueId], references: [inflowId], onDelete: Cascade)
 
-  createdAt              DateTime @default(now())
+  createdAt DateTime @default(now())
 
   @@index([variantId])
   @@index([optionId])
   @@index([optionValueId])
-  @@unique([variantId,optionId])
-
+  @@unique([variantId, optionId])
   @@map("product_variant_selection")
 }
 
 model ProductGroupOption {
-  id                    String @id @default(cuid())
-  inflowId              String @unique
-  productGroupId        String
-  lineNum               Int
+  id             String @id @default(cuid())
+  inflowId       String @unique
+  productGroupId String
+  lineNum        Int
 
-  attributeId           String
-  attribute             Attribute @relation(fields: [attributeId], references: [id], onDelete: Cascade)
+  attributeId String
+  attribute   Attribute @relation(fields: [attributeId], references: [id], onDelete: Cascade)
 
-  productGroup          ProductGroup @relation(fields: [productGroupId],references: [inflowId], onDelete: Cascade)
-  values                ProductGroupOptionValue[]
-  variantSelections     ProductVariantSelection[]
-  localMappings         ProductGroupOptionLocationMap[]
+  productGroup      ProductGroup                    @relation(fields: [productGroupId], references: [inflowId], onDelete: Cascade)
+  values            ProductGroupOptionValue[]
+  variantSelections ProductVariantSelection[]
+  localMappings     ProductGroupOptionLocationMap[]
 
-  createdAt             DateTime @default(now())
-  updatedAt             DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([productGroupId])
   @@unique([productGroupId, attributeId])
-
   @@map("product_group_option")
 }
 
 model ProductGroupOptionLocationMap {
-  id                    String       @id @default(cuid())
-  productGroupOptionId  String       // References ProductGroupOption.inflowId
-  locationId            String       // References your Location table identifier
-  localId               Int          // The unique INT assigned by that specific local database
+  id                   String @id @default(cuid())
+  productGroupOptionId String // References ProductGroupOption.inflowId
+  locationId           String // References your Location table identifier
+  localId              Int // The unique INT assigned by that specific local database
 
-  location              Location? @relation(fields: [locationId], references: [inflowId], onDelete: Cascade)
-  productGroupOption    ProductGroupOption @relation(fields: [productGroupOptionId], references: [inflowId], onDelete: Cascade)
+  location           Location?          @relation(fields: [locationId], references: [inflowId], onDelete: Cascade)
+  productGroupOption ProductGroupOption @relation(fields: [productGroupOptionId], references: [inflowId], onDelete: Cascade)
 
   @@unique([productGroupOptionId, locationId])
   @@index([locationId, localId])
@@ -1002,37 +1048,35 @@ model ProductGroupOptionLocationMap {
 }
 
 model ProductGroupOptionValue {
-  id                     String @id @default(cuid())
-  inflowId               String @unique
-  optionId               String
-  lineNum                Int
+  id       String @id @default(cuid())
+  inflowId String @unique
+  optionId String
+  lineNum  Int
 
-  attributeValueId       String
-  attributeValue         AttributeValue @relation(fields: [attributeValueId], references: [id], onDelete: Cascade)
+  attributeValueId String
+  attributeValue   AttributeValue @relation(fields: [attributeValueId], references: [id], onDelete: Cascade)
 
-  option                 ProductGroupOption @relation(fields: [optionId],references: [inflowId], onDelete: Cascade)
-  variantSelections      ProductVariantSelection[]
-  localMappings          ProductGroupOptionValueLocationMap[]
+  option            ProductGroupOption                   @relation(fields: [optionId], references: [inflowId], onDelete: Cascade)
+  variantSelections ProductVariantSelection[]
+  localMappings     ProductGroupOptionValueLocationMap[]
 
-  createdAt              DateTime @default(now())
-  updatedAt              DateTime @updatedAt
-  
-  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
   @@index([optionId])
   @@unique([optionId, attributeValueId])
   @@unique([optionId, lineNum])
-
   @@map("product_group_option_value")
 }
 
 model ProductGroupOptionValueLocationMap {
-  id                        String       @id @default(cuid())
-  productGroupOptionValueId String       // References ProductGroupOptionValue.inflowId
-  locationId                String       // References your Location table identifier
-  localId                   Int          // The unique INT assigned by that specific local database
+  id                        String @id @default(cuid())
+  productGroupOptionValueId String // References ProductGroupOptionValue.inflowId
+  locationId                String // References your Location table identifier
+  localId                   Int // The unique INT assigned by that specific local database
 
-  location                  Location? @relation(fields: [locationId], references: [inflowId], onDelete: Cascade)
-  productGroupOptionValue   ProductGroupOptionValue @relation(fields: [productGroupOptionValueId], references: [inflowId], onDelete: Cascade)
+  location                Location?               @relation(fields: [locationId], references: [inflowId], onDelete: Cascade)
+  productGroupOptionValue ProductGroupOptionValue @relation(fields: [productGroupOptionValueId], references: [inflowId], onDelete: Cascade)
 
   @@unique([productGroupOptionValueId, locationId])
   @@index([locationId, localId])
@@ -1040,44 +1084,43 @@ model ProductGroupOptionValueLocationMap {
 }
 
 // customFields.custom2
-model Feature {
-  id          String @id @default(cuid())
-  name        String @unique // e.g., "Sensor", "Max Resolution", "Weather Sealing"
-  products    ProductFeature[]
-  groups      ProductGroupFeature[]
-  values      FeatureValue[]
 
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  
+model Feature {
+  id       String                @id @default(cuid())
+  name     String                @unique // e.g., "Sensor", "Max Resolution", "Weather Sealing"
+  products ProductFeature[]
+  groups   ProductGroupFeature[]
+  values   FeatureValue[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
   @@map("feature")
 }
 
 model FeatureValue {
-  id String @id @default(cuid())
+  id        String @id @default(cuid())
   featureId String
-  value String
+  value     String
 
-  feature Feature @relation(fields: [featureId], references: [id], onDelete: Cascade)
-  products  ProductFeature[]
-  groups    ProductGroupFeature[]
+  feature  Feature               @relation(fields: [featureId], references: [id], onDelete: Cascade)
+  products ProductFeature[]
+  groups   ProductGroupFeature[]
 
   @@unique([featureId, value])
-
   @@map("feature_value")
 }
 
 model ProductGroupFeature {
-  groupId   String
-  featureId String
+  groupId        String
+  featureId      String
   featureValueId String
 
-  group          ProductGroup @relation(fields: [groupId], references: [inflowId], onDelete: Cascade)
-  feature        Feature @relation(fields: [featureId], references: [id], onDelete: Cascade)
-  featureValue   FeatureValue @relation(fields: [featureValueId], references: [id], onDelete: Cascade)
+  group        ProductGroup @relation(fields: [groupId], references: [inflowId], onDelete: Cascade)
+  feature      Feature      @relation(fields: [featureId], references: [id], onDelete: Cascade)
+  featureValue FeatureValue @relation(fields: [featureValueId], references: [id], onDelete: Cascade)
 
   @@id([groupId, featureId])
-
   @@map("group_feature")
 }
 
@@ -1085,25 +1128,24 @@ model ProductFeature {
   productId      String
   featureId      String
   featureValueId String
-  
-  product        Product @relation(fields: [productId], references: [inflowId], onDelete: Cascade)
-  feature        Feature @relation(fields: [featureId], references: [id], onDelete: Cascade)
+  product        Product      @relation(fields: [productId], references: [inflowId], onDelete: Cascade)
+  feature        Feature      @relation(fields: [featureId], references: [id], onDelete: Cascade)
   featureValue   FeatureValue @relation(fields: [featureValueId], references: [id], onDelete: Cascade)
 
   @@id([productId, featureId])
-
   @@map("product_feature")
 }
 
 // customFields.custom3
-model Tag {
-  id          String @id @default(cuid())
-  name        String @unique
-  products    ProductTag[]
-  groups      ProductGroupTag[]
 
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+model Tag {
+  id       String            @id @default(cuid())
+  name     String            @unique
+  products ProductTag[]
+  groups   ProductGroupTag[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@map("tag")
 }
@@ -1112,23 +1154,21 @@ model ProductGroupTag {
   groupId String
   tagId   String
 
-  group          ProductGroup? @relation(fields: [groupId], references: [inflowId], onDelete: Cascade)
-  tag   Tag  @relation(fields: [tagId], references: [id], onDelete: Cascade)
+  group ProductGroup? @relation(fields: [groupId], references: [inflowId], onDelete: Cascade)
+  tag   Tag           @relation(fields: [tagId], references: [id], onDelete: Cascade)
 
   @@id([groupId, tagId])
-
   @@map("group_tag")
 }
 
 model ProductTag {
-  productId      String
-  tagId          String
+  productId String
+  tagId     String
 
-  product        Product @relation(fields: [productId], references: [inflowId], onDelete: Cascade)
-  tag            Tag @relation(fields: [tagId], references: [id], onDelete: Cascade)
+  product Product @relation(fields: [productId], references: [inflowId], onDelete: Cascade)
+  tag     Tag     @relation(fields: [tagId], references: [id], onDelete: Cascade)
 
   @@id([productId, tagId])
-
   @@map("product_tag")
 }
 
@@ -1148,136 +1188,128 @@ enum LocationType {
 // Locations
 
 model Location {
-  id              String   @id @default(cuid())
-  inflowId        String   @unique
-  name            String
-  isActive        Boolean  @default(true)
-  isDefault       Boolean  @default(false)
-  locationType    LocationType  @default(STORE)
-  status          LocationStatus @default(ACTIVE)
-  url             String?
-  imageUrl        String?
-  
-  address             LocationAddress?
-  inventories         Inventory[]
-  inventoryBinItems   InventoryBinItem[]
-  sublocations        Sublocation[]
-  linkedSublocation   Sublocation[] @relation("LocationLink")
-  adjustmentLines     InventoryAdjustmentLine[]
-  inventoryLedger     InventoryLedger[]
-  teamLocations       TeamMemberLocation[]
-  customers           Customer[]
-  salesOrders         SalesOrder[]
-  purchaseOrders      PurchaseOrder[]
+  id                String                    @id @default(cuid())
+  inflowId          String                    @unique
+  name              String
+  isActive          Boolean                   @default(true)
+  isDefault         Boolean                   @default(false)
+  locationType      LocationType              @default(STORE)
+  status            LocationStatus            @default(ACTIVE)
+  url               String?
+  imageUrl          String?
+  address           LocationAddress?
+  inventories       Inventory[]
+  inventoryBinItems InventoryBinItem[]
+  sublocations      Sublocation[]
+  linkedSublocation Sublocation[]             @relation("LocationLink")
+  adjustmentLines   InventoryAdjustmentLine[]
+  inventoryLedger   InventoryLedger[]
+  teamLocations     TeamMemberLocation[]
+  customers         Customer[]
+  salesOrders       SalesOrder[]
+  purchaseOrders    PurchaseOrder[]
 
   ledgerFromLocations InventoryLedger[] @relation("LedgerFromLocation")
   ledgerToLocations   InventoryLedger[] @relation("LedgerToLocation")
-  
-  outgoingTransfers TransferOrder[] @relation("TransferSourceLocation")
-  incomingTransfers TransferOrder[]  @relation("TransferTargetLocation")
-  reorderTargets    ReorderSetting[] @relation("TargetLocation")
-  reorderSources    ReorderSetting[] @relation("SourceLocation")
-  webhooks          LocationWebhook[]
+  outgoingTransfers   TransferOrder[]   @relation("TransferSourceLocation")
+  incomingTransfers   TransferOrder[]   @relation("TransferTargetLocation")
+  reorderTargets      ReorderSetting[]  @relation("TargetLocation")
+  reorderSources      ReorderSetting[]  @relation("SourceLocation")
+  webhooks            LocationWebhook[]
 
-  inventoryPreferredSource   Inventory[]  @relation("PreferredReplenishmentLocation")    
+  inventoryPreferredSource Inventory[]       @relation("PreferredReplenishmentLocation")
+  stockAdjustments         StockAdjustment[]
 
-  stockAdjustments  StockAdjustment[]
-
-  localTaxingSchemeMappings  TaxingSchemeLocationMap[]
-  localTaxCodeMappings       TaxCodeLocationMap[]
-  localCategoryMappings      CategoryLocationMap[]
-  localProductGroupMappings  ProductGroupLocationMap[]
-  localProductVariantMappings ProductVariantLocationMap[]
-  localProductMappings       ProductLocationMap[]
-  localProductPriceMappings  ProductPriceLocationMap[]
-  localProductCostAdjustmentMappings ProductCostAdjustmentLocationMap[]
-  localProductBarcodeMappings ProductBarcodeLocationMap[]
-  localProductOperationMappings ProductOperationLocationMap[]
-  localOperationTypeMappings OperationTypeLocationMap[]
-  localProductAttachmentMappings ProductAttachmentLocationMap[]
-  localProductCostMappings   ProductCostLocationMap[]
-  localReorderSettingMappings ReorderSettingLocationMap[]
-  localProductBomMappings    ProductBomLocationMap[]
-  localProductImageMappings  ProductImageLocationMap[]
-  localProductGroupOptionMappings ProductGroupOptionLocationMap[]
+  localTaxingSchemeMappings            TaxingSchemeLocationMap[]
+  localTaxCodeMappings                 TaxCodeLocationMap[]
+  localCategoryMappings                CategoryLocationMap[]
+  localProductGroupMappings            ProductGroupLocationMap[]
+  localProductVariantMappings          ProductVariantLocationMap[]
+  localProductMappings                 ProductLocationMap[]
+  localProductPriceMappings            ProductPriceLocationMap[]
+  localProductCostAdjustmentMappings   ProductCostAdjustmentLocationMap[]
+  localProductBarcodeMappings          ProductBarcodeLocationMap[]
+  localProductOperationMappings        ProductOperationLocationMap[]
+  localOperationTypeMappings           OperationTypeLocationMap[]
+  localProductAttachmentMappings       ProductAttachmentLocationMap[]
+  localProductCostMappings             ProductCostLocationMap[]
+  localReorderSettingMappings          ReorderSettingLocationMap[]
+  localProductBomMappings              ProductBomLocationMap[]
+  localProductImageMappings            ProductImageLocationMap[]
+  localProductGroupOptionMappings      ProductGroupOptionLocationMap[]
   localProductGroupOptionValueMappings ProductGroupOptionValueLocationMap[]
-  localCurrencyMappings      CurrencyLocationMap[]
-  localPricingSchemeMappings PricingSchemeLocationMap[]
-  localPaymentTermMappings   PaymentTermLocationMap[]
-  localTeamMemberMappingsExtended TeamMemberLocationMapExtended[]
-  localCustomerMappings      CustomerLocationMap[]
-  localCustomerDueMappings   CustomerDueLocationMap[]
-  localCustomerBalanceMappings CustomerBalanceLocationMap[]
-  localCustomerCreditMappings CustomerCreditLocationMap[]
-  localVendorMappings        VendorLocationMap[]
-  localVendorAttachmentMappings VendorAttachmentLocationMap[]
-  localVendorItemMappings    VendorItemLocationMap[]
-  localVendorDueMappings     VendorDueLocationMap[]
-  localVendorBalanceMappings VendorBalanceLocationMap[]
-  localVendorCreditMappings  VendorCreditLocationMap[]
-  localSalesOrderMappings    SalesOrderLocationMap[]
-  localPurchaseOrderMappings PurchaseOrderLocationMap[]
-  sublocationLocalMappings SublocationLocationMap[]
-  
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-  deletedAt   DateTime?
+  localCurrencyMappings                CurrencyLocationMap[]
+  localPricingSchemeMappings           PricingSchemeLocationMap[]
+  localPaymentTermMappings             PaymentTermLocationMap[]
+  localTeamMemberMappingsExtended      TeamMemberLocationMapExtended[]
+  localCustomerMappings                CustomerLocationMap[]
+  localCustomerDueMappings             CustomerDueLocationMap[]
+  localCustomerBalanceMappings         CustomerBalanceLocationMap[]
+  localCustomerCreditMappings          CustomerCreditLocationMap[]
+  localVendorMappings                  VendorLocationMap[]
+  localVendorAttachmentMappings        VendorAttachmentLocationMap[]
+  localVendorItemMappings              VendorItemLocationMap[]
+  localVendorDueMappings               VendorDueLocationMap[]
+  localVendorBalanceMappings           VendorBalanceLocationMap[]
+  localVendorCreditMappings            VendorCreditLocationMap[]
+  localSalesOrderMappings              SalesOrderLocationMap[]
+  localPurchaseOrderMappings           PurchaseOrderLocationMap[]
+  sublocationLocalMappings             SublocationLocationMap[]
+  createdAt                            DateTime                             @default(now())
+  updatedAt                            DateTime                             @updatedAt
+  deletedAt                            DateTime?
 
   @@map("location")
 }
 
 model LocationAddress {
-  id            String @id @default(cuid())
-  locationId    String @unique
-  address1      String?
-  address2      String?
-  city          String?
-  state         String?
-  country       String?
-  postalCode    String?
-  remarks       String?
+  id         String  @id @default(cuid())
+  locationId String  @unique
+  address1   String?
+  address2   String?
+  city       String?
+  state      String?
+  country    String?
+  postalCode String?
+  remarks    String?
 
-  location      Location @relation(fields: [locationId],references: [inflowId], onDelete: Cascade)
+  location Location @relation(fields: [locationId], references: [inflowId], onDelete: Cascade)
 
   @@map("location_address")
 }
 
 model Sublocation {
-  id              String @id @default(cuid())
-  locationId      String
-  name            String
+  id         String @id @default(cuid())
+  locationId String
+  name       String
 
-  location        Location @relation(fields: [locationId], references: [inflowId], onDelete: Cascade)
-  inventoryBins   InventoryBin[]
-  sourceTransferLines TransferOrderLine[] @relation("TransferSourceSublocation")
-  targetTransferLines TransferOrderLine[] @relation("TransferTargetSublocation")
-  
-  linkedLocationId     String?
-  linkedLocation       Location? @relation("LocationLink", fields: [linkedLocationId], references: [inflowId], onDelete: SetNull)
-  
+  location            Location                     @relation(fields: [locationId], references: [inflowId], onDelete: Cascade)
+  inventoryBins       InventoryBin[]
+  sourceTransferLines TransferOrderLine[]          @relation("TransferSourceSublocation")
+  targetTransferLines TransferOrderLine[]          @relation("TransferTargetSublocation")
+  linkedLocationId    String?
+  linkedLocation      Location?                    @relation("LocationLink", fields: [linkedLocationId], references: [inflowId], onDelete: SetNull)
   localMappings       SublocationLocationMap[]
   inventoryLedgers    InventoryLedger[]
-  
   adjustmentLineBins  InventoryAdjustmentLineBin[]
 
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@unique([locationId, name])
   @@index([locationId])
-
   @@map("sublocation")
 }
 
 model SublocationLocationMap {
-  id            String      @id @default(cuid())
-  sublocationId String      // References Mid-Server Sublocation.id (or inflowId/name depending on keys)
-  locationId    String      // References parent Mid-Server Location.inflowId
-  localId       Int         // The flat locationId (Int) on the Local Server database
+  id            String @id @default(cuid())
+  sublocationId String // References Mid-Server Sublocation.id (or inflowId/name depending on keys)
+  locationId    String // References parent Mid-Server Location.inflowId
+  localId       Int // The flat locationId (Int) on the Local Server database
 
   // Relations
-  location      Location    @relation(fields: [locationId], references: [inflowId], onDelete: Cascade)
-  sublocation   Sublocation @relation(fields: [sublocationId], references: [id], onDelete: Cascade)
+  location    Location    @relation(fields: [locationId], references: [inflowId], onDelete: Cascade)
+  sublocation Sublocation @relation(fields: [sublocationId], references: [id], onDelete: Cascade)
 
   // Enforce that a mid-server sublocation maps to exactly one local flat location ID
   @@unique([sublocationId, locationId])
@@ -1286,29 +1318,29 @@ model SublocationLocationMap {
 }
 
 model Inventory {
-  id                         String    @id @default(cuid())
-  productId                  String
-  locationId                 String
-  quantityOnHand             Decimal   @db.Decimal(18, 4)
-  quantityAvailable          Decimal?  @db.Decimal(18, 4)
-  quantityReserved           Decimal?  @db.Decimal(18, 4)
+  id                String   @id @default(cuid())
+  productId         String
+  locationId        String
+  quantityOnHand    Decimal  @db.Decimal(18, 4)
+  quantityAvailable Decimal? @db.Decimal(18, 4)
+  quantityReserved  Decimal? @db.Decimal(18, 4)
 
-  reorderThreshold           Decimal   @default(0.0000) @db.Decimal(18, 4)
-  reorderQuantity            Decimal   @default(0.0000) @db.Decimal(18, 4)
-  isAutoReorderEnabled       Boolean   @default(false)
+  reorderThreshold     Decimal @default(0.0000) @db.Decimal(18, 4)
+  reorderQuantity      Decimal @default(0.0000) @db.Decimal(18, 4)
+  isAutoReorderEnabled Boolean @default(false)
 
-  preferredSourceLocationId  String?
-  preferredSourceLocation    Location? @relation("PreferredReplenishmentLocation", fields: [preferredSourceLocationId], references: [inflowId])
+  preferredSourceLocationId String?
+  preferredSourceLocation   Location? @relation("PreferredReplenishmentLocation", fields: [preferredSourceLocationId], references: [inflowId])
 
-  product                    Product   @relation(fields: [productId], references: [inflowId], onDelete: Cascade)
-  location                   Location  @relation(fields: [locationId], references: [inflowId], onDelete: Cascade)
-  bins                       InventoryBin[]
-  reservations               InventoryReservation[]
+  product      Product                @relation(fields: [productId], references: [inflowId], onDelete: Cascade)
+  location     Location               @relation(fields: [locationId], references: [inflowId], onDelete: Cascade)
+  bins         InventoryBin[]
+  reservations InventoryReservation[]
 
-  lastCountedAt              DateTime?
-  lastMovementAt             DateTime?
-  createdAt                  DateTime  @default(now())
-  updatedAt                  DateTime  @updatedAt
+  lastCountedAt  DateTime?
+  lastMovementAt DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
 
   @@unique([productId, locationId])
   @@index([productId])
@@ -1317,22 +1349,22 @@ model Inventory {
 }
 
 model InventoryBin {
-  id            String      @id @default(cuid())
+  id            String  @id @default(cuid())
   inventoryId   String
   sublocationId String
-  quantity      Decimal     @db.Decimal(18, 4)
+  quantity      Decimal @db.Decimal(18, 4)
 
-  inventory     Inventory   @relation(fields: [inventoryId], references: [id], onDelete: Cascade)
-  sublocation   Sublocation @relation(fields: [sublocationId], references: [id], onDelete: Cascade)
+  inventory   Inventory   @relation(fields: [inventoryId], references: [id], onDelete: Cascade)
+  sublocation Sublocation @relation(fields: [sublocationId], references: [id], onDelete: Cascade)
 
   adjustmentSerialsFrom InventoryAdjustmentSerial[] @relation("AdjustmentSerialFromBin")
-  adjustmentSerialsTo InventoryAdjustmentSerial[] @relation("AdjustmentSerialToBin")
+  adjustmentSerialsTo   InventoryAdjustmentSerial[] @relation("AdjustmentSerialToBin")
 
-  inventoryBinItems     InventoryBinItem[]
-  adjustmentLines       InventoryAdjustmentLine[]
+  inventoryBinItems InventoryBinItem[]
+  adjustmentLines   InventoryAdjustmentLine[]
 
-  createdAt     DateTime    @default(now())
-  updatedAt     DateTime    @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@unique([inventoryId, sublocationId])
   @@index([inventoryId])
@@ -1341,22 +1373,22 @@ model InventoryBin {
 }
 
 model InventoryBinItem {
-  id            String      @id @default(cuid())
-  productId     String
-  locationId    String
-  inventoryBinId  String?
-  serialNumber  String      @unique
-  status        SerialStatus @default(IN_STOCK)
+  id             String       @id @default(cuid())
+  productId      String
+  locationId     String
+  inventoryBinId String?
+  serialNumber   String       @unique
+  status         SerialStatus @default(IN_STOCK)
 
-  product       Product     @relation(fields: [productId], references: [inflowId], onDelete: Cascade)
-  location      Location    @relation(fields: [locationId], references: [inflowId], onDelete: Cascade)
-  inventoryBin  InventoryBin? @relation(fields: [inventoryBinId], references: [id], onDelete: SetNull)
+  product      Product       @relation(fields: [productId], references: [inflowId], onDelete: Cascade)
+  location     Location      @relation(fields: [locationId], references: [inflowId], onDelete: Cascade)
+  inventoryBin InventoryBin? @relation(fields: [inventoryBinId], references: [id], onDelete: SetNull)
 
-  ledgerEntries InventoryLedger[]
-  adjustmentSerials     InventoryAdjustmentSerial[]
+  ledgerEntries     InventoryLedger[]
+  adjustmentSerials InventoryAdjustmentSerial[]
 
-  createdAt     DateTime    @default(now())
-  updatedAt     DateTime    @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([productId, locationId])
   @@map("inventory_bin_item")
@@ -1371,21 +1403,20 @@ enum SerialStatus {
 }
 
 model AdjustmentReason {
-  id            String   @id @default(cuid())
-  inflowId      String   @unique
-  name          String
-  isActive      Boolean  @default(true)
-  isInternal    Boolean  @default(false)
+  id         String  @id @default(cuid())
+  inflowId   String  @unique
+  name       String
+  isActive   Boolean @default(true)
+  isInternal Boolean @default(false)
 
-  stockAdjustments  StockAdjustment[]
-  inventoryAdjustments    InventoryAdjustment[]
+  stockAdjustments     StockAdjustment[]
+  inventoryAdjustments InventoryAdjustment[]
 
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-  deletedAt     DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
 
   @@index([name])
-
   @@map("adjustment_reason")
 }
 
@@ -1397,26 +1428,26 @@ enum AdjustmentStatus {
 }
 
 model InventoryAdjustment {
-  id                    String                @id @default(cuid())
-  inflowId              String                @unique
-  adjustmentNumber      String                @unique
+  id               String @id @default(cuid())
+  inflowId         String @unique
+  adjustmentNumber String @unique
 
-  adjustmentReasonId    String?
-  remarks               String?
+  adjustmentReasonId String?
+  remarks            String?
 
-  performedById     String
-  performedBy       TeamMember?               @relation("PerformedAdjustment", fields: [performedById], references: [inflowId], onDelete: Cascade)
+  performedById String
+  performedBy   TeamMember? @relation("PerformedAdjustment", fields: [performedById], references: [inflowId], onDelete: Cascade)
 
-  lastModifiedById     String?
-  lastModifiedBy       TeamMember?            @relation("ModifiedAdjustment", fields: [lastModifiedById], references: [inflowId], onDelete: SetNull)
+  lastModifiedById String?
+  lastModifiedBy   TeamMember? @relation("ModifiedAdjustment", fields: [lastModifiedById], references: [inflowId], onDelete: SetNull)
 
-  adjustmentReason  AdjustmentReason?         @relation(fields: [adjustmentReasonId], references: [inflowId])
+  adjustmentReason AdjustmentReason? @relation(fields: [adjustmentReasonId], references: [inflowId])
 
-  lines             InventoryAdjustmentLine[]
-  status            AdjustmentStatus          @default(DRAFT)
+  lines  InventoryAdjustmentLine[]
+  status AdjustmentStatus          @default(DRAFT)
 
-  createdAt         DateTime                  @default(now())
-  updatedAt         DateTime                  @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@map("inventory_adjustment")
 }
@@ -1428,26 +1459,25 @@ model InventoryAdjustmentLine {
   inventoryId      String?
   productId        String
   locationId       String
-  inventoryBinId   String? 
-
+  inventoryBinId   String?
   quantityBefore   Decimal  @db.Decimal(18, 4)
   quantityAdjusted Decimal  @db.Decimal(18, 4) // Can be positive (+) or negative (-)
   quantityAfter    Decimal  @db.Decimal(18, 4)
   quantityReserved Decimal? @db.Decimal(18, 4)
 
-  reason           InventoryAdjustmentLineReason?
-  description      String?
+  reason      InventoryAdjustmentLineReason?
+  description String?
 
-  adjustment       InventoryAdjustment       @relation(fields: [adjustmentId], references: [inflowId], onDelete: Cascade)
-  product          Product                   @relation(fields: [productId], references: [inflowId], onDelete: Cascade) // Restrict
-  location         Location                  @relation(fields: [locationId], references: [inflowId], onDelete: Cascade) // Restrict
-  inventoryBin     InventoryBin?             @relation(fields: [inventoryBinId], references: [id], onDelete: SetNull)
+  adjustment   InventoryAdjustment @relation(fields: [adjustmentId], references: [inflowId], onDelete: Cascade)
+  product      Product             @relation(fields: [productId], references: [inflowId], onDelete: Cascade) // Restrict
+  location     Location            @relation(fields: [locationId], references: [inflowId], onDelete: Cascade) // Restrict
+  inventoryBin InventoryBin?       @relation(fields: [inventoryBinId], references: [id], onDelete: SetNull)
 
   // Track exact serial numbers modified by this adjustment line
-  serials          InventoryAdjustmentSerial[]
-  draftBins        InventoryAdjustmentLineBin[]
+  serials   InventoryAdjustmentSerial[]
+  draftBins InventoryAdjustmentLineBin[]
 
-  createdAt        DateTime                  @default(now())
+  createdAt DateTime @default(now())
 
   @@index([adjustmentId])
   @@index([productId])
@@ -1468,15 +1498,15 @@ enum InventoryAdjustmentLineReason {
 }
 
 model InventoryAdjustmentLineBin {
-  id                  String   @id @default(uuid())
-  adjustmentLineId    String
-  sublocationId       String
-  quantity            Decimal
+  id               String  @id @default(uuid())
+  adjustmentLineId String
+  sublocationId    String
+  quantity         Decimal
 
-  adjustmentLine      InventoryAdjustmentLine @relation(fields: [adjustmentLineId], references: [id], onDelete: Cascade)
-  sublocation         Sublocation              @relation(fields: [sublocationId], references: [id])
+  adjustmentLine InventoryAdjustmentLine @relation(fields: [adjustmentLineId], references: [id], onDelete: Cascade)
+  sublocation    Sublocation             @relation(fields: [sublocationId], references: [id])
 
-  serials          InventoryAdjustmentSerial[]
+  serials InventoryAdjustmentSerial[]
 
   @@index([adjustmentLineId])
   @@index([sublocationId])
@@ -1484,21 +1514,21 @@ model InventoryAdjustmentLineBin {
 }
 
 model InventoryAdjustmentSerial {
-  id                  String @id @default(cuid())
-  adjustmentLineId    String
-  draftBinId          String?
-  inventoryBinItemId  String?
-  serialNumber        String
-  action              InventorySerialAdjustmentAction
+  id                 String                          @id @default(cuid())
+  adjustmentLineId   String
+  draftBinId         String?
+  inventoryBinItemId String?
+  serialNumber       String
+  action             InventorySerialAdjustmentAction
 
-  fromInventoryBinId  String?
-  toInventoryBinId    String?
+  fromInventoryBinId String?
+  toInventoryBinId   String?
 
-  adjustmentLine      InventoryAdjustmentLine @relation(fields: [adjustmentLineId], references: [id], onDelete: Cascade)
-  draftBin           InventoryAdjustmentLineBin? @relation(fields: [draftBinId], references: [id], onDelete: Cascade)
-  inventoryBinItem    InventoryBinItem? @relation(fields: [inventoryBinItemId], references: [id], onDelete: SetNull)
-  fromInventoryBin    InventoryBin? @relation("AdjustmentSerialFromBin", fields: [fromInventoryBinId], references: [id], onDelete: SetNull)
-  toInventoryBin      InventoryBin? @relation("AdjustmentSerialToBin", fields: [toInventoryBinId], references: [id], onDelete: SetNull)
+  adjustmentLine   InventoryAdjustmentLine     @relation(fields: [adjustmentLineId], references: [id], onDelete: Cascade)
+  draftBin         InventoryAdjustmentLineBin? @relation(fields: [draftBinId], references: [id], onDelete: Cascade)
+  inventoryBinItem InventoryBinItem?           @relation(fields: [inventoryBinItemId], references: [id], onDelete: SetNull)
+  fromInventoryBin InventoryBin?               @relation("AdjustmentSerialFromBin", fields: [fromInventoryBinId], references: [id], onDelete: SetNull)
+  toInventoryBin   InventoryBin?               @relation("AdjustmentSerialToBin", fields: [toInventoryBinId], references: [id], onDelete: SetNull)
 
   @@index([adjustmentLineId])
   @@index([draftBinId])
@@ -1506,7 +1536,6 @@ model InventoryAdjustmentSerial {
   @@index([fromInventoryBinId])
   @@index([toInventoryBinId])
   @@index([serialNumber])
-
   @@map("inventory_adjustment_serial")
 }
 
@@ -1520,43 +1549,42 @@ enum InventorySerialAdjustmentAction {
 // Inventory Ledgers
 
 model InventoryLedger {
-  id               String                   @id @default(cuid())
-  productId        String
-  locationId       String
-  sublocationId    String?                  // null = Unassigned / Floor stock
-  
-  transactionType  InventoryTransactionType
-  referenceType    InventoryReferenceType?
-  referenceId      String?
-  performedById    String?
+  id              String                   @id @default(cuid())
+  productId       String
+  locationId      String
+  sublocationId   String? // null = Unassigned / Floor stock
+  transactionType InventoryTransactionType
+  referenceType   InventoryReferenceType?
+  referenceId     String?
+  performedById   String?
 
-  fromLocationId   String?
-  toLocationId     String?
+  fromLocationId    String?
+  toLocationId      String?
   fromSublocationId String?
-  toSublocationId  String?
+  toSublocationId   String?
 
-  batchNumber      String?
-  inventoryBinItemId  String?               // Set if transaction relates to a specific serial
-  uomName          String?
+  batchNumber        String?
+  inventoryBinItemId String? // Set if transaction relates to a specific serial
+  uomName            String?
 
-  quantityChange   Decimal                  @db.Decimal(18, 4)
-  quantityBefore   Decimal                  @db.Decimal(18, 4)
-  quantityAfter    Decimal                  @db.Decimal(18, 4)
+  quantityChange Decimal @db.Decimal(18, 4)
+  quantityBefore Decimal @db.Decimal(18, 4)
+  quantityAfter  Decimal @db.Decimal(18, 4)
 
-  unitCost         Decimal?                 @db.Decimal(18, 5)
-  totalCost        Decimal?                 @db.Decimal(18, 5)
+  unitCost  Decimal? @db.Decimal(18, 5)
+  totalCost Decimal? @db.Decimal(18, 5)
 
-  remarks          String?
+  remarks String?
 
-  product          Product                  @relation(fields: [productId], references: [inflowId], onDelete: Cascade) // Restrict
-  location         Location                 @relation(fields: [locationId], references: [inflowId], onDelete: Cascade) // Restrict
-  sublocation      Sublocation?             @relation(fields: [sublocationId], references: [id], onDelete: SetNull)
-  performedBy      TeamMember?              @relation(fields: [performedById], references: [inflowId], onDelete: SetNull)
-  inventoryBinItem    InventoryBinItem?           @relation(fields: [inventoryBinItemId], references: [id], onDelete: SetNull)
-  fromLocation        Location? @relation("LedgerFromLocation", fields: [fromLocationId], references: [inflowId], onDelete: SetNull)
-  toLocation        Location? @relation("LedgerToLocation", fields: [toLocationId], references: [inflowId], onDelete: SetNull)
+  product          Product           @relation(fields: [productId], references: [inflowId], onDelete: Cascade) // Restrict
+  location         Location          @relation(fields: [locationId], references: [inflowId], onDelete: Cascade) // Restrict
+  sublocation      Sublocation?      @relation(fields: [sublocationId], references: [id], onDelete: SetNull)
+  performedBy      TeamMember?       @relation(fields: [performedById], references: [inflowId], onDelete: SetNull)
+  inventoryBinItem InventoryBinItem? @relation(fields: [inventoryBinItemId], references: [id], onDelete: SetNull)
+  fromLocation     Location?         @relation("LedgerFromLocation", fields: [fromLocationId], references: [inflowId], onDelete: SetNull)
+  toLocation       Location?         @relation("LedgerToLocation", fields: [toLocationId], references: [inflowId], onDelete: SetNull)
 
-  createdAt        DateTime                 @default(now())
+  createdAt DateTime @default(now())
 
   @@index([productId, createdAt])
   @@index([locationId, createdAt])
@@ -1591,7 +1619,6 @@ enum InventoryTransactionType {
   OPENING_BALANCE
 }
 
-
 // productId      String
 // product             Product @relation(fields: [productId], references: [inflowId], onDelete: Cascade)
 // @@unique([productId,sublocationId])
@@ -1606,7 +1633,6 @@ enum InventoryTransactionType {
 //   CORRECTION
 //   MANUAL
 // }
-
 
 // model InventoryAdjustmentSerial {
 //   id                   String                  @id @default(cuid())
@@ -1623,16 +1649,15 @@ enum InventoryTransactionType {
 //   @@map("inventory_adjustment_serial")
 // }
 
-  // lotId String?
+// lotId String?
 
-  // lot ProductLot? @relation(
-  //     fields: [lotId],
-  //     references: [id],
-  //     onDelete: SetNull
-  // )
+// lot ProductLot? @relation(
+//     fields: [lotId],
+//     references: [id],
+//     onDelete: SetNull
+// )
 
 // INFLOW CLOUD ADJUSTMENT REASON
-
 
 // localMappings   AdjustmentReasonLocationMap[]
 
@@ -1650,94 +1675,91 @@ enum InventoryTransactionType {
 //   @@map("adjustment_reason_location_map")
 // }
 
-
 // CLOUD STOCK ADJUSTMENT
 
-
 model StockAdjustment {
-  id                     String   @id @default(cuid())
-  inflowId               String   @unique
-  adjustmentNumber       String
-  adjustmentReasonId     String?
-  locationId             String
-  lastModifiedById       String?
-  date                   DateTime
-  remarks                String?
-  isCancelled            Boolean  @default(false)
-  timestamp              String
+  id                 String   @id @default(cuid())
+  inflowId           String   @unique
+  adjustmentNumber   String
+  adjustmentReasonId String?
+  locationId         String
+  lastModifiedById   String?
+  date               DateTime
+  remarks            String?
+  isCancelled        Boolean  @default(false)
+  timestamp          String
 
-  custom1                String?
-  custom2                String?
-  custom3                String?
-  custom4                String?
-  custom5                String?
-  custom6                String?
-  custom7                String?
-  custom8                String?
-  custom9                String?
-  custom10               String?
+  custom1  String?
+  custom2  String?
+  custom3  String?
+  custom4  String?
+  custom5  String?
+  custom6  String?
+  custom7  String?
+  custom8  String?
+  custom9  String?
+  custom10 String?
 
-  createdAt              DateTime @default(now())
-  updatedAt              DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  adjustmentReason       AdjustmentReason? @relation(fields: [adjustmentReasonId], references: [inflowId])
-  location               Location          @relation(fields: [locationId], references: [inflowId], onDelete: Cascade)
-  lastModifiedBy         TeamMember?             @relation(fields: [lastModifiedById], references: [inflowId], onDelete: SetNull)
-  lines                  StockAdjustmentLine[]
-  attachments            StockAdjustmentAttachment[]
+  adjustmentReason AdjustmentReason?           @relation(fields: [adjustmentReasonId], references: [inflowId])
+  location         Location                    @relation(fields: [locationId], references: [inflowId], onDelete: Cascade)
+  lastModifiedBy   TeamMember?                 @relation(fields: [lastModifiedById], references: [inflowId], onDelete: SetNull)
+  lines            StockAdjustmentLine[]
+  attachments      StockAdjustmentAttachment[]
 
   @@index([locationId])
   @@index([date])
 }
 
 model StockAdjustmentLine {
-  id                     String @id @default(cuid())
-  inflowId               String @unique
-  stockAdjustmentId      String
-  productId              String
-  description            String?
-  standardQuantity       Decimal @db.Decimal(18,5)
-  uomQuantity            Decimal @db.Decimal(18,5)
-  uom                    String?
-  sublocation            String?
-  timestamp              String
+  id                String  @id @default(cuid())
+  inflowId          String  @unique
+  stockAdjustmentId String
+  productId         String
+  description       String?
+  standardQuantity  Decimal @db.Decimal(18, 5)
+  uomQuantity       Decimal @db.Decimal(18, 5)
+  uom               String?
+  sublocation       String?
+  timestamp         String
 
-  stockAdjustment        StockAdjustment @relation(fields: [stockAdjustmentId], references: [id], onDelete: Cascade)
-  product                Product @relation(fields: [productId], references: [inflowId])
-  serialNumbers          StockAdjustmentSerial[]
+  stockAdjustment StockAdjustment         @relation(fields: [stockAdjustmentId], references: [id], onDelete: Cascade)
+  product         Product                 @relation(fields: [productId], references: [inflowId])
+  serialNumbers   StockAdjustmentSerial[]
 
-  createdAt              DateTime @default(now())
-  updatedAt              DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([stockAdjustmentId])
   @@index([productId])
 }
 
 model StockAdjustmentSerial {
-  id              String @id @default(cuid())
-  lineId          String
-  serialNumber    String
+  id           String @id @default(cuid())
+  lineId       String
+  serialNumber String
 
-  line            StockAdjustmentLine @relation(fields: [lineId], references: [id], onDelete: Cascade)
+  line StockAdjustmentLine @relation(fields: [lineId], references: [id], onDelete: Cascade)
 
   @@unique([lineId, serialNumber])
 }
 
 model StockAdjustmentAttachment {
-  id                    String @id @default(cuid())
-  inflowId              String @unique
-  stockAdjustmentId     String
-  fileName              String
-  attachmentUrl         String
-  fileSize              BigInt?
-  lastModifiedDate      DateTime?
-  lastModifiedById      String?
-  stockAdjustment       StockAdjustment @relation(fields: [stockAdjustmentId], references: [id], onDelete: Cascade)
-  lastModifiedBy        TeamMember? @relation(fields: [lastModifiedById], references: [inflowId], onDelete: SetNull)
+  id                String          @id @default(cuid())
+  inflowId          String          @unique
+  stockAdjustmentId String
+  fileName          String
+  attachmentUrl     String
+  fileSize          BigInt?
+  lastModifiedDate  DateTime?
+  lastModifiedById  String?
+  stockAdjustment   StockAdjustment @relation(fields: [stockAdjustmentId], references: [id], onDelete: Cascade)
+  lastModifiedBy    TeamMember?     @relation(fields: [lastModifiedById], references: [inflowId], onDelete: SetNull)
 
   @@index([stockAdjustmentId])
 }
-
 
 // enum InventoryTransactionType {
 //   ADJUSTMENT
@@ -1751,58 +1773,54 @@ model StockAdjustmentAttachment {
 //  Transfer Order 
 
 model TransferOrder {
-  id                String   @id @default(cuid())
-  transferNumber    String   @unique
-  sourceLocationId  String
-  targetLocationId  String
-  status            TransferOrderStatus @default(DRAFT)
-  remarks           String?
-  transferredAt     DateTime?
-  receivedAt        DateTime?
-  expectedArrival   DateTime?
+  id               String              @id @default(cuid())
+  transferNumber   String              @unique
+  sourceLocationId String
+  targetLocationId String
+  status           TransferOrderStatus @default(DRAFT)
+  remarks          String?
+  transferredAt    DateTime?
+  receivedAt       DateTime?
+  expectedArrival  DateTime?
 
-  requestedById     String
-  approvedById      String?
-  receivedById      String?
-  
+  requestedById  String
+  approvedById   String?
+  receivedById   String?
+  sourceLocation Location            @relation("TransferSourceLocation", fields: [sourceLocationId], references: [inflowId], onDelete: Cascade)
+  targetLocation Location            @relation("TransferTargetLocation", fields: [targetLocationId], references: [inflowId], onDelete: Cascade)
+  lines          TransferOrderLine[]
 
-  sourceLocation    Location @relation("TransferSourceLocation",fields: [sourceLocationId],references: [inflowId], onDelete: Cascade)
-  targetLocation    Location @relation("TransferTargetLocation",fields: [targetLocationId],references: [inflowId], onDelete: Cascade)
-  lines             TransferOrderLine[]
-
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([sourceLocationId])
   @@index([targetLocationId])
-
   @@map("transfer_order")
 }
 
 model TransferOrderLine {
-  id                    String @id @default(cuid())
-  transferOrderId       String
-  productId             String
-  sourceSublocationId   String?
-  targetSublocationId   String?
-  quantity              Decimal @db.Decimal(18,4)
-  quantityReceived      Decimal?
-  description           String?
+  id                  String   @id @default(cuid())
+  transferOrderId     String
+  productId           String
+  sourceSublocationId String?
+  targetSublocationId String?
+  quantity            Decimal  @db.Decimal(18, 4)
+  quantityReceived    Decimal?
+  description         String?
 
   // --- Discrepancy Tracking Fields ---
   discrepancyQuantity Decimal? @db.Decimal(18, 4) // Stores (quantityReceived - quantity)
-  discrepancyReason   String?  // e.g., "DAMAGED_IN_TRANSIT", "MISSING_BOX", "VENDOR_SHORTAGE"
+  discrepancyReason   String? // e.g., "DAMAGED_IN_TRANSIT", "MISSING_BOX", "VENDOR_SHORTAGE"
 
-  transferOrder         TransferOrder @relation(fields: [transferOrderId],references: [id], onDelete: Cascade)
-  product               Product @relation(fields: [productId],references: [inflowId], onDelete: Cascade)
-  sourceSublocation     Sublocation? @relation("TransferSourceSublocation",fields: [sourceSublocationId], references: [id], onDelete: Cascade)
-  targetSublocation     Sublocation? @relation("TransferTargetSublocation",fields: [targetSublocationId], references: [id], onDelete: Cascade)
+  transferOrder     TransferOrder @relation(fields: [transferOrderId], references: [id], onDelete: Cascade)
+  product           Product       @relation(fields: [productId], references: [inflowId], onDelete: Cascade)
+  sourceSublocation Sublocation?  @relation("TransferSourceSublocation", fields: [sourceSublocationId], references: [id], onDelete: Cascade)
+  targetSublocation Sublocation?  @relation("TransferTargetSublocation", fields: [targetSublocationId], references: [id], onDelete: Cascade)
 
-  createdAt             DateTime @default(now())
+  createdAt DateTime @default(now())
 
   @@index([transferOrderId])
   @@index([productId])
-
   @@map("transfer_order_line")
 }
 
@@ -1810,28 +1828,28 @@ enum TransferOrderStatus {
   DRAFT
   PENDING
   IN_TRANSIT
-  RECEIVED            // Fully received with zero discrepancy
-  PARTIALLY_RECEIVED  // Received, but items are missing/short
-  RECEIVED_DISCREPANCY// Received with overage or discrepancies needing audit
+  RECEIVED // Fully received with zero discrepancy
+  PARTIALLY_RECEIVED // Received, but items are missing/short
+  RECEIVED_DISCREPANCY // Received with overage or discrepancies needing audit
   CANCELLED
 }
 
 //  TEAM MEMBER MODELS
 
 model TeamMember {
-  id                  String   @id @default(cuid())
-  inflowId            String   @unique
-  name                String
-  email               String   @unique
-  isActive            Boolean  @default(true)
-  isInternal          Boolean  @default(false)
-  canBeSalesRep       Boolean  @default(false)
-  accessAllLocations  Boolean  @default(false)
-  accessRights        TeamMemberAccessRight[]
-  locations           TeamMemberLocation[]
-  costAdjustments     ProductCostAdjustment[]
+  id                 String                  @id @default(cuid())
+  inflowId           String                  @unique
+  name               String
+  email              String                  @unique
+  isActive           Boolean                 @default(true)
+  isInternal         Boolean                 @default(false)
+  canBeSalesRep      Boolean                 @default(false)
+  accessAllLocations Boolean                 @default(false)
+  accessRights       TeamMemberAccessRight[]
+  locations          TeamMemberLocation[]
+  costAdjustments    ProductCostAdjustment[]
 
-  customerSalesRep Customer[] @relation("CustomerSalesRep")
+  customerSalesRep     Customer[] @relation("CustomerSalesRep")
   customerLastModified Customer[] @relation("CustomerLastModifiedBy")
 
   vendorLastModified Vendor[] @relation("VendorLastModifiedBy")
@@ -1839,40 +1857,38 @@ model TeamMember {
   productAttachments ProductAttachment[]
   products           Product[]
 
-  assignedOrders     SalesOrder[] @relation("AssignedOrders")
-  confirmedOrders    SalesOrder[] @relation("ConfirmedOrders")
-  salesRepOrders     SalesOrder[] @relation("SalesRepOrders")
+  assignedOrders  SalesOrder[] @relation("AssignedOrders")
+  confirmedOrders SalesOrder[] @relation("ConfirmedOrders")
+  salesRepOrders  SalesOrder[] @relation("SalesRepOrders")
 
   poAssignedOrders PurchaseOrder[] @relation("POAssignedOrders")
   poApprovedOrders PurchaseOrder[] @relation("POApprovedOrders")
 
-  localMappings     TeamMemberLocationMapExtended[]
-  stockAdjustments  StockAdjustment[]
-  stockAdjustmentAttachements  StockAdjustmentAttachment[]
+  localMappings               TeamMemberLocationMapExtended[]
+  stockAdjustments            StockAdjustment[]
+  stockAdjustmentAttachements StockAdjustmentAttachment[]
 
-  inventoryLedgers   InventoryLedger[] 
-
-  adjustments InventoryAdjustment[] @relation("PerformedAdjustment")
+  inventoryLedgers    InventoryLedger[]
+  adjustments         InventoryAdjustment[] @relation("PerformedAdjustment")
   modifiedAdjustments InventoryAdjustment[] @relation("ModifiedAdjustment")
 
+  user User?
 
-  user                User?
-
-  createdAt           DateTime @default(now())
-  updatedAt           DateTime @updatedAt
-  deletedAt           DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
 
   @@map("team_member")
 }
 
 model TeamMemberLocationMapExtended {
-  id             String       @id @default(cuid())
-  teamMemberId   String       // References TeamMember.inflowId
-  locationId     String       // References your Location table identifier
-  localId        Int          // The unique INT assigned by that specific local database
+  id           String @id @default(cuid())
+  teamMemberId String // References TeamMember.inflowId
+  locationId   String // References your Location table identifier
+  localId      Int // The unique INT assigned by that specific local database
 
-  location       Location? @relation(fields: [locationId], references: [inflowId], onDelete: Cascade)
-  teamMember     TeamMember   @relation(fields: [teamMemberId], references: [inflowId], onDelete: Cascade)
+  location   Location?  @relation(fields: [locationId], references: [inflowId], onDelete: Cascade)
+  teamMember TeamMember @relation(fields: [teamMemberId], references: [inflowId], onDelete: Cascade)
 
   @@unique([teamMemberId, locationId])
   @@index([locationId, localId])
@@ -1880,28 +1896,26 @@ model TeamMemberLocationMapExtended {
 }
 
 model TeamMemberAccessRight {
-  id            String     @id @default(cuid())
-  teamMemberId  String
-  rightName     AccessRight
+  id           String      @id @default(cuid())
+  teamMemberId String
+  rightName    AccessRight
 
-  teamMember    TeamMember @relation(fields: [teamMemberId], references: [id], onDelete: Cascade)
+  teamMember TeamMember @relation(fields: [teamMemberId], references: [id], onDelete: Cascade)
 
   @@unique([teamMemberId, rightName])
   @@index([rightName])
-
   @@map("team_member_access_right")
 }
 
 model TeamMemberLocation {
-  id                String     @id @default(cuid())
-  teamMemberId      String
-  locationInflowId  String
+  id               String @id @default(cuid())
+  teamMemberId     String
+  locationInflowId String
 
-  teamMember        TeamMember @relation(fields: [teamMemberId], references: [id], onDelete: Cascade)
-  location          Location   @relation(fields: [locationInflowId],references: [inflowId], onDelete: Cascade)
+  teamMember TeamMember @relation(fields: [teamMemberId], references: [id], onDelete: Cascade)
+  location   Location   @relation(fields: [locationInflowId], references: [inflowId], onDelete: Cascade)
 
   @@unique([teamMemberId, locationInflowId])
-
   @@map("team_member_location")
 }
 
@@ -1977,56 +1991,53 @@ enum AccessRight {
 // Business Partner Model
 
 model BusinessPartner {
-  id              String   @id @default(cuid())
-  name            String
-  contactName     String?
-  email           String?
-  phone           String?
-  fax             String?
-  website         String?
-  remarks         String?
-  isActive        Boolean @default(true)
-  customer        Customer?
-  vendor          Vendor?
-  addresses       BusinessPartnerAddress[]
+  id          String                   @id @default(cuid())
+  name        String
+  contactName String?
+  email       String?
+  phone       String?
+  fax         String?
+  website     String?
+  remarks     String?
+  isActive    Boolean                  @default(true)
+  customer    Customer?
+  vendor      Vendor?
+  addresses   BusinessPartnerAddress[]
 
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-  deletedAt       DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
 
   @@index([name])
-
   @@map("business_partner")
 }
 
 model BusinessPartnerAddress {
-  id              String @id @default(cuid())
-  inflowId        String? @unique
-  localId         Int?    @unique @default(autoincrement())
+  id                String          @id @default(cuid())
+  inflowId          String?         @unique
+  localId           Int?            @unique @default(autoincrement())
   businessPartnerId String
-  name            String?
-  address1        String?
-  address2        String?
-  city            String?
-  state           String?
-  country         String?
-  postalCode      String?
-  remarks         String?
-  addressType     AddressType? 
+  name              String?
+  address1          String?
+  address2          String?
+  city              String?
+  state             String?
+  country           String?
+  postalCode        String?
+  remarks           String?
+  addressType       AddressType?
+  businessPartner   BusinessPartner @relation(fields: [businessPartnerId], references: [id], onDelete: Cascade)
 
-  businessPartner BusinessPartner @relation(fields: [businessPartnerId], references: [id], onDelete: Cascade)
-
-  billingCustomers Customer[] @relation("CustomerBillingAddress")
+  billingCustomers  Customer[] @relation("CustomerBillingAddress")
   shippingCustomers Customer[] @relation("CustomerShippingAddress")
 
-  addressVendors    Vendor[] @relation("VendorDefaultAddress")
+  addressVendors Vendor[] @relation("VendorDefaultAddress")
 
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-  deletedAt       DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
 
   @@index([businessPartnerId])
-
   @@map("business_partner_address")
 }
 
@@ -2036,61 +2047,59 @@ enum AddressType {
 }
 
 model Customer {
-  id                            String @id @default(cuid())
-  businessPartnerId             String @unique
-  inflowId                      String @unique
-  taxExemptNumber               String?
-  defaultCarrier                String?
-  defaultPaymentMethod          String?
-  discount                      Decimal? @db.Decimal(10,2)
-  defaultLocationId             String?
-  defaultPaymentTermsId         String?
-  pricingSchemeId               String?
-  taxingSchemeId                String?
-  defaultSalesRepTeamMemberId   String?
-  lastModifiedById              String?
-  defaultBillingAddressId       String?
-  defaultShippingAddressId      String?
+  id                          String   @id @default(cuid())
+  businessPartnerId           String   @unique
+  inflowId                    String   @unique
+  taxExemptNumber             String?
+  defaultCarrier              String?
+  defaultPaymentMethod        String?
+  discount                    Decimal? @db.Decimal(10, 2)
+  defaultLocationId           String?
+  defaultPaymentTermsId       String?
+  pricingSchemeId             String?
+  taxingSchemeId              String?
+  defaultSalesRepTeamMemberId String?
+  lastModifiedById            String?
+  defaultBillingAddressId     String?
+  defaultShippingAddressId    String?
 
-  businessPartner BusinessPartner @relation(fields: [businessPartnerId], references: [id], onDelete: Cascade)
-  
-  defaultLocation     Location? @relation(fields: [defaultLocationId], references: [inflowId], onDelete: SetNull)
-  defaultPaymentTerms PaymentTerm? @relation(fields: [defaultPaymentTermsId], references: [inflowId])
-  pricingScheme PricingScheme? @relation(fields: [pricingSchemeId], references: [inflowId])
-  taxingScheme TaxingScheme? @relation(fields: [taxingSchemeId], references: [inflowId])
-  defaultSalesRep TeamMember? @relation("CustomerSalesRep", fields: [defaultSalesRepTeamMemberId], references: [inflowId])
-  lastModifiedBy TeamMember? @relation("CustomerLastModifiedBy", fields: [lastModifiedById], references: [inflowId], onDelete: SetNull)
+  businessPartner     BusinessPartner @relation(fields: [businessPartnerId], references: [id], onDelete: Cascade)
+  defaultLocation     Location?       @relation(fields: [defaultLocationId], references: [inflowId], onDelete: SetNull)
+  defaultPaymentTerms PaymentTerm?    @relation(fields: [defaultPaymentTermsId], references: [inflowId])
+  pricingScheme       PricingScheme?  @relation(fields: [pricingSchemeId], references: [inflowId])
+  taxingScheme        TaxingScheme?   @relation(fields: [taxingSchemeId], references: [inflowId])
+  defaultSalesRep     TeamMember?     @relation("CustomerSalesRep", fields: [defaultSalesRepTeamMemberId], references: [inflowId])
+  lastModifiedBy      TeamMember?     @relation("CustomerLastModifiedBy", fields: [lastModifiedById], references: [inflowId], onDelete: SetNull)
 
-  defaultBillingAddress BusinessPartnerAddress? @relation("CustomerBillingAddress",fields: [defaultBillingAddressId], references: [inflowId])
-  defaultShippingAddress BusinessPartnerAddress? @relation("CustomerShippingAddress",fields: [defaultShippingAddressId], references: [inflowId])
+  defaultBillingAddress  BusinessPartnerAddress? @relation("CustomerBillingAddress", fields: [defaultBillingAddressId], references: [inflowId])
+  defaultShippingAddress BusinessPartnerAddress? @relation("CustomerShippingAddress", fields: [defaultShippingAddressId], references: [inflowId])
 
-  dues       CustomerDue[]
-  balances   CustomerBalance[]
-  credits    CustomerCredit[]
+  dues     CustomerDue[]
+  balances CustomerBalance[]
+  credits  CustomerCredit[]
 
-  salesOrders  SalesOrder[]
-  localMappings       CustomerLocationMap[]
+  salesOrders   SalesOrder[]
+  localMappings CustomerLocationMap[]
 
-  user       User?
+  user User?
 
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
-  deletedAt  DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
 
   @@index([pricingSchemeId])
   @@index([taxingSchemeId])
-
   @@map("customer")
 }
 
 model CustomerLocationMap {
-  id         String       @id @default(cuid())
-  customerId String       // References Customer.inflowId
-  locationId String       // References your Location table identifier
-  localId    Int          // The unique INT assigned by that specific local database
+  id         String @id @default(cuid())
+  customerId String // References Customer.inflowId
+  locationId String // References your Location table identifier
+  localId    Int // The unique INT assigned by that specific local database
 
-  location   Location? @relation(fields: [locationId], references: [inflowId], onDelete: Cascade)
-  customer   Customer  @relation(fields: [customerId], references: [inflowId], onDelete: Cascade)
+  location Location? @relation(fields: [locationId], references: [inflowId], onDelete: Cascade)
+  customer Customer  @relation(fields: [customerId], references: [inflowId], onDelete: Cascade)
 
   @@unique([customerId, locationId])
   @@index([locationId, localId])
@@ -2098,76 +2107,71 @@ model CustomerLocationMap {
 }
 
 model CustomerDue {
-  id                String   @id @default(cuid())
-  inflowId          String   @unique
-  customerId        String
-  currencyId        String
-  amountCurrent     Decimal  @db.Decimal(18,5)
-  amount1To30       Decimal  @db.Decimal(18,5)
-  amount31To60      Decimal  @db.Decimal(18,5)
-  amount61Plus      Decimal  @db.Decimal(18,5)
+  id            String  @id @default(cuid())
+  inflowId      String  @unique
+  customerId    String
+  currencyId    String
+  amountCurrent Decimal @db.Decimal(18, 5)
+  amount1To30   Decimal @db.Decimal(18, 5)
+  amount31To60  Decimal @db.Decimal(18, 5)
+  amount61Plus  Decimal @db.Decimal(18, 5)
 
-  customer          Customer @relation(fields: [customerId], references: [inflowId], onDelete: Cascade)
-  currency          Currency @relation(fields: [currencyId], references: [inflowId])
+  customer Customer @relation(fields: [customerId], references: [inflowId], onDelete: Cascade)
+  currency Currency @relation(fields: [currencyId], references: [inflowId])
 
-  localMappings     CustomerDueLocationMap[]
+  localMappings CustomerDueLocationMap[]
 
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([customerId])
   @@index([currencyId])
-
   @@unique([customerId, currencyId])
-
   @@map("customer_due")
 }
 
 model CustomerDueLocationMap {
-  id            String       @id @default(cuid())
-  customerDueId String       // References CustomerDue.inflowId
-  locationId    String       // References your Location table identifier
-  localId       Int          // The unique INT assigned by that specific local database
+  id            String @id @default(cuid())
+  customerDueId String // References CustomerDue.inflowId
+  locationId    String // References your Location table identifier
+  localId       Int // The unique INT assigned by that specific local database
 
-  location      Location? @relation(fields: [locationId], references: [inflowId], onDelete: Cascade)
-  customerDue   CustomerDue  @relation(fields: [customerDueId], references: [inflowId], onDelete: Cascade)
+  location    Location?   @relation(fields: [locationId], references: [inflowId], onDelete: Cascade)
+  customerDue CustomerDue @relation(fields: [customerDueId], references: [inflowId], onDelete: Cascade)
 
   @@unique([customerDueId, locationId])
   @@index([locationId, localId])
   @@map("customer_due_location_map")
 }
 
-
 model CustomerBalance {
-  id                String   @id @default(cuid())
-  inflowId          String   @unique
-  customerId        String
-  currencyId        String
-  balance           Decimal  @db.Decimal(18,5)
-  customer          Customer @relation(fields: [customerId], references: [inflowId], onDelete: Cascade)
-  currency          Currency @relation(fields: [currencyId], references: [inflowId])
+  id         String   @id @default(cuid())
+  inflowId   String   @unique
+  customerId String
+  currencyId String
+  balance    Decimal  @db.Decimal(18, 5)
+  customer   Customer @relation(fields: [customerId], references: [inflowId], onDelete: Cascade)
+  currency   Currency @relation(fields: [currencyId], references: [inflowId])
 
-  localMappings     CustomerBalanceLocationMap[]
+  localMappings CustomerBalanceLocationMap[]
 
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([customerId])
   @@index([currencyId])
-
   @@unique([customerId, currencyId])
-
   @@map("customer_balance")
 }
 
 model CustomerBalanceLocationMap {
-  id               String       @id @default(cuid())
-  customerBalanceId String      // References CustomerBalance.inflowId
-  locationId       String       // References your Location table identifier
-  localId          Int          // The unique INT assigned by that specific local database
+  id                String @id @default(cuid())
+  customerBalanceId String // References CustomerBalance.inflowId
+  locationId        String // References your Location table identifier
+  localId           Int // The unique INT assigned by that specific local database
 
-  location         Location? @relation(fields: [locationId], references: [inflowId], onDelete: Cascade)
-  customerBalance  CustomerBalance @relation(fields: [customerBalanceId], references: [inflowId], onDelete: Cascade)
+  location        Location?       @relation(fields: [locationId], references: [inflowId], onDelete: Cascade)
+  customerBalance CustomerBalance @relation(fields: [customerBalanceId], references: [inflowId], onDelete: Cascade)
 
   @@unique([customerBalanceId, locationId])
   @@index([locationId, localId])
@@ -2175,34 +2179,32 @@ model CustomerBalanceLocationMap {
 }
 
 model CustomerCredit {
-  id                String   @id @default(cuid())
-  inflowId          String   @unique
-  customerId        String
-  currencyId        String
-  credit            Decimal  @db.Decimal(18,5)
-  customer          Customer @relation(fields: [customerId], references: [inflowId], onDelete: Cascade)
-  currency          Currency @relation(fields: [currencyId], references: [inflowId])
+  id         String   @id @default(cuid())
+  inflowId   String   @unique
+  customerId String
+  currencyId String
+  credit     Decimal  @db.Decimal(18, 5)
+  customer   Customer @relation(fields: [customerId], references: [inflowId], onDelete: Cascade)
+  currency   Currency @relation(fields: [currencyId], references: [inflowId])
 
-  localMappings     CustomerCreditLocationMap[]
+  localMappings CustomerCreditLocationMap[]
 
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([customerId])
   @@index([currencyId])
-
   @@unique([customerId, currencyId])
-
   @@map("customer_credit")
 }
 
 model CustomerCreditLocationMap {
-  id             String       @id @default(cuid())
-  customerCreditId String     // References CustomerCredit.inflowId
-  locationId     String       // References your Location table identifier
-  localId        Int          // The unique INT assigned by that specific local database
+  id               String @id @default(cuid())
+  customerCreditId String // References CustomerCredit.inflowId
+  locationId       String // References your Location table identifier
+  localId          Int // The unique INT assigned by that specific local database
 
-  location       Location? @relation(fields: [locationId], references: [inflowId], onDelete: Cascade)
+  location       Location?      @relation(fields: [locationId], references: [inflowId], onDelete: Cascade)
   customerCredit CustomerCredit @relation(fields: [customerCreditId], references: [inflowId], onDelete: Cascade)
 
   @@unique([customerCreditId, locationId])
@@ -2210,43 +2212,42 @@ model CustomerCreditLocationMap {
   @@map("customer_credit_location_map")
 }
 
-
 // Vendor Model
 
 model Vendor {
-  id                        String @id @default(cuid())
-  inflowId                  String @unique
-  businessPartnerId         String @unique
-  isTaxInclusivePricing     Boolean @default(false)
-  isCloudSynced             Boolean @default(false)
-  defaultCarrier            String?
-  defaultPaymentMethod      String?
-  discount                  Decimal? @db.Decimal(10,2)
-  leadTimeDays              Int?
-  currencyId                String?
-  defaultAddressId          String?
-  defaultPaymentTermsId     String?
-  taxingSchemeId            String?
-  lastModifiedById          String?
+  id                    String   @id @default(cuid())
+  inflowId              String   @unique
+  businessPartnerId     String   @unique
+  isTaxInclusivePricing Boolean  @default(false)
+  isCloudSynced         Boolean  @default(false)
+  defaultCarrier        String?
+  defaultPaymentMethod  String?
+  discount              Decimal? @db.Decimal(10, 2)
+  leadTimeDays          Int?
+  currencyId            String?
+  defaultAddressId      String?
+  defaultPaymentTermsId String?
+  taxingSchemeId        String?
+  lastModifiedById      String?
 
-  businessPartner BusinessPartner @relation(fields: [businessPartnerId],references: [id],onDelete: Cascade)
-  currency Currency? @relation(fields: [currencyId], references: [inflowId])
-  defaultPaymentTerms PaymentTerm? @relation(fields: [defaultPaymentTermsId], references: [inflowId])
-  taxingScheme TaxingScheme? @relation(fields: [taxingSchemeId], references: [inflowId])
-  lastModifiedBy TeamMember? @relation("VendorLastModifiedBy",fields: [lastModifiedById],references: [inflowId])
+  businessPartner     BusinessPartner @relation(fields: [businessPartnerId], references: [id], onDelete: Cascade)
+  currency            Currency?       @relation(fields: [currencyId], references: [inflowId])
+  defaultPaymentTerms PaymentTerm?    @relation(fields: [defaultPaymentTermsId], references: [inflowId])
+  taxingScheme        TaxingScheme?   @relation(fields: [taxingSchemeId], references: [inflowId])
+  lastModifiedBy      TeamMember?     @relation("VendorLastModifiedBy", fields: [lastModifiedById], references: [inflowId])
 
-  defaultAddress BusinessPartnerAddress? @relation("VendorDefaultAddress",fields: [defaultAddressId], references: [inflowId])
+  defaultAddress BusinessPartnerAddress? @relation("VendorDefaultAddress", fields: [defaultAddressId], references: [inflowId])
 
-  products   Product[]
-  dues       VendorDue[]
-  balances   VendorBalance[]
-  credits    VendorCredit[]
+  products        Product[]
+  dues            VendorDue[]
+  balances        VendorBalance[]
+  credits         VendorCredit[]
   attachments     VendorAttachment[]
   vendorItems     VendorItem[]
   reorderSettings ReorderSetting[]
-  purchaseOrders        PurchaseOrder[]
+  purchaseOrders  PurchaseOrder[]
 
-  localMappings     VendorLocationMap[]
+  localMappings VendorLocationMap[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -2257,48 +2258,46 @@ model Vendor {
 }
 
 model VendorLocationMap {
-  id         String       @id @default(cuid())
-  vendorId   String       // References Vendor.inflowId
-  locationId String       // References your Location table identifier
-  localId    Int          // The unique INT assigned by that specific local database
+  id         String @id @default(cuid())
+  vendorId   String // References Vendor.inflowId
+  locationId String // References your Location table identifier
+  localId    Int // The unique INT assigned by that specific local database
 
-  location   Location? @relation(fields: [locationId], references: [inflowId], onDelete: Cascade)
-  vendor     Vendor    @relation(fields: [vendorId], references: [inflowId], onDelete: Cascade)
+  location Location? @relation(fields: [locationId], references: [inflowId], onDelete: Cascade)
+  vendor   Vendor    @relation(fields: [vendorId], references: [inflowId], onDelete: Cascade)
 
   @@unique([vendorId, locationId])
   @@index([locationId, localId])
   @@map("vendor_location_map")
 }
 
-
 model VendorAttachment {
-  id            String @id @default(cuid())
-  inflowId      String @unique
-  vendorId      String
-  fileName      String?
-  fileUrl       String?
-  fileSize      Int?
-  contentType   String?
-  vendor        Vendor @relation(fields: [vendorId], references: [inflowId], onDelete: Cascade)
+  id          String  @id @default(cuid())
+  inflowId    String  @unique
+  vendorId    String
+  fileName    String?
+  fileUrl     String?
+  fileSize    Int?
+  contentType String?
+  vendor      Vendor  @relation(fields: [vendorId], references: [inflowId], onDelete: Cascade)
 
-  localMappings     VendorAttachmentLocationMap[]
+  localMappings VendorAttachmentLocationMap[]
 
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([vendorId])
-
   @@map("vendor_attachment")
 }
 
 model VendorAttachmentLocationMap {
-  id                  String       @id @default(cuid())
-  vendorAttachmentId  String       // References VendorAttachment.inflowId
-  locationId          String       // References your Location table identifier
-  localId             Int          // The unique INT assigned by that specific local database
+  id                 String @id @default(cuid())
+  vendorAttachmentId String // References VendorAttachment.inflowId
+  locationId         String // References your Location table identifier
+  localId            Int // The unique INT assigned by that specific local database
 
-  location            Location? @relation(fields: [locationId], references: [inflowId], onDelete: Cascade)
-  vendorAttachment    VendorAttachment @relation(fields: [vendorAttachmentId], references: [inflowId], onDelete: Cascade)
+  location         Location?        @relation(fields: [locationId], references: [inflowId], onDelete: Cascade)
+  vendorAttachment VendorAttachment @relation(fields: [vendorAttachmentId], references: [inflowId], onDelete: Cascade)
 
   @@unique([vendorAttachmentId, locationId])
   @@index([locationId, localId])
@@ -2306,37 +2305,35 @@ model VendorAttachmentLocationMap {
 }
 
 model VendorItem {
-  id            String @id @default(cuid())
-  inflowId      String @unique
-  leadTimeDays  Int?
-  lineNum       Int?       
-  vendorId      String
-  productId     String
-  vendorSku     String?
-  unitCost      Decimal? @db.Decimal(18,5)
-  vendor        Vendor @relation(fields: [vendorId], references: [inflowId], onDelete: Cascade)
-  product       Product @relation(fields: [productId], references: [inflowId], onDelete: Cascade)
+  id           String   @id @default(cuid())
+  inflowId     String   @unique
+  leadTimeDays Int?
+  lineNum      Int?
+  vendorId     String
+  productId    String
+  vendorSku    String?
+  unitCost     Decimal? @db.Decimal(18, 5)
+  vendor       Vendor   @relation(fields: [vendorId], references: [inflowId], onDelete: Cascade)
+  product      Product  @relation(fields: [productId], references: [inflowId], onDelete: Cascade)
 
-  localMappings     VendorItemLocationMap[]
+  localMappings VendorItemLocationMap[]
 
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@unique([vendorId, productId])
-
   @@index([vendorId])
   @@index([productId])
-
   @@map("vendor_item")
 }
 
 model VendorItemLocationMap {
-  id         String       @id @default(cuid())
-  vendorItemId String     // References VendorItem.inflowId
-  locationId String       // References your Location table identifier
-  localId    Int          // The unique INT assigned by that specific local database
+  id           String @id @default(cuid())
+  vendorItemId String // References VendorItem.inflowId
+  locationId   String // References your Location table identifier
+  localId      Int // The unique INT assigned by that specific local database
 
-  location   Location? @relation(fields: [locationId], references: [inflowId], onDelete: Cascade)
+  location   Location?  @relation(fields: [locationId], references: [inflowId], onDelete: Cascade)
   vendorItem VendorItem @relation(fields: [vendorItemId], references: [inflowId], onDelete: Cascade)
 
   @@unique([vendorItemId, locationId])
@@ -2345,36 +2342,34 @@ model VendorItemLocationMap {
 }
 
 model VendorDue {
-  id                String   @id @default(cuid())
-  inflowId          String   @unique
-  vendorId        String
-  currencyId        String
-  amountCurrent     Decimal  @db.Decimal(18,5)
-  amount1To30       Decimal  @db.Decimal(18,5)
-  amount31To60      Decimal  @db.Decimal(18,5)
-  amount61Plus      Decimal  @db.Decimal(18,5)
+  id            String  @id @default(cuid())
+  inflowId      String  @unique
+  vendorId      String
+  currencyId    String
+  amountCurrent Decimal @db.Decimal(18, 5)
+  amount1To30   Decimal @db.Decimal(18, 5)
+  amount31To60  Decimal @db.Decimal(18, 5)
+  amount61Plus  Decimal @db.Decimal(18, 5)
 
-  vendor            Vendor @relation(fields: [vendorId], references: [inflowId], onDelete: Cascade)
-  currency          Currency @relation(fields: [currencyId], references: [inflowId])
+  vendor   Vendor   @relation(fields: [vendorId], references: [inflowId], onDelete: Cascade)
+  currency Currency @relation(fields: [currencyId], references: [inflowId])
 
-  localMappings     VendorDueLocationMap[]
+  localMappings VendorDueLocationMap[]
 
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([vendorId])
   @@index([currencyId])
-
   @@unique([vendorId, currencyId])
-
   @@map("vendor_due")
 }
 
 model VendorDueLocationMap {
-  id        String       @id @default(cuid())
-  vendorDueId String     // References VendorDue.inflowId
-  locationId String       // References your Location table identifier
-  localId   Int          // The unique INT assigned by that specific local database
+  id          String @id @default(cuid())
+  vendorDueId String // References VendorDue.inflowId
+  locationId  String // References your Location table identifier
+  localId     Int // The unique INT assigned by that specific local database
 
   location  Location? @relation(fields: [locationId], references: [inflowId], onDelete: Cascade)
   vendorDue VendorDue @relation(fields: [vendorDueId], references: [inflowId], onDelete: Cascade)
@@ -2385,35 +2380,33 @@ model VendorDueLocationMap {
 }
 
 model VendorBalance {
-  id                String   @id @default(cuid())
-  inflowId          String   @unique
-  vendorId          String
-  currencyId        String
-  balance           Decimal  @db.Decimal(18,5)
-  vendor            Vendor @relation(fields: [vendorId], references: [inflowId], onDelete: Cascade)
-  currency          Currency @relation(fields: [currencyId], references: [inflowId])
+  id         String   @id @default(cuid())
+  inflowId   String   @unique
+  vendorId   String
+  currencyId String
+  balance    Decimal  @db.Decimal(18, 5)
+  vendor     Vendor   @relation(fields: [vendorId], references: [inflowId], onDelete: Cascade)
+  currency   Currency @relation(fields: [currencyId], references: [inflowId])
 
-  localMappings     VendorBalanceLocationMap[]
+  localMappings VendorBalanceLocationMap[]
 
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([vendorId])
   @@index([currencyId])
-
   @@unique([vendorId, currencyId])
-
   @@map("vendor_balance")
 }
 
 model VendorBalanceLocationMap {
-  id             String       @id @default(cuid())
-  vendorBalanceId String      // References VendorBalance.inflowId
-  locationId     String       // References your Location table identifier
-  localId        Int          // The unique INT assigned by that specific local database
+  id              String @id @default(cuid())
+  vendorBalanceId String // References VendorBalance.inflowId
+  locationId      String // References your Location table identifier
+  localId         Int // The unique INT assigned by that specific local database
 
-  location       Location? @relation(fields: [locationId], references: [inflowId], onDelete: Cascade)
-  vendorBalance  VendorBalance @relation(fields: [vendorBalanceId], references: [inflowId], onDelete: Cascade)
+  location      Location?     @relation(fields: [locationId], references: [inflowId], onDelete: Cascade)
+  vendorBalance VendorBalance @relation(fields: [vendorBalanceId], references: [inflowId], onDelete: Cascade)
 
   @@unique([vendorBalanceId, locationId])
   @@index([locationId, localId])
@@ -2421,35 +2414,33 @@ model VendorBalanceLocationMap {
 }
 
 model VendorCredit {
-  id                String   @id @default(cuid())
-  inflowId          String   @unique
-  vendorId          String
-  currencyId        String
-  credit            Decimal  @db.Decimal(18,5)
-  vendor            Vendor @relation(fields: [vendorId], references: [inflowId], onDelete: Cascade)
-  currency          Currency @relation(fields: [currencyId], references: [inflowId])
+  id         String   @id @default(cuid())
+  inflowId   String   @unique
+  vendorId   String
+  currencyId String
+  credit     Decimal  @db.Decimal(18, 5)
+  vendor     Vendor   @relation(fields: [vendorId], references: [inflowId], onDelete: Cascade)
+  currency   Currency @relation(fields: [currencyId], references: [inflowId])
 
-  localMappings     VendorCreditLocationMap[]
+  localMappings VendorCreditLocationMap[]
 
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([vendorId])
   @@index([currencyId])
-
   @@unique([vendorId, currencyId])
-
   @@map("vendor_credit")
 }
 
 model VendorCreditLocationMap {
-  id            String       @id @default(cuid())
-  vendorCreditId String      // References VendorCredit.inflowId
-  locationId    String       // References your Location table identifier
-  localId       Int          // The unique INT assigned by that specific local database
+  id             String @id @default(cuid())
+  vendorCreditId String // References VendorCredit.inflowId
+  locationId     String // References your Location table identifier
+  localId        Int // The unique INT assigned by that specific local database
 
-  location      Location? @relation(fields: [locationId], references: [inflowId], onDelete: Cascade)
-  vendorCredit  VendorCredit @relation(fields: [vendorCreditId], references: [inflowId], onDelete: Cascade)
+  location     Location?    @relation(fields: [locationId], references: [inflowId], onDelete: Cascade)
+  vendorCredit VendorCredit @relation(fields: [vendorCreditId], references: [inflowId], onDelete: Cascade)
 
   @@unique([vendorCreditId, locationId])
   @@index([locationId, localId])
@@ -2461,55 +2452,54 @@ model VendorCreditLocationMap {
 // ==========================================
 
 model TaxingScheme {
-  id                  String   @id @default(cuid())
-  inflowId            String   @unique // Global Cloud Identifier
+  id                  String  @id @default(cuid())
+  inflowId            String  @unique // Global Cloud Identifier
   name                String
-  isActive            Boolean  @default(true)
-  isDefault           Boolean  @default(false)
-  calculateTax2OnTax1 Boolean  @default(false)
+  isActive            Boolean @default(true)
+  isDefault           Boolean @default(false)
+  calculateTax2OnTax1 Boolean @default(false)
   tax1Name            String?
-  tax1OnShipping      Boolean  @default(false)
+  tax1OnShipping      Boolean @default(false)
   tax2Name            String?
-  tax2OnShipping      Boolean  @default(false)
+  tax2OnShipping      Boolean @default(false)
   defaultTaxCodeId    String?
 
-  defaultTaxCode      TaxCode? @relation("DefaultTaxCode", fields: [defaultTaxCodeId], references: [inflowId])
-  taxCodes            TaxCode[] @relation("SchemeTaxCodes")
+  defaultTaxCode TaxCode?  @relation("DefaultTaxCode", fields: [defaultTaxCodeId], references: [inflowId])
+  taxCodes       TaxCode[] @relation("SchemeTaxCodes")
 
-  productTaxCodes     ProductTaxCode[]
-  customers           Customer[]
-  vendors             Vendor[]
-  
+  productTaxCodes ProductTaxCode[]
+  customers       Customer[]
+  vendors         Vendor[]
   // 👉 RELATION: Link to the many local IDs this scheme has across your network
-  localMappings       TaxingSchemeLocationMap[]
+  localMappings   TaxingSchemeLocationMap[]
 
-  createdAt           DateTime @default(now())
-  updatedAt           DateTime @updatedAt
-  deletedAt           DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
 
   @@map("taxing_scheme")
 }
 
 model TaxCode {
-  id                  String   @id @default(cuid())
-  inflowId            String   @unique // Global Cloud Identifier
-  taxingSchemeId      String
-  name                String
-  isActive            Boolean  @default(true)
-  tax1Rate            Decimal? @db.Decimal(10,4)
-  tax2Rate            Decimal? @db.Decimal(10,4)
+  id             String   @id @default(cuid())
+  inflowId       String   @unique // Global Cloud Identifier
+  taxingSchemeId String
+  name           String
+  isActive       Boolean  @default(true)
+  tax1Rate       Decimal? @db.Decimal(10, 4)
+  tax2Rate       Decimal? @db.Decimal(10, 4)
 
-  taxingScheme        TaxingScheme @relation("SchemeTaxCodes", fields: [taxingSchemeId], references: [inflowId], onDelete: Cascade)
-  defaultForSchemes   TaxingScheme[] @relation("DefaultTaxCode")
+  taxingScheme      TaxingScheme   @relation("SchemeTaxCodes", fields: [taxingSchemeId], references: [inflowId], onDelete: Cascade)
+  defaultForSchemes TaxingScheme[] @relation("DefaultTaxCode")
 
-  productTaxCodes   ProductTaxCode[]
+  productTaxCodes ProductTaxCode[]
 
   // 👉 RELATION: Link to the many local IDs this tax code has across your network
-  localMappings       TaxCodeLocationMap[]
+  localMappings TaxCodeLocationMap[]
 
-  createdAt           DateTime @default(now())
-  updatedAt           DateTime @updatedAt
-  deletedAt           DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
 
   @@index([taxingSchemeId])
   @@map("tax_code")
@@ -2520,29 +2510,30 @@ model TaxCode {
 // ==========================================
 
 model TaxingSchemeLocationMap {
-  id             String       @id @default(cuid())
-  taxingSchemeId String       // References TaxingScheme.inflowId
-  locationId     String       // References your Location table identifier
-  localId        Int          // The unique INT assigned by that specific local database
+  id             String @id @default(cuid())
+  taxingSchemeId String // References TaxingScheme.inflowId
+  locationId     String // References your Location table identifier
+  localId        Int // The unique INT assigned by that specific local database
 
-  location       Location? @relation(fields: [locationId], references: [inflowId], onDelete: Cascade)
+  location Location? @relation(fields: [locationId], references: [inflowId], onDelete: Cascade)
 
-  taxingScheme   TaxingScheme @relation(fields: [taxingSchemeId], references: [inflowId], onDelete: Cascade)
+  taxingScheme TaxingScheme @relation(fields: [taxingSchemeId], references: [inflowId], onDelete: Cascade)
 
   // Enforce that a location can only map a global taxing scheme exactly once
+  // High-performance lookup when a local webhook sends updates
   @@unique([taxingSchemeId, locationId])
-  @@index([locationId, localId]) // High-performance lookup when a local webhook sends updates
+  @@index([locationId, localId])
   @@map("taxing_scheme_location_map")
 }
 
 model TaxCodeLocationMap {
-  id             String       @id @default(cuid())
-  taxCodeId      String       // References TaxCode.inflowId
-  locationId     String       // References your Location table identifier
-  localId        Int          // The unique INT assigned by that specific local database
+  id         String @id @default(cuid())
+  taxCodeId  String // References TaxCode.inflowId
+  locationId String // References your Location table identifier
+  localId    Int // The unique INT assigned by that specific local database
 
-  location       Location? @relation(fields: [locationId], references: [inflowId], onDelete: Cascade)
-  taxCode        TaxCode      @relation(fields: [taxCodeId], references: [inflowId], onDelete: Cascade)
+  location Location? @relation(fields: [locationId], references: [inflowId], onDelete: Cascade)
+  taxCode  TaxCode   @relation(fields: [taxCodeId], references: [inflowId], onDelete: Cascade)
 
   @@unique([taxCodeId, locationId])
   @@index([locationId, localId])
@@ -2560,47 +2551,46 @@ enum CurrencyNegativeType {
 }
 
 model Currency {
-  id                    String   @id @default(cuid())
-  inflowId              String   @unique
-  name                  String
-  isoCode               String   @unique
-  symbol                String?
-  decimalPlaces         Int      @default(2)
-  decimalSeparator      String?
-  thousandsSeparator    String?
-  isSymbolFirst         Boolean  @default(true)
-  negativeType          String?
-  conversions           CurrencyConversion[]
-  pricingSchemes        PricingScheme[]
+  id                 String               @id @default(cuid())
+  inflowId           String               @unique
+  name               String
+  isoCode            String               @unique
+  symbol             String?
+  decimalPlaces      Int                  @default(2)
+  decimalSeparator   String?
+  thousandsSeparator String?
+  isSymbolFirst      Boolean              @default(true)
+  negativeType       String?
+  conversions        CurrencyConversion[]
+  pricingSchemes     PricingScheme[]
 
-  customerDues      CustomerDue[]
-  customerBalances  CustomerBalance[]
-  customerCredits   CustomerCredit[]
+  customerDues     CustomerDue[]
+  customerBalances CustomerBalance[]
+  customerCredits  CustomerCredit[]
 
-  vendorDues        VendorDue[]
-  vendorBalances    VendorBalance[]
-  vendorCredits     VendorCredit[]
+  vendorDues     VendorDue[]
+  vendorBalances VendorBalance[]
+  vendorCredits  VendorCredit[]
 
-  vendors           Vendor[]
-  localMappings     CurrencyLocationMap[]
+  vendors       Vendor[]
+  localMappings CurrencyLocationMap[]
 
-  createdAt             DateTime @default(now())
-  updatedAt             DateTime @updatedAt
-  deletedAt             DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
 
   @@index([isoCode])
-
   @@map("currency")
 }
 
 model CurrencyLocationMap {
-  id         String       @id @default(cuid())
-  currencyId String       // References Currency.inflowId
-  locationId String       // References your Location table identifier
-  localId    Int          // The unique INT assigned by that specific local database
+  id         String @id @default(cuid())
+  currencyId String // References Currency.inflowId
+  locationId String // References your Location table identifier
+  localId    Int // The unique INT assigned by that specific local database
 
-  location   Location? @relation(fields: [locationId], references: [inflowId], onDelete: Cascade)
-  currency   Currency  @relation(fields: [currencyId], references: [inflowId], onDelete: Cascade)
+  location Location? @relation(fields: [locationId], references: [inflowId], onDelete: Cascade)
+  currency Currency  @relation(fields: [currencyId], references: [inflowId], onDelete: Cascade)
 
   @@unique([currencyId, locationId])
   @@index([locationId, localId])
@@ -2608,140 +2598,128 @@ model CurrencyLocationMap {
 }
 
 model CurrencyConversion {
-  id                    String   @id @default(cuid())
-  inflowId              String   @unique
-  currencyId            String
-  exchangeRate          Decimal  @db.Decimal(18, 8)
-  isManual              Boolean  @default(false)
-  currency              Currency @relation(fields: [currencyId],references: [inflowId], onDelete: Cascade)
+  id           String   @id @default(cuid())
+  inflowId     String   @unique
+  currencyId   String
+  exchangeRate Decimal  @db.Decimal(18, 8)
+  isManual     Boolean  @default(false)
+  currency     Currency @relation(fields: [currencyId], references: [inflowId], onDelete: Cascade)
 
-  createdAt             DateTime @default(now())
-  updatedAt             DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([currencyId])
-
   @@map("currency_conversion")
 }
 
 // PRICING SCHEME MODELS
 
 model PricingScheme {
-  id                String   @id @default(cuid())
-  inflowId          String   @unique
-  currencyId        String
-  name              String
-  isActive          Boolean  @default(true)
-  isDefault         Boolean  @default(false)
-  isTaxInclusive    Boolean  @default(false)
+  id             String  @id @default(cuid())
+  inflowId       String  @unique
+  currencyId     String
+  name           String
+  isActive       Boolean @default(true)
+  isDefault      Boolean @default(false)
+  isTaxInclusive Boolean @default(false)
 
-  currency          Currency  @relation(fields: [currencyId], references: [inflowId], onDelete: Restrict)
-  productPrices     ProductPrice[]
-  customers         Customer[]
-  
-  localMappings     PricingSchemeLocationMap[]
+  currency      Currency                   @relation(fields: [currencyId], references: [inflowId], onDelete: Restrict)
+  productPrices ProductPrice[]
+  customers     Customer[]
+  localMappings PricingSchemeLocationMap[]
 
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
-  deletedAt         DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
 
   @@index([currencyId])
-
   @@map("pricing_scheme")
 }
 
 model PricingSchemeLocationMap {
-  id              String       @id @default(cuid())
-  pricingSchemeId String       // References PricingScheme.inflowId
-  locationId      String       // References your Location table identifier
-  localId         Int          // The unique INT assigned by that specific local database
+  id              String @id @default(cuid())
+  pricingSchemeId String // References PricingScheme.inflowId
+  locationId      String // References your Location table identifier
+  localId         Int // The unique INT assigned by that specific local database
 
-  location        Location? @relation(fields: [locationId], references: [inflowId], onDelete: Cascade)
-  pricingScheme   PricingScheme @relation(fields: [pricingSchemeId], references: [inflowId], onDelete: Cascade)
+  location      Location?     @relation(fields: [locationId], references: [inflowId], onDelete: Cascade)
+  pricingScheme PricingScheme @relation(fields: [pricingSchemeId], references: [inflowId], onDelete: Cascade)
 
   @@unique([pricingSchemeId, locationId])
   @@index([locationId, localId])
   @@map("pricing_scheme_location_map")
 }
 
-
 // PAYMENT TERM
+
 model PaymentTerm {
-  id              String   @id @default(cuid())
-  inflowId        String   @unique
-  name            String
-  daysDue         Int?
-  isActive        Boolean  @default(true)
+  id       String  @id @default(cuid())
+  inflowId String  @unique
+  name     String
+  daysDue  Int?
+  isActive Boolean @default(true)
 
-  customers       Customer[]
-  vendors         Vendor[]
-  salesOrders     SalesOrder[]
-  localMappings   PaymentTermLocationMap[]
+  customers     Customer[]
+  vendors       Vendor[]
+  salesOrders   SalesOrder[]
+  localMappings PaymentTermLocationMap[]
 
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-  deletedAt       DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
 
   @@index([name])
-
   @@map("payment_terms")
 }
 
 model PaymentTermLocationMap {
-  id             String       @id @default(cuid())
-  paymentTermId  String       // References PaymentTerm.inflowId
-  locationId     String       // References your Location table identifier
-  localId        Int          // The unique INT assigned by that specific local database
+  id            String @id @default(cuid())
+  paymentTermId String // References PaymentTerm.inflowId
+  locationId    String // References your Location table identifier
+  localId       Int // The unique INT assigned by that specific local database
 
-  location       Location? @relation(fields: [locationId], references: [inflowId], onDelete: Cascade)
-  paymentTerm    PaymentTerm  @relation(fields: [paymentTermId], references: [inflowId], onDelete: Cascade)
+  location    Location?   @relation(fields: [locationId], references: [inflowId], onDelete: Cascade)
+  paymentTerm PaymentTerm @relation(fields: [paymentTermId], references: [inflowId], onDelete: Cascade)
 
   @@unique([paymentTermId, locationId])
   @@index([locationId, localId])
   @@map("payment_term_location_map")
 }
 
-
-
-
 // ==========================================
 // Sales Order Models
 // ==========================================
 
-
-
 model SalesOrder {
-  id                     String    @id @default(cuid())
-  inflowId               String    @unique
-  localId                Int      @unique @default(autoincrement())
-  orderNumber            String    @unique
+  id                     String                    @id @default(cuid())
+  inflowId               String                    @unique
+  localId                Int                       @unique @default(autoincrement())
+  orderNumber            String                    @unique
   poNumber               String?
   externalId             String?
   source                 String?
-  
   // Financials
-  subTotal               Decimal   @db.Decimal(18, 5)
-  total                  Decimal   @db.Decimal(18, 5)
-  amountPaid             Decimal   @db.Decimal(18, 5)
-  balance                Decimal   @db.Decimal(18, 5)
-  orderFreight           Decimal   @db.Decimal(18, 5)
-  returnFee              Decimal   @db.Decimal(18, 5)
-  returnFreight          Decimal   @db.Decimal(18, 5)
-  exchangeRate           Decimal   @default(1.0) @db.Decimal(18, 10)
+  subTotal               Decimal                   @db.Decimal(18, 5)
+  total                  Decimal                   @db.Decimal(18, 5)
+  amountPaid             Decimal                   @db.Decimal(18, 5)
+  balance                Decimal                   @db.Decimal(18, 5)
+  orderFreight           Decimal                   @db.Decimal(18, 5)
+  returnFee              Decimal                   @db.Decimal(18, 5)
+  returnFreight          Decimal                   @db.Decimal(18, 5)
+  exchangeRate           Decimal                   @default(1.0) @db.Decimal(18, 10)
   exchangeRateAutoPulled DateTime?
-  
   // Statuses & Flags
-  paymentStatus          SalesOrderPaymentStatus 
+  paymentStatus          SalesOrderPaymentStatus
   inventoryStatus        SalesOrderInventoryStatus
-  isCancelled            Boolean   @default(false)
-  isCompleted            Boolean   @default(false)
-  isFullyPicked          Boolean   @default(false)
-  isInvoiced             Boolean   @default(false)
-  isPicking              Boolean   @default(false)
-  isPrioritized          Boolean   @default(false)
-  isQuote                Boolean   @default(false)
-  isTaxInclusive         Boolean   @default(false)
-  needsConfirmation      Boolean   @default(false)
-  
+  isCancelled            Boolean                   @default(false)
+  isCompleted            Boolean                   @default(false)
+  isFullyPicked          Boolean                   @default(false)
+  isInvoiced             Boolean                   @default(false)
+  isPicking              Boolean                   @default(false)
+  isPrioritized          Boolean                   @default(false)
+  isQuote                Boolean                   @default(false)
+  isTaxInclusive         Boolean                   @default(false)
+  needsConfirmation      Boolean                   @default(false)
   // Dates
   orderDate              DateTime?
   dueDate                DateTime?
@@ -2749,62 +2727,55 @@ model SalesOrder {
   paidDate               DateTime?
   requestedShipDate      DateTime?
   shippedDate            DateTime?
-  
   // Contact & Remarks
   contactName            String?
   email                  String?
   phone                  String?
-  orderRemarks           String?   @db.Text
-  packRemarks            String?   @db.Text
-  pickRemarks            String?   @db.Text
-  restockRemarks         String?   @db.Text
-  returnRemarks          String?   @db.Text
-  shipRemarks            String?   @db.Text
+  orderRemarks           String?                   @db.Text
+  packRemarks            String?                   @db.Text
+  pickRemarks            String?                   @db.Text
+  restockRemarks         String?                   @db.Text
+  returnRemarks          String?                   @db.Text
+  shipRemarks            String?                   @db.Text
   shipToCompanyName      String?
-  showShipping           Boolean   @default(true)
-  
+  showShipping           Boolean                   @default(true)
   // Embedded / JSON Objects
-  billingAddress         Json?     // Stores address1, address2, city, state, country, etc.
-  shippingAddress        Json?     // Stores address1, address2, city, state, country, etc.
-  customFields           Json?     // Stores custom1 through custom10
-  nonCustomerCost        Json?     // Stores { value: "19.99", isPercent: true }
-  sameBillingAndShipping Boolean   @default(false)
+  billingAddress         Json? // Stores address1, address2, city, state, country, etc.
+  shippingAddress        Json? // Stores address1, address2, city, state, country, etc.
+  customFields           Json? // Stores custom1 through custom10
+  nonCustomerCost        Json? // Stores { value: "19.99", isPercent: true }
+  sameBillingAndShipping Boolean                   @default(false)
 
   // Relations
   customerId             String
-  customer               Customer  @relation(fields: [customerId], references: [inflowId])
-  
+  customer               Customer    @relation(fields: [customerId], references: [inflowId])
   locationId             String?
-  location               Location? @relation(fields: [locationId], references: [inflowId], onDelete: SetNull)
-  
+  location               Location?   @relation(fields: [locationId], references: [inflowId], onDelete: SetNull)
   assignedToTeamMemberId String?
   assignedToTeamMember   TeamMember? @relation("AssignedOrders", fields: [assignedToTeamMemberId], references: [inflowId], onDelete: SetNull)
-  
   confirmerTeamMemberId  String?
   confirmerTeamMember    TeamMember? @relation("ConfirmedOrders", fields: [confirmerTeamMemberId], references: [inflowId], onDelete: SetNull)
-  
   salesRepTeamMemberId   String?
   salesRepTeamMember     TeamMember? @relation("SalesRepOrders", fields: [salesRepTeamMemberId], references: [inflowId], onDelete: SetNull)
   salesRep               String?
 
-  paymentTermsId         String?
-  paymentTerms           PaymentTerm? @relation(fields: [paymentTermsId], references: [inflowId])
-  
-  pricingSchemeId        String?
-  taxingSchemeId         String?
-  currencyId             String?
-  lastModifiedById       String?
+  paymentTermsId   String?
+  paymentTerms     PaymentTerm? @relation(fields: [paymentTermsId], references: [inflowId])
+  pricingSchemeId  String?
+  taxingSchemeId   String?
+  currencyId       String?
+  lastModifiedById String?
 
   // Tax Details
-  calculateTax2OnTax1    Boolean   @default(false)
-  tax1                   Decimal   @db.Decimal(18, 5)
-  tax1Name               String?
-  tax1OnShipping         Boolean   @default(false)
-  tax1Rate               Decimal   @db.Decimal(18, 5)
-  tax2                   Decimal   @db.Decimal(18, 5)
-  tax2Name               String?
-  tax2OnShipping         Boolean   @default(false)
-  tax2Rate               Decimal   @db.Decimal(18, 5)
+  calculateTax2OnTax1 Boolean @default(false)
+  tax1                Decimal @db.Decimal(18, 5)
+  tax1Name            String?
+  tax1OnShipping      Boolean @default(false)
+  tax1Rate            Decimal @db.Decimal(18, 5)
+  tax2                Decimal @db.Decimal(18, 5)
+  tax2Name            String?
+  tax2OnShipping      Boolean @default(false)
+  tax2Rate            Decimal @db.Decimal(18, 5)
 
   // Has-Many Relations
   lines                  SalesOrderLine[]
@@ -2819,7 +2790,7 @@ model SalesOrder {
   attachments            SalesOrderAttachment[]
   reservations           InventoryReservation[]
 
-  localMappings          SalesOrderLocationMap[]
+  localMappings SalesOrderLocationMap[]
 
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
@@ -2831,7 +2802,6 @@ model SalesOrder {
   @@index([locationId])
   @@index([paymentStatus])
   @@index([orderDate])
-
   @@map("sales_order")
 }
 
@@ -2846,18 +2816,18 @@ enum SalesOrderPaymentStatus {
 enum SalesOrderInventoryStatus {
   STARTED
   UNFULFILLED
-  FULFILLED  
+  FULFILLED
   QUOTE
 }
 
 model SalesOrderLocationMap {
-  id             String       @id @default(cuid())
-  salesOrderId  String       // References SalesOrder.inflowId
-  locationId     String       // References your Location table identifier
-  localId        Int          // The unique INT assigned by that specific local database
+  id           String @id @default(cuid())
+  salesOrderId String // References SalesOrder.inflowId
+  locationId   String // References your Location table identifier
+  localId      Int // The unique INT assigned by that specific local database
 
-  location       Location? @relation(fields: [locationId], references: [inflowId], onDelete: Cascade)
-  salesOrder    SalesOrder  @relation(fields: [salesOrderId], references: [inflowId], onDelete: Cascade)
+  location   Location?  @relation(fields: [locationId], references: [inflowId], onDelete: Cascade)
+  salesOrder SalesOrder @relation(fields: [salesOrderId], references: [inflowId], onDelete: Cascade)
 
   @@unique([salesOrderId, locationId])
   @@index([locationId, localId])
@@ -2866,21 +2836,18 @@ model SalesOrderLocationMap {
 
 model SalesOrderLine {
   salesOrderLineId String     @id @default(uuid())
-  salesOrderId     String     
+  salesOrderId     String
   salesOrder       SalesOrder @relation(fields: [salesOrderId], references: [inflowId], onDelete: Cascade)
-  
   productId        String
   product          Product    @relation(fields: [productId], references: [inflowId])
-  
   description      String?    @db.Text
   unitPrice        Decimal    @db.Decimal(18, 5)
   subTotal         Decimal    @db.Decimal(18, 5)
-  discount         Json?      // Stores { value: "0.00", isPercent: true }
+  discount         Json? // Stores { value: "0.00", isPercent: true }
   isDiscarded      Boolean    @default(false)
   serviceCompleted Boolean?
   returnDate       DateTime?
-  
-  quantity         Json       // Stores standardQuantity, uomQuantity, uom, and serialNumbers array
+  quantity         Json // Stores standardQuantity, uomQuantity, uom, and serialNumbers array
   tax1Rate         Decimal    @db.Decimal(18, 5)
   tax2Rate         Decimal    @db.Decimal(18, 5)
   taxCodeId        String?
@@ -2890,7 +2857,6 @@ model SalesOrderLine {
 
   @@index([salesOrderId])
   @@index([productId])
-
   @@map("sales_order_line")
 }
 
@@ -2898,17 +2864,14 @@ model SalesOrderPackLine {
   salesOrderPackLineId String     @id @default(uuid())
   salesOrderId         String
   salesOrder           SalesOrder @relation(fields: [salesOrderId], references: [inflowId], onDelete: Cascade)
-  
   productId            String
   product              Product    @relation(fields: [productId], references: [inflowId])
-  
   containerNumber      String?
   description          String?
-  quantity             Json       // Holds quantity object variants
+  quantity             Json // Holds quantity object variants
 
   @@index([salesOrderId])
   @@index([productId])
-
   @@map("sales_order_pack_line")
 }
 
@@ -2916,10 +2879,8 @@ model SalesOrderPickLine {
   salesOrderPickLineId String     @id @default(uuid())
   salesOrderId         String
   salesOrder           SalesOrder @relation(fields: [salesOrderId], references: [inflowId], onDelete: Cascade)
-  
   productId            String
   product              Product    @relation(fields: [productId], references: [inflowId])
-  
   lineNum              String?
   locationId           String?
   sublocation          String?
@@ -2929,7 +2890,6 @@ model SalesOrderPickLine {
 
   @@index([salesOrderId])
   @@index([productId])
-
   @@map("sales_order_pick_line")
 }
 
@@ -2937,10 +2897,8 @@ model SalesOrderPickAllocationLine {
   salesOrderPickAllocationLineId String     @id @default(uuid())
   salesOrderId                   String
   salesOrder                     SalesOrder @relation(fields: [salesOrderId], references: [inflowId], onDelete: Cascade)
-  
   productId                      String
   product                        Product    @relation(fields: [productId], references: [inflowId])
-  
   lineNum                        String?
   locationId                     String?
   sublocation                    String?
@@ -2948,7 +2906,6 @@ model SalesOrderPickAllocationLine {
 
   @@index([salesOrderId])
   @@index([productId])
-
   @@map("sales_order_pick_allocation_line")
 }
 
@@ -2956,17 +2913,14 @@ model SalesOrderPickAllocationFailure {
   salesOrderPickAllocationFailureId String     @id @default(uuid())
   salesOrderId                      String
   salesOrder                        SalesOrder @relation(fields: [salesOrderId], references: [inflowId], onDelete: Cascade)
-  
   productId                         String
   product                           Product    @relation(fields: [productId], references: [inflowId])
-  
   lineNum                           String?
   hasExpiredLotsInStock             Boolean    @default(false)
   quantity                          Json
 
   @@index([salesOrderId])
   @@index([productId])
-
   @@map("sales_order_pick_allocation_failure")
 }
 
@@ -2974,10 +2928,8 @@ model SalesOrderRestockLine {
   salesOrderRestockLineId String     @id @default(uuid())
   salesOrderId            String
   salesOrder              SalesOrder @relation(fields: [salesOrderId], references: [inflowId], onDelete: Cascade)
-  
   productId               String
   product                 Product    @relation(fields: [productId], references: [inflowId])
-  
   description             String?
   locationId              String?
   sublocation             String?
@@ -2986,26 +2938,22 @@ model SalesOrderRestockLine {
 
   @@index([salesOrderId])
   @@index([productId])
-
   @@map("sales_order_restock_line")
 }
 
 model SalesOrderShipLine {
-  salesOrderShipLineId String     @id @default(uuid())
-  salesOrderId         String
-  salesOrder           SalesOrder @relation(fields: [salesOrderId], references: [inflowId], onDelete: Cascade)
-  
-  carrier              String?
-  trackingNumber       String?
-  shippedDate          DateTime?
-  easyPostShipmentId   String?
-  easyPostShipmentStatus String?
+  salesOrderShipLineId             String     @id @default(uuid())
+  salesOrderId                     String
+  salesOrder                       SalesOrder @relation(fields: [salesOrderId], references: [inflowId], onDelete: Cascade)
+  carrier                          String?
+  trackingNumber                   String?
+  shippedDate                      DateTime?
+  easyPostShipmentId               String?
+  easyPostShipmentStatus           String?
   easyPostConfirmationEmailAddress String?
-  containers           Json?      // To support nested structured array layouts if present
-  
+  containers                       Json? // To support nested structured array layouts if present
 
   @@index([salesOrderId])
-
   @@map("sales_order_ship_line")
 }
 
@@ -3013,7 +2961,6 @@ model SalesOrderPaymentLine {
   salesOrderPaymentHistoryLineId String     @id @default(uuid())
   salesOrderId                   String
   salesOrder                     SalesOrder @relation(fields: [salesOrderId], references: [inflowId], onDelete: Cascade)
-  
   lineNum                        Int
   amount                         Decimal    @db.Decimal(18, 5)
   datePaid                       DateTime?
@@ -3023,7 +2970,6 @@ model SalesOrderPaymentLine {
   remarks                        String?    @db.Text
 
   @@index([salesOrderId])
-
   @@map("sales_order_payment_line")
 }
 
@@ -3042,27 +2988,24 @@ model SalesOrderAttachment {
   salesOrder       SalesOrder @relation(fields: [salesOrderId], references: [inflowId], onDelete: Cascade)
   attachmentUrl    String
   fileName         String
-  fileSize         Json?      // Empty or structured size metadata
+  fileSize         Json? // Empty or structured size metadata
   lastModifiedById String?
 
   @@index([salesOrderId])
-
   @@map("sales_order_attachment")
 }
 
-
-
 model InventoryReservation {
-  id          String @id @default(cuid())
+  id           String            @id @default(cuid())
   salesOrderId String?
-  inventoryId String
-  quantity    Decimal @db.Decimal(18,4)
-  status      ReservationStatus
-  inventory   Inventory  @relation(fields: [inventoryId],references: [id], onDelete: Cascade)
-  salesOrder  SalesOrder? @relation(fields: [salesOrderId],references: [inflowId], onDelete: Cascade)
+  inventoryId  String
+  quantity     Decimal           @db.Decimal(18, 4)
+  status       ReservationStatus
+  inventory    Inventory         @relation(fields: [inventoryId], references: [id], onDelete: Cascade)
+  salesOrder   SalesOrder?       @relation(fields: [salesOrderId], references: [inflowId], onDelete: Cascade)
 
-  expiresAt   DateTime?
-  createdAt DateTime @default(now())
+  expiresAt DateTime?
+  createdAt DateTime  @default(now())
 }
 
 enum ReservationStatus {
@@ -3078,7 +3021,6 @@ model PurchaseOrder {
   inflowId               String    @unique
   orderNumber            String    @unique // e.g., "PO-000123"
   vendorOrderNumber      String?
-  
   // Financials
   subTotal               Decimal   @db.Decimal(18, 5)
   total                  Decimal   @db.Decimal(18, 5)
@@ -3087,76 +3029,75 @@ model PurchaseOrder {
   freight                Decimal   @db.Decimal(18, 5)
   returnFee              Decimal   @db.Decimal(18, 5)
   returnExtra            Decimal   @db.Decimal(18, 5)
-  exchangeRate           Decimal  @default(1.0) @db.Decimal(18, 10)
+  exchangeRate           Decimal   @default(1.0) @db.Decimal(18, 10)
   exchangeRateAutoPulled DateTime?
 
   // Statuses & Flags
-  paymentStatus          PurchaseOrderPaymentStatus    // e.g., "Quote"
-  inventoryStatus        PurchaseOrderInventoryStatus    // e.g., "Quote"
-  isCancelled            Boolean   @default(false)
-  isCompleted            Boolean   @default(false)
-  isQuote                Boolean   @default(false)
-  isTaxInclusive         Boolean   @default(false)
-  showShipping           Boolean   @default(true)
-  carrier                String?
+  paymentStatus   PurchaseOrderPaymentStatus // e.g., "Quote"
+  inventoryStatus PurchaseOrderInventoryStatus // e.g., "Quote"
+  isCancelled     Boolean                      @default(false)
+  isCompleted     Boolean                      @default(false)
+  isQuote         Boolean                      @default(false)
+  isTaxInclusive  Boolean                      @default(false)
+  showShipping    Boolean                      @default(true)
+  carrier         String?
 
   // Dates
-  orderDate              DateTime?
-  dueDate                DateTime?
-  requestShipDate        DateTime?
+  orderDate       DateTime?
+  dueDate         DateTime?
+  requestShipDate DateTime?
 
   // Contact & Remarks
-  contactName            String?
-  email                  String?
-  phone                  String?
-  orderRemarks           String?   @db.Text
-  receiveRemarks         String?   @db.Text
-  returnRemarks          String?   @db.Text
-  unstockRemarks         String?   @db.Text
-  shipToCompanyName      String?
+  contactName       String?
+  email             String?
+  phone             String?
+  orderRemarks      String? @db.Text
+  receiveRemarks    String? @db.Text
+  returnRemarks     String? @db.Text
+  unstockRemarks    String? @db.Text
+  shipToCompanyName String?
 
   // Embedded Structured JSON Data
-  shipToAddress          Json?     // Stores complete address sub-object
-  vendorAddress          Json?     // Stores complete address sub-object
-  customFields           Json?     // Stores custom1 through custom10
-  nonVendorCosts         Json?     // Stores { value: "19.99", isPercent: true }
+  shipToAddress  Json? // Stores complete address sub-object
+  vendorAddress  Json? // Stores complete address sub-object
+  customFields   Json? // Stores custom1 through custom10
+  nonVendorCosts Json? // Stores { value: "19.99", isPercent: true }
 
   // Relations
-  vendorId               String
-  vendor                 Vendor    @relation(fields: [vendorId], references: [inflowId])
+  vendorId String
+  vendor   Vendor @relation(fields: [vendorId], references: [inflowId])
 
-  locationId             String?
-  location               Location? @relation(fields: [locationId], references: [inflowId], onDelete: SetNull)
+  locationId String?
+  location   Location? @relation(fields: [locationId], references: [inflowId], onDelete: SetNull)
 
   assignedToTeamMemberId String?
   assignedToTeamMember   TeamMember? @relation("POAssignedOrders", fields: [assignedToTeamMemberId], references: [inflowId], onDelete: SetNull)
-  
   approverTeamMemberId   String?
   approverTeamMember     TeamMember? @relation("POApprovedOrders", fields: [approverTeamMemberId], references: [inflowId], onDelete: SetNull)
 
-  lastModifiedById       String?
-  currencyId             String?
-  paymentTermsId         String?
-  taxingSchemeId         String?
+  lastModifiedById String?
+  currencyId       String?
+  paymentTermsId   String?
+  taxingSchemeId   String?
 
   // Tax Subfields
-  calculateTax2OnTax1    Boolean   @default(false)
-  tax1                   Decimal   @db.Decimal(18, 5)
-  tax1Name               String?
-  tax1OnShipping         Boolean   @default(false)
-  tax1Rate               Decimal   @db.Decimal(18, 5)
-  tax2                   Decimal   @db.Decimal(18, 5)
-  tax2Name               String?
-  tax2OnShipping         Boolean   @default(false)
-  tax2Rate               Decimal   @db.Decimal(18, 5)
+  calculateTax2OnTax1 Boolean @default(false)
+  tax1                Decimal @db.Decimal(18, 5)
+  tax1Name            String?
+  tax1OnShipping      Boolean @default(false)
+  tax1Rate            Decimal @db.Decimal(18, 5)
+  tax2                Decimal @db.Decimal(18, 5)
+  tax2Name            String?
+  tax2OnShipping      Boolean @default(false)
+  tax2Rate            Decimal @db.Decimal(18, 5)
 
   // Dependents / Line Array Relations
-  lines                  PurchaseOrderLine[]
-  paymentLines           PurchaseOrderPaymentLine[]
-  receiveLines           PurchaseOrderReceiveLine[]
-  unstockLines           PurchaseOrderUnstockLine[]
-  attachments            PurchaseOrderAttachment[]
-  localMappings          PurchaseOrderLocationMap[]
+  lines         PurchaseOrderLine[]
+  paymentLines  PurchaseOrderPaymentLine[]
+  receiveLines  PurchaseOrderReceiveLine[]
+  unstockLines  PurchaseOrderUnstockLine[]
+  attachments   PurchaseOrderAttachment[]
+  localMappings PurchaseOrderLocationMap[]
 
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
@@ -3168,7 +3109,6 @@ model PurchaseOrder {
   @@index([locationId])
   @@index([paymentStatus])
   @@index([orderDate])
-
   @@map("purchase_order")
 }
 
@@ -3183,18 +3123,18 @@ enum PurchaseOrderPaymentStatus {
 enum PurchaseOrderInventoryStatus {
   STARTED
   UNFULFILLED
-  FULFILLED  
+  FULFILLED
   QUOTE
 }
 
 model PurchaseOrderLocationMap {
-  id             String       @id @default(cuid())
-  purchaseOrderId  String       // References PurchaseOrder.inflowId
-  locationId     String       // References your Location table identifier
-  localId        Int          // The unique INT assigned by that specific local database
+  id              String @id @default(cuid())
+  purchaseOrderId String // References PurchaseOrder.inflowId
+  locationId      String // References your Location table identifier
+  localId         Int // The unique INT assigned by that specific local database
 
-  location       Location? @relation(fields: [locationId], references: [inflowId], onDelete: Cascade)
-  purchaseOrder    PurchaseOrder  @relation(fields: [purchaseOrderId], references: [inflowId], onDelete: Cascade)
+  location      Location?     @relation(fields: [locationId], references: [inflowId], onDelete: Cascade)
+  purchaseOrder PurchaseOrder @relation(fields: [purchaseOrderId], references: [inflowId], onDelete: Cascade)
 
   @@unique([purchaseOrderId, locationId])
   @@index([locationId, localId])
@@ -3206,31 +3146,29 @@ model PurchaseOrderLine {
   purchaseOrderId     String
   purchaseOrder       PurchaseOrder @relation(fields: [purchaseOrderId], references: [inflowId], onDelete: Cascade)
 
-  productId           String
-  product             Product       @relation(fields: [productId], references: [inflowId])
-  
-  vendorItemCode      String?
-  description         String?       @db.Text
-  unitPrice           Decimal       @db.Decimal(18, 5)
-  subTotal            Decimal       @db.Decimal(18, 5)
-  discount            Json?         // Holds { value: "19.99", isPercent: true }
-  serviceCompleted    Boolean       @default(false)
-  returnDate          DateTime?
-  quantity            Json          // Holds standardQuantity, uomQuantity, uom, and serials
+  productId        String
+  product          Product   @relation(fields: [productId], references: [inflowId])
+  vendorItemCode   String?
+  description      String?   @db.Text
+  unitPrice        Decimal   @db.Decimal(18, 5)
+  subTotal         Decimal   @db.Decimal(18, 5)
+  discount         Json? // Holds { value: "19.99", isPercent: true }
+  serviceCompleted Boolean   @default(false)
+  returnDate       DateTime?
+  quantity         Json // Holds standardQuantity, uomQuantity, uom, and serials
 
   // Product structural fallback fields tracking specs at PO generation
-  productHeight       Decimal?      @db.Decimal(10, 4)
-  productLength       Decimal?      @db.Decimal(10, 4)
-  productWidth        Decimal?      @db.Decimal(10, 4)
-  productWeight       Decimal?      @db.Decimal(10, 4)
+  productHeight Decimal? @db.Decimal(10, 4)
+  productLength Decimal? @db.Decimal(10, 4)
+  productWidth  Decimal? @db.Decimal(10, 4)
+  productWeight Decimal? @db.Decimal(10, 4)
 
-  tax1Rate            Decimal       @db.Decimal(18, 5)
-  tax2Rate            Decimal       @db.Decimal(18, 5)
-  taxCodeId           String?
+  tax1Rate  Decimal @db.Decimal(18, 5)
+  tax2Rate  Decimal @db.Decimal(18, 5)
+  taxCodeId String?
 
   @@index([purchaseOrderId])
   @@index([productId])
-
   @@map("purchase_order_line")
 }
 
@@ -3239,25 +3177,24 @@ model PurchaseOrderReceiveLine {
   purchaseOrderId            String
   purchaseOrder              PurchaseOrder @relation(fields: [purchaseOrderId], references: [inflowId], onDelete: Cascade)
 
-  productId                  String
-  product                    Product       @relation(fields: [productId], references: [inflowId])
+  productId String
+  product   Product @relation(fields: [productId], references: [inflowId])
 
-  locationId                 String?
-  sublocation                String?       // e.g., "C-19"
-  receiveDate                DateTime?
-  description                String?
-  vendorItemCode             String?
-  quantity                   Json          // Quantity structural wrapper object
+  locationId     String?
+  sublocation    String? // e.g., "C-19"
+  receiveDate    DateTime?
+  description    String?
+  vendorItemCode String?
+  quantity       Json // Quantity structural wrapper object
 
-  productHeight              Decimal?      @db.Decimal(10, 4)
-  productLength              Decimal?      @db.Decimal(10, 4)
-  productWidth               Decimal?      @db.Decimal(10, 4)
-  productWeight              Decimal?      @db.Decimal(10, 4)
+  productHeight Decimal? @db.Decimal(10, 4)
+  productLength Decimal? @db.Decimal(10, 4)
+  productWidth  Decimal? @db.Decimal(10, 4)
+  productWeight Decimal? @db.Decimal(10, 4)
 
   @@index([purchaseOrderId])
   @@index([productId])
   @@index([locationId])
-
   @@map("purchase_order_receive_line")
 }
 
@@ -3266,20 +3203,19 @@ model PurchaseOrderUnstockLine {
   purchaseOrderId            String
   purchaseOrder              PurchaseOrder @relation(fields: [purchaseOrderId], references: [inflowId], onDelete: Cascade)
 
-  productId                  String
-  product                    Product       @relation(fields: [productId], references: [inflowId])
+  productId String
+  product   Product @relation(fields: [productId], references: [inflowId])
 
-  locationId                 String?
-  sublocation                String?
-  unstockDate                DateTime?
-  description                String?
-  vendorItemCode             String?
-  quantity                   Json
+  locationId     String?
+  sublocation    String?
+  unstockDate    DateTime?
+  description    String?
+  vendorItemCode String?
+  quantity       Json
 
   @@index([purchaseOrderId])
   @@index([productId])
   @@index([locationId])
-
   @@map("purchase_order_unstock_line")
 }
 
@@ -3288,15 +3224,14 @@ model PurchaseOrderPaymentLine {
   purchaseOrderId                   String
   purchaseOrder                     PurchaseOrder @relation(fields: [purchaseOrderId], references: [inflowId], onDelete: Cascade)
 
-  amount                            Decimal       @db.Decimal(18, 5)
-  datePaid                          DateTime?
-  paymentMethod                     String?
-  paymentType                       String?       // e.g., "Payment"
-  referenceNumber                   String?
-  remarks                           String?       @db.Text
+  amount          Decimal   @db.Decimal(18, 5)
+  datePaid        DateTime?
+  paymentMethod   String?
+  paymentType     String? // e.g., "Payment"
+  referenceNumber String?
+  remarks         String?   @db.Text
 
   @@index([purchaseOrderId])
-
   @@map("purchase_order_payment_line")
 }
 
@@ -3306,11 +3241,169 @@ model PurchaseOrderAttachment {
   purchaseOrder    PurchaseOrder @relation(fields: [purchaseOrderId], references: [inflowId], onDelete: Cascade)
   attachmentUrl    String
   fileName         String
-  fileSize         Json?         // Empty or structured size metadata
-  lastModifiedById String? 
-  
-  @@index([purchaseOrderId])
+  fileSize         Json? // Empty or structured size metadata
+  lastModifiedById String?
 
+  @@index([purchaseOrderId])
   @@map("purchase_order_attachment")
 }
 
+<<<<<<< HEAD
+=======
+// Customer Model
+// model Customer {
+//   id                            String   @id @default(cuid())
+//   inflowId                      String   @unique
+//   name                          String
+//   contactName                   String?
+//   email                         String?
+//   phone                         String?
+//   fax                           String?
+//   website                       String?
+//   remarks                       String?
+//   taxExemptNumber               String?
+//   defaultCarrier                String?
+//   defaultPaymentMethod          String?
+//   discount                      Decimal? @db.Decimal(10,2)
+//   isActive                      Boolean  @default(true)
+//   defaultLocationId             String?
+//   defaultPaymentTermsId         String?
+//   pricingSchemeId               String?
+//   taxingSchemeId                String?
+//   defaultSalesRepTeamMemberId   String?
+//   lastModifiedById             String?
+//   lastModifiedDttm             DateTime?
+//   defaultBillingAddressId      String?
+//   defaultShippingAddressId     String?
+//   timestamp                    String?
+
+//   addresses                    CustomerAddress[]
+//   defaultLocation              Location? @relation(fields: [defaultLocationId],references: [inflowId])
+//   defaultPaymentTerms          PaymentTerms? @relation(fields: [defaultPaymentTermsId], references: [inflowId])
+//   pricingScheme                PricingScheme? @relation(fields: [pricingSchemeId],references: [inflowId])
+//   taxingScheme                 TaxingScheme? @relation(fields: [taxingSchemeId], references: [inflowId])
+//   defaultSalesRep              TeamMember? @relation("CustomerSalesRep", fields: [defaultSalesRepTeamMemberId], references: [inflowId])
+//   lastModifiedBy               TeamMember? @relation("CustomerLastModifiedBy",fields: [lastModifiedById],references: [inflowId])
+//   dues                          CustomerDue[]
+//   balances                      CustomerBalance[]
+//   credits                       CustomerCredit[]
+
+//   user                          User?
+
+//   createdAt                   DateTime @default(now())
+//   updatedAt                   DateTime @updatedAt
+
+//   deletedAt                   DateTime?
+
+//   @@index([name])
+//   @@index([pricingSchemeId])
+//   @@index([taxingSchemeId])
+
+//   @@map("customer")
+// }
+
+// model CustomerAddress {
+//   id                        String @id @default(cuid())
+//   inflowId                  String @unique
+//   customerId                String
+//   name                      String?
+//   address1                  String?
+//   address2                  String?
+//   city                      String?
+//   state                     String?
+//   country                   String?
+//   postalCode                String?
+//   remarks                   String?
+//   addressType               String?
+//   timestamp                 String?
+//   customer                  Customer @relation(fields: [customerId],references: [inflowId],onDelete: Cascade)
+
+//   createdAt                 DateTime @default(now())
+//   updatedAt                 DateTime @updatedAt
+
+//   @@index([customerId])
+
+//   @@map("customer_address")
+// }
+
+// model InflowIntegration {
+//   id          String   @id @default(cuid())
+//   webhookId   String?  @unique
+//   webhookUrl  String?
+//   secret      String?
+//   isConnected Boolean @default(false)
+
+//   createdAt   DateTime @default(now())
+//   updatedAt   DateTime @updatedAt
+
+//   @@map("inflow_integration")
+// }
+
+// model ProductGroupOptionAttributeMap {
+//   id          String @id @default(cuid())
+
+//   optionId    String @unique
+//   attributeId String
+
+//   option      ProductGroupOption @relation(fields:[optionId], references:[inflowId])
+//   attribute   Attribute @relation(fields:[attributeId], references:[id])
+// }
+
+// model ProductGroupOptionValueAttributeValueMap {
+//   id               String @id @default(cuid())
+
+//   optionValueId    String @unique
+//   attributeValueId String
+
+//   optionValue      ProductGroupOptionValue @relation(fields:[optionValueId], references:[inflowId])
+//   attributeValue   AttributeValue @relation(fields:[attributeValueId], references:[id])
+// }
+
+// Integrations
+
+// model WebhookSubscription {
+//   id          String   @id @default(cuid())
+//   provider    String   // "inflow"
+//   remoteId    String?  // ID from inFlow if they provide one
+//   url         String
+//   event       String
+//   active      Boolean  @default(true)
+
+//   createdAt   DateTime @default(now())
+//   updatedAt   DateTime @updatedAt
+
+//   @@map("webhook_subscription")
+// }
+
+// model WebhookEvent {
+//   id          String   @id @default(cuid())
+
+//   provider    String
+//   eventType   String
+//   payload     Json
+
+//   processed   Boolean  @default(false)
+//   receivedAt  DateTime @default(now())
+
+//   @@index([provider, eventType])
+
+//   @@map("webhook_event")
+// }
+
+// model InflowWebhook {
+//   id                      String   @id
+//   url                     String
+
+//   secret                  String?
+//   events                  Json
+//   isDisabled              Boolean @default(false)
+//   consecutiveFailureCount Int     @default(0)
+//   lastFailureMessage      String?
+
+//   createdAt               DateTime @default(now())
+//   updatedAt               DateTime @updatedAt
+
+//   @@map("inflow_webhook")
+// }
+
+>>>>>>> 66d64040f96b91c1be2d55be67546e32a2cb977d
