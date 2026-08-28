@@ -1,5 +1,5 @@
 import { headers } from "next/headers";
-import { auth } from "./auth";
+import { auth } from "@/auth";
 import { UserRole } from "@/generated/prisma/enums";
 
 export const getCurrentUser = async () => {

@@ -1,7 +1,7 @@
 // src/proxy.ts
 import { NextRequest, NextResponse } from "next/server";
 import { headers } from "next/headers";
-import { auth } from "@/lib/auth";
+import { auth } from "@/auth";
 import { authRoutes, DEFAULT_REDIRECT_PATH, protectedRoutes } from "./routes";
 
 export async function proxy(request: NextRequest) {

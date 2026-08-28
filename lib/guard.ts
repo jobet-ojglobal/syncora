@@ -1,6 +1,6 @@
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
-import { auth } from "./auth";
+import { auth } from "@/auth";
 import { UserRole } from "@/generated/prisma/enums";
 
 export async function requireAuth() {

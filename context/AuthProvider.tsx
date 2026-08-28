@@ -1,7 +1,7 @@
 // components/providers/auth-provider.tsx
 "use client";
 
-import { authClient } from "@/lib/auth-client";
+import { authClient } from "@/auth-client";
 import { createContext, useContext, ReactNode } from "react";
 
 // Define what our context will actually expose to components

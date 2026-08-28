@@ -1,7 +1,8 @@
 // lib\auth-client.ts
 import { createAuthClient } from "better-auth/react"
 import { inferAdditionalFields, usernameClient } from "better-auth/client/plugins";
-import { auth } from "./auth";
+import { auth } from "@/auth";
+import { DEFAULT_REDIRECT_PATH } from "@/routes";
 
 export const authClient = createAuthClient({
     /** The base URL of the server (optional if you're using the same domain) */
@@ -18,7 +19,7 @@ export const authClient = createAuthClient({
  */
 export const signInWithSocial = async (
   provider: "google" | "github" | "discord" | string, 
-  callbackUrl: string = "/dashboard"
+  callbackUrl: string = DEFAULT_REDIRECT_PATH
 ) => {
   try {
     await authClient.signIn.social({

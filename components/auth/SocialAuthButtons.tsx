@@ -3,7 +3,7 @@
 
 import { useState } from "react";
 import { Button } from "@/components/ui/button"; // Assuming shadcn/ui
-import { signInWithSocial } from "@/lib/auth-client";
+import { signInWithSocial } from "@/auth-client";
 import { useSearchParams } from "next/navigation";
 import { DEFAULT_REDIRECT_PATH } from "@/routes";
 import { Field } from "../ui/field";

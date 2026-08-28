@@ -13,7 +13,7 @@ export const protectedRoutes = [
 ];
 
 export const authRoutes = [
-    "/login",
+    "/sign-in",
     "/sign-up", 
     "/forgot-password",
     "/reset-password",

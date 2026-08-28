@@ -9,7 +9,7 @@ import { toast } from "sonner";
 import { Loader2, UserPlus, ShieldAlert, CheckCircle2 } from "lucide-react";
 
 import { cn } from "@/lib/utils";
-import { authClient } from "@/lib/auth-client";
+import { authClient } from "@/auth-client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
