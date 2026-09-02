@@ -2,7 +2,7 @@ import { inflow } from "@/lib/inflow/inflow.client";
 import { InflowTeamMember } from "../types";
 
 export async function getTeamMembers(
-  count = 30,
+  count = 100,
   after?: string,
 ) {
   const params = new URLSearchParams({

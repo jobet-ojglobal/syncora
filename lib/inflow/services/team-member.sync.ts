@@ -47,12 +47,12 @@ export async function syncTeamMember(tx: Tx, member: InflowTeamMember) {
         
         if (stringRights.includes("admin") || stringRights.includes("fullaccess")) {
           targetRole = UserRole.Admin;
-        } else if (stringRights.includes("inventory") || stringRights.includes("stock")) {
-          targetRole = UserRole.InventoryClerk;
-        } else if (stringRights.includes("sales")) {
-          targetRole = UserRole.SalesAssociate;
+        // } else if (stringRights.includes("inventory") || stringRights.includes("stock")) {
+        //   targetRole = UserRole.InventoryClerk;
+        // } else if (stringRights.includes("sales")) {
+        //   targetRole = UserRole;
         } else {
-          targetRole = UserRole.WarehouseStaff;
+          targetRole = UserRole.TeamMember;
         }
       }
 

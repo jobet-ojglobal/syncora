@@ -49,7 +49,7 @@ export async function getProducts(
     params.append("after", after);
   }
 
-  return inflow.get<InflowProduct[]>(
+  return inflowLimit.get<InflowProduct[]>(
     `/products?${params.toString()}`,
   );
 }

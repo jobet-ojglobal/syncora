@@ -3,7 +3,7 @@ import { getCategories } from "../data/categories";
 import { InflowCategory } from "../types";
 import { genInflowUniqueSlug } from "@/helpers/genUniqueSlug";
 import { Prisma } from "@/generated/prisma/client";
-import { SyncOptions } from "@/lib/locations/types";
+import { SyncOptions } from "@/lib/workers/sync.worker";
 
 type DbClient = Prisma.TransactionClient;
 

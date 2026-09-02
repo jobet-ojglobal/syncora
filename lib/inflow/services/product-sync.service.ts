@@ -134,7 +134,7 @@ export class ProductSyncService {
     syncedAll?: boolean,
     after: string | undefined = undefined
   ) {
-    const BATCH_SIZE = options?.batchSize ?? 100;
+    const BATCH_SIZE = options?.batchSize ?? 30;
     const INTER_BATCH_DELAY = options?.delayBetweenBatchesMs ?? 1000;
     const INTER_SINGLE_DELAY = 2000;
     const INTER_ITEM_DELAY = 300;
@@ -157,6 +157,7 @@ export class ProductSyncService {
       verifiedTaxCodes: new Set<string>(),
       verifiedOperationTypes: new Set<string>(),
       verifiedPricingSchemeIds: new Set<string>(),
+      
       verifiedProductIds: new Set<string>(),
     };
 

@@ -2,15 +2,11 @@
 import { prisma } from "@/lib/prisma";
 import { getTeamMembers } from "../data/team-members";
 import { syncTeamMember } from "./team-member.sync";
-
-type SyncOptions = {
-  onProgress?: (processedCount: number) => Promise<void>;
-  batchSize?: number;
-};
+import { SyncOptions } from "@/lib/workers/types";
 
 export class TeamMemberSyncService {
   async sync(options?: SyncOptions) {
-    const BATCH_SIZE = options?.batchSize ?? 100;
+    const BATCH_SIZE = options?.batchSize ?? 30;
     let after: string | undefined;
     let totalProcessed = 0;
 
